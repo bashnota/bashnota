@@ -11,21 +11,24 @@ export const ExecutableCodeBlockExtension = CodeBlock.extend({
       language: {
         default: null,
         parseHTML: element => element.getAttribute('data-language'),
-        renderHTML: attributes => {
-          return {
-            'data-language': attributes.language,
-            class: `language-${attributes.language}`
-          }
-        }
+        renderHTML: attributes => ({
+          'data-language': attributes.language,
+          class: `language-${attributes.language}`
+        })
       },
       executeable: {
         default: false,
         parseHTML: element => element.getAttribute('data-executeable') === 'true',
-        renderHTML: attributes => {
-          return {
-            'data-executeable': attributes.executeable
-          }
-        }
+        renderHTML: attributes => ({
+          'data-executeable': attributes.executeable
+        })
+      },
+      id: {
+        default: null,
+        parseHTML: element => element.getAttribute('data-block-id'),
+        renderHTML: attributes => ({
+          'data-block-id': attributes.id
+        })
       }
     }
   },

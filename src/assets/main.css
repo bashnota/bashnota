@@ -1,23 +1,68 @@
 @import './base.css';
 
 :root {
+  /* Light theme */
   --color-primary: #2563eb;
-  --color-primary-dark: #1d4ed8;
+  --color-primary-soft: #3b82f6;
+  --color-primary-mute: #60a5fa;
+  
   --color-background: #ffffff;
   --color-background-soft: #f8fafc;
   --color-background-mute: #f1f5f9;
+  
   --color-border: #e2e8f0;
+  --color-border-dark: #cbd5e1;
+  
   --color-text: #0f172a;
   --color-text-light: #64748b;
+  --color-text-lighter: #94a3b8;
+  
   --color-heading: #0f172a;
-  --color-toc-text: #0f172a;
-  --color-toc-background: #f8fafc;
-  --color-toc-hover: #f1f5f9;
-  --color-danger-soft: #fef2f2;
+  
+  --color-code-background: #f8fafc;
+  --color-code-text: #334155;
+  
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
   --color-danger: #dc2626;
+  --color-danger-soft: #fef2f2;
 
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 }
 
+/* Dark theme */
+.dark {
+  --color-primary: #3b82f6;
+  --color-primary-soft: #2563eb;
+  --color-primary-mute: #1d4ed8;
+  
+  --color-background: #0f172a;
+  --color-background-soft: #1e293b;
+  --color-background-mute: #334155;
+  
+  --color-border: #334155;
+  --color-border-dark: #475569;
+  
+  --color-text: #f8fafc;
+  --color-text-light: #cbd5e1;
+  --color-text-lighter: #94a3b8;
+  
+  --color-heading: #f8fafc;
+  
+  --color-code-background: #1e293b;
+  --color-code-text: #e2e8f0;
+  
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-danger-soft: #450a0a;
+}
+
+/* Base styles */
 body {
   min-height: 100vh;
   color: var(--color-text);
@@ -73,26 +118,104 @@ a,
   }
 }
 
-.dark {
-  --color-background: #1a1a1a;
-  --color-background-soft: #242424;
-  --color-background-mute: #2f2f2f;
-  
-  --color-border: #3f3f3f;
-  --color-border-hover: #505050;
-  
-  --color-heading: #ffffff;
-  --color-text: #e5e5e5;
-  --color-text-light: #909399;
-  
-  --color-primary: #3eaf7c;
-  --color-primary-dark: #357a5b;
-  --color-toc-text: #e5e5e5;
-  --color-toc-background: #242424;
-  --color-toc-hover: #2f2f2f;
+/* Common components */
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  cursor: pointer;
 }
 
-/* Smooth transitions when switching themes */
+.button-primary {
+  background: var(--color-primary);
+  color: white;
+  border: none;
+}
+
+.button-primary:hover {
+  background: var(--color-primary-soft);
+}
+
+.button-secondary {
+  background: var(--color-background-soft);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.button-secondary:hover {
+  background: var(--color-background-mute);
+}
+
+/* Card styles */
+.card {
+  background: var(--color-background-soft);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Input styles */
+.input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.375rem;
+  background: var(--color-background);
+  color: var(--color-text);
+  font-size: 0.875rem;
+  transition: all 0.2s;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-mute);
+}
+
+/* Code block styles */
+.code-block {
+  background: var(--color-code-background);
+  color: var(--color-code-text);
+  padding: 1rem;
+  border-radius: 0.5rem;
+  font-family: 'Fira Code', monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  overflow-x: auto;
+}
+
+/* Transitions */
 * {
-  transition: background-color 0.3s, border-color 0.3s;
+  transition: background-color 0.3s, border-color 0.3s, color 0.3s;
+}
+
+/* Layout utilities */
+.flex {
+  display: flex;
+}
+
+.flex-col {
+  flex-direction: column;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.gap-2 {
+  gap: 0.5rem;
+}
+
+.gap-4 {
+  gap: 1rem;
 }

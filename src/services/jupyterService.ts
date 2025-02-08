@@ -21,7 +21,7 @@ export class JupyterService {
   private getRequestConfig(server: JupyterServer) {
     return {
       headers: this.getHeaders(server),
-      withCredentials: false // Change this to false since we're using token auth
+      withCredentials: false
     }
   }
 
@@ -146,30 +146,80 @@ export class JupyterService {
     }
   }
 
-  async executeCode(server: JupyterServer, sessionId: string, code: string) {
+  async executeCode(server: JupyterServer, sessionId: string, code: string): Promise<{ msg_id: string }> {
     try {
+      // First get the kernel ID from the session
+      const session = await this.getSessionStatus(server, sessionId);
+      const kernelId = session.kernel.id;
+
+      // Execute code using the kernel API
       const response = await axios.post(
-        this.getUrlWithToken(server, `/sessions/${sessionId}/execute`),
-        { code },
-        this.getRequestConfig(server)
+        this.getUrlWithToken(server, `/kernels/${kernelId}/execute`),
+        {
+          code,
+          silent: false,
+          store_history: true,
+          user_expressions: {},
+          allow_stdin: false
+        },
+        {
+          ...this.getRequestConfig(server),
+          headers: {
+            ...this.getHeaders(server),
+            'Content-Type': 'application/json'
+          }
+        }
       );
-      return response.data;
+
+      const msgId = response.data.msg_id;
+
+      // Wait for execution to complete
+      await this.waitForKernelIdle(server, kernelId);
+
+      return { msg_id: msgId };
     } catch (error) {
+      console.error('Execute code error:', error);
       this.handleError(error, 'Failed to execute code');
     }
   }
 
+  private async waitForKernelIdle(server: JupyterServer, kernelId: string, timeout = 30000): Promise<void> {
+    const startTime = Date.now();
+    
+    while (Date.now() - startTime < timeout) {
+      try {
+        const response = await axios.get(
+          this.getUrlWithToken(server, `/kernels/${kernelId}`),
+          this.getRequestConfig(server)
+        );
+
+        if (response.data.execution_state === 'idle') {
+          return;
+        }
+
+        // Wait a bit before polling again
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (error) {
+        console.warn('Error checking kernel status:', error);
+        // Continue polling even if we get an error
+      }
+    }
+
+    throw new Error('Code execution timed out');
+  }
+
   async getExecutionResult(server: JupyterServer, sessionId: string, msgId: string): Promise<ExecutionResult> {
     try {
+      // Get kernel ID from session
       const session = await this.getSessionStatus(server, sessionId);
       const kernelId = session.kernel.id;
 
+      // Get execution result from kernel
       const response = await axios.get(
         this.getUrlWithToken(server, `/kernels/${kernelId}/messages`),
         {
           params: { msg_id: msgId },
-          headers: this.getHeaders(server),
-          withCredentials: true
+          ...this.getRequestConfig(server)
         }
       );
 
@@ -184,24 +234,30 @@ export class JupyterService {
         }
       };
 
-      messages.forEach((msg: any) => {
-        if (msg.msg_type === 'execute_result' || msg.msg_type === 'display_data') {
-          result.content.data = { ...result.content.data, ...msg.content.data };
-          result.content.execution_count = msg.content.execution_count;
-        } else if (msg.msg_type === 'stream') {
-          if (msg.content.name === 'stdout') {
-            result.content.stdout += msg.content.text;
-          } else if (msg.content.name === 'stderr') {
-            result.content.stderr += msg.content.text;
-          }
-        } else if (msg.msg_type === 'error') {
-          result.content.error = {
-            ename: msg.content.ename,
-            evalue: msg.content.evalue,
-            traceback: msg.content.traceback
-          };
+      // Process messages
+      for (const msg of messages) {
+        switch (msg.msg_type) {
+          case 'execute_result':
+          case 'display_data':
+            result.content.data = { ...result.content.data, ...msg.content.data };
+            result.content.execution_count = msg.content.execution_count;
+            break;
+          case 'stream':
+            if (msg.content.name === 'stdout') {
+              result.content.stdout += msg.content.text;
+            } else if (msg.content.name === 'stderr') {
+              result.content.stderr += msg.content.text;
+            }
+            break;
+          case 'error':
+            result.content.error = {
+              ename: msg.content.ename,
+              evalue: msg.content.evalue,
+              traceback: msg.content.traceback
+            };
+            break;
         }
-      });
+      }
 
       return result;
     } catch (error) {

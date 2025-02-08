@@ -21,19 +21,7 @@ export interface Nota {
   updatedAt: Date
   pages: string[]
   type: 'nota'
-  config?: {
-    jupyterServers: Array<{
-      ip: string
-      port: string
-      token: string
-    }>
-    notebooks: Array<{
-      notebook: string
-      server: string
-      kernel: string
-    }>
-    kernels: Record<string, string[]>
-  }
+  config?: NotaConfig
 }
 
 interface StoredNota {
@@ -68,6 +56,12 @@ interface StoredPage {
   parentId: string | null
   children: string[]
   type: 'page'
+}
+
+export interface NotaConfig {
+  jupyterServers: JupyterServer[]
+  notebooks: Array<{ notebook: string; server: string; kernel: string }>
+  kernels: Record<string, string> // blockId -> kernelName mapping
 }
 
 export const useNotaStore = defineStore('nota', () => {
@@ -327,19 +321,20 @@ export const useNotaStore = defineStore('nota', () => {
     await db.notas.delete(id)
   }
 
-  const updateNotaConfig = async (notaId: string, config: any) => {
-    const nota = notas.value.find(n => n.id === notaId)
+  const updateNotaConfig = async (notaId: string, updater: (config: NotaConfig) => void) => {
+    const nota = getCurrentNota(notaId)
     if (nota) {
-      // Create a serializable copy of the config
-      const serializableConfig = JSON.parse(JSON.stringify({
-        jupyterServers: config.jupyterServers,
-        notebooks: config.notebooks,
-        kernels: config.kernels
-      }))
+      const config = nota.config || {
+        jupyterServers: [],
+        notebooks: [],
+        kernels: {}
+      }
       
-      nota.config = serializableConfig
+      updater(config)
+      nota.config = config
+      
       await db.notas.update(notaId, { 
-        config: serializableConfig,
+        config,
         updatedAt: new Date().toISOString()
       })
     }
