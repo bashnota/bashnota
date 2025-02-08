@@ -21,6 +21,19 @@ export interface Nota {
   updatedAt: Date
   pages: string[]
   type: 'nota'
+  config?: {
+    jupyterServers: Array<{
+      ip: string
+      port: string
+      token: string
+    }>
+    notebooks: Array<{
+      notebook: string
+      server: string
+      kernel: string
+    }>
+    kernels: Record<string, string[]>
+  }
 }
 
 interface StoredNota {
@@ -31,6 +44,19 @@ interface StoredNota {
   updatedAt: string
   pages: string[]
   type: 'nota'
+  config?: {
+    jupyterServers: Array<{
+      ip: string
+      port: string
+      token: string
+    }>
+    notebooks: Array<{
+      notebook: string
+      server: string
+      kernel: string
+    }>
+    kernels: Record<string, string[]>
+  }
 }
 
 interface StoredPage {
@@ -49,6 +75,7 @@ export const useNotaStore = defineStore('nota', () => {
   const pages = ref<Page[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
+  const serverSessions = ref<Record<string, any[]>>({})
 
   const loadNotas = async () => {
     loading.value = true
@@ -58,8 +85,14 @@ export const useNotaStore = defineStore('nota', () => {
         ...nota,
         createdAt: new Date(nota.createdAt),
         updatedAt: new Date(nota.updatedAt),
-        pages: nota.pages || []
+        pages: nota.pages || [],
+        config: nota.config || {
+          jupyterServers: [],
+          notebooks: [],
+          kernels: {}
+        }
       }))
+      console.log('Loaded notas:', notas.value) // Debug log
     } catch (e) {
       error.value = 'Failed to load notas'
       console.error(e)
@@ -172,9 +205,16 @@ export const useNotaStore = defineStore('nota', () => {
     return pages.value.filter(p => p.parentId === pageId)
   }
 
-  const getCurrentPage = (id?: string) => {
-    if (!id) return null
+  const getCurrentPage = (id: string) => {
     return pages.value.find(page => page.id === id)
+  }
+
+  const getPageParentNota = (pageId: string) => {
+    const page = getCurrentPage(pageId)
+    if (page?.parentId) {
+      return notas.value.find(nota => nota.id === page.parentId)
+    }
+    return null
   }
 
   const savePage = async (page: Partial<Page>) => {
@@ -287,6 +327,32 @@ export const useNotaStore = defineStore('nota', () => {
     await db.notas.delete(id)
   }
 
+  const updateNotaConfig = async (notaId: string, config: any) => {
+    const nota = notas.value.find(n => n.id === notaId)
+    if (nota) {
+      // Create a serializable copy of the config
+      const serializableConfig = JSON.parse(JSON.stringify({
+        jupyterServers: config.jupyterServers,
+        notebooks: config.notebooks,
+        kernels: config.kernels
+      }))
+      
+      nota.config = serializableConfig
+      await db.notas.update(notaId, { 
+        config: serializableConfig,
+        updatedAt: new Date().toISOString()
+      })
+    }
+  }
+
+  const getServerSessions = (serverIp: string) => {
+    return serverSessions.value[serverIp] || []
+  }
+
+  const updateServerSessions = (serverIp: string, sessions: any[]) => {
+    serverSessions.value[serverIp] = sessions
+  }
+
   return {
     notas,
     pages,
@@ -305,6 +371,10 @@ export const useNotaStore = defineStore('nota', () => {
     getCurrentPage,
     savePage,
     deletePage,
-    renamePage
+    renamePage,
+    updateNotaConfig,
+    getServerSessions,
+    updateServerSessions,
+    getPageParentNota,
   }
 })

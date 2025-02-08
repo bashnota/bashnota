@@ -22,6 +22,7 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import { formatDistanceToNow } from 'date-fns'
 import TableOfContents from './TableOfContents.vue'
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/24/solid'
+import { ExecutableCodeBlockExtension } from './editor/ExecutableCodeBlockExtension'
 
 const props = defineProps<{
   notaId?: string
@@ -72,6 +73,13 @@ const editor = useEditor({
     StarterKit.configure({
       codeBlock: false,
     }),
+    ExecutableCodeBlockExtension.configure({
+      HTMLAttributes: {
+        class: 'code-block',
+      },
+      languageClassPrefix: 'language-',
+      lowlight,
+    }),
     Link.configure({
       openOnClick: false,
       HTMLAttributes: {
@@ -79,13 +87,6 @@ const editor = useEditor({
       }
     }),
     PageLink,
-    CodeBlock.configure({
-      HTMLAttributes: {
-        class: 'code-block',
-      },
-      languageClassPrefix: 'language-',
-      lowlight,
-    }),
     Table.configure({
       resizable: true,
     }),

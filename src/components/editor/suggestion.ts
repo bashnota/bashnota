@@ -160,9 +160,49 @@ export default {
           createPage()
         },
       },
+      {
+        title: 'Python Code Block',
+        icon: '🐍',
+        command: ({ editor, range }) => {
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .insertContent({
+              type: 'executableCodeBlock',
+              attrs: {
+                language: 'python',
+                executeable: true
+              },
+              content: [{ type: 'text', text: '# Your Python code here' }]
+            })
+            .run()
+        },
+      },
+      {
+        title: 'R Code Block',
+        icon: 'R',
+        command: ({ editor, range }) => {
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .insertContent({
+              type: 'executableCodeBlock',
+              attrs: {
+                language: 'r',
+                executeable: true
+              },
+              content: [{ type: 'text', text: '# Your R code here' }]
+            })
+            .run()
+        },
+      },
     ]
 
-    return items.filter(item => 
+    if (!query) return items
+
+    return items.filter(item =>
       item.title.toLowerCase().includes(query.toLowerCase())
     ).slice(0, 10)
   },

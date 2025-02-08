@@ -35,9 +35,28 @@ export default defineConfig({
       }
     }),
   ],
+  server: {
+    proxy: {
+      '/jupyter': {
+        target: 'http://localhost:8888',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/jupyter/, ''),
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, _res) => {
+            console.log('proxy error', err);
+          });
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            if (req.headers.authorization) {
+              proxyReq.setHeader('Authorization', req.headers.authorization);
+            }
+          });
+        }
+      }
+    }
+  },
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
-    },
-  },
+      '@': fileURLToPath(new URL('./src', import.meta.url))
+    }
+  }
 })

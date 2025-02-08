@@ -13,6 +13,9 @@
   --color-toc-text: #0f172a;
   --color-toc-background: #f8fafc;
   --color-toc-hover: #f1f5f9;
+  --color-danger-soft: #fef2f2;
+  --color-danger: #dc2626;
+
 }
 
 body {
