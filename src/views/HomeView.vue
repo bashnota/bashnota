@@ -1,9 +1,16 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { useNotaStore } from '@/stores/nota'
-import RecentItems from '@/components/RecentItems.vue'
-import { DocumentTextIcon, CodeBracketIcon, LinkIcon } from '@heroicons/vue/24/outline'
-import { ref, onMounted } from 'vue'
+import {
+  DocumentTextIcon,
+  CodeBracketIcon,
+  LinkIcon,
+  DocumentIcon,
+  FolderIcon,
+} from '@heroicons/vue/24/outline'
+import { ref, onMounted, computed } from 'vue'
+import { Button } from '@/components/ui/button'
+import { ChevronRightIcon } from '@heroicons/vue/24/solid'
 
 const router = useRouter()
 const store = useNotaStore()
@@ -12,6 +19,10 @@ const createNewNota = async () => {
   const nota = await store.createNota('Untitled Nota')
   router.push(`/nota/${nota.id}`)
 }
+
+const buttonText = computed(() => {
+  return store.notas.length === 0 ? 'Create your first nota' : 'Create new nota'
+})
 
 const recentItems = ref<
   Array<{ id: string; title: string; type: 'nota' | 'page'; updatedAt: Date }>
@@ -43,186 +54,112 @@ onMounted(async () => {
 const openItem = (item: { id: string; type: 'nota' | 'page' }) => {
   router.push(`/${item.type}/${item.id}`)
 }
+
+const formatDate = (date: Date) => {
+  const now = new Date()
+  const diff = now.getTime() - new Date(date).getTime()
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+
+  if (days === 0) return 'Today'
+  if (days === 1) return 'Yesterday'
+  if (days < 7) return `${days} days ago`
+  return new Date(date).toLocaleDateString()
+}
 </script>
 
 <template>
-  <div class="home">
-    <div v-if="!store.notas.length" class="welcome">
-      <h1>Welcome to BashNota</h1>
-      <p>Your personal knowledge base for code and notes</p>
-      <div class="getting-started">
-        <button @click="createNewNota" class="primary-button">Create your first nota</button>
-        <div class="features">
-          <div class="feature">
-            <DocumentTextIcon class="icon" />
-            <h3>Organize</h3>
-            <p>Create notas and nested pages to organize your knowledge</p>
+  <div class="min-h-[calc(100vh-64px)] py-10">
+    <div class="container mx-auto">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <!-- Right column: Welcome section -->
+        <div class="space-y-12">
+          <div class="mb-8">
+            <h1
+              class="text-4xl font-bold mb-4 bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent"
+            >
+              Welcome to BashNota
+            </h1>
+            <p class="text-xl text-muted-foreground">
+              Your personal knowledge base for code and notes
+            </p>
           </div>
-          <div class="feature">
-            <CodeBracketIcon class="icon" />
-            <h3>Code</h3>
-            <p>Write and format code with syntax highlighting</p>
+
+          <div class="space-y-6">
+            <div class="flex items-start space-x-4 group p-4 rounded-lg border">
+              <DocumentTextIcon class="w-6 h-6 text-primary mt-1 shrink-0" />
+              <div>
+                <h3 class="text-lg font-semibold mb-2">Organize</h3>
+                <p class="text-sm text-muted-foreground leading-relaxed">
+                  Create notas and nested pages to organize your knowledge
+                </p>
+              </div>
+            </div>
+
+            <div class="flex items-start space-x-4 group p-4 rounded-lg border">
+              <CodeBracketIcon class="w-6 h-6 text-primary mt-1 shrink-0" />
+              <div>
+                <h3 class="text-lg font-semibold mb-2">Code</h3>
+                <p class="text-sm text-muted-foreground leading-relaxed">
+                  Write and format code with syntax highlighting
+                </p>
+              </div>
+            </div>
+
+            <div class="flex items-start space-x-4 group p-4 rounded-lg border">
+              <LinkIcon class="w-6 h-6 text-primary mt-1 shrink-0" />
+              <div>
+                <h3 class="text-lg font-semibold mb-2">Connect</h3>
+                <p class="text-sm text-muted-foreground leading-relaxed">
+                  Link pages together to build your knowledge network
+                </p>
+              </div>
+            </div>
           </div>
-          <div class="feature">
-            <LinkIcon class="icon" />
-            <h3>Connect</h3>
-            <p>Link pages together to build your knowledge network</p>
+        </div>
+
+        <!-- Left column: Recent Items -->
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-2xl font-semibold">Recent Items</h2>
+            <Button size="sm" @click="createNewNota">{{ buttonText }}</Button>
+          </div>
+
+          <div v-if="recentItems.length" class="space-y-1">
+            <div
+              v-for="item in recentItems"
+              :key="item.id"
+              @click="openItem(item)"
+              class="flex items-center space-x-3 p-3 rounded-lg border hover:bg-accent/50 transition-colors cursor-pointer"
+            >
+              <FolderIcon v-if="item.type === 'nota'" class="w-5 h-5 text-muted-foreground" />
+              <DocumentIcon v-else class="w-5 h-5 text-muted-foreground" />
+
+              <div class="flex-1 min-w-0">
+                <div class="font-medium truncate">{{ item.title }}</div>
+                <div class="text-sm text-muted-foreground">
+                  {{ formatDate(item.updatedAt) }}
+                </div>
+              </div>
+
+              <ChevronRightIcon class="w-5 h-5 text-muted-foreground" />
+            </div>
+          </div>
+
+          <div
+            v-else
+            class="border rounded-lg p-8 flex flex-col items-center justify-center text-center bg-background"
+          >
+            <div class="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
+              <DocumentTextIcon class="w-6 h-6 text-muted-foreground" />
+            </div>
+            <h3 class="font-medium text-lg mb-2">No items yet</h3>
+            <p class="text-sm text-muted-foreground mb-4">
+              Get started by creating your first nota
+            </p>
+            <Button variant="outline" size="sm" @click="createNewNota">{{ buttonText }}</Button>
           </div>
         </div>
       </div>
-    </div>
-    <RecentItems v-else />
-    <div class="recent-items">
-      <h2>Recent Items</h2>
-      <div v-if="recentItems.length" class="items-list">
-        <div v-for="item in recentItems" :key="item.id" class="item" @click="openItem(item)">
-          <span class="title">{{ item.title }}</span>
-          <span class="type">{{ item.type }}</span>
-          <span class="date">{{ new Date(item.updatedAt).toLocaleDateString() }}</span>
-        </div>
-      </div>
-      <div v-else class="empty-state">No items yet</div>
     </div>
   </div>
 </template>
-
-<style scoped>
-.home {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: calc(100vh - 64px);
-  padding: 2rem;
-}
-
-.welcome {
-  text-align: center;
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 4rem 2rem;
-}
-
-.welcome h1 {
-  font-size: 2.5rem;
-  margin-bottom: 1rem;
-  background: linear-gradient(45deg, var(--color-primary), var(--color-heading));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.welcome p {
-  font-size: 1.25rem;
-  color: var(--color-text-light);
-  margin-bottom: 3rem;
-}
-
-.getting-started {
-  display: flex;
-  flex-direction: column;
-  gap: 3rem;
-}
-
-.primary-button {
-  padding: 0.75rem 1.5rem;
-  font-size: 1.1rem;
-  background: var(--color-primary);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.primary-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-}
-
-.features {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 2rem;
-  margin-top: 2rem;
-}
-
-.feature {
-  padding: 1.5rem;
-  background: var(--color-background-soft);
-  border-radius: 12px;
-  transition: all 0.2s;
-}
-
-.feature:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-}
-
-.feature .icon {
-  width: 2rem;
-  height: 2rem;
-  color: var(--color-primary);
-  margin-bottom: 1rem;
-}
-
-.feature h3 {
-  font-size: 1.25rem;
-  margin-bottom: 0.5rem;
-}
-
-.feature p {
-  font-size: 0.875rem;
-  color: var(--color-text-light);
-  margin: 0;
-}
-
-.recent-items {
-  max-width: 800px;
-  margin: 2rem auto;
-  padding: 0 1rem;
-}
-
-h2 {
-  margin-bottom: 1rem;
-  color: var(--color-heading);
-}
-
-.items-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.item {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 1rem;
-  padding: 0.75rem;
-  background: var(--color-background-soft);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.item:hover {
-  background: var(--color-background-mute);
-}
-
-.title {
-  font-weight: 500;
-}
-
-.type {
-  color: var(--color-text-light);
-  text-transform: capitalize;
-}
-
-.date {
-  color: var(--color-text-light);
-}
-
-.empty-state {
-  text-align: center;
-  padding: 2rem;
-  color: var(--color-text-light);
-}
-</style>
