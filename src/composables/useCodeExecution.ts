@@ -8,62 +8,61 @@ export function useCodeExecution(codeRef: Ref<string>) {
   const isExecuting = ref(false)
   const error = ref<Error | null>(null)
   const isCopied = ref(false)
+  const hasError = ref(false)
 
-  const hasError = computed(() => error.value !== null)
+  const formatOutput = (result: any) => {
+    const parts = [];
+    
+    // Add stdout if present
+    if (result.content.stdout) {
+      parts.push(result.content.stdout);
+    }
+    
+    // Add stderr if present
+    if (result.content.stderr) {
+      parts.push(result.content.stderr);
+    }
+    
+    // Add execution result if present
+    if (result.content.data) {
+      if (result.content.data['text/plain']) {
+        parts.push(result.content.data['text/plain']);
+      }
+      if (result.content.data['text/html']) {
+        parts.push(result.content.data['text/html']);
+      }
+    }
 
-  async function execute(server: JupyterServer, kernelName: string) {
-    isExecuting.value = true
-    error.value = null
-    output.value = 'Executing...'
+    // Add error if present
+    if (result.content.error) {
+      hasError.value = true;
+      parts.push(`${result.content.error.ename}: ${result.content.error.evalue}`);
+      if (result.content.error.traceback) {
+        parts.push(result.content.error.traceback.join('\n'));
+      }
+      error.value = new Error(`${result.content.error.ename}: ${result.content.error.evalue}`)
+    }
+
+    return parts.join('\n');
+  }
+
+  const execute = async (server: JupyterServer, kernelName: string) => {
+    isExecuting.value = true;
+    hasError.value = false;
+    output.value = '';
+    error.value = null;
 
     try {
-      // Create session with the selected server and kernel
-      const session = await jupyterService.createSession(server, kernelName)
-
-      try {
-        // Execute code using the selected server
-        const result = await jupyterService.executeCode(
-          server,
-          session.id, 
-          codeRef.value
-        )
-
-        // Get execution result from the selected server
-        const executionResult = await jupyterService.getExecutionResult(
-          server,
-          session.id,
-          result.msg_id
-        )
-
-        // Format output
-        const outputs = []
-        if (executionResult.content.stdout) outputs.push(executionResult.content.stdout)
-        if (executionResult.content.stderr) outputs.push(executionResult.content.stderr)
-        if (executionResult.content.error) {
-          const { ename, evalue, traceback } = executionResult.content.error
-          outputs.push(`${ename}: ${evalue}`)
-          outputs.push(...traceback)
-          error.value = new Error(`${ename}: ${evalue}`)
-        }
-        if (executionResult.content.data) {
-          if (executionResult.content.data['text/plain']) {
-            outputs.push(executionResult.content.data['text/plain'])
-          }
-          if (executionResult.content.data['text/html']) {
-            outputs.push(executionResult.content.data['text/html'])
-          }
-        }
-
-        output.value = outputs.join('\n')
-      } finally {
-        // Always clean up the session
-        await jupyterService.deleteSession(server, session.id)
-      }
-    } catch (e) {
-      error.value = e instanceof Error ? e : new Error('Unknown error occurred')
-      output.value = error.value.message
+      // Execute code and get result directly
+      const result = await jupyterService.executeCode(server, kernelName, codeRef.value);
+      output.value = formatOutput(result);
+    } catch (err) {
+      console.error('Execution error:', err);
+      hasError.value = true;
+      error.value = err instanceof Error ? err : new Error('Execution failed');
+      output.value = error.value.message;
     } finally {
-      isExecuting.value = false
+      isExecuting.value = false;
     }
   }
 
@@ -71,7 +70,6 @@ export function useCodeExecution(codeRef: Ref<string>) {
     try {
       await navigator.clipboard.writeText(output.value)
       isCopied.value = true
-      // Reset copy status after 2 seconds
       setTimeout(() => {
         isCopied.value = false
       }, 2000)
