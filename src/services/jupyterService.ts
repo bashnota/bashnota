@@ -1,7 +1,10 @@
 import axios, { AxiosError } from 'axios'
 import type { JupyterServer, JupyterSession, ExecutionResult } from '@/types/jupyter'
+import { v4 as uuidv4 } from 'uuid'
 
 export class JupyterService {
+  private websockets: Map<string, WebSocket> = new Map()
+
   private getBaseUrl(server: JupyterServer): string {
     const protocol = server.ip.startsWith('http') ? '' : 'http://'
     return `${protocol}${server.ip}:${server.port}/api`
@@ -21,7 +24,7 @@ export class JupyterService {
   private getRequestConfig(server: JupyterServer) {
     return {
       headers: this.getHeaders(server),
-      withCredentials: false, // Change this to false since we're using token auth
+      withCredentials: false,
     }
   }
 
@@ -132,78 +135,160 @@ export class JupyterService {
     try {
       await axios.delete(this.getUrlWithToken(server, `/sessions/${sessionId}`))
     } catch (error) {
-      this.handleError(error, 'Failed to delete session')
+      console.warn('Delete session error:', error)
+      // Don't throw error since this is cleanup
     }
   }
 
-  async executeCode(server: JupyterServer, sessionId: string, code: string) {
-    try {
-      const response = await axios.post(
-        this.getUrlWithToken(server, `/sessions/${sessionId}/execute`),
-        { code },
-        this.getRequestConfig(server),
-      )
-      return response.data
-    } catch (error) {
-      this.handleError(error, 'Failed to execute code')
-    }
+  private getWebSocketUrl(server: JupyterServer, kernelId: string): string {
+    const protocol = server.ip.startsWith('https') ? 'wss' : 'ws'
+    const baseUrl = server.ip.startsWith('http')
+      ? server.ip.replace(/^http(s?):\/\//, '')
+      : server.ip
+    return `${protocol}://${baseUrl}:${server.port}/api/kernels/${kernelId}/channels`
   }
 
-  async getExecutionResult(
+  async executeCode(
     server: JupyterServer,
     sessionId: string,
-    msgId: string,
+    code: string,
   ): Promise<ExecutionResult> {
     try {
-      const session = await this.getSessionStatus(server, sessionId)
-      const kernelId = session.kernel.id
-
-      const response = await axios.get(
-        this.getUrlWithToken(server, `/kernels/${kernelId}/messages`),
-        {
-          params: { msg_id: msgId },
-          headers: this.getHeaders(server),
-          withCredentials: true,
-        },
+      // Create a new kernel
+      const kernelResponse = await axios.post(
+        this.getUrlWithToken(server, '/kernels'),
+        { name: 'python3' },
+        this.getRequestConfig(server),
       )
 
-      const messages = response.data
-      const result: ExecutionResult = {
-        content: {
-          execution_count: null,
-          data: {},
-          stdout: '',
-          stderr: '',
-          error: null,
-        },
-      }
+      const kernelId = kernelResponse.data.id
 
-      messages.forEach((msg: any) => {
-        if (msg.msg_type === 'execute_result' || msg.msg_type === 'display_data') {
-          result.content.data = { ...result.content.data, ...msg.content.data }
+      try {
+        // Connect to WebSocket
+        const ws = new WebSocket(this.getWebSocketUrl(server, kernelId))
+        const msgId = uuidv4()
+
+        // Wait for execution results
+        const result = await new Promise<ExecutionResult>((resolve, reject) => {
+          const messages: any[] = []
+
+          ws.onopen = () => {
+            // Send execute request
+            ws.send(
+              JSON.stringify({
+                header: {
+                  msg_id: msgId,
+                  username: 'bashnota',
+                  session: uuidv4(),
+                  msg_type: 'execute_request',
+                  version: '5.2',
+                },
+                parent_header: {},
+                metadata: {},
+                content: {
+                  code,
+                  silent: false,
+                  store_history: true,
+                  user_expressions: {},
+                  allow_stdin: false,
+                },
+                channel: 'shell',
+              }),
+            )
+          }
+
+          ws.onmessage = (event) => {
+            const msg = JSON.parse(event.data)
+            if (msg.parent_header.msg_id === msgId) {
+              messages.push(msg)
+
+              // Check if execution is complete
+              if (msg.msg_type === 'status' && msg.content.execution_state === 'idle') {
+                ws.close()
+                resolve(this.processMessages(messages))
+              }
+              // Check for errors
+              else if (msg.msg_type === 'error') {
+                ws.close()
+                resolve(this.processMessages(messages))
+              }
+            }
+          }
+
+          ws.onerror = (error) => {
+            reject(new Error('WebSocket error: ' + error))
+          }
+
+          // Set timeout
+          setTimeout(() => {
+            ws.close()
+            resolve(this.processMessages(messages))
+          }, 10000)
+        })
+
+        return result
+      } finally {
+        // Clean up the kernel
+        await this.deleteKernel(server, kernelId)
+      }
+    } catch (error) {
+      console.error('Execute code error:', error)
+      throw error
+    }
+  }
+
+  private async deleteKernel(server: JupyterServer, kernelId: string): Promise<void> {
+    try {
+      await axios.delete(
+        this.getUrlWithToken(server, `/kernels/${kernelId}`),
+        this.getRequestConfig(server),
+      )
+    } catch (error) {
+      console.warn('Failed to delete kernel:', error)
+    }
+  }
+
+  private processMessages(messages: any[]): ExecutionResult {
+    const result: ExecutionResult = {
+      content: {
+        execution_count: null,
+        data: {},
+        stdout: '',
+        stderr: '',
+        error: null,
+      },
+    }
+
+    for (const msg of messages) {
+      switch (msg.msg_type) {
+        case 'execute_input':
           result.content.execution_count = msg.content.execution_count
-        } else if (msg.msg_type === 'stream') {
+          break
+        case 'stream':
           if (msg.content.name === 'stdout') {
             result.content.stdout += msg.content.text
           } else if (msg.content.name === 'stderr') {
             result.content.stderr += msg.content.text
           }
-        } else if (msg.msg_type === 'error') {
+          break
+        case 'execute_result':
+        case 'display_data':
+          result.content.data = { ...result.content.data, ...msg.content.data }
+          if (msg.content.execution_count !== undefined) {
+            result.content.execution_count = msg.content.execution_count
+          }
+          break
+        case 'error':
           result.content.error = {
             ename: msg.content.ename,
             evalue: msg.content.evalue,
             traceback: msg.content.traceback,
           }
-        }
-      })
-
-      return result
-    } catch (error) {
-      if (axios.isAxiosError(error)) {
-        console.error('Get result error:', error.response?.data)
+          break
       }
-      this.handleError(error, 'Failed to get execution result')
     }
+
+    return result
   }
 
   async testConnection(server: JupyterServer) {
@@ -307,6 +392,17 @@ export class JupyterService {
     } catch (error) {
       console.error('Failed to validate config:', error)
       return false
+    }
+  }
+
+  // Update cleanup method
+  async cleanup() {
+    for (const [kernelId, ws] of this.websockets.entries()) {
+      if (ws.readyState === 1) {
+        // WebSocket.OPEN = 1
+        ws.close()
+      }
+      this.websockets.delete(kernelId)
     }
   }
 }

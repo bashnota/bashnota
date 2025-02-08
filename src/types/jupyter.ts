@@ -31,12 +31,24 @@ export interface ExecutionResult {
   }
 }
 
+export interface KernelConfig {
+  blockId: string
+  kernelName: string
+  serverId: string
+  lastUsed: string
+}
+
 export interface NotaConfig {
   jupyterServers: JupyterServer[]
+  kernelPreferences: Record<string, KernelConfig> // blockId -> kernel config
   notebooks: Array<{
     notebook: string
     server: string
     kernel: string
   }>
-  kernels: Record<string, string[]>
+}
+
+export interface KernelStatus {
+  execution_state: 'idle' | 'busy' | 'starting'
+  id: string
 }
