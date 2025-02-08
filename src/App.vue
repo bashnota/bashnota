@@ -3,23 +3,17 @@ import { RouterView } from 'vue-router'
 import AppSidebar from './components/AppSidebar.vue'
 import BreadcrumbNav from './components/BreadcrumbNav.vue'
 import GlobalSearch from './components/GlobalSearch.vue'
-import KeyboardShortcuts from './components/KeyboardShortcuts.vue'
-import ShortcutsDialog from './components/ShortcutsDialog.vue'
 import { Bars3Icon as MenuIcon } from '@heroicons/vue/24/solid'
 import { ref, onMounted, watch } from 'vue'
 import { useNotaStore } from '@/stores/nota'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
-const shortcutsDialog = ref()
 const isSidebarOpen = ref(true)
-const sidebarWidth = ref(250)
-const isResizing = ref(false)
+const sidebarWidth = ref(300)
 const store = useNotaStore()
+const isResizing = ref(false)
 
-const toggleSidebar = () => {
-  isSidebarOpen.value = !isSidebarOpen.value
-}
-
-// Load saved sidebar state
 onMounted(() => {
   // Load data
   store.loadNotas()
@@ -33,199 +27,83 @@ onMounted(() => {
   if (savedWidth) {
     sidebarWidth.value = parseInt(savedWidth)
   }
+
+  // Setup resize handling
+  document.addEventListener('mousemove', handleMouseMove)
+  document.addEventListener('mouseup', stopResize)
 })
 
-// Save sidebar state when changed
 watch(isSidebarOpen, (newState) => {
   localStorage.setItem('sidebar-state', JSON.stringify(newState))
 })
 
-const showShortcuts = () => {
-  shortcutsDialog.value.isOpen = true
-}
-
-const startResize = (event: MouseEvent) => {
+// Resize functionality
+const startResize = () => {
   isResizing.value = true
-  document.body.classList.add('resizing')
-  const startX = event.clientX
-  const startWidth = sidebarWidth.value
-
-  const handleMouseMove = (e: MouseEvent) => {
-    if (!isResizing.value) return
-    const newWidth = startWidth + (e.clientX - startX)
-    sidebarWidth.value = Math.max(200, Math.min(400, newWidth))
-    document.documentElement.style.setProperty('--sidebar-width', `${sidebarWidth.value}px`)
-  }
-
-  const handleMouseUp = () => {
-    isResizing.value = false
-    document.body.classList.remove('resizing')
-    document.removeEventListener('mousemove', handleMouseMove)
-    document.removeEventListener('mouseup', handleMouseUp)
-    localStorage.setItem('sidebar-width', sidebarWidth.value.toString())
-  }
-
-  document.addEventListener('mousemove', handleMouseMove)
-  document.addEventListener('mouseup', handleMouseUp)
+  document.body.classList.add('select-none cursor-col-resize')
 }
 
-const resetWidth = () => {
-  sidebarWidth.value = 250
-  document.documentElement.style.setProperty('--sidebar-width', '250px')
-  localStorage.setItem('sidebar-width', '250')
+const stopResize = () => {
+  isResizing.value = false
+  document.body.classList.remove('select-none', 'cursor-col-resize')
+}
+
+const handleMouseMove = (event: MouseEvent) => {
+  if (!isResizing.value) return
+
+  const newWidth = Math.max(200, Math.min(400, event.clientX))
+  sidebarWidth.value = newWidth
+  localStorage.setItem('sidebar-width', newWidth.toString())
 }
 </script>
 
 <template>
-  <div class="app-container">
-    <AppSidebar />
+  <div class="flex h-screen w-screen overflow-hidden bg-background">
+    <!-- Sidebar -->
     <div
-      v-if="isSidebarOpen"
-      class="resize-handle"
-      @mousedown="startResize"
-      @dblclick="resetWidth"
-    ></div>
-    <div class="main-content">
-      <div class="top-bar">
-        <button
-          class="menu-button"
-          @click="isSidebarOpen = !isSidebarOpen"
-          :title="`${isSidebarOpen ? 'Hide' : 'Show'} sidebar (⌘B)`"
-        >
-          <MenuIcon class="icon" />
-        </button>
-        <BreadcrumbNav />
-        <div class="top-bar-right">
-          <GlobalSearch />
-          <button class="icon-button" @click="showShortcuts" title="Keyboard shortcuts">
-            <KeyIcon class="w-4 h-4" />
-          </button>
+      :style="{ width: `${sidebarWidth}px` }"
+      :class="
+        cn(
+          'transition-transform duration-300 ease-in-out relative shrink-0',
+          !isSidebarOpen && '-translate-x-full',
+        )
+      "
+    >
+      <AppSidebar />
+
+      <!-- Resize Handle -->
+      <div
+        class="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/50 transition-colors"
+        @mousedown="startResize"
+      ></div>
+    </div>
+
+    <!-- Main Content -->
+    <div
+      class="flex-1 flex flex-col overflow-hidden transition-all duration-300 ease-in-out"
+      :style="{ marginLeft: !isSidebarOpen ? `-${sidebarWidth}px` : '0' }"
+    >
+      <!-- Top Bar -->
+      <div class="sticky top-0 z-10 border-b bg-background/80 backdrop-blur-sm">
+        <div class="flex items-center justify-between px-4 h-14">
+          <div class="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              @click="isSidebarOpen = !isSidebarOpen"
+              :title="isSidebarOpen ? 'Hide sidebar' : 'Show sidebar'"
+            >
+              <MenuIcon class="h-5 w-5" />
+            </Button>
+            <BreadcrumbNav />
+          </div>
         </div>
       </div>
-      <RouterView />
+
+      <!-- Router View -->
+      <div class="flex-1 overflow-auto">
+        <RouterView />
+      </div>
     </div>
-    <KeyboardShortcuts />
-    <ShortcutsDialog ref="shortcutsDialog" @toggleSidebar="toggleSidebar" />
   </div>
 </template>
-
-<style>
-:root {
-  --sidebar-width: 250px;
-  --sidebar-min-width: 200px;
-  --sidebar-max-width: 400px;
-  --resize-handle-width: 4px;
-}
-
-.app-container {
-  display: flex;
-  height: 100vh;
-  width: 100vw;
-}
-
-.sidebar {
-  width: var(--sidebar-width);
-  border-right: 1px solid var(--color-border);
-  transition: all 0.3s ease;
-  transform: translateX(0);
-}
-
-.sidebar.closed {
-  width: 0;
-  transform: translateX(-100%);
-}
-
-.main-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  margin-left: 0;
-}
-
-.sidebar.closed + .main-content {
-  margin-left: -250px;
-}
-
-.top-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.5rem 1rem;
-  background: var(--color-background-soft);
-  border-bottom: 1px solid var(--color-border);
-  gap: 1rem;
-  backdrop-filter: blur(8px);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-.top-bar-right {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.icon-button {
-  padding: 0.5rem;
-  background: none;
-  border: none;
-  border-radius: 6px;
-  color: var(--color-text-light);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.icon-button:hover {
-  background: var(--color-background-mute);
-  color: var(--color-text);
-}
-
-.menu-button {
-  padding: 0.5rem;
-  background: none;
-  border: none;
-  border-radius: 6px;
-  color: var(--color-text-light);
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.menu-button:hover {
-  background: var(--color-background-mute);
-  color: var(--color-text);
-}
-
-.menu-button .icon {
-  width: 1.25rem;
-  height: 1.25rem;
-}
-
-.resize-handle {
-  width: 4px;
-  cursor: col-resize;
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  transform: translateX(calc(var(--sidebar-width) - 2px));
-  background: transparent;
-  transition: all 0.3s ease;
-}
-
-.resize-handle:hover,
-.resize-handle:active {
-  background: var(--color-primary);
-  transform: translateX(calc(var(--sidebar-width) - 2px)) scaleX(2);
-}
-
-body.resizing {
-  cursor: col-resize;
-  user-select: none;
-}
-</style>

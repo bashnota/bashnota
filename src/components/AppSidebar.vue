@@ -101,7 +101,7 @@ onKeyStroke('/', (e) => {
 </script>
 
 <template>
-  <div class="w-[300px] h-full flex flex-col border-e bg-slate-100 dark:bg-slate-900">
+  <div class="w-full h-full flex flex-col border-e bg-slate-100 dark:bg-slate-900">
     <!-- Header -->
     <div class="p-6 border-b space-y-4">
       <div class="flex items-center justify-between">

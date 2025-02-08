@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useNotaStore } from '@/stores/nota'
-import { ChevronRightIcon } from '@heroicons/vue/24/solid'
+import { ChevronRightIcon, HomeIcon } from '@heroicons/vue/24/solid'
 
 const route = useRoute()
 const store = useNotaStore()
@@ -38,50 +38,37 @@ const breadcrumbs = computed(() => {
 </script>
 
 <template>
-  <nav v-if="breadcrumbs.length" class="breadcrumbs">
-    <RouterLink to="/" class="home-link">Home</RouterLink>
-    <ChevronRightIcon class="separator" />
-    <template v-for="(item, index) in breadcrumbs" :key="item.path">
-      <RouterLink :to="item.path" :class="{ active: index === breadcrumbs.length - 1 }">
-        {{ item.name }}
-      </RouterLink>
-      <ChevronRightIcon v-if="index < breadcrumbs.length - 1" class="separator" />
-    </template>
+  <nav v-if="breadcrumbs.length" aria-label="Breadcrumb" class="flex items-center">
+    <RouterLink
+      to="/"
+      class="flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+    >
+      <HomeIcon class="h-4 w-4" />
+    </RouterLink>
+
+    <ChevronRightIcon class="h-4 w-4 mx-2 text-muted-foreground/50" aria-hidden="true" />
+
+    <ol class="flex items-center">
+      <li v-for="(item, index) in breadcrumbs" :key="item.path" class="flex items-center">
+        <RouterLink
+          :to="item.path"
+          :class="[
+            'text-sm transition-colors',
+            index === breadcrumbs.length - 1
+              ? 'font-medium text-foreground'
+              : 'text-muted-foreground hover:text-foreground',
+          ]"
+          :aria-current="index === breadcrumbs.length - 1 ? 'page' : undefined"
+        >
+          {{ item.name }}
+        </RouterLink>
+
+        <ChevronRightIcon
+          v-if="index < breadcrumbs.length - 1"
+          class="h-4 w-4 mx-2 text-muted-foreground/50"
+          aria-hidden="true"
+        />
+      </li>
+    </ol>
   </nav>
 </template>
-
-<style scoped>
-.breadcrumbs {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  background: var(--color-background-soft);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.separator {
-  width: 1rem;
-  height: 1rem;
-  color: var(--color-text-light);
-}
-
-a {
-  color: var(--color-text-light);
-  text-decoration: none;
-  font-size: 0.875rem;
-}
-
-a:hover {
-  color: var(--color-text);
-}
-
-.active {
-  color: var(--color-text);
-  font-weight: 500;
-}
-
-.home-link {
-  font-weight: 500;
-}
-</style>
