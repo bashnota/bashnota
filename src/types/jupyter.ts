@@ -39,4 +39,4 @@ export interface NotaConfig {
     kernel: string
   }>
   kernels: Record<string, string[]>
-} 
+}

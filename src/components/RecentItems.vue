@@ -9,14 +9,14 @@ const router = useRouter()
 
 const recentItems = computed(() => {
   const allItems = [
-    ...store.notas.map(nota => ({
+    ...store.notas.map((nota) => ({
       ...nota,
-      path: `/nota/${nota.id}`
+      path: `/nota/${nota.id}`,
     })),
-    ...store.pages.map(page => ({
+    ...store.pages.map((page) => ({
       ...page,
-      path: `/page/${page.id}`
-    }))
+      path: `/page/${page.id}`,
+    })),
   ]
 
   return allItems
@@ -28,7 +28,7 @@ const formatDate = (date: Date) => {
   const now = new Date()
   const diff = now.getTime() - new Date(date).getTime()
   const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-  
+
   if (days === 0) return 'Today'
   if (days === 1) return 'Yesterday'
   if (days < 7) return `${days} days ago`
@@ -39,12 +39,12 @@ const formatDate = (date: Date) => {
 <template>
   <div class="recent-items">
     <h2 class="title">
-      <ClockIcon class="icon" style="width: 16px; height: 16px;" />
+      <ClockIcon class="icon" style="width: 16px; height: 16px" />
       Recent Items
     </h2>
     <div class="items-grid">
-      <div 
-        v-for="item in recentItems" 
+      <div
+        v-for="item in recentItems"
         :key="item.id"
         class="item-card"
         @click="router.push(item.path)"
@@ -119,4 +119,4 @@ const formatDate = (date: Date) => {
   color: var(--color-text-light);
   margin-top: 0.25rem;
 }
-</style> 
+</style>

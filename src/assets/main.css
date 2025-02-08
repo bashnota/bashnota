@@ -15,7 +15,6 @@
   --color-toc-hover: #f1f5f9;
   --color-danger-soft: #fef2f2;
   --color-danger: #dc2626;
-
 }
 
 body {
@@ -23,8 +22,18 @@ body {
   color: var(--color-text);
   background: var(--color-background);
   line-height: 1.6;
-  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-    Oxygen, Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    'Fira Sans',
+    'Droid Sans',
+    'Helvetica Neue',
     sans-serif;
   font-size: 15px;
   text-rendering: optimizeLegibility;
@@ -77,14 +86,14 @@ a,
   --color-background: #1a1a1a;
   --color-background-soft: #242424;
   --color-background-mute: #2f2f2f;
-  
+
   --color-border: #3f3f3f;
   --color-border-hover: #505050;
-  
+
   --color-heading: #ffffff;
   --color-text: #e5e5e5;
   --color-text-light: #909399;
-  
+
   --color-primary: #3eaf7c;
   --color-primary-dark: #357a5b;
   --color-toc-text: #e5e5e5;
@@ -94,5 +103,7 @@ a,
 
 /* Smooth transitions when switching themes */
 * {
-  transition: background-color 0.3s, border-color 0.3s;
+  transition:
+    background-color 0.3s,
+    border-color 0.3s;
 }

@@ -43,7 +43,7 @@ const notaConfig = computed(() => {
     return {
       jupyterServers: [],
       kernels: {},
-      notebooks: []
+      notebooks: [],
     }
   }
   return nota.config
@@ -52,9 +52,9 @@ const notaConfig = computed(() => {
 // Get available servers
 const availableServers = computed(() => {
   console.log('Jupyter servers:', notaConfig.value.jupyterServers) // Debug log
-  return notaConfig.value.jupyterServers.map(server => ({
+  return notaConfig.value.jupyterServers.map((server) => ({
     ...server,
-    displayName: `${server.ip}:${server.port}`
+    displayName: `${server.ip}:${server.port}`,
   }))
 })
 
@@ -87,15 +87,18 @@ watch(
   () => route.params.id,
   async () => {
     await loadConfig()
-  }
+  },
 )
 
 // Watch for external code changes
-watch(() => props.code, (newCode) => {
-  if (newCode !== codeValue.value) {
-    codeValue.value = newCode
-  }
-})
+watch(
+  () => props.code,
+  (newCode) => {
+    if (newCode !== codeValue.value) {
+      codeValue.value = newCode
+    }
+  },
+)
 
 const executeCode = async () => {
   if (!selectedServer.value || !selectedKernel.value) {
@@ -103,7 +106,7 @@ const executeCode = async () => {
     return
   }
 
-  const server = availableServers.value.find(s => s.ip === selectedServer.value)
+  const server = availableServers.value.find((s) => s.ip === selectedServer.value)
   if (!server) {
     output.value = 'Selected server not found'
     return
@@ -117,11 +120,11 @@ const formatExecutionResult = (result: any) => {
   if (!result.content) return 'No output'
 
   const output = []
-  
+
   // Handle stdout/stderr
   if (result.content.stdout) output.push(result.content.stdout)
   if (result.content.stderr) output.push(result.content.stderr)
-  
+
   // Handle execution result
   if (result.content.data) {
     if (result.content.data['text/plain']) {
@@ -150,35 +153,23 @@ const updateCode = (event: Event) => {
           <label>Server</label>
           <select v-model="selectedServer" class="server-select">
             <option value="">Select Server</option>
-            <option 
-              v-for="server in availableServers" 
-              :key="server.ip" 
-              :value="server.ip"
-            >
+            <option v-for="server in availableServers" :key="server.ip" :value="server.ip">
               {{ server.displayName }}
             </option>
           </select>
         </div>
         <div class="select-group">
           <label>Kernel</label>
-          <select 
-            v-model="selectedKernel" 
-            class="kernel-select"
-            :disabled="!selectedServer"
-          >
+          <select v-model="selectedKernel" class="kernel-select" :disabled="!selectedServer">
             <option value="">Select Kernel</option>
-            <option 
-              v-for="kernel in availableKernels" 
-              :key="kernel.name" 
-              :value="kernel.name"
-            >
+            <option v-for="kernel in availableKernels" :key="kernel.name" :value="kernel.name">
               {{ kernel.display_name }}
             </option>
           </select>
         </div>
       </div>
-      <button 
-        @click="executeCode" 
+      <button
+        @click="executeCode"
         :disabled="isExecuting || !selectedServer || !selectedKernel"
         class="execute-button"
       >
@@ -197,26 +188,17 @@ const updateCode = (event: Event) => {
     <div class="output-container" v-if="output">
       <div class="output-header">
         <span>Output</span>
-        <button 
-          class="copy-button" 
+        <button
+          class="copy-button"
           @click="copyOutput"
           :title="isCopied ? 'Copied!' : 'Copy output'"
         >
-          <DocumentDuplicateIcon 
-            v-if="!isCopied" 
-            class="icon"
-          />
-          <CheckIcon 
-            v-else 
-            class="icon"
-          />
+          <DocumentDuplicateIcon v-if="!isCopied" class="icon" />
+          <CheckIcon v-else class="icon" />
           {{ isCopied ? 'Copied!' : 'Copy' }}
         </button>
       </div>
-      <div 
-        class="output" 
-        :class="{ 'has-error': hasError }"
-      >
+      <div class="output" :class="{ 'has-error': hasError }">
         <pre>{{ output }}</pre>
       </div>
     </div>
@@ -370,4 +352,4 @@ const updateCode = (event: Event) => {
   word-wrap: break-word;
   font-family: 'Fira Code', monospace;
 }
-</style> 
+</style>

@@ -79,12 +79,12 @@ const resetWidth = () => {
 
 <template>
   <div class="app-container">
-    <AppSidebar 
-      class="sidebar" 
-      :class="{ 'closed': !isSidebarOpen }" 
+    <AppSidebar
+      class="sidebar"
+      :class="{ closed: !isSidebarOpen }"
       :style="{ width: sidebarWidth + 'px' }"
     />
-    <div 
+    <div
       v-if="isSidebarOpen"
       class="resize-handle"
       @mousedown="startResize"
@@ -92,7 +92,7 @@ const resetWidth = () => {
     ></div>
     <div class="main-content">
       <div class="top-bar">
-        <button 
+        <button
           class="menu-button"
           @click="isSidebarOpen = !isSidebarOpen"
           :title="`${isSidebarOpen ? 'Hide' : 'Show'} sidebar (⌘B)`"
@@ -111,10 +111,7 @@ const resetWidth = () => {
       <RouterView />
     </div>
     <KeyboardShortcuts />
-    <ShortcutsDialog 
-      ref="shortcutsDialog" 
-      @toggleSidebar="toggleSidebar"
-    />
+    <ShortcutsDialog ref="shortcutsDialog" @toggleSidebar="toggleSidebar" />
   </div>
 </template>
 

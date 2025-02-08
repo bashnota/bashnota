@@ -3,7 +3,13 @@ import { ref, computed, nextTick } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { useRouter } from 'vue-router'
 import PageTreeItem from './PageTreeItem.vue'
-import { ChevronDownIcon, ChevronRightIcon, FolderIcon, TrashIcon, PencilIcon } from '@heroicons/vue/24/solid'
+import {
+  ChevronDownIcon,
+  ChevronRightIcon,
+  FolderIcon,
+  TrashIcon,
+  PencilIcon,
+} from '@heroicons/vue/24/solid'
 
 const props = defineProps<{
   notaId: string
@@ -31,7 +37,7 @@ const deleteNota = async (event: Event) => {
 
 const nota = computed(() => {
   const notas = store.notas
-  return notas.find(n => n.id === props.notaId)
+  return notas.find((n) => n.id === props.notaId)
 })
 
 const pages = computed(() => {
@@ -68,21 +74,13 @@ const handleKeydown = (event: KeyboardEvent) => {
 
 <template>
   <div class="nota-tree-item" v-if="nota">
-    <div 
-      class="nota-item"
-      :class="{ 'active': $route.params.id === nota.id }"
-      @click="openNota"
-    >
+    <div class="nota-item" :class="{ active: $route.params.id === nota.id }" @click="openNota">
       <div class="nota-content">
-        <button 
-          v-if="pages.length"
-          class="expand-button"
-          @click.stop="isExpanded = !isExpanded"
-        >
-          <ChevronDownIcon v-if="isExpanded" style="width: 10px; height: 10px;" />
-          <ChevronRightIcon v-else style="width: 10px; height: 10px;" />
+        <button v-if="pages.length" class="expand-button" @click.stop="isExpanded = !isExpanded">
+          <ChevronDownIcon v-if="isExpanded" style="width: 10px; height: 10px" />
+          <ChevronRightIcon v-else style="width: 10px; height: 10px" />
         </button>
-        <FolderIcon class="text-yellow-500" style="width: 12px; height: 12px;" />
+        <FolderIcon class="text-yellow-500" style="width: 12px; height: 12px" />
         <div class="nota-title">
           <input
             v-if="isEditing"
@@ -97,19 +95,11 @@ const handleKeydown = (event: KeyboardEvent) => {
         </div>
       </div>
       <div class="nota-actions">
-        <button 
-          class="action-button"
-          @click="startEditing"
-          title="Rename nota"
-        >
-          <PencilIcon style="width: 10px; height: 10px;" />
+        <button class="action-button" @click="startEditing" title="Rename nota">
+          <PencilIcon style="width: 10px; height: 10px" />
         </button>
-        <button 
-          class="action-button delete"
-          @click="deleteNota"
-          title="Delete nota"
-        >
-          <TrashIcon style="width: 10px; height: 10px;" />
+        <button class="action-button delete" @click="deleteNota" title="Delete nota">
+          <TrashIcon style="width: 10px; height: 10px" />
         </button>
       </div>
     </div>
@@ -122,11 +112,7 @@ const handleKeydown = (event: KeyboardEvent) => {
       leave-to-class="transform scale-95 opacity-0"
     >
       <div v-if="isExpanded && pages.length" class="pages">
-        <page-tree-item
-          v-for="page in pages"
-          :key="page.id"
-          :page-id="page.id"
-        />
+        <page-tree-item v-for="page in pages" :key="page.id" :page-id="page.id" />
       </div>
     </transition>
   </div>
@@ -239,4 +225,4 @@ const handleKeydown = (event: KeyboardEvent) => {
   outline: none;
   border-color: var(--color-primary);
 }
-</style> 
+</style>

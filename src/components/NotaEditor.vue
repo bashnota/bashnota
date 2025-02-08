@@ -83,8 +83,8 @@ const editor = useEditor({
     Link.configure({
       openOnClick: false,
       HTMLAttributes: {
-        class: 'nota-link'
-      }
+        class: 'nota-link',
+      },
     }),
     PageLink,
     Table.configure({
@@ -99,11 +99,11 @@ const editor = useEditor({
     }),
     SlashCommands.configure({
       suggestion,
-    })
+    }),
   ],
   editorProps: {
     attributes: {
-      class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none'
+      class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none',
     },
   },
   onCreate({ editor }) {
@@ -123,14 +123,16 @@ const editor = useEditor({
   },
   onUpdate: ({ editor }) => {
     isSaving.value = true
-    notaStore.saveNota({
-      id: props.notaId,
-      content: editor.getHTML(),
-      updatedAt: new Date()
-    }).finally(() => {
-      isSaving.value = false
-      showSavedIndicator()
-    })
+    notaStore
+      .saveNota({
+        id: props.notaId,
+        content: editor.getHTML(),
+        updatedAt: new Date(),
+      })
+      .finally(() => {
+        isSaving.value = false
+        showSavedIndicator()
+      })
   },
 })
 
@@ -149,7 +151,7 @@ watch(
       }
     }
   },
-  { immediate: true }
+  { immediate: true },
 )
 
 const isLoading = ref(true)
@@ -166,19 +168,16 @@ const showSavedIndicator = () => {
 const wordCount = computed(() => {
   if (!editor.value) return 0
   const text = editor.value.getText()
-  return text.split(/\s+/).filter(word => word.length > 0).length
+  return text.split(/\s+/).filter((word) => word.length > 0).length
 })
 </script>
 
 <template>
   <div class="editor-container">
-    <div 
-      class="editor-sidebar" 
-      :class="{ 'closed': !isSidebarOpen }"
-    >
+    <div class="editor-sidebar" :class="{ closed: !isSidebarOpen }">
       <TableOfContents :editor="editor" />
     </div>
-    <button 
+    <button
       class="sidebar-toggle"
       @click="isSidebarOpen = !isSidebarOpen"
       :title="isSidebarOpen ? 'Hide sidebar' : 'Show sidebar'"
@@ -192,9 +191,7 @@ const wordCount = computed(() => {
         <span class="last-updated" v-if="lastUpdated">
           Last updated {{ formatDate(lastUpdated) }}
         </span>
-        <span class="word-count">
-          {{ wordCount }} words
-        </span>
+        <span class="word-count"> {{ wordCount }} words </span>
       </div>
       <div v-if="isLoading" class="editor-loading">
         <LoadingSpinner />
@@ -204,25 +201,12 @@ const wordCount = computed(() => {
         <span v-else-if="showSaved" class="saved">Saved</span>
       </div>
       <editor-content :editor="editor" />
-      
-      <bubble-menu
-        v-if="editor"
-        :editor="editor"
-        :should-show="shouldShow"
-        class="bubble-menu"
-      >
-        <button @click="editor.chain().focus().toggleBold().run()">
-          Bold
-        </button>
-        <button @click="editor.chain().focus().toggleItalic().run()">
-          Italic
-        </button>
-        <button @click="editor.chain().focus().toggleCode().run()">
-          Code
-        </button>
-        <button @click="editor.chain().focus().toggleLink().run()">
-          Link
-        </button>
+
+      <bubble-menu v-if="editor" :editor="editor" :should-show="shouldShow" class="bubble-menu">
+        <button @click="editor.chain().focus().toggleBold().run()">Bold</button>
+        <button @click="editor.chain().focus().toggleItalic().run()">Italic</button>
+        <button @click="editor.chain().focus().toggleCode().run()">Code</button>
+        <button @click="editor.chain().focus().toggleLink().run()">Link</button>
       </bubble-menu>
     </div>
   </div>

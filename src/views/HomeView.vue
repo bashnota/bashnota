@@ -13,16 +13,28 @@ const createNewNota = async () => {
   router.push(`/nota/${nota.id}`)
 }
 
-const recentItems = ref<Array<{ id: string; title: string; type: 'nota' | 'page'; updatedAt: Date }>>([])
+const recentItems = ref<
+  Array<{ id: string; title: string; type: 'nota' | 'page'; updatedAt: Date }>
+>([])
 
 onMounted(async () => {
   await Promise.all([store.loadNotas(), store.loadPages()])
-  
+
   const items = [
-    ...store.notas.map(n => ({ id: n.id, title: n.title, type: 'nota' as const, updatedAt: n.updatedAt })),
-    ...store.pages.map(p => ({ id: p.id, title: p.title, type: 'page' as const, updatedAt: p.updatedAt }))
+    ...store.notas.map((n) => ({
+      id: n.id,
+      title: n.title,
+      type: 'nota' as const,
+      updatedAt: n.updatedAt,
+    })),
+    ...store.pages.map((p) => ({
+      id: p.id,
+      title: p.title,
+      type: 'page' as const,
+      updatedAt: p.updatedAt,
+    })),
   ]
-  
+
   recentItems.value = items
     .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
     .slice(0, 10)
@@ -39,9 +51,7 @@ const openItem = (item: { id: string; type: 'nota' | 'page' }) => {
       <h1>Welcome to BashNota</h1>
       <p>Your personal knowledge base for code and notes</p>
       <div class="getting-started">
-        <button @click="createNewNota" class="primary-button">
-          Create your first nota
-        </button>
+        <button @click="createNewNota" class="primary-button">Create your first nota</button>
         <div class="features">
           <div class="feature">
             <DocumentTextIcon class="icon" />
@@ -65,20 +75,13 @@ const openItem = (item: { id: string; type: 'nota' | 'page' }) => {
     <div class="recent-items">
       <h2>Recent Items</h2>
       <div v-if="recentItems.length" class="items-list">
-        <div 
-          v-for="item in recentItems" 
-          :key="item.id"
-          class="item"
-          @click="openItem(item)"
-        >
+        <div v-for="item in recentItems" :key="item.id" class="item" @click="openItem(item)">
           <span class="title">{{ item.title }}</span>
           <span class="type">{{ item.type }}</span>
           <span class="date">{{ new Date(item.updatedAt).toLocaleDateString() }}</span>
         </div>
       </div>
-      <div v-else class="empty-state">
-        No items yet
-      </div>
+      <div v-else class="empty-state">No items yet</div>
     </div>
   </div>
 </template>

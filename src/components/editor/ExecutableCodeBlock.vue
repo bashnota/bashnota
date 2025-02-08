@@ -8,20 +8,20 @@ import { useNotaStore } from '@/stores/nota'
 const props = defineProps({
   node: {
     type: Object,
-    required: true
+    required: true,
   },
   updateAttributes: {
     type: Function,
-    required: true
+    required: true,
   },
   editor: {
     type: Object,
-    required: true
+    required: true,
   },
   getPos: {
     type: Function,
-    required: true
-  }
+    required: true,
+  },
 })
 
 const route = useRoute()
@@ -48,16 +48,16 @@ onMounted(() => {
     isExecuteable: isExecuteable.value,
     language: language.value,
     notaId: route.params.id,
-    routeName: route.name
+    routeName: route.name,
   })
 })
 </script>
 
 <template>
   <NodeViewWrapper class="code-block-wrapper">
-    <CodeBlockWithExecution 
+    <CodeBlockWithExecution
       v-if="isExecuteable"
-      :code="code" 
+      :code="code"
       :language="language"
       :nota-id="route.params.id as string"
       @update:code="updateCode"
@@ -82,4 +82,4 @@ onMounted(() => {
   font-size: 0.875rem;
   line-height: 1.5;
 }
-</style> 
+</style>

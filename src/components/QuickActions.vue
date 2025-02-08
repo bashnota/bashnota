@@ -9,7 +9,7 @@ import {
   Cog6ToothIcon,
   KeyIcon,
   SunIcon,
-  MoonIcon
+  MoonIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps<{
@@ -33,7 +33,7 @@ const actions = [
       const nota = await store.createNota('Untitled Nota')
       router.push(`/nota/${nota.id}`)
       emit('close')
-    }
+    },
   },
   {
     id: 'new-page',
@@ -43,17 +43,17 @@ const actions = [
     action: () => {
       // Implement new page creation
       emit('close')
-    }
+    },
   },
   {
     id: 'toggle-theme',
     name: 'Toggle Theme',
-    icon: computed(() => isDark.value ? SunIcon : MoonIcon),
+    icon: computed(() => (isDark.value ? SunIcon : MoonIcon)),
     shortcut: '⌘K ⌘T',
     action: () => {
       // Implement theme toggle
       emit('close')
-    }
+    },
   },
   {
     id: 'keyboard-shortcuts',
@@ -63,7 +63,7 @@ const actions = [
     action: () => {
       // Show keyboard shortcuts
       emit('close')
-    }
+    },
   },
   {
     id: 'settings',
@@ -73,16 +73,14 @@ const actions = [
     action: () => {
       // Open settings
       emit('close')
-    }
-  }
+    },
+  },
 ]
 
 const filteredActions = computed(() => {
   if (!searchQuery.value) return actions
   const query = searchQuery.value.toLowerCase()
-  return actions.filter(action => 
-    action.name.toLowerCase().includes(query)
-  )
+  return actions.filter((action) => action.name.toLowerCase().includes(query))
 })
 
 const handleKeydown = (event: KeyboardEvent) => {
@@ -93,9 +91,8 @@ const handleKeydown = (event: KeyboardEvent) => {
       break
     case 'ArrowUp':
       event.preventDefault()
-      selectedIndex.value = selectedIndex.value - 1 < 0 
-        ? filteredActions.value.length - 1 
-        : selectedIndex.value - 1
+      selectedIndex.value =
+        selectedIndex.value - 1 < 0 ? filteredActions.value.length - 1 : selectedIndex.value - 1
       break
     case 'Enter':
       event.preventDefault()
@@ -111,11 +108,7 @@ const handleKeydown = (event: KeyboardEvent) => {
 </script>
 
 <template>
-  <Dialog 
-    :open="isOpen" 
-    @close="emit('close')"
-    class="quick-actions"
-  >
+  <Dialog :open="isOpen" @close="emit('close')" class="quick-actions">
     <div class="dialog-backdrop" aria-hidden="true" />
     <DialogPanel class="dialog-panel">
       <input
@@ -130,7 +123,7 @@ const handleKeydown = (event: KeyboardEvent) => {
           v-for="(action, index) in filteredActions"
           :key="action.id"
           class="action-item"
-          :class="{ 'selected': index === selectedIndex }"
+          :class="{ selected: index === selectedIndex }"
           @click="action.action"
         >
           <component :is="action.icon" class="icon" />
@@ -221,4 +214,4 @@ const handleKeydown = (event: KeyboardEvent) => {
   color: var(--color-text-light);
   font-family: monospace;
 }
-</style> 
+</style>

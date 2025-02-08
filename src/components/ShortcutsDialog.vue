@@ -12,7 +12,7 @@ const shortcuts = [
   { key: '/', description: 'Open commands menu (in editor)' },
   { key: '⌘ B', description: 'Bold text (in editor)' },
   { key: '⌘ I', description: 'Italic text (in editor)' },
-  { key: 'Esc', description: 'Close dialogs / Cancel editing' }
+  { key: 'Esc', description: 'Close dialogs / Cancel editing' },
 ]
 
 defineExpose({ isOpen })
@@ -100,4 +100,4 @@ kbd {
 .close-button:hover {
   background: var(--color-background-mute);
 }
-</style> 
+</style>

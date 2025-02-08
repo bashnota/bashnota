@@ -24,15 +24,15 @@ export default defineConfig({
           {
             src: '/icons/icon-192x192.png',
             sizes: '192x192',
-            type: 'image/png'
+            type: 'image/png',
           },
           {
             src: '/icons/icon-512x512.png',
             sizes: '512x512',
-            type: 'image/png'
-          }
-        ]
-      }
+            type: 'image/png',
+          },
+        ],
+      },
     }),
   ],
   server: {
@@ -43,20 +43,20 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/jupyter/, ''),
         configure: (proxy, _options) => {
           proxy.on('error', (err, _req, _res) => {
-            console.log('proxy error', err);
-          });
+            console.log('proxy error', err)
+          })
           proxy.on('proxyReq', (proxyReq, req, _res) => {
             if (req.headers.authorization) {
-              proxyReq.setHeader('Authorization', req.headers.authorization);
+              proxyReq.setHeader('Authorization', req.headers.authorization)
             }
-          });
-        }
-      }
-    }
+          })
+        },
+      },
+    },
   },
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url))
-    }
-  }
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
 })

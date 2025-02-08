@@ -20,4 +20,4 @@ export class JupyterService {
       throw error
     }
   }
-} 
+}

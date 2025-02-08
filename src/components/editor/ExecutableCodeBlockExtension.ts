@@ -10,23 +10,23 @@ export const ExecutableCodeBlockExtension = CodeBlock.extend({
       ...this.parent?.(),
       language: {
         default: null,
-        parseHTML: element => element.getAttribute('data-language'),
-        renderHTML: attributes => {
+        parseHTML: (element) => element.getAttribute('data-language'),
+        renderHTML: (attributes) => {
           return {
             'data-language': attributes.language,
-            class: `language-${attributes.language}`
+            class: `language-${attributes.language}`,
           }
-        }
+        },
       },
       executeable: {
         default: false,
-        parseHTML: element => element.getAttribute('data-executeable') === 'true',
-        renderHTML: attributes => {
+        parseHTML: (element) => element.getAttribute('data-executeable') === 'true',
+        renderHTML: (attributes) => {
           return {
-            'data-executeable': attributes.executeable
+            'data-executeable': attributes.executeable,
           }
-        }
-      }
+        },
+      },
     }
   },
 
@@ -46,4 +46,4 @@ export const ExecutableCodeBlockExtension = CodeBlock.extend({
   renderHTML({ HTMLAttributes }) {
     return ['pre', HTMLAttributes, ['code', {}, 0]]
   },
-}) 
+})

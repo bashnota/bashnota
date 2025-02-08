@@ -22,17 +22,13 @@ export function useCodeExecution(codeRef: Ref<string>) {
 
       try {
         // Execute code using the selected server
-        const result = await jupyterService.executeCode(
-          server,
-          session.id, 
-          codeRef.value
-        )
+        const result = await jupyterService.executeCode(server, session.id, codeRef.value)
 
         // Get execution result from the selected server
         const executionResult = await jupyterService.getExecutionResult(
           server,
           session.id,
-          result.msg_id
+          result.msg_id,
         )
 
         // Format output
@@ -95,6 +91,6 @@ export function useCodeExecution(codeRef: Ref<string>) {
     hasError,
     execute,
     copyOutput,
-    isCopied
+    isCopied,
   }
-} 
+}

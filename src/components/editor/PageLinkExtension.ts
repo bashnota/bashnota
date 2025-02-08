@@ -11,26 +11,27 @@ export const PageLink = Node.create({
   addAttributes() {
     return {
       href: {
-        default: null
+        default: null,
       },
       title: {
-        default: null
-      }
+        default: null,
+      },
     }
   },
 
   parseHTML() {
     return [
       {
-        tag: 'a[data-type="page-link"]'
-      }
+        tag: 'a[data-type="page-link"]',
+      },
     ]
   },
 
   renderHTML({ HTMLAttributes }) {
-    return ['a', mergeAttributes(
-      { 'data-type': 'page-link', class: 'nota-link' },
-      HTMLAttributes
-    ), `📄 ${HTMLAttributes.title}`]
-  }
-}) 
+    return [
+      'a',
+      mergeAttributes({ 'data-type': 'page-link', class: 'nota-link' }, HTMLAttributes),
+      `📄 ${HTMLAttributes.title}`,
+    ]
+  },
+})

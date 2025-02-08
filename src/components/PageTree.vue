@@ -16,7 +16,7 @@ const showRenameInput = ref<string | null>(null)
 const renameTitle = ref('')
 
 const hasChildren = (pageId: string) => {
-  return store.pages.some(p => p.parentId === pageId)
+  return store.pages.some((p) => p.parentId === pageId)
 }
 
 const togglePage = (pageId: string) => {
@@ -50,11 +50,7 @@ const handleDelete = async (pageId: string) => {
   <div class="page-tree">
     <div v-for="page in pages" :key="page.id" class="page-item">
       <div class="page-header">
-        <button 
-          v-if="hasChildren(page.id)"
-          class="expand-button"
-          @click="togglePage(page.id)"
-        >
+        <button v-if="hasChildren(page.id)" class="expand-button" @click="togglePage(page.id)">
           <ChevronDownIcon v-if="expandedPages.has(page.id)" class="icon" />
           <ChevronRightIcon v-else class="icon" />
         </button>
@@ -75,18 +71,10 @@ const handleDelete = async (pageId: string) => {
             {{ page.title }}
           </RouterLink>
           <div class="page-actions">
-            <button 
-              class="action-button"
-              @click="startRename(page)"
-              title="Rename"
-            >
+            <button class="action-button" @click="startRename(page)" title="Rename">
               <PencilIcon class="icon" />
             </button>
-            <button 
-              class="action-button"
-              @click="handleDelete(page.id)"
-              title="Delete"
-            >
+            <button class="action-button" @click="handleDelete(page.id)" title="Delete">
               <TrashIcon class="icon" />
             </button>
           </div>
@@ -204,4 +192,4 @@ const handleDelete = async (pageId: string) => {
   width: 1rem;
   height: 1rem;
 }
-</style> 
+</style>

@@ -10,7 +10,7 @@ const store = useNotaStore()
 const breadcrumbs = computed(() => {
   const items = []
   const id = route.params.id as string
-  
+
   if (route.name === 'nota') {
     const nota = store.getCurrentNota(id)
     if (nota) items.push({ name: nota.title, path: `/nota/${nota.id}` })
@@ -32,7 +32,7 @@ const breadcrumbs = computed(() => {
       items.push({ name: page.title, path: `/page/${page.id}` })
     }
   }
-  
+
   return items
 })
 </script>
@@ -84,4 +84,4 @@ a:hover {
 .home-link {
   font-weight: 500;
 }
-</style> 
+</style>

@@ -11,9 +11,7 @@
         <span>{{ item.title }}</span>
       </button>
     </template>
-    <div class="item" v-else>
-      No result
-    </div>
+    <div class="item" v-else>No result</div>
   </div>
 </template>
 
@@ -31,9 +29,12 @@ const props = defineProps<{
 
 const selectedIndex = ref(0)
 
-watch(() => props.items, () => {
-  selectedIndex.value = 0
-})
+watch(
+  () => props.items,
+  () => {
+    selectedIndex.value = 0
+  },
+)
 
 const selectItem = (index: number) => {
   const item = props.items[index]
@@ -44,7 +45,7 @@ const selectItem = (index: number) => {
 
 const onKeyDown = ({ event }: { event: KeyboardEvent }) => {
   if (event.key === 'ArrowUp') {
-    selectedIndex.value = ((selectedIndex.value + props.items.length) - 1) % props.items.length
+    selectedIndex.value = (selectedIndex.value + props.items.length - 1) % props.items.length
     return true
   }
 
@@ -104,4 +105,4 @@ button.is-selected {
   background: var(--color-background-mute);
   border-radius: 4px;
 }
-</style> 
+</style>

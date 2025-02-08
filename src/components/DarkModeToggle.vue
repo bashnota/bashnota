@@ -27,7 +27,11 @@ const updateTheme = () => {
 </script>
 
 <template>
-  <button class="theme-toggle" @click="toggleDarkMode" :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'">
+  <button
+    class="theme-toggle"
+    @click="toggleDarkMode"
+    :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
+  >
     <SunIcon v-if="!isDark" class="icon" />
     <MoonIcon v-else class="icon" />
   </button>
@@ -55,4 +59,4 @@ const updateTheme = () => {
   width: 1.25rem;
   height: 1.25rem;
 }
-</style> 
+</style>

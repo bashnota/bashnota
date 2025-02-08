@@ -18,4 +18,4 @@ const props = defineProps<{
   display: flex;
   overflow: hidden;
 }
-</style> 
+</style>

@@ -28,16 +28,16 @@ const currentNotaId = computed(() => route.params.id as string)
 const filteredNotas = computed(() => {
   const query = searchQuery.value.toLowerCase()
   if (!query) return notaStore.notas
-  return notaStore.notas.filter(nota => 
-    nota.title.toLowerCase().includes(query)
-  )
+  return notaStore.notas.filter((nota) => nota.title.toLowerCase().includes(query))
 })
 
 const notaPages = computed(() => {
-  return notaStore.notas.map(nota => ({
-    nota,
-    pages: notaStore.getNotaPages(nota.id)
-  })).filter(item => item.pages.length > 0)
+  return notaStore.notas
+    .map((nota) => ({
+      nota,
+      pages: notaStore.getNotaPages(nota.id),
+    }))
+    .filter((item) => item.pages.length > 0)
 })
 
 const createNewNota = async () => {
@@ -67,7 +67,7 @@ const toggleNota = (notaId: string) => {
   }
 }
 
-const startRename = (nota: { id: string, title: string }) => {
+const startRename = (nota: { id: string; title: string }) => {
   showRenameInput.value = nota.id
   renameTitle.value = nota.title
 }
@@ -110,17 +110,13 @@ onKeyStroke('/', (e) => {
         <h1 class="app-title">BashNota</h1>
         <DarkModeToggle />
       </div>
-      
+
       <!-- Search Bar -->
       <div class="search-bar">
-        <MagnifyingGlassIcon class="search-icon" style="width: 12px; height: 12px;" />
-        <input
-          v-model="searchQuery"
-          placeholder="Search notas..."
-          class="search-input"
-        />
+        <MagnifyingGlassIcon class="search-icon" style="width: 12px; height: 12px" />
+        <input v-model="searchQuery" placeholder="Search notas..." class="search-input" />
       </div>
-      
+
       <!-- New Nota Button/Input -->
       <div class="new-nota-section">
         <template v-if="showNewNotaInput">
@@ -134,12 +130,8 @@ onKeyStroke('/', (e) => {
             autofocus
           />
         </template>
-        <button 
-          v-else
-          class="new-nota-button"
-          @click="showNewNotaInput = true"
-        >
-          <PlusIcon style="width: 12px; height: 12px;" />
+        <button v-else class="new-nota-button" @click="showNewNotaInput = true">
+          <PlusIcon style="width: 12px; height: 12px" />
           <span>New Nota</span>
         </button>
       </div>
@@ -149,7 +141,7 @@ onKeyStroke('/', (e) => {
     <div class="nota-list">
       <div v-for="nota in filteredNotas" :key="nota.id" class="nota-item">
         <div class="nota-header">
-          <button 
+          <button
             class="expand-button"
             @click="toggleNota(nota.id)"
             v-if="notaStore.getNotaPages(nota.id)?.length"
@@ -174,18 +166,10 @@ onKeyStroke('/', (e) => {
               {{ nota.title }}
             </RouterLink>
             <div class="nota-actions">
-              <button 
-                class="action-button"
-                @click="startRename(nota)"
-                title="Rename"
-              >
+              <button class="action-button" @click="startRename(nota)" title="Rename">
                 <PencilIcon class="icon" />
               </button>
-              <button 
-                class="action-button"
-                @click="handleDelete(nota.id)"
-                title="Delete"
-              >
+              <button class="action-button" @click="handleDelete(nota.id)" title="Delete">
                 <TrashIcon class="icon" />
               </button>
             </div>

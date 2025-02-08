@@ -21,7 +21,7 @@ interface KernelInfo {
 const notaConfig = ref({
   jupyterServers: [] as JupyterServer[],
   notebooks: [] as Array<{ notebook: string; server: string }>,
-  kernels: {} as Record<string, KernelInfo[]>
+  kernels: {} as Record<string, KernelInfo[]>,
 })
 
 const serverInput = ref('')
@@ -36,7 +36,7 @@ const loadConfig = () => {
     notaConfig.value = nota.config || {
       jupyterServers: [],
       notebooks: [],
-      kernels: {}
+      kernels: {},
     }
   }
 }
@@ -48,17 +48,17 @@ const addJupyterServer = async (server: JupyterServer) => {
     if (result.success) {
       // Get available kernels with full information
       const kernels = await jupyterService.getAvailableKernels(server)
-      
+
       // Add server to config
       notaConfig.value.jupyterServers.push(server)
-      
+
       // Store full kernel information for this server
       notaConfig.value.kernels[server.ip] = kernels
-      
-      message.value = `Server added successfully. Available kernels: ${
-        kernels.map(k => k.display_name).join(', ')
-      }`
-      
+
+      message.value = `Server added successfully. Available kernels: ${kernels
+        .map((k) => k.display_name)
+        .join(', ')}`
+
       // Save the updated configuration
       await store.updateNotaConfig(props.notaId, notaConfig.value)
     } else {
@@ -76,7 +76,7 @@ const handleServerSubmit = async (event: Event) => {
 
   // Parse server input
   try {
-    const [ip, port, token] = serverInput.value.split(',').map(s => s.trim())
+    const [ip, port, token] = serverInput.value.split(',').map((s) => s.trim())
     if (!ip || !port || !token) {
       throw new Error('Please provide IP, port, and token (comma-separated)')
     }
@@ -108,7 +108,7 @@ const saveConfig = async () => {
 
 const removeServer = async (server: JupyterServer) => {
   try {
-    const index = notaConfig.value.jupyterServers.findIndex(s => s.ip === server.ip)
+    const index = notaConfig.value.jupyterServers.findIndex((s) => s.ip === server.ip)
     if (index !== -1) {
       notaConfig.value.jupyterServers.splice(index, 1)
       delete notaConfig.value.kernels[server.ip]
@@ -124,7 +124,7 @@ const removeKernel = async (server: JupyterServer, kernelName: string) => {
   try {
     const kernels = notaConfig.value.kernels[server.ip]
     if (kernels) {
-      notaConfig.value.kernels[server.ip] = kernels.filter(k => k.name !== kernelName)
+      notaConfig.value.kernels[server.ip] = kernels.filter((k) => k.name !== kernelName)
       await store.updateNotaConfig(props.notaId, notaConfig.value)
       message.value = 'Kernel removed successfully'
     }
@@ -154,24 +154,24 @@ loadConfig()
       </header>
 
       <div class="tabs">
-        <button 
-          class="tab-button" 
+        <button
+          class="tab-button"
           :class="{ active: activeTab === 'servers' }"
           @click="switchTab('servers')"
         >
           <i class="fas fa-server"></i>
           Servers
         </button>
-        <button 
-          class="tab-button" 
+        <button
+          class="tab-button"
           :class="{ active: activeTab === 'kernels' }"
           @click="switchTab('kernels')"
         >
           <i class="fas fa-microchip"></i>
           Kernels
         </button>
-        <button 
-          class="tab-button" 
+        <button
+          class="tab-button"
           :class="{ active: activeTab === 'notebooks' }"
           @click="switchTab('notebooks')"
         >
@@ -197,7 +197,7 @@ loadConfig()
             <h3>Add Jupyter Server</h3>
             <div class="server-form">
               <div class="input-group">
-                <input 
+                <input
                   v-model="serverInput"
                   type="text"
                   placeholder="IP, port, token (e.g., localhost, 8888, your_token)"
@@ -218,17 +218,17 @@ loadConfig()
             <h3>Configured Servers</h3>
           </div>
           <div class="server-grid">
-            <div v-for="server in notaConfig.jupyterServers" 
-                 :key="server.ip" 
-                 class="server-card">
+            <div v-for="server in notaConfig.jupyterServers" :key="server.ip" class="server-card">
               <div class="server-card-header">
                 <div class="server-info">
                   <i class="fas fa-server"></i>
                   <strong>{{ server.ip }}:{{ server.port }}</strong>
                 </div>
-                <button class="icon-button danger" 
-                        @click="removeServer(server)"
-                        title="Remove server">
+                <button
+                  class="icon-button danger"
+                  @click="removeServer(server)"
+                  title="Remove server"
+                >
                   <i class="fas fa-trash"></i>
                 </button>
               </div>
@@ -250,9 +250,7 @@ loadConfig()
             <p class="subtitle">Manage kernels for each server</p>
           </div>
           <div class="server-grid">
-            <div v-for="server in notaConfig.jupyterServers" 
-                 :key="server.ip" 
-                 class="server-card">
+            <div v-for="server in notaConfig.jupyterServers" :key="server.ip" class="server-card">
               <div class="server-card-header">
                 <div class="server-info">
                   <i class="fas fa-server"></i>
@@ -262,23 +260,25 @@ loadConfig()
               <div class="server-card-content">
                 <div class="kernel-section">
                   <div class="kernel-list" v-if="notaConfig.kernels[server.ip]?.length">
-                    <div v-for="kernel in notaConfig.kernels[server.ip]" 
-                         :key="kernel.name"
-                         class="kernel-item">
+                    <div
+                      v-for="kernel in notaConfig.kernels[server.ip]"
+                      :key="kernel.name"
+                      class="kernel-item"
+                    >
                       <div class="kernel-info">
                         <span class="kernel-name">{{ kernel.display_name }}</span>
                         <span class="kernel-language">{{ kernel.language }}</span>
                       </div>
-                      <button class="icon-button danger" 
-                              @click="removeKernel(server, kernel.name)"
-                              title="Remove kernel">
+                      <button
+                        class="icon-button danger"
+                        @click="removeKernel(server, kernel.name)"
+                        title="Remove kernel"
+                      >
                         <i class="fas fa-times"></i>
                       </button>
                     </div>
                   </div>
-                  <div v-else class="no-kernels">
-                    No kernels found
-                  </div>
+                  <div v-else class="no-kernels">No kernels found</div>
                 </div>
               </div>
             </div>
@@ -568,4 +568,4 @@ loadConfig()
 .tab-content {
   min-height: 400px;
 }
-</style> 
+</style>

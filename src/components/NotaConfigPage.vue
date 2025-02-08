@@ -4,12 +4,7 @@ import { useNotaStore } from '@/stores/nota'
 import { JupyterService } from '@/services/jupyterService'
 import LoadingSpinner from './LoadingSpinner.vue'
 import type { JupyterServer } from '@/types/jupyter'
-import { 
-  ServerIcon, 
-  CpuChipIcon, 
-  Cog6ToothIcon,
-  ArrowPathIcon
-} from '@heroicons/vue/24/outline'
+import { ServerIcon, CpuChipIcon, Cog6ToothIcon, ArrowPathIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps<{
   notaId: string
@@ -22,7 +17,7 @@ const jupyterService = new JupyterService()
 const serverForm = ref({
   ip: 'localhost',
   port: '8888',
-  token: ''
+  token: '',
 })
 
 const isTestingConnection = ref(false)
@@ -35,11 +30,13 @@ const activeTab = ref('servers') // 'servers', 'kernels', or 'settings'
 // Load config from store
 const config = computed(() => {
   const nota = store.getCurrentNota(props.notaId)
-  return nota?.config || {
-    jupyterServers: [],
-    notebooks: [],
-    kernels: {}
-  }
+  return (
+    nota?.config || {
+      jupyterServers: [],
+      notebooks: [],
+      kernels: {},
+    }
+  )
 })
 
 // Test server connection
@@ -55,7 +52,7 @@ const testConnection = async (server: JupyterServer) => {
   } catch (error) {
     testResults.value[server.ip] = {
       success: false,
-      message: error instanceof Error ? error.message : 'Connection failed'
+      message: error instanceof Error ? error.message : 'Connection failed',
     }
   } finally {
     isTestingConnection.value = false
@@ -71,8 +68,8 @@ const refreshKernels = async (server: JupyterServer) => {
       ...config.value,
       kernels: {
         ...config.value.kernels,
-        [server.ip]: kernels
-      }
+        [server.ip]: kernels,
+      },
     })
   } catch (error) {
     console.error('Failed to refresh kernels:', error)
@@ -86,23 +83,23 @@ const addServer = async () => {
   const server = {
     ip: serverForm.value.ip,
     port: serverForm.value.port,
-    token: serverForm.value.token
+    token: serverForm.value.token,
   }
 
   // Test connection before adding
   await testConnection(server)
-  
+
   if (testResults.value[server.ip]?.success) {
     await store.updateNotaConfig(props.notaId, {
       ...config.value,
-      jupyterServers: [...config.value.jupyterServers, server]
+      jupyterServers: [...config.value.jupyterServers, server],
     })
-    
+
     // Reset form
     serverForm.value = {
       ip: 'localhost',
       port: '8888',
-      token: ''
+      token: '',
     }
   }
 }
@@ -110,15 +107,13 @@ const addServer = async () => {
 // Remove server
 const removeServer = async (server: JupyterServer) => {
   if (confirm('Are you sure you want to remove this server?')) {
-    const updatedServers = config.value.jupyterServers.filter(
-      s => s.ip !== server.ip
-    )
+    const updatedServers = config.value.jupyterServers.filter((s) => s.ip !== server.ip)
     await store.updateNotaConfig(props.notaId, {
       ...config.value,
       jupyterServers: updatedServers,
       kernels: Object.fromEntries(
-        Object.entries(config.value.kernels).filter(([ip]) => ip !== server.ip)
-      )
+        Object.entries(config.value.kernels).filter(([ip]) => ip !== server.ip),
+      ),
     })
   }
 }
@@ -151,8 +146,8 @@ const stopKernel = async (server: JupyterServer, kernelId: string) => {
     <div class="config-header">
       <h2>Nota Configuration</h2>
       <div class="tabs">
-        <button 
-          v-for="tab in ['servers', 'kernels', 'settings']" 
+        <button
+          v-for="tab in ['servers', 'kernels', 'settings']"
           :key="tab"
           :class="{ active: activeTab === tab }"
           @click="activeTab = tab"
@@ -172,26 +167,21 @@ const stopKernel = async (server: JupyterServer, kernelId: string) => {
         <div v-if="config.jupyterServers.length === 0" class="empty-state">
           No servers configured yet
         </div>
-        <div 
-          v-else 
-          v-for="server in config.jupyterServers" 
-          :key="server.ip"
-          class="server-card"
-        >
+        <div v-else v-for="server in config.jupyterServers" :key="server.ip" class="server-card">
           <div class="server-info">
             <div class="server-name">{{ server.ip }}:{{ server.port }}</div>
-            <div 
+            <div
               class="server-status"
-              :class="{ 
-                'success': testResults[server.ip]?.success,
-                'error': testResults[server.ip]?.success === false
+              :class="{
+                success: testResults[server.ip]?.success,
+                error: testResults[server.ip]?.success === false,
               }"
             >
               {{ testResults[server.ip]?.message || 'Not tested' }}
             </div>
           </div>
           <div class="server-actions">
-            <button 
+            <button
               class="test-button"
               @click="testConnection(server)"
               :disabled="isTestingConnection"
@@ -199,12 +189,7 @@ const stopKernel = async (server: JupyterServer, kernelId: string) => {
               <LoadingSpinner v-if="isTestingConnection" />
               <span v-else>Test Connection</span>
             </button>
-            <button 
-              class="remove-button"
-              @click="removeServer(server)"
-            >
-              Remove
-            </button>
+            <button class="remove-button" @click="removeServer(server)">Remove</button>
           </div>
         </div>
       </div>
@@ -222,11 +207,11 @@ const stopKernel = async (server: JupyterServer, kernelId: string) => {
           </div>
           <div class="form-group">
             <label>Token</label>
-            <input 
-              v-model="serverForm.token" 
-              type="password" 
+            <input
+              v-model="serverForm.token"
+              type="password"
               placeholder="Jupyter token"
-              required 
+              required
             />
           </div>
           <button type="submit" class="primary-button">Add Server</button>
@@ -244,27 +229,22 @@ const stopKernel = async (server: JupyterServer, kernelId: string) => {
         <div v-else v-for="server in config.jupyterServers" :key="server.ip" class="server-kernels">
           <div class="server-header">
             <h4>{{ server.ip }}:{{ server.port }}</h4>
-            <button 
+            <button
               class="refresh-button"
               @click="refreshKernels(server)"
               :disabled="isRefreshingKernels"
             >
-              <ArrowPathIcon 
-                class="icon" 
-                :class="{ 'spinning': isRefreshingKernels }" 
-              />
+              <ArrowPathIcon class="icon" :class="{ spinning: isRefreshingKernels }" />
               Refresh Kernels
             </button>
           </div>
-          
+
           <div v-if="!config.kernels[server.ip]?.length" class="empty-state">
             <p>No kernels found. Make sure Jupyter kernels are installed on the server.</p>
           </div>
-          
+
           <div v-else class="kernels-grid">
-            <div v-for="kernel in config.kernels[server.ip]" 
-                 :key="kernel.name"
-                 class="kernel-card">
+            <div v-for="kernel in config.kernels[server.ip]" :key="kernel.name" class="kernel-card">
               <div class="kernel-header">
                 <span class="kernel-name">{{ kernel.display_name }}</span>
                 <span class="kernel-language">{{ kernel.language }}</span>
@@ -516,8 +496,12 @@ select {
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .kernel-info {
@@ -531,4 +515,4 @@ select {
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
 }
-</style> 
+</style>

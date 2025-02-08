@@ -12,12 +12,12 @@ const selectedIndex = ref(0)
 
 const searchResults = computed(() => {
   if (!searchQuery.value) return []
-  
+
   const query = searchQuery.value.toLowerCase()
   const results = []
-  
+
   // Search in notas
-  store.notas.forEach(nota => {
+  store.notas.forEach((nota) => {
     const titleMatch = nota.title.toLowerCase().includes(query)
     const contentMatch = nota.content.toLowerCase().includes(query)
     if (titleMatch || contentMatch) {
@@ -26,13 +26,13 @@ const searchResults = computed(() => {
         title: nota.title,
         preview: contentMatch ? highlightMatch(nota.content, query) : null,
         type: 'nota',
-        path: `/nota/${nota.id}`
+        path: `/nota/${nota.id}`,
       })
     }
   })
-  
+
   // Search in pages
-  store.pages.forEach(page => {
+  store.pages.forEach((page) => {
     const titleMatch = page.title.toLowerCase().includes(query)
     const contentMatch = page.content.toLowerCase().includes(query)
     if (titleMatch || contentMatch) {
@@ -41,28 +41,28 @@ const searchResults = computed(() => {
         title: page.title,
         preview: contentMatch ? highlightMatch(page.content, query) : null,
         type: 'page',
-        path: `/page/${page.id}`
+        path: `/page/${page.id}`,
       })
     }
   })
-  
+
   return results
 })
 
 const highlightMatch = (text: string, query: string) => {
   const index = text.toLowerCase().indexOf(query.toLowerCase())
   if (index === -1) return null
-  
+
   const start = Math.max(0, index - 40)
   const end = Math.min(text.length, index + query.length + 40)
   let preview = text.slice(start, end)
-  
+
   if (start > 0) preview = '...' + preview
   if (end < text.length) preview = preview + '...'
-  
+
   return preview.replace(
     new RegExp(query, 'gi'),
-    match => `<mark class="highlight">${match}</mark>`
+    (match) => `<mark class="highlight">${match}</mark>`,
   )
 }
 
@@ -76,9 +76,8 @@ const handleKeydown = (event: KeyboardEvent) => {
       break
     case 'ArrowUp':
       event.preventDefault()
-      selectedIndex.value = selectedIndex.value - 1 < 0 
-        ? searchResults.value.length - 1 
-        : selectedIndex.value - 1
+      selectedIndex.value =
+        selectedIndex.value - 1 < 0 ? searchResults.value.length - 1 : selectedIndex.value - 1
       break
     case 'Enter':
       event.preventDefault()
@@ -107,22 +106,22 @@ const navigateToResult = (path: string) => {
 <template>
   <div class="global-search">
     <div class="search-input-container">
-      <MagnifyingGlassIcon class="search-icon" style="width: 12px; height: 12px;" />
+      <MagnifyingGlassIcon class="search-icon" style="width: 12px; height: 12px" />
       <input
         v-model="searchQuery"
         placeholder="Search all notas and pages..."
         @focus="showResults = true"
-        @blur="setTimeout(() => showResults = false, 200)"
+        @blur="setTimeout(() => (showResults = false), 200)"
         @keydown="handleKeydown"
       />
     </div>
-    
+
     <div v-if="showResults && searchResults.length" class="search-results">
-      <div 
-        v-for="(result, index) in searchResults" 
+      <div
+        v-for="(result, index) in searchResults"
         :key="result.id"
         class="search-result"
-        :class="{'selected': index === selectedIndex}"
+        :class="{ selected: index === selectedIndex }"
         @click="navigateToResult(result.path)"
         @mouseover="selectedIndex = index"
       >
@@ -131,11 +130,7 @@ const navigateToResult = (path: string) => {
         </span>
         <div class="result-content">
           <div class="result-title">{{ result.title }}</div>
-          <div 
-            v-if="result.preview" 
-            class="result-preview"
-            v-html="result.preview"
-          ></div>
+          <div v-if="result.preview" class="result-preview" v-html="result.preview"></div>
         </div>
       </div>
     </div>
@@ -229,4 +224,4 @@ input {
   border-radius: 2px;
   padding: 0 2px;
 }
-</style> 
+</style>

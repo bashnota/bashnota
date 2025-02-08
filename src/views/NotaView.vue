@@ -30,7 +30,7 @@ watch(
       console.log('Loading nota:', newId)
     }
   },
-  { immediate: true }
+  { immediate: true },
 )
 </script>
 
@@ -38,12 +38,16 @@ watch(
   <div class="nota-view">
     <div class="nota-header">
       <h1>{{ nota?.title }}</h1>
-      <button class="config-button" @click="toggleConfigPage" :title="showConfigPage ? 'Hide settings' : 'Show settings'">
+      <button
+        class="config-button"
+        @click="toggleConfigPage"
+        :title="showConfigPage ? 'Hide settings' : 'Show settings'"
+      >
         <Cog6ToothIcon class="icon" />
         {{ showConfigPage ? 'Hide Settings' : 'Settings' }}
       </button>
     </div>
-    
+
     <div class="nota-content">
       <NotaEditor v-if="!showConfigPage" :nota-id="id" />
       <NotaConfigPage v-else :nota-id="id" />
@@ -101,4 +105,4 @@ watch(
   width: 1.25rem;
   height: 1.25rem;
 }
-</style> 
+</style>

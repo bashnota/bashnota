@@ -6,8 +6,8 @@
 </template>
 
 <script>
-import { EditorContent, EditorMenuBar, useEditor } from '@tiptap/vue-2';
-import StarterKit from '@tiptap/starter-kit';
+import { EditorContent, EditorMenuBar, useEditor } from '@tiptap/vue-2'
+import StarterKit from '@tiptap/starter-kit'
 
 export default {
   components: {
@@ -16,20 +16,18 @@ export default {
   },
   setup() {
     const editor = useEditor({
-      extensions: [
-        StarterKit,
-      ],
+      extensions: [StarterKit],
       content: '<p>Hello World!</p>',
-    });
+    })
 
     return {
       editor,
-    };
+    }
   },
   beforeUnmount() {
-    this.editor.destroy();
+    this.editor.destroy()
   },
-};
+}
 </script>
 
 <style>

@@ -2,20 +2,20 @@
 import { ref, computed, nextTick } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { useRouter } from 'vue-router'
-import { 
-  ChevronDownIcon, 
-  ChevronRightIcon, 
+import {
+  ChevronDownIcon,
+  ChevronRightIcon,
   DocumentTextIcon,
   TrashIcon,
   PlusIcon,
-  PencilIcon
+  PencilIcon,
 } from '@heroicons/vue/24/outline'
 import {
   ChevronDownIcon as ChevronDownIconSolid,
   ChevronRightIcon as ChevronRightIconSolid,
   DocumentTextIcon as DocumentTextIconSolid,
   TrashIcon as TrashIconSolid,
-  PlusIcon as PlusIconSolid
+  PlusIcon as PlusIconSolid,
 } from '@heroicons/vue/24/solid'
 
 const props = defineProps<{
@@ -49,7 +49,7 @@ const deletePage = async (event: Event) => {
 
 const createNewPage = async () => {
   if (!newPageTitle.value.trim() || !page.value) return
-  
+
   const newPage = await store.createPage(newPageTitle.value, page.value.id)
   newPageTitle.value = ''
   showNewPageInput.value = false
@@ -85,21 +85,13 @@ const handleKeydown = (event: KeyboardEvent) => {
 
 <template>
   <div class="page-tree-item" v-if="page">
-    <div 
-      class="page-item"
-      :class="{ 'active': $route.params.id === page.id }"
-      @click="openPage"
-    >
+    <div class="page-item" :class="{ active: $route.params.id === page.id }" @click="openPage">
       <div class="page-content">
-        <button 
-          v-if="children.length"
-          class="expand-button"
-          @click.stop="isExpanded = !isExpanded"
-        >
-          <ChevronDownIcon v-if="isExpanded" style="width: 10px; height: 10px;" />
-          <ChevronRightIcon v-else style="width: 10px; height: 10px;" />
+        <button v-if="children.length" class="expand-button" @click.stop="isExpanded = !isExpanded">
+          <ChevronDownIcon v-if="isExpanded" style="width: 10px; height: 10px" />
+          <ChevronRightIcon v-else style="width: 10px; height: 10px" />
         </button>
-        <DocumentTextIcon class="text-blue-500" style="width: 12px; height: 12px;" />
+        <DocumentTextIcon class="text-blue-500" style="width: 12px; height: 12px" />
         <div class="page-title">
           <input
             v-if="isEditing"
@@ -114,26 +106,14 @@ const handleKeydown = (event: KeyboardEvent) => {
         </div>
       </div>
       <div class="page-actions">
-        <button 
-          class="action-button"
-          @click.stop="showNewPageInput = true"
-          title="Add sub-page"
-        >
-          <PlusIcon style="width: 10px; height: 10px;" />
+        <button class="action-button" @click.stop="showNewPageInput = true" title="Add sub-page">
+          <PlusIcon style="width: 10px; height: 10px" />
         </button>
-        <button 
-          class="action-button delete"
-          @click="deletePage"
-          title="Delete page"
-        >
-          <TrashIcon style="width: 10px; height: 10px;" />
+        <button class="action-button delete" @click="deletePage" title="Delete page">
+          <TrashIcon style="width: 10px; height: 10px" />
         </button>
-        <button 
-          class="action-button"
-          @click="startEditing"
-          title="Rename page"
-        >
-          <PencilIcon style="width: 10px; height: 10px;" />
+        <button class="action-button" @click="startEditing" title="Rename page">
+          <PencilIcon style="width: 10px; height: 10px" />
         </button>
       </div>
     </div>
@@ -160,11 +140,7 @@ const handleKeydown = (event: KeyboardEvent) => {
       leave-to-class="transform scale-95 opacity-0"
     >
       <div v-if="isExpanded && children.length" class="children">
-        <page-tree-item
-          v-for="child in children"
-          :key="child.id"
-          :page-id="child.id"
-        />
+        <page-tree-item v-for="child in children" :key="child.id" :page-id="child.id" />
       </div>
     </transition>
   </div>
@@ -291,4 +267,4 @@ const handleKeydown = (event: KeyboardEvent) => {
   outline: none;
   border-color: var(--color-primary);
 }
-</style> 
+</style>

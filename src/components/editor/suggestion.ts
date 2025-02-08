@@ -48,72 +48,42 @@ export default {
         title: 'Python Code',
         icon: 'Py',
         command: ({ editor, range }) => {
-          editor
-            .chain()
-            .focus()
-            .deleteRange(range)
-            .setCodeBlock({ language: 'python' })
-            .run()
+          editor.chain().focus().deleteRange(range).setCodeBlock({ language: 'python' }).run()
         },
       },
       {
         title: 'JavaScript Code',
         icon: 'JS',
         command: ({ editor, range }) => {
-          editor
-            .chain()
-            .focus()
-            .deleteRange(range)
-            .setCodeBlock({ language: 'javascript' })
-            .run()
+          editor.chain().focus().deleteRange(range).setCodeBlock({ language: 'javascript' }).run()
         },
       },
       {
         title: 'TypeScript Code',
         icon: 'TS',
         command: ({ editor, range }) => {
-          editor
-            .chain()
-            .focus()
-            .deleteRange(range)
-            .setCodeBlock({ language: 'typescript' })
-            .run()
+          editor.chain().focus().deleteRange(range).setCodeBlock({ language: 'typescript' }).run()
         },
       },
       {
         title: 'R Code',
         icon: 'R',
         command: ({ editor, range }) => {
-          editor
-            .chain()
-            .focus()
-            .deleteRange(range)
-            .setCodeBlock({ language: 'r' })
-            .run()
+          editor.chain().focus().deleteRange(range).setCodeBlock({ language: 'r' }).run()
         },
       },
       {
         title: 'SQL Code',
         icon: 'SQL',
         command: ({ editor, range }) => {
-          editor
-            .chain()
-            .focus()
-            .deleteRange(range)
-            .setCodeBlock({ language: 'sql' })
-            .run()
+          editor.chain().focus().deleteRange(range).setCodeBlock({ language: 'sql' }).run()
         },
       },
       {
         title: 'Shell Script',
         icon: '$',
         command: ({ editor, range }) => {
-          editor
-            .chain()
-            .focus()
-            .deleteRange(range)
-            .setCodeBlock({ language: 'bash' })
-            .run()
+          editor.chain().focus().deleteRange(range).setCodeBlock({ language: 'bash' }).run()
         },
       },
       {
@@ -131,13 +101,13 @@ export default {
             const store = useNotaStore()
             const currentRoute = router.currentRoute.value
             const parentId = currentRoute.params.id as string
-            
+
             const title = prompt('Enter page title:')
             if (!title) return
 
             try {
               const newPage = await store.createPage(title, parentId)
-              
+
               editor
                 .chain()
                 .focus()
@@ -146,8 +116,8 @@ export default {
                   type: 'pageLink',
                   attrs: {
                     href: `/page/${newPage.id}`,
-                    title: title
-                  }
+                    title: title,
+                  },
                 })
                 .run()
 
@@ -172,9 +142,9 @@ export default {
               type: 'executableCodeBlock',
               attrs: {
                 language: 'python',
-                executeable: true
+                executeable: true,
               },
-              content: [{ type: 'text', text: '# Your Python code here' }]
+              content: [{ type: 'text', text: '# Your Python code here' }],
             })
             .run()
         },
@@ -191,9 +161,9 @@ export default {
               type: 'executableCodeBlock',
               attrs: {
                 language: 'r',
-                executeable: true
+                executeable: true,
               },
-              content: [{ type: 'text', text: '# Your R code here' }]
+              content: [{ type: 'text', text: '# Your R code here' }],
             })
             .run()
         },
@@ -202,9 +172,9 @@ export default {
 
     if (!query) return items
 
-    return items.filter(item =>
-      item.title.toLowerCase().includes(query.toLowerCase())
-    ).slice(0, 10)
+    return items
+      .filter((item) => item.title.toLowerCase().includes(query.toLowerCase()))
+      .slice(0, 10)
   },
 
   render: () => {

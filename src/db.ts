@@ -25,9 +25,9 @@ export class NotaDB extends Dexie {
     super('notadb')
     this.version(1).stores({
       notas: 'id, title, createdAt, updatedAt',
-      pages: 'id, title, createdAt, updatedAt'
+      pages: 'id, title, createdAt, updatedAt',
     })
   }
 }
 
-export const db = new NotaDB() 
+export const db = new NotaDB()

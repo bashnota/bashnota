@@ -56,4 +56,4 @@ defineEmits(['toggleSidebar', 'toggleEditorSidebar'])
 
 <template>
   <!-- This component doesn't render anything -->
-</template> 
+</template>

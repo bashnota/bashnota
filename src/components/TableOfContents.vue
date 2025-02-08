@@ -7,24 +7,24 @@ const props = defineProps<{
 
 const headings = computed(() => {
   if (!props.editor) return []
-  
+
   const json = props.editor.getJSON()
   const headings = []
-  
+
   const processNode = (node: any, level = 0) => {
     if (node.type === 'heading') {
       headings.push({
         level: node.attrs.level,
         text: node.content?.[0]?.text || '',
-        indent: level
+        indent: level,
       })
     }
     if (node.content) {
       node.content.forEach((child: any) => processNode(child, level + 1))
     }
   }
-  
-  json.content?.forEach(node => processNode(node))
+
+  json.content?.forEach((node) => processNode(node))
   return headings
 })
 
@@ -34,9 +34,9 @@ const scrollToHeading = (text: string) => {
     document.body,
     null,
     XPathResult.FIRST_ORDERED_NODE_TYPE,
-    null
+    null,
   ).singleNodeValue as HTMLElement
-  
+
   if (element) {
     element.scrollIntoView({ behavior: 'smooth' })
   }
@@ -95,4 +95,4 @@ h3 {
 .toc-item:hover {
   background: var(--color-toc-hover);
 }
-</style> 
+</style>
