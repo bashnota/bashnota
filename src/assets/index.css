@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'Google Sans';
+  src: url('/fonts/google-sans.woff2') format('woff2');
+}
+
+body {
+  @apply font-sans;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

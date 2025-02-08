@@ -84,6 +84,9 @@ export const theme = {
       'collapsible-down': 'collapsible-down 0.2s ease-in-out',
       'collapsible-up': 'collapsible-up 0.2s ease-in-out',
     },
+    fontFamily: {
+      sans: ['Google Sans', 'sans-serif'],
+    },
   },
 }
 export const plugins = [animate]
