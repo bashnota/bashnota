@@ -5,8 +5,18 @@ import { useNotaStore } from '@/stores/nota'
 import { onKeyStroke } from '@vueuse/core'
 import PageTree from './PageTree.vue'
 import DarkModeToggle from './DarkModeToggle.vue'
-import { PlusIcon, MagnifyingGlassIcon, PencilIcon, TrashIcon } from '@heroicons/vue/24/solid'
-import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/vue/24/solid'
+import {
+  PlusIcon,
+  MagnifyingGlassIcon,
+  PencilIcon,
+  TrashIcon,
+  DocumentTextIcon,
+  FolderIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+} from '@heroicons/vue/24/solid'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 
 const router = useRouter()
 const route = useRoute()
@@ -31,15 +41,6 @@ const filteredNotas = computed(() => {
   return notaStore.notas.filter((nota) => nota.title.toLowerCase().includes(query))
 })
 
-const notaPages = computed(() => {
-  return notaStore.notas
-    .map((nota) => ({
-      nota,
-      pages: notaStore.getNotaPages(nota.id),
-    }))
-    .filter((item) => item.pages.length > 0)
-})
-
 const createNewNota = async () => {
   if (!newNotaTitle.value.trim()) return
   const nota = await notaStore.createNota(newNotaTitle.value)
@@ -53,10 +54,6 @@ const handleKeydown = (event: KeyboardEvent) => {
     showNewNotaInput.value = false
     newNotaTitle.value = ''
   }
-}
-
-const openNota = (id: string) => {
-  router.push(`/nota/${id}`)
 }
 
 const toggleNota = (notaId: string) => {
@@ -104,293 +101,126 @@ onKeyStroke('/', (e) => {
 </script>
 
 <template>
-  <div class="sidebar">
-    <div class="sidebar-header">
-      <div class="header-top">
-        <h1 class="app-title">BashNota</h1>
+  <div class="w-[300px] h-full flex flex-col border-e bg-slate-100 dark:bg-slate-900">
+    <!-- Header -->
+    <div class="p-6 border-b space-y-4">
+      <div class="flex items-center justify-between">
+        <h1 class="text-xl font-semibold">BashNota</h1>
         <DarkModeToggle />
       </div>
 
-      <!-- Search Bar -->
-      <div class="search-bar">
-        <MagnifyingGlassIcon class="search-icon" style="width: 12px; height: 12px" />
-        <input v-model="searchQuery" placeholder="Search notas..." class="search-input" />
+      <!-- Search -->
+      <div class="relative">
+        <MagnifyingGlassIcon
+          class="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground"
+        />
+        <Input v-model="searchQuery" placeholder="Search notas..." class="pl-8 text-sm" />
       </div>
 
       <!-- New Nota Button/Input -->
-      <div class="new-nota-section">
-        <template v-if="showNewNotaInput">
-          <input
-            v-model="newNotaTitle"
-            placeholder="New nota title..."
-            class="new-nota-input"
-            @keyup.enter="createNewNota"
-            @keydown="handleKeydown"
-            ref="newNotaInput"
-            autofocus
-          />
-        </template>
-        <button v-else class="new-nota-button" @click="showNewNotaInput = true">
-          <PlusIcon style="width: 12px; height: 12px" />
-          <span>New Nota</span>
-        </button>
+      <div>
+        <Input
+          v-if="showNewNotaInput"
+          v-model="newNotaTitle"
+          placeholder="New nota title..."
+          class="text-sm"
+          @keyup.enter="createNewNota"
+          @keydown="handleKeydown"
+          ref="newNotaInput"
+          autofocus
+        />
+        <Button
+          v-else
+          @click="showNewNotaInput = true"
+          class="w-full justify-start gap-2 text-sm"
+          variant="default"
+        >
+          <PlusIcon class="h-3 w-3" />
+          New Nota
+        </Button>
       </div>
     </div>
 
     <!-- Nota List -->
-    <div class="nota-list">
-      <div v-for="nota in filteredNotas" :key="nota.id" class="nota-item">
-        <div class="nota-header">
+    <div class="flex-1 overflow-y-auto p-4 space-y-1">
+      <div v-for="nota in filteredNotas" :key="nota.id" class="group">
+        <div class="flex items-center gap-1 rounded-md py-1.5 text-sm">
+          <!-- Expand/Indent Button -->
           <button
-            class="expand-button"
-            @click="toggleNota(nota.id)"
             v-if="notaStore.getNotaPages(nota.id)?.length"
+            @click="toggleNota(nota.id)"
+            class="w-5 h-5 flex items-center justify-center text-muted-foreground hover:text-foreground"
           >
-            <ChevronDownIcon v-if="expandedNotas.has(nota.id)" class="icon" />
-            <ChevronRightIcon v-else class="icon" />
+            <ChevronDownIcon v-if="expandedNotas.has(nota.id)" class="h-4 w-4" />
+            <ChevronRightIcon v-else class="h-4 w-4" />
           </button>
-          <span v-else class="indent"></span>
-          <template v-if="showRenameInput === nota.id">
-            <input
-              v-model="renameTitle"
-              class="rename-input"
-              @keyup.enter="handleRename(nota.id)"
-              @keyup.esc="showRenameInput = null"
-              @blur="handleRename(nota.id)"
-              ref="renameInput"
-              autofocus
+          <div v-else class="w-5"></div>
+
+          <!-- Title/Rename Input -->
+          <Input
+            v-if="showRenameInput === nota.id"
+            v-model="renameTitle"
+            class="h-7 text-sm"
+            @keyup.enter="handleRename(nota.id)"
+            @keyup.esc="showRenameInput = null"
+            @blur="handleRename(nota.id)"
+            ref="renameInput"
+            autofocus
+          />
+          <RouterLink
+            v-else
+            :to="`/nota/${nota.id}`"
+            class="flex items-center gap-2 flex-1 px-2 py-2 rounded-md hover:bg-slate-200"
+          >
+            <!-- Nota Icon -->
+            <FolderIcon
+              v-if="notaStore.getNotaPages(nota.id)?.length"
+              class="h-4 w-4 text-muted-foreground"
             />
-          </template>
-          <template v-else>
-            <RouterLink :to="`/nota/${nota.id}`" class="nota-link">
-              {{ nota.title }}
-            </RouterLink>
-            <div class="nota-actions">
-              <button class="action-button" @click="startRename(nota)" title="Rename">
-                <PencilIcon class="icon" />
-              </button>
-              <button class="action-button" @click="handleDelete(nota.id)" title="Delete">
-                <TrashIcon class="icon" />
-              </button>
-            </div>
-          </template>
+            <DocumentTextIcon v-else class="h-4 w-4 text-muted-foreground" />
+            {{ nota.title }}
+          </RouterLink>
+
+          <!-- Actions -->
+          <div class="opacity-0 group-hover:opacity-100 flex items-center gap-1 pr-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-7 w-7"
+              @click="startRename(nota)"
+              title="Rename"
+            >
+              <PencilIcon class="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-7 w-7 hover:text-red-500"
+              @click="handleDelete(nota.id)"
+              title="Delete"
+            >
+              <TrashIcon class="h-3 w-3" />
+            </Button>
+          </div>
         </div>
-        <div v-if="expandedNotas.has(nota.id)" class="page-list">
+
+        <!-- Page Tree -->
+        <div v-if="expandedNotas.has(nota.id)" class="ml-6 mt-1">
           <PageTree :pages="notaStore.getNotaPages(nota.id)" />
         </div>
       </div>
-      <div v-if="filteredNotas.length === 0" class="empty-state">
-        <p v-if="searchQuery">No notas found</p>
-        <p v-else>Create your first nota</p>
+
+      <!-- Empty State -->
+      <div
+        v-if="filteredNotas.length === 0"
+        class="flex flex-col items-center justify-center h-32 text-sm text-muted-foreground gap-3"
+      >
+        <div class="rounded-full bg-muted/50 p-3">
+          <FolderIcon v-if="!searchQuery" class="w-5 h-5" />
+          <MagnifyingGlassIcon v-else class="w-5 h-5" />
+        </div>
+        {{ searchQuery ? 'No notas found' : 'Create your first nota' }}
       </div>
     </div>
   </div>
 </template>
-
-<style scoped>
-.sidebar {
-  display: flex;
-  flex-direction: column;
-  background: var(--color-background-soft);
-  height: 100%;
-  width: 300px;
-  border-right: 1px solid var(--color-border);
-}
-
-.sidebar-header {
-  padding: 1.5rem;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.header-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1.5rem;
-}
-
-.app-title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: var(--color-heading);
-}
-
-.search-bar {
-  position: relative;
-  margin-bottom: 1rem;
-}
-
-.search-icon {
-  position: absolute;
-  left: 0.5rem;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--color-text-light);
-}
-
-.search-input {
-  width: 100%;
-  padding: 0.5rem 0.75rem 0.5rem 1.75rem;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-background);
-  font-size: 0.875rem;
-}
-
-.new-nota-section {
-  margin-bottom: 1rem;
-}
-
-.new-nota-button {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  width: 100%;
-  padding: 0.5rem;
-  background: var(--color-primary);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.new-nota-button:hover {
-  background: var(--color-primary-dark);
-}
-
-.new-nota-input {
-  width: 100%;
-  padding: 0.5rem;
-  border: 2px solid var(--color-primary);
-  border-radius: 6px;
-  font-size: 0.875rem;
-}
-
-.nota-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 1rem;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 2rem;
-  color: var(--color-text-light);
-}
-
-/* Custom scrollbar */
-.nota-list::-webkit-scrollbar {
-  width: 6px;
-}
-
-.nota-list::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.nota-list::-webkit-scrollbar-thumb {
-  background: var(--color-border);
-  border-radius: 3px;
-}
-
-.nota-list::-webkit-scrollbar-thumb:hover {
-  background: var(--color-text-light);
-}
-
-.nota-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem;
-  border-radius: 4px;
-}
-
-.nota-header:hover {
-  background: var(--color-background-mute);
-}
-
-.nota-header:hover .nota-actions {
-  opacity: 1;
-}
-
-.nota-actions {
-  display: flex;
-  gap: 0.25rem;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.action-button {
-  padding: 0.25rem;
-  background: none;
-  border: none;
-  border-radius: 4px;
-  color: var(--color-text-light);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.action-button:hover {
-  color: var(--color-text);
-  background: var(--color-background);
-}
-
-.action-button .icon {
-  width: 1rem;
-  height: 1rem;
-}
-
-.rename-input {
-  flex: 1;
-  padding: 0.25rem 0.5rem;
-  border: 1px solid var(--color-primary);
-  border-radius: 4px;
-  font-size: 0.875rem;
-  background: var(--color-background);
-}
-
-.expand-button {
-  padding: 0.25rem;
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--color-text-light);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.expand-button:hover {
-  color: var(--color-text);
-}
-
-.expand-button .icon {
-  width: 1rem;
-  height: 1rem;
-}
-
-.nota-item {
-  margin-bottom: 0.5rem;
-}
-
-.nota-link {
-  flex: 1;
-  display: block;
-  padding: 0.25rem 0.5rem;
-  color: var(--color-text);
-  text-decoration: none;
-  border-radius: 4px;
-  transition: all 0.2s;
-}
-
-.nota-link:hover {
-  background: var(--color-background-mute);
-}
-
-.page-list {
-  margin-left: 1.5rem;
-  margin-top: 0.25rem;
-}
-</style>

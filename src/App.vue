@@ -5,7 +5,6 @@ import BreadcrumbNav from './components/BreadcrumbNav.vue'
 import GlobalSearch from './components/GlobalSearch.vue'
 import KeyboardShortcuts from './components/KeyboardShortcuts.vue'
 import ShortcutsDialog from './components/ShortcutsDialog.vue'
-import ColorSchemeToggle from './components/ColorSchemeToggle.vue'
 import { Bars3Icon as MenuIcon } from '@heroicons/vue/24/solid'
 import { ref, onMounted, watch } from 'vue'
 import { useNotaStore } from '@/stores/nota'
@@ -79,11 +78,7 @@ const resetWidth = () => {
 
 <template>
   <div class="app-container">
-    <AppSidebar
-      class="sidebar"
-      :class="{ closed: !isSidebarOpen }"
-      :style="{ width: sidebarWidth + 'px' }"
-    />
+    <AppSidebar />
     <div
       v-if="isSidebarOpen"
       class="resize-handle"
@@ -102,7 +97,6 @@ const resetWidth = () => {
         <BreadcrumbNav />
         <div class="top-bar-right">
           <GlobalSearch />
-          <ColorSchemeToggle />
           <button class="icon-button" @click="showShortcuts" title="Keyboard shortcuts">
             <KeyIcon class="w-4 h-4" />
           </button>

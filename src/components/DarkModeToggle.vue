@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted } from 'vue'
 import { SunIcon, MoonIcon } from '@heroicons/vue/24/solid'
+import { Button } from '@/components/ui/button'
 
 const isDark = ref(false)
 
@@ -27,36 +28,14 @@ const updateTheme = () => {
 </script>
 
 <template>
-  <button
-    class="theme-toggle"
+  <Button
+    variant="ghost"
+    size="icon"
     @click="toggleDarkMode"
     :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
+    class="h-9 w-9 transition-colors hover:bg-accent hover:text-accent-foreground"
   >
-    <SunIcon v-if="!isDark" class="icon" />
-    <MoonIcon v-else class="icon" />
-  </button>
+    <SunIcon v-if="!isDark" class="h-5 w-5" />
+    <MoonIcon v-else class="h-5 w-5" />
+  </Button>
 </template>
-
-<style scoped>
-.theme-toggle {
-  padding: 0.5rem;
-  background: none;
-  border: none;
-  border-radius: 6px;
-  color: var(--color-text);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-}
-
-.theme-toggle:hover {
-  background: var(--color-background-mute);
-}
-
-.icon {
-  width: 1.25rem;
-  height: 1.25rem;
-}
-</style>
