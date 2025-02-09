@@ -233,32 +233,115 @@ const wordCount = computed(() => {
 </template>
 
 <style>
-/* TipTap Specific Styles */
 .ProseMirror {
   @apply outline-none min-h-[calc(100vh-10rem)];
 }
 
+/* Editor Typography */
+.ProseMirror h1 {
+  @apply text-4xl font-bold tracking-tight mt-6 mb-2;
+}
+
+.ProseMirror h2 {
+  @apply text-2xl font-semibold tracking-tight mt-4 mb-2;
+}
+
+.ProseMirror h3 {
+  @apply text-xl font-semibold tracking-tight mt-2 mb-2;
+}
+
+.ProseMirror p {
+  @apply leading-7;
+}
+
+/* Lists */
+.ProseMirror ul {
+  @apply my-4 ml-6 list-disc;
+}
+
+.ProseMirror ol {
+  @apply my-4 ml-6 list-decimal;
+}
+
+/* Nested Lists */
+.ProseMirror li > ul,
+.ProseMirror li > ol {
+  @apply my-2 ml-6;
+}
+
+/* Blockquotes */
+.ProseMirror blockquote {
+  @apply mt-4 border-l-2 border-foreground/20 pl-6 italic;
+}
+
+/* Code Blocks */
+.ProseMirror pre {
+  @apply my-4 p-4 bg-muted rounded-lg overflow-x-auto font-mono text-sm;
+}
+
+.ProseMirror code {
+  @apply relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm;
+}
+
+.ProseMirror pre code {
+  @apply bg-transparent p-0;
+}
+
+/* Empty State */
 .ProseMirror p.is-empty::before {
   @apply text-muted-foreground float-left pointer-events-none h-0;
   content: attr(data-placeholder);
 }
 
-.code-block {
-  @apply bg-muted p-3 rounded-md font-mono my-4;
+/* Links */
+.ProseMirror a {
+  @apply text-primary underline-offset-4 hover:underline;
 }
 
-/* Table Styles */
+/* Tables */
 .ProseMirror table {
-  @apply w-full border-collapse table-fixed;
+  @apply w-full border-collapse my-6;
 }
 
 .ProseMirror td,
 .ProseMirror th {
-  @apply border-2 border-border p-2 align-top relative min-w-[1em];
+  @apply border border-border p-2 align-top;
 }
 
 .ProseMirror th {
-  @apply bg-muted font-bold text-left;
+  @apply bg-muted font-semibold text-left;
+}
+
+/* Horizontal Rule */
+.ProseMirror hr {
+  @apply my-8 border-foreground/20;
+}
+
+/* Selection */
+.ProseMirror ::selection {
+  @apply bg-primary/20;
+}
+
+/* Focus Styles */
+.ProseMirror:focus {
+  @apply outline-none;
+}
+
+/* Lists with Checkboxes */
+.ProseMirror ul[data-type='taskList'] {
+  @apply list-none p-0;
+}
+
+.ProseMirror ul[data-type='taskList'] li {
+  @apply flex items-start gap-2;
+}
+
+.ProseMirror ul[data-type='taskList'] li > label {
+  @apply mt-1;
+}
+
+.ProseMirror ul[data-type='taskList'] li > div {
+  @apply flex-1;
 }
 
 /* Link Styles */
