@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { ListOrdered, Heading1, Heading2, Heading3 } from 'lucide-vue-next'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
 
 const props = defineProps<{
   editor: any
@@ -41,58 +45,62 @@ const scrollToHeading = (text: string) => {
     element.scrollIntoView({ behavior: 'smooth' })
   }
 }
+
+const getHeadingIcon = (level: number) => {
+  switch (level) {
+    case 1:
+      return Heading1
+    case 2:
+      return Heading2
+    default:
+      return Heading3
+  }
+}
 </script>
 
 <template>
-  <div class="table-of-contents">
-    <h3>Table of Contents</h3>
-    <div class="toc-items">
-      <button
-        v-for="(heading, index) in headings"
-        :key="index"
-        class="toc-item"
-        :style="{ paddingLeft: `${heading.level * 1}rem` }"
-        @click="scrollToHeading(heading.text)"
-      >
-        {{ heading.text }}
-      </button>
+  <div class="flex flex-col gap-4">
+    <!-- Enhanced Header -->
+    <div class="flex flex-col gap-2">
+      <div class="flex items-center gap-2 px-2">
+        <ListOrdered class="w-4 h-4 text-primary" />
+        <h3 class="font-semibold">Table of Contents</h3>
+      </div>
+      <Separator class="w-full" />
     </div>
+
+    <ScrollArea class="flex-1">
+      <div v-if="headings.length === 0" class="px-4 py-8 text-center">
+        <ListOrdered class="w-8 h-8 mx-auto mb-3 text-muted-foreground/50" />
+        <p class="text-sm font-medium text-muted-foreground">No headings found</p>
+        <p class="text-xs text-muted-foreground/80 mt-1">
+          Add headings to your document to see them here
+        </p>
+      </div>
+
+      <div v-else class="flex flex-col gap-0.5">
+        <Button
+          v-for="(heading, index) in headings"
+          :key="index"
+          variant="ghost"
+          size="sm"
+          class="justify-start h-auto py-1.5 px-2 group"
+          :style="{ paddingLeft: `${heading.level * 0.75}rem` }"
+          @click="scrollToHeading(heading.text)"
+        >
+          <div class="flex items-center gap-2 w-full">
+            <component
+              :is="getHeadingIcon(heading.level)"
+              class="w-3 h-3 flex-shrink-0 text-muted-foreground/70 group-hover:text-primary transition-colors"
+            />
+            <span
+              class="text-sm truncate text-muted-foreground group-hover:text-foreground transition-colors"
+            >
+              {{ heading.text }}
+            </span>
+          </div>
+        </Button>
+      </div>
+    </ScrollArea>
   </div>
 </template>
-
-<style scoped>
-.table-of-contents {
-  padding: 1rem;
-  background: var(--color-toc-background);
-  border-radius: 8px;
-  margin-bottom: 1rem;
-}
-
-h3 {
-  font-size: 1rem;
-  margin-bottom: 0.75rem;
-  color: var(--color-toc-text);
-}
-
-.toc-items {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.toc-item {
-  text-align: left;
-  padding: 0.25rem;
-  background: none;
-  border: none;
-  border-radius: 4px;
-  font-size: 0.875rem;
-  color: var(--color-toc-text);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.toc-item:hover {
-  background: var(--color-toc-hover);
-}
-</style>

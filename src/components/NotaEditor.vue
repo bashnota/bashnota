@@ -161,9 +161,9 @@ const wordCount = computed(() => {
   <div class="flex h-full">
     <!-- Sidebar -->
     <div
-      class="transition-all duration-300 ease-in-out border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 relative"
+      class="transition-all duration-300 ease-in-out border-r relative"
       :class="{
-        'w-64 px-6 py-4': isSidebarOpen,
+        'w-72 px-6 py-4': isSidebarOpen,
         'w-0 p-0': !isSidebarOpen,
       }"
     >
@@ -175,9 +175,7 @@ const wordCount = computed(() => {
     <!-- Main Editor Area -->
     <div class="flex-1 flex flex-col min-w-0">
       <!-- Editor Toolbar -->
-      <div
-        class="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10"
-      >
+      <div class="border-b backdrop-blur sticky top-0 z-10">
         <EditorToolbar v-if="editor" :editor="editor" class="px-4 py-2" />
 
         <!-- Editor Info Bar -->
