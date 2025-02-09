@@ -4,20 +4,14 @@ import AppSidebar from './components/layout/AppSidebar.vue'
 import BreadcrumbNav from './components/layout/BreadcrumbNav.vue'
 import { Bars3Icon as MenuIcon } from '@heroicons/vue/24/solid'
 import { ref, onMounted, watch } from 'vue'
-import { useNotaStore } from '@/stores/nota'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 const isSidebarOpen = ref(true)
 const sidebarWidth = ref(300)
-const store = useNotaStore()
 const isResizing = ref(false)
 
 onMounted(() => {
-  // Load data
-  store.loadNotas()
-  store.loadPages()
-
   const savedState = localStorage.getItem('sidebar-state')
   if (savedState) {
     isSidebarOpen.value = JSON.parse(savedState)

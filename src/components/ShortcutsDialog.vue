@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { Dialog, DialogPanel } from '@headlessui/vue'
-import { KeyIcon } from '@heroicons/vue/24/outline'
 
 const isOpen = ref(false)
 

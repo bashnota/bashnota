@@ -1,57 +1,27 @@
 import type { NotaConfig } from './jupyter'
 
-export interface Page {
-  id: string
-  title: string
-  content: string
-  createdAt: Date
-  updatedAt: Date
-  parentId: string | null
-  children: string[]
-  type: 'page'
+export enum DocumentType {
+  PAGE = 'page',
+  NOTA = 'nota',
 }
 
-export interface Nota {
+interface BaseDocument {
   id: string
   title: string
   content: string
-  createdAt: Date
-  updatedAt: Date
+  createdAt: Date | string
+  updatedAt: Date | string
+  type: DocumentType
+}
+
+export interface Page extends BaseDocument {
+  parentId: string | null
+  children: string[]
+  type: DocumentType.PAGE
+}
+
+export interface Nota extends BaseDocument {
   pages: string[]
-  type: 'nota'
+  type: DocumentType.NOTA
   config?: NotaConfig
-}
-
-export interface StoredNota {
-  id: string
-  title: string
-  content: string
-  createdAt: string
-  updatedAt: string
-  pages: string[]
-  type: 'nota'
-  config?: {
-    jupyterServers: Array<{
-      ip: string
-      port: string
-      token: string
-    }>
-    notebooks: Array<{
-      notebook: string
-      server: string
-      kernel: string
-    }>
-    kernels: Record<string, string[]>
-  }
-}
-
-export interface StoredPage {
-  id: string
-  title: string
-  content: string
-  createdAt: string
-  updatedAt: string
-  parentId: string | null
-  children: string[]
-  type: 'page'
 }

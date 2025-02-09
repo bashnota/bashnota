@@ -34,6 +34,8 @@ export const ExecutableCodeBlockExtension = CodeBlock.extend({
   },
 
   addNodeView() {
+    // eslint-disable-next-line
+    // @ts-ignore
     return VueNodeViewRenderer(ExecutableCodeBlock)
   },
 

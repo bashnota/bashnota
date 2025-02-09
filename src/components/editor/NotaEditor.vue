@@ -14,7 +14,6 @@ import EditorToolbar from './EditorToolbar.vue'
 import SlashCommands from './extensions/Commands'
 import suggestion from './extensions/suggestion'
 import { ref, watch, computed } from 'vue'
-import { common, createLowlight } from 'lowlight'
 import 'highlight.js/styles/github.css'
 import { useRouter } from 'vue-router'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
@@ -25,7 +24,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { ListIcon } from 'lucide-vue-next'
 
 const props = defineProps<{
-  notaId?: string
+  notaId: string
 }>()
 
 const emit = defineEmits<{
@@ -41,26 +40,6 @@ const content = computed(() => {
   return nota?.content || ''
 })
 
-// Create lowlight instance with common languages
-const lowlight = createLowlight(common)
-
-// Register languages directly
-Promise.all([
-  import('highlight.js/lib/languages/python'),
-  import('highlight.js/lib/languages/javascript'),
-  import('highlight.js/lib/languages/typescript'),
-  import('highlight.js/lib/languages/r'),
-  import('highlight.js/lib/languages/sql'),
-  import('highlight.js/lib/languages/bash'),
-]).then(([python, javascript, typescript, r, sql, bash]) => {
-  lowlight.register('python', python.default)
-  lowlight.register('javascript', javascript.default)
-  lowlight.register('typescript', typescript.default)
-  lowlight.register('r', r.default)
-  lowlight.register('sql', sql.default)
-  lowlight.register('bash', bash.default)
-})
-
 const editor = useEditor({
   content: content.value,
   extensions: [
@@ -72,7 +51,6 @@ const editor = useEditor({
         class: 'code-block',
       },
       languageClassPrefix: 'language-',
-      lowlight,
     }),
     Link.configure({
       openOnClick: false,

@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { JupyterService } from '@/services/jupyterService'
 import LoadingSpinner from './LoadingSpinner.vue'
-import type { JupyterServer } from '@/types/jupyter'
+import type { JupyterServer, KernelSpec } from '@/types/jupyter'
 import { ServerIcon, CpuChipIcon, ArrowPathIcon, Cog6ToothIcon } from '@heroicons/vue/24/outline'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
@@ -29,9 +29,6 @@ const isTestingConnection = ref(false)
 const isRefreshingKernels = ref(false)
 const testResults = ref<Record<string, { success: boolean; message: string }>>({})
 
-// Active tab state
-const activeTab = ref('servers') // 'servers', 'kernels', or 'settings'
-
 // Load config from store
 const config = computed(() => {
   const nota = store.getCurrentNota(props.notaId)
@@ -39,7 +36,7 @@ const config = computed(() => {
     nota?.config || {
       jupyterServers: [],
       notebooks: [],
-      kernels: {},
+      kernels: {} as Record<string, KernelSpec[]>,
     }
   )
 })
@@ -126,7 +123,7 @@ const removeServer = async (server: JupyterServer) => {
         <h2 class="text-2xl font-semibold tracking-tight">Nota Configuration</h2>
       </div>
 
-      <Tabs :default-value="activeTab" class="w-full" @update:value="activeTab = $event">
+      <Tabs default-value="servers" class="w-full">
         <TabsList class="grid w-full grid-cols-3">
           <TabsTrigger value="servers">
             <div class="flex items-center justify-center gap-2 p-1">
@@ -285,11 +282,11 @@ const removeServer = async (server: JupyterServer) => {
                       <div class="space-y-2 flex-1">
                         <div class="space-y-1">
                           <div class="flex flex-col items-start gap-2">
-                            <span class="font-medium">{{ kernel.display_name }}</span>
+                            <span class="font-medium">{{ kernel.spec.display_name }}</span>
                             <span
                               class="text-xs sn px-3 rounded-full bg-slate-100 dark:bg-slate-800 border font-medium"
                             >
-                              {{ kernel.language }}
+                              {{ kernel.spec.language }}
                             </span>
                           </div>
                         </div>

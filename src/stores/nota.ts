@@ -1,21 +1,14 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { db } from '@/db'
-import type { JupyterServer } from '@/types/jupyter'
-import type { Nota, Page, StoredNota, StoredPage } from '@/types/nota'
-
-export interface NotaConfig {
-  jupyterServers: JupyterServer[]
-  notebooks: Array<{ notebook: string; server: string; kernel: string }>
-  kernels: Record<string, string> // blockId -> kernelName mapping
-}
+import { DocumentType, type Nota, type Page } from '@/types/nota'
+import type { NotaConfig } from '@/types/jupyter'
 
 export const useNotaStore = defineStore('nota', () => {
   const notas = ref<Nota[]>([])
   const pages = ref<Page[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
-  const serverSessions = ref<Record<string, any[]>>({})
 
   const loadNotas = async () => {
     loading.value = true
@@ -28,11 +21,9 @@ export const useNotaStore = defineStore('nota', () => {
         pages: nota.pages || [],
         config: nota.config || {
           jupyterServers: [],
-          notebooks: [],
           kernels: {},
         },
       }))
-      console.log('Loaded notas:', notas.value) // Debug log
     } catch (e) {
       error.value = 'Failed to load notas'
       console.error(e)
@@ -64,20 +55,13 @@ export const useNotaStore = defineStore('nota', () => {
       id: crypto.randomUUID(),
       title,
       content: '',
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
       pages: [],
-      type: 'nota',
+      type: DocumentType.NOTA,
     }
 
-    const notaToStore: StoredNota = {
-      ...nota,
-      pages: [],
-      createdAt: nota.createdAt.toISOString(),
-      updatedAt: nota.updatedAt.toISOString(),
-    }
-
-    await db.notas.add(notaToStore)
+    await db.notas.add(nota)
     notas.value.push(nota)
     return nota
   }
@@ -91,21 +75,14 @@ export const useNotaStore = defineStore('nota', () => {
       id: crypto.randomUUID(),
       title,
       content: '',
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
       parentId,
       children: [],
-      type: 'page',
+      type: DocumentType.PAGE,
     }
 
-    const pageToStore: StoredPage = {
-      ...page,
-      children: [],
-      createdAt: page.createdAt.toISOString(),
-      updatedAt: page.updatedAt.toISOString(),
-    }
-
-    await db.pages.add(pageToStore)
+    await db.pages.add(page)
     pages.value.push(page)
 
     if (parentId) {
@@ -160,7 +137,7 @@ export const useNotaStore = defineStore('nota', () => {
   const savePage = async (page: Partial<Page>) => {
     if (!page.id) return
 
-    const pageToStore: Partial<StoredPage> = {
+    const pageToStore: Partial<Page> = {
       ...page,
       updatedAt: new Date().toISOString(),
       children: page.children ? [...page.children] : undefined,
@@ -219,7 +196,7 @@ export const useNotaStore = defineStore('nota', () => {
   }
 
   const saveNota = async (nota: Partial<Nota> & { id: string }) => {
-    const notaToStore: Partial<StoredNota> = {
+    const notaToStore: Partial<Nota> = {
       ...nota,
       updatedAt: new Date().toISOString(),
       pages: nota.pages ? [...nota.pages] : undefined,
@@ -272,7 +249,6 @@ export const useNotaStore = defineStore('nota', () => {
     if (nota) {
       const config = nota.config || {
         jupyterServers: [],
-        notebooks: [],
         kernels: {},
       }
 
@@ -284,14 +260,6 @@ export const useNotaStore = defineStore('nota', () => {
         updatedAt: new Date().toISOString(),
       })
     }
-  }
-
-  const getServerSessions = (serverIp: string) => {
-    return serverSessions.value[serverIp] || []
-  }
-
-  const updateServerSessions = (serverIp: string, sessions: any[]) => {
-    serverSessions.value[serverIp] = sessions
   }
 
   return {
@@ -314,8 +282,6 @@ export const useNotaStore = defineStore('nota', () => {
     deletePage,
     renamePage,
     updateNotaConfig,
-    getServerSessions,
-    updateServerSessions,
     getPageParentNota,
   }
 })

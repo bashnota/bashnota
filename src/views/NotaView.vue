@@ -7,7 +7,7 @@ import { useNotaStore } from '@/stores/nota'
 import { computed } from 'vue'
 import { Cog6ToothIcon, CheckCircleIcon, ArrowPathIcon } from '@heroicons/vue/24/outline'
 import { Button } from '@/components/ui/button'
-import { formatDistanceToNow } from 'date-fns'
+import { formatDate } from '@/lib/utils'
 
 const props = defineProps<{
   id: string
@@ -46,10 +46,6 @@ watch(
   },
   { immediate: true },
 )
-
-const formatDate = (date: Date) => {
-  return formatDistanceToNow(new Date(date), { addSuffix: true })
-}
 </script>
 
 <template>
@@ -76,7 +72,7 @@ const formatDate = (date: Date) => {
         </div>
 
         <span v-if="nota?.updatedAt" class="text-xs text-muted-foreground">
-          Last updated {{ formatDate(nota?.updatedAt) }}
+          Last updated {{ formatDate(nota.updatedAt) }}
         </span>
       </div>
 

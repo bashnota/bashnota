@@ -11,6 +11,8 @@ import {
 import { ref, onMounted, computed } from 'vue'
 import { Button } from '@/components/ui/button'
 import { ChevronRightIcon } from '@heroicons/vue/24/solid'
+import { formatDate } from '@/lib/utils'
+import { DocumentType } from '@/types/nota'
 
 const router = useRouter()
 const store = useNotaStore()
@@ -25,7 +27,7 @@ const buttonText = computed(() => {
 })
 
 const recentItems = ref<
-  Array<{ id: string; title: string; type: 'nota' | 'page'; updatedAt: Date }>
+  Array<{ id: string; title: string; type: DocumentType; updatedAt: Date | string }>
 >([])
 
 onMounted(async () => {
@@ -35,35 +37,24 @@ onMounted(async () => {
     ...store.notas.map((n) => ({
       id: n.id,
       title: n.title,
-      type: 'nota' as const,
+      type: DocumentType.NOTA,
       updatedAt: n.updatedAt,
     })),
     ...store.pages.map((p) => ({
       id: p.id,
       title: p.title,
-      type: 'page' as const,
+      type: DocumentType.PAGE,
       updatedAt: p.updatedAt,
     })),
   ]
 
   recentItems.value = items
-    .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .slice(0, 10)
 })
 
 const openItem = (item: { id: string; type: 'nota' | 'page' }) => {
   router.push(`/${item.type}/${item.id}`)
-}
-
-const formatDate = (date: Date) => {
-  const now = new Date()
-  const diff = now.getTime() - new Date(date).getTime()
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-
-  if (days === 0) return 'Today'
-  if (days === 1) return 'Yesterday'
-  if (days < 7) return `${days} days ago`
-  return new Date(date).toLocaleDateString()
 }
 </script>
 

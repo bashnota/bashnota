@@ -4,18 +4,32 @@ import { ListOrdered, Heading1, Heading2, Heading3 } from 'lucide-vue-next'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import type { Editor } from '@tiptap/vue-3'
 
 const props = defineProps<{
-  editor: any
+  editor?: Editor
 }>()
+
+type Heading = {
+  level: number
+  text: string
+  indent: number
+}
+
+type Node = {
+  type: string
+  attrs: { level: number }
+  text?: string
+  content: Node[]
+}
 
 const headings = computed(() => {
   if (!props.editor) return []
 
   const json = props.editor.getJSON()
-  const headings = []
+  const headings: Heading[] = []
 
-  const processNode = (node: any, level = 0) => {
+  const processNode = (node: Node, level = 0) => {
     if (node.type === 'heading') {
       headings.push({
         level: node.attrs.level,
@@ -24,11 +38,11 @@ const headings = computed(() => {
       })
     }
     if (node.content) {
-      node.content.forEach((child: any) => processNode(child, level + 1))
+      node.content.forEach((child: Node) => processNode(child, level + 1))
     }
   }
 
-  json.content?.forEach((node) => processNode(node))
+  json.content?.forEach((node) => processNode(node as Node))
   return headings
 })
 

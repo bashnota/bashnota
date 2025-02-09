@@ -1,5 +1,6 @@
 import { Extension } from '@tiptap/core'
 import Suggestion from '@tiptap/suggestion'
+import type { Editor, Range } from '@tiptap/vue-3'
 import { PluginKey } from 'prosemirror-state'
 
 export default Extension.create({
@@ -9,7 +10,8 @@ export default Extension.create({
     return {
       suggestion: {
         char: '/',
-        command: ({ editor, range, props }) => {
+        // eslint-disable-next-line
+        command: ({ editor, range, props }: { editor: Editor; range: Range; props: any }) => {
           props.command({ editor, range })
         },
       },

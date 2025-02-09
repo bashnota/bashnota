@@ -68,15 +68,8 @@ const currentServer = computed(() => {
   return availableServers.value.find((s) => s.ip === selectedServer.value)
 })
 
-// Load initial configuration
-const loadConfig = async () => {
-  await store.loadNotas()
-  await store.loadPages()
-}
-
 // Initialize
 onMounted(async () => {
-  await loadConfig()
   if (props.kernelPreference) {
     selectedServer.value = props.kernelPreference.serverId || 'none'
   }

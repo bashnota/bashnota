@@ -1,6 +1,6 @@
-import { ref, computed, watch } from 'vue'
+import { ref, watch, type Ref } from 'vue'
 import { JupyterService } from '@/services/jupyterService'
-import type { JupyterServer } from '@/types/jupyter'
+import type { ExecutionResult, JupyterServer } from '@/types/jupyter'
 
 export function useCodeExecution(codeRef: Ref<string>) {
   const jupyterService = new JupyterService()
@@ -10,7 +10,7 @@ export function useCodeExecution(codeRef: Ref<string>) {
   const isCopied = ref(false)
   const hasError = ref(false)
 
-  const formatOutput = (result: any) => {
+  const formatOutput = (result: ExecutionResult) => {
     const parts = []
 
     // Add stdout if present

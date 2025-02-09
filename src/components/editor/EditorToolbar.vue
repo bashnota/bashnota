@@ -7,13 +7,11 @@ import {
   FileCode,
   List,
   ListOrdered,
-  Link,
   Quote,
   Heading1,
   Heading2,
   Heading3,
   Table,
-  Image as ImageIcon,
   Undo,
   Redo,
   MinusSquare,
@@ -21,13 +19,14 @@ import {
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import type { FunctionalComponent } from 'vue'
 
 defineProps<{
   editor: Editor | null
 }>()
 
 // Toolbar groups for better organization
-const headingLevels = [
+const headingLevels: { icon: FunctionalComponent; level: 1 | 2 | 3 }[] = [
   { icon: Heading1, level: 1 },
   { icon: Heading2, level: 2 },
   { icon: Heading3, level: 3 },
@@ -143,12 +142,6 @@ const headingLevels = [
 
       <!-- Insert Group -->
       <div class="flex items-center gap-0.5">
-        <Button variant="ghost" size="sm" @click="editor.chain().focus().toggleLink().run()">
-          <Link class="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="sm" @click="editor.chain().focus().addImage().run()">
-          <ImageIcon class="h-4 w-4" />
-        </Button>
         <Button variant="ghost" size="sm" @click="editor.chain().focus().insertTable().run()">
           <Table class="h-4 w-4" />
         </Button>

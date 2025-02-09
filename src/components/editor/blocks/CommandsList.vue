@@ -4,13 +4,15 @@ import { computed, ref, watch } from 'vue'
 
 interface CommandItem {
   title: string
-  icon: any
+  icon: FunctionConstructor
+  // eslint-disable-next-line
   command: (props: any) => void
   category: string
 }
 
 const props = defineProps<{
   items: Array<CommandItem>
+  // eslint-disable-next-line
   command: (props: any) => void
 }>()
 
@@ -52,7 +54,11 @@ watch(
   },
 )
 
-const selectItem = (index: number) => {
+const selectItem = (index?: number) => {
+  if (index === undefined) {
+    return
+  }
+
   const item = props.items[index]
   if (item) {
     props.command(item)

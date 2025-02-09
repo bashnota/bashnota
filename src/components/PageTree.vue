@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { useNotaStore } from '@/stores/nota'
-import type { Page } from '@/stores/nota'
 import { ref } from 'vue'
 import {
   ChevronDownIcon,
@@ -13,6 +12,7 @@ import {
 import { useRouter } from 'vue-router'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import type { Page } from '@/types/nota'
 
 defineProps<{
   pages: Page[]

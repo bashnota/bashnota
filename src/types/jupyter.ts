@@ -4,15 +4,6 @@ export interface JupyterServer {
   token: string
 }
 
-export interface JupyterSession {
-  id: string
-  kernel: {
-    id: string
-    name: string
-    execution_state: string
-  }
-}
-
 export interface ExecutionResult {
   content: {
     execution_count: number
@@ -39,16 +30,37 @@ export interface KernelConfig {
 }
 
 export interface NotaConfig {
-  jupyterServers: JupyterServer[]
-  kernelPreferences: Record<string, KernelConfig> // blockId -> kernel config
-  notebooks: Array<{
-    notebook: string
-    server: string
-    kernel: string
+  jupyterServers: Array<{
+    ip: string
+    port: string
+    token: string
   }>
+  kernels: Record<string, KernelSpec[]>
 }
 
-export interface KernelStatus {
-  execution_state: 'idle' | 'busy' | 'starting'
-  id: string
+export interface KernelSpec {
+  name: string
+  spec: {
+    display_name: string
+    language: string
+    argv: string[]
+    metadata: Record<string, unknown>
+  }
+}
+
+export interface WSMessage {
+  msg_type: string
+  content: {
+    execution_count: number
+    data?: {
+      'text/plain'?: string
+      'text/html'?: string
+      'image/png'?: string
+    }
+    name?: string
+    text?: string
+    ename?: string
+    evalue?: string
+    traceback?: string[]
+  }
 }

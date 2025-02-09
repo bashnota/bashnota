@@ -1,4 +1,4 @@
-import { VueRenderer } from '@tiptap/vue-3'
+import { Editor, VueRenderer, type Range } from '@tiptap/vue-3'
 import tippy from 'tippy.js'
 import CommandsList from '@/components/editor/blocks/CommandsList.vue'
 import 'tippy.js/dist/tippy.css'
@@ -16,6 +16,11 @@ import {
   Heading3,
 } from 'lucide-vue-next'
 
+type CommandArgs = {
+  editor: Editor
+  range: Range
+}
+
 export default {
   items: ({ query }: { query: string }) => {
     const items = [
@@ -24,7 +29,7 @@ export default {
         title: 'Text',
         category: 'Basic Blocks',
         icon: TextIcon,
-        command: ({ editor, range }) => {
+        command: ({ editor, range }: CommandArgs) => {
           editor.chain().focus().deleteRange(range).setParagraph().run()
         },
       },
@@ -32,7 +37,7 @@ export default {
         title: 'Heading 1',
         category: 'Basic Blocks',
         icon: Heading1,
-        command: ({ editor, range }) => {
+        command: ({ editor, range }: CommandArgs) => {
           editor.chain().focus().deleteRange(range).setHeading({ level: 1 }).run()
         },
       },
@@ -40,7 +45,7 @@ export default {
         title: 'Heading 2',
         category: 'Basic Blocks',
         icon: Heading2,
-        command: ({ editor, range }) => {
+        command: ({ editor, range }: CommandArgs) => {
           editor.chain().focus().deleteRange(range).setHeading({ level: 2 }).run()
         },
       },
@@ -48,7 +53,7 @@ export default {
         title: 'Heading 3',
         category: 'Basic Blocks',
         icon: Heading3,
-        command: ({ editor, range }) => {
+        command: ({ editor, range }: CommandArgs) => {
           editor.chain().focus().deleteRange(range).setHeading({ level: 3 }).run()
         },
       },
@@ -56,7 +61,7 @@ export default {
         title: 'Bullet List',
         category: 'Basic Blocks',
         icon: List,
-        command: ({ editor, range }) => {
+        command: ({ editor, range }: CommandArgs) => {
           editor.chain().focus().deleteRange(range).toggleBulletList().run()
         },
       },
@@ -64,7 +69,7 @@ export default {
         title: 'Numbered List',
         category: 'Basic Blocks',
         icon: ListOrdered,
-        command: ({ editor, range }) => {
+        command: ({ editor, range }: CommandArgs) => {
           editor.chain().focus().deleteRange(range).toggleOrderedList().run()
         },
       },
@@ -74,7 +79,7 @@ export default {
         title: 'Python Code Block',
         category: 'Code Blocks',
         icon: FileCode,
-        command: ({ editor, range }) => {
+        command: ({ editor, range }: CommandArgs) => {
           editor
             .chain()
             .focus()
@@ -96,7 +101,7 @@ export default {
         title: 'Table',
         category: 'Advanced',
         icon: Table2,
-        command: ({ editor, range }) => {
+        command: ({ editor, range }: CommandArgs) => {
           editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3 }).run()
         },
       },
@@ -104,7 +109,7 @@ export default {
         title: 'New Page',
         category: 'Advanced',
         icon: FilePlus,
-        command: ({ editor, range }) => {
+        command: ({ editor, range }: CommandArgs) => {
           const createPage = async () => {
             const store = useNotaStore()
             const currentRoute = router.currentRoute.value
@@ -146,15 +151,19 @@ export default {
 
   render: () => {
     let component: VueRenderer
+    // eslint-disable-next-line
     let popup: any
 
     return {
+      // eslint-disable-next-line
       onStart: (props: any) => {
         component = new VueRenderer(CommandsList, {
           props,
           editor: props.editor,
         })
 
+        // eslint-disable-next-line
+        // @ts-ignore
         popup = tippy('body', {
           getReferenceClientRect: props.clientRect,
           appendTo: () => document.body,
@@ -167,6 +176,7 @@ export default {
         })
       },
 
+      // eslint-disable-next-line
       onUpdate(props: any) {
         component.updateProps(props)
         popup[0].setProps({
@@ -174,6 +184,7 @@ export default {
         })
       },
 
+      // eslint-disable-next-line
       onKeyDown(props: any) {
         if (props.event.key === 'Escape') {
           popup[0].hide()
