@@ -4,7 +4,12 @@ import { useNotaStore } from '@/stores/nota'
 import { JupyterService } from '@/services/jupyterService'
 import LoadingSpinner from './LoadingSpinner.vue'
 import type { JupyterServer } from '@/types/jupyter'
-import { ServerIcon, CpuChipIcon, Cog6ToothIcon, ArrowPathIcon } from '@heroicons/vue/24/outline'
+import { ServerIcon, CpuChipIcon, ArrowPathIcon, Cog6ToothIcon } from '@heroicons/vue/24/outline'
+import { Button } from '@/components/ui/button'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
 const props = defineProps<{
   notaId: string
@@ -64,12 +69,9 @@ const refreshKernels = async (server: JupyterServer) => {
   isRefreshingKernels.value = true
   try {
     const kernels = await jupyterService.getAvailableKernels(server)
-    await store.updateNotaConfig(props.notaId, {
-      ...config.value,
-      kernels: {
-        ...config.value.kernels,
-        [server.ip]: kernels,
-      },
+    await store.updateNotaConfig(props.notaId, (config) => {
+      if (!config.kernels) config.kernels = {}
+      config.kernels[server.ip] = kernels
     })
   } catch (error) {
     console.error('Failed to refresh kernels:', error)
@@ -90,9 +92,9 @@ const addServer = async () => {
   await testConnection(server)
 
   if (testResults.value[server.ip]?.success) {
-    await store.updateNotaConfig(props.notaId, {
-      ...config.value,
-      jupyterServers: [...config.value.jupyterServers, server],
+    await store.updateNotaConfig(props.notaId, (config) => {
+      if (!config.jupyterServers) config.jupyterServers = []
+      config.jupyterServers.push(server)
     })
 
     // Reset form
@@ -107,412 +109,211 @@ const addServer = async () => {
 // Remove server
 const removeServer = async (server: JupyterServer) => {
   if (confirm('Are you sure you want to remove this server?')) {
-    const updatedServers = config.value.jupyterServers.filter((s) => s.ip !== server.ip)
-    await store.updateNotaConfig(props.notaId, {
-      ...config.value,
-      jupyterServers: updatedServers,
-      kernels: Object.fromEntries(
-        Object.entries(config.value.kernels).filter(([ip]) => ip !== server.ip),
-      ),
+    await store.updateNotaConfig(props.notaId, (config) => {
+      config.jupyterServers = config.jupyterServers.filter((s) => s.ip !== server.ip)
+      if (config.kernels) {
+        delete config.kernels[server.ip]
+      }
     })
-  }
-}
-
-// Start a new kernel
-const startKernel = async (server: JupyterServer, kernelName: string) => {
-  try {
-    const result = await jupyterService.createKernel(server, kernelName)
-    if (result?.success) {
-      await refreshKernels(server)
-    }
-  } catch (error) {
-    console.error('Failed to start kernel:', error)
-  }
-}
-
-// Stop a kernel
-const stopKernel = async (server: JupyterServer, kernelId: string) => {
-  try {
-    await jupyterService.deleteKernel(server, kernelId)
-    await refreshKernels(server)
-  } catch (error) {
-    console.error('Failed to stop kernel:', error)
   }
 }
 </script>
 
 <template>
-  <div class="config-page">
-    <div class="config-header">
-      <h2>Nota Configuration</h2>
-      <div class="tabs">
-        <button
-          v-for="tab in ['servers', 'kernels', 'settings']"
-          :key="tab"
-          :class="{ active: activeTab === tab }"
-          @click="activeTab = tab"
-        >
-          <ServerIcon v-if="tab === 'servers'" class="icon" />
-          <CpuChipIcon v-if="tab === 'kernels'" class="icon" />
-          <Cog6ToothIcon v-if="tab === 'settings'" class="icon" />
-          {{ tab.charAt(0).toUpperCase() + tab.slice(1) }}
-        </button>
+  <div class="p-6 max-w-4xl mx-auto">
+    <div class="space-y-6">
+      <div class="flex items-center justify-between">
+        <h2 class="text-2xl font-semibold tracking-tight">Nota Configuration</h2>
       </div>
-    </div>
 
-    <!-- Servers Tab -->
-    <div v-if="activeTab === 'servers'" class="tab-content">
-      <div class="server-list">
-        <h3>Connected Servers</h3>
-        <div v-if="config.jupyterServers.length === 0" class="empty-state">
-          No servers configured yet
-        </div>
-        <div v-else v-for="server in config.jupyterServers" :key="server.ip" class="server-card">
-          <div class="server-info">
-            <div class="server-name">{{ server.ip }}:{{ server.port }}</div>
-            <div
-              class="server-status"
-              :class="{
-                success: testResults[server.ip]?.success,
-                error: testResults[server.ip]?.success === false,
-              }"
-            >
-              {{ testResults[server.ip]?.message || 'Not tested' }}
+      <Tabs :default-value="activeTab" class="w-full" @update:value="activeTab = $event">
+        <TabsList class="grid w-full grid-cols-3">
+          <TabsTrigger value="servers">
+            <div class="flex items-center justify-center gap-2 p-1">
+              <ServerIcon class="w-4 h-4 shrink-0" />
+              <span class="text-sm">Servers</span>
             </div>
-          </div>
-          <div class="server-actions">
-            <button
-              class="test-button"
-              @click="testConnection(server)"
-              :disabled="isTestingConnection"
-            >
-              <LoadingSpinner v-if="isTestingConnection" />
-              <span v-else>Test Connection</span>
-            </button>
-            <button class="remove-button" @click="removeServer(server)">Remove</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="add-server-form">
-        <h3>Add New Server</h3>
-        <form @submit.prevent="addServer">
-          <div class="form-group">
-            <label>Server IP</label>
-            <input v-model="serverForm.ip" placeholder="localhost" required />
-          </div>
-          <div class="form-group">
-            <label>Port</label>
-            <input v-model="serverForm.port" placeholder="8888" required />
-          </div>
-          <div class="form-group">
-            <label>Token</label>
-            <input
-              v-model="serverForm.token"
-              type="password"
-              placeholder="Jupyter token"
-              required
-            />
-          </div>
-          <button type="submit" class="primary-button">Add Server</button>
-        </form>
-      </div>
-    </div>
-
-    <!-- Kernels Tab -->
-    <div v-if="activeTab === 'kernels'" class="tab-content">
-      <div class="section">
-        <h3>Available Kernels</h3>
-        <div v-if="config.jupyterServers.length === 0" class="empty-state">
-          <p>No servers configured. Add a server to view available kernels.</p>
-        </div>
-        <div v-else v-for="server in config.jupyterServers" :key="server.ip" class="server-kernels">
-          <div class="server-header">
-            <h4>{{ server.ip }}:{{ server.port }}</h4>
-            <button
-              class="refresh-button"
-              @click="refreshKernels(server)"
-              :disabled="isRefreshingKernels"
-            >
-              <ArrowPathIcon class="icon" :class="{ spinning: isRefreshingKernels }" />
-              Refresh Kernels
-            </button>
-          </div>
-
-          <div v-if="!config.kernels[server.ip]?.length" class="empty-state">
-            <p>No kernels found. Make sure Jupyter kernels are installed on the server.</p>
-          </div>
-
-          <div v-else class="kernels-grid">
-            <div v-for="kernel in config.kernels[server.ip]" :key="kernel.name" class="kernel-card">
-              <div class="kernel-header">
-                <span class="kernel-name">{{ kernel.display_name }}</span>
-                <span class="kernel-language">{{ kernel.language }}</span>
-              </div>
-              <div class="kernel-info">
-                <code>{{ kernel.name }}</code>
-              </div>
+          </TabsTrigger>
+          <TabsTrigger value="kernels">
+            <div class="flex items-center justify-center gap-2 p-1">
+              <CpuChipIcon class="w-4 h-4 shrink-0" />
+              <span class="text-sm">Kernels</span>
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
+          </TabsTrigger>
+          <TabsTrigger value="settings">
+            <div class="flex items-center justify-center gap-2 p-1">
+              <Cog6ToothIcon class="w-4 h-4 shrink-0" />
+              <span class="text-sm">General Settings</span>
+            </div>
+          </TabsTrigger>
+        </TabsList>
 
-    <!-- Settings Tab -->
-    <div v-if="activeTab === 'settings'" class="tab-content">
-      <h3>General Settings</h3>
-      <!-- Add general settings here -->
+        <!-- Servers Tab -->
+        <TabsContent value="servers" class="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Connected Servers</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div
+                v-if="config.jupyterServers.length === 0"
+                class="rounded-lg border border-dashed p-8 text-center text-muted-foreground"
+              >
+                No servers configured yet
+              </div>
+
+              <div v-else class="space-y-4">
+                <div
+                  v-for="server in config.jupyterServers"
+                  :key="server.ip"
+                  class="rounded-lg border p-4 space-y-4 bg-slate-50 dark:bg-slate-900"
+                >
+                  <div class="flex items-center justify-between">
+                    <div class="space-y-1">
+                      <h4 class="font-medium">{{ server.ip }}:{{ server.port }}</h4>
+                      <p
+                        class="text-sm"
+                        :class="{
+                          'text-green-600': testResults[server.ip]?.success,
+                          'text-red-600': testResults[server.ip]?.success === false,
+                        }"
+                      >
+                        {{ testResults[server.ip]?.message || 'Not tested' }}
+                      </p>
+                    </div>
+                    <div class="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        @click="testConnection(server)"
+                        :disabled="isTestingConnection"
+                      >
+                        <LoadingSpinner v-if="isTestingConnection" />
+                        <span v-else>Test Connection</span>
+                      </Button>
+                      <Button variant="destructive" size="sm" @click="removeServer(server)">
+                        Remove
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Add New Server</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form @submit.prevent="addServer" class="space-y-4">
+                <div class="space-y-2">
+                  <label class="text-sm font-medium">Server IP</label>
+                  <Input v-model="serverForm.ip" placeholder="localhost" required />
+                </div>
+                <div class="space-y-2">
+                  <label class="text-sm font-medium">Port</label>
+                  <Input v-model="serverForm.port" placeholder="8888" required />
+                </div>
+                <div class="space-y-2">
+                  <label class="text-sm font-medium">Token</label>
+                  <Input v-model="serverForm.token" type="password" placeholder="Jupyter token" />
+                </div>
+                <Button type="submit" class="w-full">Add Server</Button>
+              </form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <!-- Kernels Tab -->
+        <TabsContent value="kernels" class="space-y-6">
+          <div v-if="config.jupyterServers.length === 0">
+            <Alert>
+              <AlertDescription>
+                No servers configured. Add a server to view available kernels.
+              </AlertDescription>
+            </Alert>
+          </div>
+
+          <div v-else v-for="server in config.jupyterServers" :key="server.ip" class="space-y-4">
+            <Card>
+              <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-4">
+                <div class="space-y-1">
+                  <CardTitle class="flex items-center gap-2 text-lg">
+                    <ServerIcon class="w-8 h-8 text-muted-foreground" />
+                    <code>{{ server.ip }}:{{ server.port }}</code>
+                  </CardTitle>
+                  <p class="text-sm text-muted-foreground">
+                    Available Jupyter kernels on this server
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  @click="refreshKernels(server)"
+                  :disabled="isRefreshingKernels"
+                  class="flex items-center gap-2"
+                >
+                  <ArrowPathIcon class="w-4 h-4" :class="{ 'animate-spin': isRefreshingKernels }" />
+                  {{ isRefreshingKernels ? 'Refreshing...' : 'Refresh Kernels' }}
+                </Button>
+              </CardHeader>
+              <CardContent class="border-t pt-6">
+                <div
+                  v-if="!config.kernels[server.ip]?.length"
+                  class="rounded-lg border border-dashed p-8 text-center"
+                >
+                  <CpuChipIcon class="w-10 h-10 mx-auto mb-4 text-muted-foreground/50" />
+                  <p class="text-sm font-medium mb-1">No kernels found</p>
+                  <p class="text-sm text-muted-foreground">
+                    Make sure Jupyter kernels are installed on the server.
+                  </p>
+                </div>
+
+                <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div
+                    v-for="kernel in config.kernels[server.ip]"
+                    :key="kernel.name"
+                    class="group rounded-lg border bg-slate-50 dark:bg-slate-900 hover:shadow-sm transition-all duration-200 p-4"
+                  >
+                    <div class="flex items-start gap-3">
+                      <div
+                        class="rounded-md bg-blue-50 dark:bg-blue-700 border border-blue-950 p-2 mt-1"
+                      >
+                        <CpuChipIcon class="w-8 h-7" />
+                      </div>
+                      <div class="space-y-2 flex-1">
+                        <div class="space-y-1">
+                          <div class="flex flex-col items-start gap-2">
+                            <span class="font-medium">{{ kernel.display_name }}</span>
+                            <span
+                              class="text-xs sn px-3 rounded-full bg-slate-100 dark:bg-slate-800 border font-medium"
+                            >
+                              {{ kernel.language }}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <!-- Settings Tab -->
+        <TabsContent value="settings">
+          <Card>
+            <CardHeader>
+              <CardTitle>General Settings</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <!-- Add general settings here -->
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   </div>
 </template>
-
-<style scoped>
-.config-page {
-  padding: 2rem;
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-.config-header {
-  margin-bottom: 2rem;
-}
-
-.tabs {
-  display: flex;
-  gap: 1rem;
-  margin-top: 1rem;
-  border-bottom: 1px solid var(--color-border);
-  padding-bottom: 0.5rem;
-}
-
-.tabs button {
-  padding: 0.5rem 1rem;
-  border: none;
-  background: none;
-  cursor: pointer;
-  color: var(--color-text-light);
-  border-radius: 4px;
-}
-
-.tabs button.active {
-  background: var(--color-primary);
-  color: white;
-}
-
-.server-card {
-  background: var(--color-background-soft);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 1rem;
-  margin-bottom: 1rem;
-}
-
-.server-info {
-  margin-bottom: 1rem;
-}
-
-.server-name {
-  font-weight: 500;
-  margin-bottom: 0.5rem;
-}
-
-.server-status {
-  font-size: 0.875rem;
-}
-
-.server-status.success {
-  color: #10b981;
-}
-
-.server-status.error {
-  color: #ef4444;
-}
-
-.server-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.form-group {
-  margin-bottom: 1rem;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-size: 0.875rem;
-  color: var(--color-text-light);
-}
-
-.form-group input {
-  width: 100%;
-  padding: 0.5rem;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  background: var(--color-background);
-}
-
-.primary-button {
-  background: var(--color-primary);
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.test-button {
-  background: var(--color-background);
-  border: 1px solid var(--color-border);
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.remove-button {
-  background: var(--color-danger-soft);
-  color: var(--color-danger);
-  border: 1px solid var(--color-danger);
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.kernel-card {
-  background: var(--color-background-soft);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 1rem;
-  margin-bottom: 1rem;
-}
-
-.kernel-name {
-  font-weight: 500;
-}
-
-.kernel-language {
-  background: var(--color-background-mute);
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.75rem;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 2rem;
-  color: var(--color-text-light);
-  background: var(--color-background-soft);
-  border-radius: 8px;
-}
-
-.kernel-form {
-  background: var(--color-background-soft);
-  padding: 1.5rem;
-  border-radius: 8px;
-  margin-bottom: 2rem;
-}
-
-.kernels-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 1rem;
-  margin-top: 1rem;
-}
-
-.server-kernels {
-  margin-bottom: 2rem;
-}
-
-.server-kernels h4 {
-  margin-bottom: 1rem;
-  color: var(--color-text-light);
-}
-
-.kernel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-
-.kernel-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-select {
-  width: 100%;
-  padding: 0.5rem;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  background: var(--color-background);
-  color: var(--color-text);
-}
-
-.section {
-  margin-bottom: 2rem;
-}
-
-.section h3 {
-  margin-bottom: 1rem;
-  color: var(--color-heading);
-}
-
-.icon {
-  width: 1.25rem;
-  height: 1.25rem;
-}
-
-.server-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-
-.refresh-button {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  background: var(--color-background);
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.refresh-button:hover {
-  background: var(--color-background-mute);
-}
-
-.refresh-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.icon.spinning {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.kernel-info {
-  margin-top: 0.5rem;
-  font-size: 0.875rem;
-  color: var(--color-text-light);
-}
-
-.kernel-info code {
-  background: var(--color-background-mute);
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-}
-</style>

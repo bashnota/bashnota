@@ -334,7 +334,7 @@ export const useNotaStore = defineStore('nota', () => {
       nota.config = config
 
       await db.notas.update(notaId, {
-        config,
+        config: JSON.parse(JSON.stringify(config)),
         updatedAt: new Date().toISOString(),
       })
     }
