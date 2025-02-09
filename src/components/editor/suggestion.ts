@@ -90,26 +90,6 @@ export default {
             .run()
         },
       },
-      {
-        title: 'R Code Block',
-        category: 'Code Blocks',
-        icon: FileCode,
-        command: ({ editor, range }) => {
-          editor
-            .chain()
-            .focus()
-            .deleteRange(range)
-            .insertContent({
-              type: 'executableCodeBlock',
-              attrs: {
-                language: 'r',
-                executeable: true,
-              },
-              content: [{ type: 'text', text: '# Your R code here' }],
-            })
-            .run()
-        },
-      },
 
       // Advanced
       {

@@ -5,6 +5,7 @@ import CodeBlockWithExecution from '../CodeBlockWithExecution.vue'
 import { useRoute } from 'vue-router'
 import { useNotaStore } from '@/stores/nota'
 import type { KernelConfig } from '@/types/jupyter'
+import { Card, CardContent } from '@/components/ui/card'
 
 const props = defineProps({
   node: {
@@ -57,7 +58,7 @@ const onKernelSelect = async (kernelName: string, serverId: string) => {
     blockId: blockId.value,
     kernelName,
     serverId,
-    lastUsed: new Date().toISOString()
+    lastUsed: new Date().toISOString(),
   }
 
   await store.updateNotaConfig(route.params.id as string, (config) => {
@@ -83,34 +84,26 @@ onMounted(() => {
 </script>
 
 <template>
-  <NodeViewWrapper class="code-block-wrapper">
-    <CodeBlockWithExecution
-      v-if="isExecuteable"
-      :code="code"
-      :language="language"
-      :nota-id="route.params.id as string"
-      :kernel-preference="kernelPreference"
-      @update:code="updateCode"
-      @kernel-select="onKernelSelect"
-    />
-    <pre v-else class="code-block">
-      <code :class="language">{{ code }}</code>
-    </pre>
+  <NodeViewWrapper class="my-6">
+    <Card class="overflow-hidden" v-if="isExecuteable">
+      <CardContent class="p-0">
+        <CodeBlockWithExecution
+          :code="code"
+          :language="language"
+          :nota-id="route.params.id as string"
+          :kernel-preference="kernelPreference"
+          @update:code="updateCode"
+          @kernel-select="onKernelSelect"
+        />
+      </CardContent>
+    </Card>
+
+    <Card v-else class="overflow-hidden">
+      <CardContent class="p-0">
+        <pre class="bg-muted p-4 overflow-x-auto font-mono text-sm leading-relaxed">
+          <code :class="language">{{ code }}</code>
+        </pre>
+      </CardContent>
+    </Card>
   </NodeViewWrapper>
 </template>
-
-<style scoped>
-.code-block-wrapper {
-  margin: 1em 0;
-}
-
-.code-block {
-  background: var(--color-background-soft);
-  padding: 1rem;
-  border-radius: 4px;
-  overflow-x: auto;
-  font-family: 'Fira Code', monospace;
-  font-size: 0.875rem;
-  line-height: 1.5;
-}
-</style>
