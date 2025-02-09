@@ -1,6 +1,6 @@
 import CodeBlock from '@tiptap/extension-code-block'
 import { VueNodeViewRenderer } from '@tiptap/vue-3'
-import ExecutableCodeBlock from './ExecutableCodeBlock.vue'
+import ExecutableCodeBlock from '../blocks/executable-code-block/ExecutableCodeBlock.vue'
 
 export const ExecutableCodeBlockExtension = CodeBlock.extend({
   name: 'executableCodeBlock',

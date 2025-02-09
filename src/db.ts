@@ -1,21 +1,6 @@
 import Dexie from 'dexie'
 import type { Table } from 'dexie'
-
-export interface Nota {
-  id: string
-  title: string
-  content: string
-  createdAt: Date
-  updatedAt: Date
-}
-
-export interface Page {
-  id: string
-  title: string
-  content: string
-  createdAt: Date
-  updatedAt: Date
-}
+import type { Nota, Page } from './types/nota'
 
 export class NotaDB extends Dexie {
   notas!: Table<Nota>

@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { RouterView } from 'vue-router'
-import AppSidebar from './components/AppSidebar.vue'
-import BreadcrumbNav from './components/BreadcrumbNav.vue'
-import GlobalSearch from './components/GlobalSearch.vue'
+import AppSidebar from './components/layout/AppSidebar.vue'
+import BreadcrumbNav from './components/layout/BreadcrumbNav.vue'
 import { Bars3Icon as MenuIcon } from '@heroicons/vue/24/solid'
 import { ref, onMounted, watch } from 'vue'
 import { useNotaStore } from '@/stores/nota'

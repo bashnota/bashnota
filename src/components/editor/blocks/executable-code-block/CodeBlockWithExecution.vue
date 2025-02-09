@@ -6,7 +6,7 @@ import { useCodeExecution } from '@/composables/useCodeExecution'
 import type { KernelConfig } from '@/types/jupyter'
 import { Copy, Check, Play } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
-import CodeMirror from './editor/CodeMirror.vue'
+import CodeMirror from './CodeMirror.vue'
 
 const props = defineProps<{
   code: string

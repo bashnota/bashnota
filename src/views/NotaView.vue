@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import NotaEditor from '@/components/NotaEditor.vue'
+import NotaEditor from '@/components/editor/NotaEditor.vue'
 import NotaConfigPage from '@/components/NotaConfigPage.vue'
 import { watch, ref } from 'vue'
 import { useRoute } from 'vue-router'

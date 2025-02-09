@@ -1,6 +1,6 @@
 import { VueRenderer } from '@tiptap/vue-3'
 import tippy from 'tippy.js'
-import CommandsList from '@/components/editor/CommandsList.vue'
+import CommandsList from '@/components/editor/blocks/CommandsList.vue'
 import 'tippy.js/dist/tippy.css'
 import router from '@/router'
 import { useNotaStore } from '@/stores/nota'

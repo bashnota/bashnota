@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { NodeViewWrapper } from '@tiptap/vue-3'
-import CodeBlockWithExecution from '../CodeBlockWithExecution.vue'
+import CodeBlockWithExecution from './CodeBlockWithExecution.vue'
 import { useRoute } from 'vue-router'
 import { useNotaStore } from '@/stores/nota'
 import type { KernelConfig } from '@/types/jupyter'

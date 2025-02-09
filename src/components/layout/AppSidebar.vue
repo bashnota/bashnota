@@ -3,7 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useNotaStore } from '@/stores/nota'
 import { onKeyStroke } from '@vueuse/core'
-import PageTree from './PageTree.vue'
+import PageTree from '../notas-list/PageTree.vue'
 import DarkModeToggle from './DarkModeToggle.vue'
 import {
   PlusIcon,

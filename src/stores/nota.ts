@@ -1,62 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { db } from '@/db'
-
-export interface Page {
-  id: string
-  title: string
-  content: string
-  createdAt: Date
-  updatedAt: Date
-  parentId: string | null
-  children: string[]
-  type: 'page'
-}
-
-export interface Nota {
-  id: string
-  title: string
-  content: string
-  createdAt: Date
-  updatedAt: Date
-  pages: string[]
-  type: 'nota'
-  config?: NotaConfig
-}
-
-interface StoredNota {
-  id: string
-  title: string
-  content: string
-  createdAt: string
-  updatedAt: string
-  pages: string[]
-  type: 'nota'
-  config?: {
-    jupyterServers: Array<{
-      ip: string
-      port: string
-      token: string
-    }>
-    notebooks: Array<{
-      notebook: string
-      server: string
-      kernel: string
-    }>
-    kernels: Record<string, string[]>
-  }
-}
-
-interface StoredPage {
-  id: string
-  title: string
-  content: string
-  createdAt: string
-  updatedAt: string
-  parentId: string | null
-  children: string[]
-  type: 'page'
-}
+import type { JupyterServer } from '@/types/jupyter'
+import type { Nota, Page, StoredNota, StoredPage } from '@/types/nota'
 
 export interface NotaConfig {
   jupyterServers: JupyterServer[]
