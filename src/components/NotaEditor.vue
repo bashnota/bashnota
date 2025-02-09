@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useEditor, EditorContent, BubbleMenu } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
-import CodeBlock from '@tiptap/extension-code-block'
 import Table from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
 import TableCell from '@tiptap/extension-table-cell'
@@ -19,33 +18,29 @@ import { common, createLowlight } from 'lowlight'
 import 'highlight.js/styles/github.css'
 import { useRouter } from 'vue-router'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
-import { formatDistanceToNow } from 'date-fns'
 import TableOfContents from './TableOfContents.vue'
-import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/24/solid'
 import { ExecutableCodeBlockExtension } from './editor/ExecutableCodeBlockExtension'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { ListIcon } from 'lucide-vue-next'
 
 const props = defineProps<{
   notaId?: string
 }>()
 
+const emit = defineEmits<{
+  saving: [boolean]
+}>()
+
 const notaStore = useNotaStore()
 const router = useRouter()
-const showBubbleMenu = ref(false)
 const isSidebarOpen = ref(true)
 
 const content = computed(() => {
   const nota = notaStore.getCurrentNota(props.notaId)
   return nota?.content || ''
 })
-
-const lastUpdated = computed(() => {
-  const nota = notaStore.getCurrentNota(props.notaId)
-  return nota?.updatedAt
-})
-
-const formatDate = (date: Date) => {
-  return formatDistanceToNow(new Date(date), { addSuffix: true })
-}
 
 // Create lowlight instance with common languages
 const lowlight = createLowlight(common)
@@ -122,7 +117,7 @@ const editor = useEditor({
     isLoading.value = false
   },
   onUpdate: ({ editor }) => {
-    isSaving.value = true
+    emit('saving', true) // Emit instead of setting local ref
     notaStore
       .saveNota({
         id: props.notaId,
@@ -130,8 +125,7 @@ const editor = useEditor({
         updatedAt: new Date(),
       })
       .finally(() => {
-        isSaving.value = false
-        showSavedIndicator()
+        emit('saving', false) // Emit instead of setting local ref
       })
   },
 })
@@ -155,15 +149,6 @@ watch(
 )
 
 const isLoading = ref(true)
-const isSaving = ref(false)
-const showSaved = ref(false)
-
-const showSavedIndicator = () => {
-  showSaved.value = true
-  setTimeout(() => {
-    showSaved.value = false
-  }, 2000)
-}
 
 const wordCount = computed(() => {
   if (!editor.value) return 0
@@ -173,246 +158,126 @@ const wordCount = computed(() => {
 </script>
 
 <template>
-  <div class="editor-container">
-    <div class="editor-sidebar" :class="{ closed: !isSidebarOpen }">
-      <TableOfContents :editor="editor" />
-    </div>
-    <button
-      class="sidebar-toggle"
-      @click="isSidebarOpen = !isSidebarOpen"
-      :title="isSidebarOpen ? 'Hide sidebar' : 'Show sidebar'"
+  <div class="flex h-full">
+    <!-- Sidebar -->
+    <div
+      class="transition-all duration-300 ease-in-out border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 relative"
+      :class="{
+        'w-64 px-6 py-4': isSidebarOpen,
+        'w-0 p-0': !isSidebarOpen,
+      }"
     >
-      <ChevronLeftIcon v-if="isSidebarOpen" class="icon" />
-      <ChevronRightIcon v-else class="icon" />
-    </button>
-    <div class="editor-main">
-      <EditorToolbar v-if="editor" :editor="editor" />
-      <div class="editor-info">
-        <span class="last-updated" v-if="lastUpdated">
-          Last updated {{ formatDate(lastUpdated) }}
-        </span>
-        <span class="word-count"> {{ wordCount }} words </span>
-      </div>
-      <div v-if="isLoading" class="editor-loading">
-        <LoadingSpinner />
-      </div>
-      <div class="save-status">
-        <span v-if="isSaving">Saving...</span>
-        <span v-else-if="showSaved" class="saved">Saved</span>
-      </div>
-      <editor-content :editor="editor" />
+      <ScrollArea class="h-full" v-show="isSidebarOpen">
+        <TableOfContents :editor="editor" />
+      </ScrollArea>
+    </div>
 
-      <bubble-menu v-if="editor" :editor="editor" :should-show="shouldShow" class="bubble-menu">
-        <button @click="editor.chain().focus().toggleBold().run()">Bold</button>
-        <button @click="editor.chain().focus().toggleItalic().run()">Italic</button>
-        <button @click="editor.chain().focus().toggleCode().run()">Code</button>
-        <button @click="editor.chain().focus().toggleLink().run()">Link</button>
-      </bubble-menu>
+    <!-- Main Editor Area -->
+    <div class="flex-1 flex flex-col min-w-0">
+      <!-- Editor Toolbar -->
+      <div
+        class="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10"
+      >
+        <EditorToolbar v-if="editor" :editor="editor" class="px-4 py-2" />
+
+        <!-- Editor Info Bar -->
+        <div
+          class="flex items-center justify-between px-4 py-2 text-sm text-muted-foreground border-t"
+        >
+          <Button
+            variant="ghost"
+            size="sm"
+            class="flex items-center gap-2"
+            @click="isSidebarOpen = !isSidebarOpen"
+          >
+            <ListIcon class="h-4 w-4" />
+            <span class="text-xs">Contents</span>
+          </Button>
+          <span>{{ wordCount }} words</span>
+        </div>
+      </div>
+
+      <!-- Editor Content -->
+      <div class="flex-1 relative">
+        <!-- Loading State -->
+        <div
+          v-if="isLoading"
+          class="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm"
+        >
+          <LoadingSpinner class="w-8 h-8" />
+        </div>
+
+        <!-- Editor Content Area -->
+        <div class="h-full overflow-auto px-4 md:px-8 lg:px-12">
+          <editor-content :editor="editor" class="max-w-4xl mx-auto py-8" />
+        </div>
+
+        <!-- Bubble Menu -->
+        <bubble-menu
+          v-if="editor"
+          :editor="editor"
+          :should-show="shouldShow"
+          class="flex gap-1 p-1 rounded-lg border shadow-lg bg-background backdrop-blur-lg"
+        >
+          <Button
+            v-for="(action, index) in ['Bold', 'Italic', 'Code', 'Link']"
+            :key="index"
+            variant="ghost"
+            size="sm"
+            @click="editor.chain().focus()[`toggle${action}`]().run()"
+          >
+            {{ action }}
+          </Button>
+        </bubble-menu>
+      </div>
     </div>
   </div>
 </template>
 
 <style>
-.editor-container {
-  flex: 1;
-  display: flex;
-  gap: 2rem;
-  overflow-y: auto;
-  position: relative;
+/* TipTap Specific Styles */
+.ProseMirror {
+  @apply outline-none min-h-[calc(100vh-10rem)];
 }
 
-.editor-sidebar {
-  width: 250px;
-  padding: 2rem 0 2rem 2rem;
-  flex-shrink: 0;
-  transition: all 0.3s ease;
-  transform: translateX(0);
-}
-
-.editor-sidebar.closed {
-  width: 0;
-  padding: 0;
-  transform: translateX(-100%);
-}
-
-.sidebar-toggle {
-  position: absolute;
-  left: 250px;
-  top: 50%;
-  transform: translateY(-50%);
-  padding: 0.5rem;
-  background: var(--color-background-soft);
-  border: 1px solid var(--color-border);
-  border-radius: 50%;
-  cursor: pointer;
-  z-index: 10;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.editor-sidebar.closed + .sidebar-toggle {
-  left: 0;
-}
-
-.sidebar-toggle:hover {
-  background: var(--color-background-mute);
-}
-
-.sidebar-toggle .icon {
-  width: 1rem;
-  height: 1rem;
-  color: var(--color-text-light);
-}
-
-.editor-main {
-  flex: 1;
-  padding: 2rem 2rem 2rem 0;
-  min-width: 0;
-  transition: padding-left 0.3s ease;
-}
-
-.editor-sidebar.closed + .sidebar-toggle + .editor-main {
-  padding-left: 2rem;
+.ProseMirror p.is-empty::before {
+  @apply text-muted-foreground float-left pointer-events-none h-0;
+  content: attr(data-placeholder);
 }
 
 .code-block {
-  background: #f5f5f5;
-  padding: 0.75rem;
-  border-radius: 4px;
-  font-family: 'Fira Code', monospace;
-  margin: 1rem 0;
+  @apply bg-muted p-3 rounded-md font-mono my-4;
 }
 
-/* Add styles for tables */
+/* Table Styles */
 .ProseMirror table {
-  border-collapse: collapse;
-  margin: 0;
-  overflow: hidden;
-  table-layout: fixed;
-  width: 100%;
+  @apply w-full border-collapse table-fixed;
 }
 
 .ProseMirror td,
 .ProseMirror th {
-  border: 2px solid #ced4da;
-  box-sizing: border-box;
-  min-width: 1em;
-  padding: 3px 5px;
-  position: relative;
-  vertical-align: top;
+  @apply border-2 border-border p-2 align-top relative min-w-[1em];
 }
 
 .ProseMirror th {
-  background-color: #f8f9fa;
-  font-weight: bold;
-  text-align: left;
+  @apply bg-muted font-bold text-left;
 }
 
-.bubble-menu {
-  display: flex;
-  gap: 0.5rem;
-  background-color: #ffffff;
-  padding: 0.5rem;
-  border-radius: 0.5rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+/* Link Styles */
+.nota-link {
+  @apply text-primary no-underline cursor-pointer hover:underline;
 }
 
-.bubble-menu button {
-  padding: 0.25rem 0.5rem;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  background: white;
-  cursor: pointer;
-}
-
-.bubble-menu button:hover {
-  background: var(--color-background-soft);
-}
-
-.ProseMirror {
-  padding: 1rem;
-  min-height: calc(100vh - 10rem);
-  outline: none;
-}
-
-.ProseMirror p.is-empty::before {
-  content: attr(data-placeholder);
-  float: left;
-  color: #adb5bd;
-  pointer-events: none;
-  height: 0;
-}
-
+/* Slash Commands Menu */
 .slash-commands-menu {
-  background: white;
-  border-radius: 0.5rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
+  @apply bg-background rounded-lg shadow-lg overflow-hidden;
 }
 
 .slash-commands-item {
-  padding: 0.5rem 1rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-}
-
-.slash-commands-item:hover {
-  background: var(--color-background-soft);
+  @apply p-2 flex items-center gap-2 cursor-pointer hover:bg-muted;
 }
 
 .slash-commands-item .icon {
-  width: 1.5rem;
-  height: 1.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-background-mute);
-  border-radius: 4px;
-}
-
-.nota-link {
-  color: var(--color-primary);
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.nota-link:hover {
-  text-decoration: underline;
-}
-
-.editor-loading {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 200px;
-}
-
-.save-status {
-  position: fixed;
-  bottom: 1rem;
-  right: 1rem;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  background: var(--color-background-soft);
-  font-size: 0.875rem;
-  color: var(--color-text-light);
-  transition: opacity 0.2s;
-}
-
-.saved {
-  color: var(--color-success);
-}
-
-.editor-info {
-  padding: 0.5rem 1rem;
-  border-bottom: 1px solid var(--color-border);
-  font-size: 0.875rem;
-  color: var(--color-text-light);
-  display: flex;
-  justify-content: space-between;
+  @apply w-6 h-6 flex items-center justify-center bg-muted rounded;
 }
 </style>
