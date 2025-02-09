@@ -3,7 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useNotaStore } from '@/stores/nota'
 import { useCodeExecution } from '@/composables/useCodeExecution'
-import type { KernelConfig } from '@/types/jupyter'
+import type { KernelConfig, KernelSpec } from '@/types/jupyter'
 import { Copy, Check, Play } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import CodeMirror from './CodeMirror.vue'
@@ -38,6 +38,8 @@ const parentNotaId = computed(() => {
 
 // Get the nota's configuration
 const notaConfig = computed(() => {
+  if (!parentNotaId.value) return { jupyterServers: [], kernels: {}, notebooks: [] }
+
   const nota = store.getCurrentNota(parentNotaId.value)
   if (!nota?.config) {
     return {
@@ -60,7 +62,7 @@ const availableServers = computed(() => {
 // Get available kernels for selected server
 const availableKernels = computed(() => {
   if (!selectedServer.value || selectedServer.value === 'none') return []
-  return notaConfig.value.kernels[selectedServer.value] || []
+  return (notaConfig.value.kernels[selectedServer.value] || []) as KernelSpec[]
 })
 
 // Get the current server object
@@ -181,7 +183,7 @@ const copyCode = async () => {
               :value="kernel.name"
               class="text-foreground"
             >
-              {{ kernel.display_name }}
+              {{ kernel.spec.display_name }}
             </option>
           </select>
         </div>
