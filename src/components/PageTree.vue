@@ -1,11 +1,20 @@
 <script setup lang="ts">
 import { useNotaStore } from '@/stores/nota'
-import type { Page } from '@/stores/nota'
 import { ref } from 'vue'
-import { ChevronDownIcon, ChevronRightIcon, PencilIcon, TrashIcon } from '@heroicons/vue/24/solid'
+import {
+  ChevronDownIcon,
+  ChevronRightIcon,
+  PencilIcon,
+  TrashIcon,
+  FolderIcon,
+  DocumentTextIcon,
+} from '@heroicons/vue/24/solid'
 import { useRouter } from 'vue-router'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import type { Page } from '@/types/nota'
 
-const props = defineProps<{
+defineProps<{
   pages: Page[]
 }>()
 
@@ -16,7 +25,7 @@ const showRenameInput = ref<string | null>(null)
 const renameTitle = ref('')
 
 const hasChildren = (pageId: string) => {
-  return store.pages.some(p => p.parentId === pageId)
+  return store.pages.some((p) => p.parentId === pageId)
 }
 
 const togglePage = (pageId: string) => {
@@ -47,161 +56,69 @@ const handleDelete = async (pageId: string) => {
 </script>
 
 <template>
-  <div class="page-tree">
-    <div v-for="page in pages" :key="page.id" class="page-item">
-      <div class="page-header">
-        <button 
+  <div class="ml-1">
+    <div v-for="page in pages" :key="page.id" class="group">
+      <div class="flex items-center gap-1 rounded-md py-1.5 text-sm">
+        <!-- Expand/Indent Button -->
+        <button
           v-if="hasChildren(page.id)"
-          class="expand-button"
           @click="togglePage(page.id)"
+          class="w-5 h-5 flex items-center justify-center text-muted-foreground hover:text-foreground"
         >
-          <ChevronDownIcon v-if="expandedPages.has(page.id)" class="icon" />
-          <ChevronRightIcon v-else class="icon" />
+          <ChevronDownIcon v-if="expandedPages.has(page.id)" class="h-4 w-4" />
+          <ChevronRightIcon v-else class="h-4 w-4" />
         </button>
-        <span v-else class="indent"></span>
-        <template v-if="showRenameInput === page.id">
-          <input
-            v-model="renameTitle"
-            class="rename-input"
-            @keyup.enter="handleRename(page.id)"
-            @keyup.esc="showRenameInput = null"
-            @blur="handleRename(page.id)"
-            ref="renameInput"
-            autofocus
-          />
-        </template>
-        <template v-else>
-          <RouterLink :to="`/page/${page.id}`" class="page-link">
-            {{ page.title }}
-          </RouterLink>
-          <div class="page-actions">
-            <button 
-              class="action-button"
-              @click="startRename(page)"
-              title="Rename"
-            >
-              <PencilIcon class="icon" />
-            </button>
-            <button 
-              class="action-button"
-              @click="handleDelete(page.id)"
-              title="Delete"
-            >
-              <TrashIcon class="icon" />
-            </button>
-          </div>
-        </template>
+        <div v-else class="w-5"></div>
+
+        <!-- Title/Rename Input -->
+        <Input
+          v-if="showRenameInput === page.id"
+          v-model="renameTitle"
+          class="h-7 text-sm"
+          @keyup.enter="handleRename(page.id)"
+          @keyup.esc="showRenameInput = null"
+          @blur="handleRename(page.id)"
+          ref="renameInput"
+          autofocus
+        />
+        <RouterLink
+          v-else
+          :to="`/page/${page.id}`"
+          class="flex items-center gap-2 flex-1 px-2 py-2 rounded-md hover:bg-slate-200"
+        >
+          <!-- Nota Icon -->
+          <FolderIcon v-if="expandedPages.has(page.id)" class="h-4 w-4 text-muted-foreground" />
+          <DocumentTextIcon v-else class="h-4 w-4 text-muted-foreground" />
+          {{ page.title }}
+        </RouterLink>
+
+        <!-- Actions -->
+        <div class="opacity-0 group-hover:opacity-100 flex items-center gap-1 pr-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            class="h-7 w-7"
+            @click="startRename(page)"
+            title="Rename"
+          >
+            <PencilIcon class="h-3 w-3" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            class="h-7 w-7"
+            @click="handleDelete(page.id)"
+            title="Delete"
+          >
+            <TrashIcon class="h-3 w-3" />
+          </Button>
+        </div>
       </div>
-      <div v-if="expandedPages.has(page.id)" class="sub-pages">
+
+      <!-- Nested Pages -->
+      <div v-if="expandedPages.has(page.id)" class="ml-6 mt-1">
         <PageTree :pages="store.getPageChildren(page.id)" />
       </div>
     </div>
   </div>
 </template>
-
-<style scoped>
-.page-tree {
-  margin-left: 0.5rem;
-}
-
-.page-item {
-  margin: 0.25rem 0;
-}
-
-.page-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem;
-  border-radius: 4px;
-}
-
-.page-header:hover {
-  background: var(--color-background-mute);
-}
-
-.page-header:hover .page-actions {
-  opacity: 1;
-}
-
-.page-actions {
-  display: flex;
-  gap: 0.25rem;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.expand-button {
-  padding: 0.25rem;
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--color-text-light);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.expand-button:hover {
-  color: var(--color-text);
-}
-
-.expand-button .icon {
-  width: 1rem;
-  height: 1rem;
-}
-
-.indent {
-  width: 1.5rem;
-}
-
-.page-link {
-  flex: 1;
-  display: block;
-  padding: 0.25rem 0.5rem;
-  color: var(--color-text);
-  text-decoration: none;
-  border-radius: 4px;
-  transition: all 0.2s;
-}
-
-.page-link:hover {
-  background: var(--color-background-mute);
-}
-
-.sub-pages {
-  margin-left: 1.5rem;
-  margin-top: 0.25rem;
-}
-
-.rename-input {
-  flex: 1;
-  padding: 0.25rem 0.5rem;
-  border: 1px solid var(--color-primary);
-  border-radius: 4px;
-  font-size: 0.875rem;
-  background: var(--color-background);
-}
-
-.action-button {
-  padding: 0.25rem;
-  background: none;
-  border: none;
-  border-radius: 4px;
-  color: var(--color-text-light);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.action-button:hover {
-  color: var(--color-text);
-  background: var(--color-background);
-}
-
-.action-button .icon {
-  width: 1rem;
-  height: 1rem;
-}
-</style> 

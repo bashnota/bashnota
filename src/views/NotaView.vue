@@ -1,104 +1,79 @@
 <script setup lang="ts">
-import NotaEditor from '@/components/NotaEditor.vue'
+import NotaEditor from '@/components/editor/NotaEditor.vue'
 import NotaConfigPage from '@/components/NotaConfigPage.vue'
 import { watch, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useNotaStore } from '@/stores/nota'
 import { computed } from 'vue'
-import { Cog6ToothIcon } from '@heroicons/vue/24/outline'
+import { Cog6ToothIcon, CheckCircleIcon, ArrowPathIcon } from '@heroicons/vue/24/outline'
+import { Button } from '@/components/ui/button'
+import { formatDate } from '@/lib/utils'
 
 const props = defineProps<{
   id: string
 }>()
 
 const route = useRoute()
-const router = useRouter()
 const store = useNotaStore()
 
 const nota = computed(() => store.getCurrentNota(props.id))
 const showConfigPage = ref(false)
+const isSaving = ref(false)
+const showSaved = ref(false)
 
 const toggleConfigPage = () => {
   showConfigPage.value = !showConfigPage.value
 }
 
-// Watch for route changes to handle navigation between notas
-watch(
-  () => route.params.id,
-  (newId) => {
-    if (newId) {
-      console.log('Loading nota:', newId)
-    }
-  },
-  { immediate: true }
-)
+// Save status handlers
+const handleSaving = (saving: boolean) => {
+  isSaving.value = saving
+  if (!saving) {
+    showSaved.value = true
+    setTimeout(() => {
+      showSaved.value = false
+    }, 2000)
+  }
+}
 </script>
 
 <template>
-  <div class="nota-view">
-    <div class="nota-header">
-      <h1>{{ nota?.title }}</h1>
-      <button class="config-button" @click="toggleConfigPage" :title="showConfigPage ? 'Hide settings' : 'Show settings'">
-        <Cog6ToothIcon class="icon" />
+  <div class="flex flex-col flex-1 h-full overflow-hidden bg-background">
+    <header class="flex items-center justify-between px-6 py-4 border-b">
+      <div class="flex flex-col gap-1">
+        <div class="flex items-center gap-3">
+          <h1 class="text-2xl font-semibold tracking-tight">{{ nota?.title }}</h1>
+
+          <!-- Save Status Indicator -->
+          <div
+            class="flex items-center text-xs text-muted-foreground transition-opacity duration-200"
+            :class="{ 'opacity-0': !isSaving && !showSaved }"
+          >
+            <span v-if="isSaving" class="flex items-center gap-1">
+              <ArrowPathIcon class="w-3 h-3 animate-spin" />
+              Saving
+            </span>
+            <span v-else-if="showSaved" class="flex items-center gap-1">
+              <CheckCircleIcon class="w-3 h-3 text-green-600" />
+              Saved
+            </span>
+          </div>
+        </div>
+
+        <span v-if="nota?.updatedAt" class="text-xs text-muted-foreground">
+          Last updated {{ formatDate(nota.updatedAt) }}
+        </span>
+      </div>
+
+      <Button variant="outline" class="flex items-center gap-2" @click="toggleConfigPage">
+        <Cog6ToothIcon class="w-4 h-4" />
         {{ showConfigPage ? 'Hide Settings' : 'Settings' }}
-      </button>
-    </div>
-    
-    <div class="nota-content">
-      <NotaEditor v-if="!showConfigPage" :nota-id="id" />
+      </Button>
+    </header>
+
+    <main class="flex-1 overflow-auto">
+      <NotaEditor v-if="!showConfigPage" :nota-id="id" @saving="handleSaving" />
       <NotaConfigPage v-else :nota-id="id" />
-    </div>
+    </main>
   </div>
 </template>
-
-<style scoped>
-.nota-view {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.nota-header {
-  padding: 1rem 2rem;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-background-soft);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.nota-header h1 {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: var(--color-heading);
-  margin: 0;
-}
-
-.nota-content {
-  flex: 1;
-  overflow: auto;
-}
-
-.config-button {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  background: var(--color-background);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  color: var(--color-text);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.config-button:hover {
-  background: var(--color-background-mute);
-}
-
-.config-button .icon {
-  width: 1.25rem;
-  height: 1.25rem;
-}
-</style> 

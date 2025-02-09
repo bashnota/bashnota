@@ -1,21 +1,13 @@
 <script setup lang="ts">
-import NotaEditor from '@/components/NotaEditor.vue'
+import NotaEditor from '@/components/editor/NotaEditor.vue'
 
-const props = defineProps<{
+defineProps<{
   id: string
 }>()
 </script>
 
 <template>
-  <div class="page-view">
+  <div>
     <NotaEditor :page-id="id" />
   </div>
 </template>
-
-<style scoped>
-.page-view {
-  flex: 1;
-  display: flex;
-  overflow: hidden;
-}
-</style> 

@@ -18,4 +18,4 @@
       "type": "image/png"
     }
   ]
-} 
+}
