@@ -20,6 +20,12 @@ const router = createRouter({
       component: () => import('../views/PageView.vue'),
       props: true,
     },
+    // 404 route should be the last route
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'not-found',
+      component: () => import('../views/NotFound.vue'),
+    },
   ],
 })
 
