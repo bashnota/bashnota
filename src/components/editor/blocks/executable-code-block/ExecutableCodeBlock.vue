@@ -68,13 +68,6 @@ const onKernelSelect = async (kernelName: string, serverId: string) => {
 }
 
 onMounted(() => {
-  console.log('ExecutableCodeBlock mounted:', {
-    isExecuteable: isExecuteable.value,
-    language: language.value,
-    notaId: route.params.id,
-    routeName: route.name,
-  })
-
   // Generate unique ID for the block if it doesn't have one
   if (!blockId.value) {
     const newId = `block-${Math.random().toString(36).substr(2, 9)}`

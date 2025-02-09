@@ -35,17 +35,6 @@ const handleSaving = (saving: boolean) => {
     }, 2000)
   }
 }
-
-// Watch for route changes to handle navigation between notas
-watch(
-  () => route.params.id,
-  (newId) => {
-    if (newId) {
-      console.log('Loading nota:', newId)
-    }
-  },
-  { immediate: true },
-)
 </script>
 
 <template>

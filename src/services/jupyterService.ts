@@ -145,7 +145,6 @@ export class JupyterService {
   }
 
   private processMessages(messages: WSMessage[]): ExecutionResult {
-    console.log('Messages:', messages)
     const result: ExecutionResult = {
       content: {
         execution_count: 0,
