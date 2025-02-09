@@ -1,33 +1,49 @@
-<template>
-  <div class="commands-list">
-    <template v-if="items.length">
-      <button
-        v-for="(item, index) in items"
-        :key="index"
-        :class="{ 'is-selected': index === selectedIndex }"
-        @click="selectItem(index)"
-      >
-        <span class="icon">{{ item.icon }}</span>
-        <span>{{ item.title }}</span>
-      </button>
-    </template>
-    <div class="item" v-else>No result</div>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ArrowTurnDownLeftIcon } from '@heroicons/vue/24/outline'
+import { computed, ref, watch } from 'vue'
+
+interface CommandItem {
+  title: string
+  icon: any
+  command: (props: any) => void
+  category: string
+}
 
 const props = defineProps<{
-  items: Array<{
-    title: string
-    icon?: string
-    command: (props: any) => void
-  }>
+  items: Array<CommandItem>
   command: (props: any) => void
 }>()
 
 const selectedIndex = ref(0)
+
+// Group items by category
+const groupedItems = computed(() => {
+  const groups: Record<string, CommandItem[]> = {}
+
+  props.items.forEach((item) => {
+    const category = item.category || 'Other'
+    if (!groups[category]) {
+      groups[category] = []
+    }
+    groups[category].push(item)
+  })
+
+  return groups
+})
+
+// Create a map of global indices
+const itemToGlobalIndex = computed(() => {
+  const map = new Map<CommandItem, number>()
+  let globalIndex = 0
+
+  Object.values(groupedItems.value).forEach((items) => {
+    items.forEach((item) => {
+      map.set(item, globalIndex++)
+    })
+  })
+
+  return map
+})
 
 watch(
   () => props.items,
@@ -65,44 +81,77 @@ const onKeyDown = ({ event }: { event: KeyboardEvent }) => {
 defineExpose({ onKeyDown })
 </script>
 
-<style scoped>
-.commands-list {
-  background: var(--color-background);
-  border: 1px solid var(--color-border);
-  border-radius: 0.7rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  overflow: auto;
-  padding: 0.4rem;
-  position: relative;
+<template>
+  <div class="w-72 rounded-lg border bg-popover shadow-md">
+    <div class="flex flex-col p-1">
+      <template v-if="items.length">
+        <div v-for="(items, groupName) in groupedItems" :key="groupName">
+          <!-- Group Header -->
+          <div v-if="items.length" class="px-2 py-1.5">
+            <p class="text-xs font-medium text-muted-foreground/70">{{ groupName }}</p>
+          </div>
+
+          <!-- Group Items -->
+          <button
+            v-for="item in items"
+            :key="item.title"
+            class="relative flex justify-between cursor-pointer items-center w-full cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+            :class="[
+              itemToGlobalIndex.get(item) === selectedIndex
+                ? 'bg-accent text-accent-foreground'
+                : 'text-popover-foreground hover:bg-accent hover:text-accent-foreground',
+            ]"
+            @click="selectItem(itemToGlobalIndex.get(item))"
+          >
+            <div class="flex items-center gap-2">
+              <component
+                :is="item.icon"
+                class="mr-2 h-4 w-4"
+                :class="[
+                  itemToGlobalIndex.get(item) === selectedIndex
+                    ? 'text-accent-foreground/70'
+                    : 'text-muted-foreground/70',
+                ]"
+              />
+              <span>{{ item.title }}</span>
+            </div>
+
+            <!-- Optional: Add keyboard shortcut hints -->
+            <span
+              v-if="itemToGlobalIndex.get(item) === selectedIndex"
+              class="text-xs tracking-widest text-muted-foreground/50"
+            >
+              <ArrowTurnDownLeftIcon class="h-3 w-3" />
+            </span>
+          </button>
+
+          <!-- Group Separator -->
+          <div v-if="items.length" class="px-2 my-1">
+            <div class="h-px bg-border/50"></div>
+          </div>
+        </div>
+      </template>
+
+      <!-- Empty State -->
+      <div v-else class="flex flex-col items-center justify-center py-6 px-4">
+        <p class="text-sm font-medium text-muted-foreground">No results found</p>
+        <p class="text-xs text-muted-foreground/70">Try a different search term</p>
+      </div>
+    </div>
+  </div>
+</template>
+
+<!-- Add Tippy theme styles -->
+<style>
+.tippy-arrow {
+  @apply text-transparent !important;
 }
 
-button {
-  align-items: center;
-  background-color: transparent;
-  border: none;
-  border-radius: 4px;
-  display: flex;
-  gap: 0.5rem;
-  padding: 0.5rem;
-  text-align: left;
-  width: 100%;
+.tippy-box[data-theme~='command-palette'] {
+  @apply bg-transparent border-none shadow-none;
 }
 
-button:hover,
-button.is-selected {
-  background-color: var(--color-background-soft);
-}
-
-.icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  background: var(--color-background-mute);
-  border-radius: 4px;
+.tippy-box[data-theme~='command-palette'] .tippy-content {
+  @apply p-0;
 }
 </style>

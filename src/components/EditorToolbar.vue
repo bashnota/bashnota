@@ -1,74 +1,161 @@
 <script setup lang="ts">
 import { Editor } from '@tiptap/vue-3'
+import {
+  Bold,
+  Italic,
+  Code,
+  FileCode,
+  List,
+  ListOrdered,
+  Link,
+  Quote,
+  Heading1,
+  Heading2,
+  Heading3,
+  Table,
+  Image as ImageIcon,
+  Undo,
+  Redo,
+  MinusSquare,
+} from 'lucide-vue-next'
+import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
 defineProps<{
   editor: Editor | null
 }>()
+
+// Toolbar groups for better organization
+const headingLevels = [
+  { icon: Heading1, level: 1 },
+  { icon: Heading2, level: 2 },
+  { icon: Heading3, level: 3 },
+]
 </script>
 
 <template>
-  <div class="editor-toolbar" v-if="editor">
-    <button
-      @click="editor.chain().focus().toggleBold().run()"
-      :class="{ 'is-active': editor.isActive('bold') }"
-    >
-      Bold
-    </button>
-    <button
-      @click="editor.chain().focus().toggleItalic().run()"
-      :class="{ 'is-active': editor.isActive('italic') }"
-    >
-      Italic
-    </button>
-    <button
-      @click="editor.chain().focus().toggleCode().run()"
-      :class="{ 'is-active': editor.isActive('code') }"
-    >
-      Code
-    </button>
-    <button
-      @click="editor.chain().focus().toggleCodeBlock().run()"
-      :class="{ 'is-active': editor.isActive('codeBlock') }"
-    >
-      Code Block
-    </button>
-    <button
-      @click="editor.chain().focus().toggleBulletList().run()"
-      :class="{ 'is-active': editor.isActive('bulletList') }"
-    >
-      Bullet List
-    </button>
-    <button
-      @click="editor.chain().focus().toggleOrderedList().run()"
-      :class="{ 'is-active': editor.isActive('orderedList') }"
-    >
-      Ordered List
-    </button>
+  <div v-if="editor" class="border-b">
+    <div class="flex flex-wrap items-center gap-1 p-1">
+      <!-- History Group -->
+      <div class="flex items-center">
+        <Button
+          variant="ghost"
+          size="sm"
+          @click="editor.chain().focus().undo().run()"
+          :disabled="!editor.can().undo()"
+        >
+          <Undo class="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          @click="editor.chain().focus().redo().run()"
+          :disabled="!editor.can().redo()"
+        >
+          <Redo class="h-4 w-4" />
+        </Button>
+      </div>
+
+      <Separator orientation="vertical" class="mx-1 h-6" />
+
+      <!-- Headings Group -->
+      <ToggleGroup size="sm" type="single">
+        <ToggleGroupItem
+          v-for="{ icon: Icon, level } in headingLevels"
+          :key="level"
+          :value="'h' + level"
+          :pressed="editor.isActive('heading', { level })"
+          @click="editor.chain().focus().toggleHeading({ level }).run()"
+        >
+          <component :is="Icon" class="h-4 w-4" />
+        </ToggleGroupItem>
+      </ToggleGroup>
+
+      <Separator orientation="vertical" class="mx-1 h-6" />
+
+      <!-- Text Formatting Group -->
+      <ToggleGroup size="sm" type="multiple">
+        <ToggleGroupItem
+          value="bold"
+          :pressed="editor.isActive('bold')"
+          @click="editor.chain().focus().toggleBold().run()"
+        >
+          <Bold class="h-4 w-4" />
+        </ToggleGroupItem>
+        <ToggleGroupItem
+          value="italic"
+          :pressed="editor.isActive('italic')"
+          @click="editor.chain().focus().toggleItalic().run()"
+        >
+          <Italic class="h-4 w-4" />
+        </ToggleGroupItem>
+        <ToggleGroupItem
+          value="code"
+          :pressed="editor.isActive('code')"
+          @click="editor.chain().focus().toggleCode().run()"
+        >
+          <Code class="h-4 w-4" />
+        </ToggleGroupItem>
+      </ToggleGroup>
+
+      <Separator orientation="vertical" class="mx-1 h-6" />
+
+      <!-- Lists Group -->
+      <ToggleGroup size="sm" type="multiple">
+        <ToggleGroupItem
+          value="bulletList"
+          :pressed="editor.isActive('bulletList')"
+          @click="editor.chain().focus().toggleBulletList().run()"
+        >
+          <List class="h-4 w-4" />
+        </ToggleGroupItem>
+        <ToggleGroupItem
+          value="orderedList"
+          :pressed="editor.isActive('orderedList')"
+          @click="editor.chain().focus().toggleOrderedList().run()"
+        >
+          <ListOrdered class="h-4 w-4" />
+        </ToggleGroupItem>
+      </ToggleGroup>
+
+      <Separator orientation="vertical" class="mx-1 h-6" />
+
+      <!-- Block Elements Group -->
+      <ToggleGroup size="sm" type="multiple">
+        <ToggleGroupItem
+          value="codeBlock"
+          :pressed="editor.isActive('codeBlock')"
+          @click="editor.chain().focus().toggleCodeBlock().run()"
+        >
+          <FileCode class="h-4 w-4" />
+        </ToggleGroupItem>
+        <ToggleGroupItem
+          value="blockquote"
+          :pressed="editor.isActive('blockquote')"
+          @click="editor.chain().focus().toggleBlockquote().run()"
+        >
+          <Quote class="h-4 w-4" />
+        </ToggleGroupItem>
+      </ToggleGroup>
+
+      <Separator orientation="vertical" class="mx-1 h-6" />
+
+      <!-- Insert Group -->
+      <div class="flex items-center gap-0.5">
+        <Button variant="ghost" size="sm" @click="editor.chain().focus().toggleLink().run()">
+          <Link class="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="sm" @click="editor.chain().focus().addImage().run()">
+          <ImageIcon class="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="sm" @click="editor.chain().focus().insertTable().run()">
+          <Table class="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="sm" @click="editor.chain().focus().setHorizontalRule().run()">
+          <MinusSquare class="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
   </div>
 </template>
-
-<style scoped>
-.editor-toolbar {
-  padding: 0.5rem;
-  border-bottom: 1px solid var(--color-border);
-  display: flex;
-  gap: 0.5rem;
-}
-
-button {
-  padding: 0.5rem;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  background: white;
-  cursor: pointer;
-}
-
-button:hover {
-  background: var(--color-background-soft);
-}
-
-button.is-active {
-  background: var(--color-primary);
-  color: white;
-}
-</style>

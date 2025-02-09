@@ -4,98 +4,126 @@ import CommandsList from '@/components/editor/CommandsList.vue'
 import 'tippy.js/dist/tippy.css'
 import router from '@/router'
 import { useNotaStore } from '@/stores/nota'
-import Link from '@tiptap/extension-link'
+import {
+  TextIcon,
+  Heading1,
+  Heading2,
+  List,
+  ListOrdered,
+  FileCode,
+  Table2,
+  FilePlus,
+  Heading3,
+} from 'lucide-vue-next'
 
 export default {
   items: ({ query }: { query: string }) => {
     const items = [
+      // Basic Blocks
       {
         title: 'Text',
-        icon: '¶',
+        category: 'Basic Blocks',
+        icon: TextIcon,
         command: ({ editor, range }) => {
           editor.chain().focus().deleteRange(range).setParagraph().run()
         },
       },
       {
         title: 'Heading 1',
-        icon: 'H1',
+        category: 'Basic Blocks',
+        icon: Heading1,
         command: ({ editor, range }) => {
           editor.chain().focus().deleteRange(range).setHeading({ level: 1 }).run()
         },
       },
       {
         title: 'Heading 2',
-        icon: 'H2',
+        category: 'Basic Blocks',
+        icon: Heading2,
         command: ({ editor, range }) => {
           editor.chain().focus().deleteRange(range).setHeading({ level: 2 }).run()
         },
       },
       {
+        title: 'Heading 3',
+        category: 'Basic Blocks',
+        icon: Heading3,
+        command: ({ editor, range }) => {
+          editor.chain().focus().deleteRange(range).setHeading({ level: 3 }).run()
+        },
+      },
+      {
         title: 'Bullet List',
-        icon: '•',
+        category: 'Basic Blocks',
+        icon: List,
         command: ({ editor, range }) => {
           editor.chain().focus().deleteRange(range).toggleBulletList().run()
         },
       },
       {
         title: 'Numbered List',
-        icon: '1.',
+        category: 'Basic Blocks',
+        icon: ListOrdered,
         command: ({ editor, range }) => {
           editor.chain().focus().deleteRange(range).toggleOrderedList().run()
         },
       },
+
+      // Code Blocks
       {
-        title: 'Python Code',
-        icon: 'Py',
+        title: 'Python Code Block',
+        category: 'Code Blocks',
+        icon: FileCode,
         command: ({ editor, range }) => {
-          editor.chain().focus().deleteRange(range).setCodeBlock({ language: 'python' }).run()
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .insertContent({
+              type: 'executableCodeBlock',
+              attrs: {
+                language: 'python',
+                executeable: true,
+              },
+              content: [{ type: 'text', text: '# Your Python code here' }],
+            })
+            .run()
         },
       },
       {
-        title: 'JavaScript Code',
-        icon: 'JS',
+        title: 'R Code Block',
+        category: 'Code Blocks',
+        icon: FileCode,
         command: ({ editor, range }) => {
-          editor.chain().focus().deleteRange(range).setCodeBlock({ language: 'javascript' }).run()
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .insertContent({
+              type: 'executableCodeBlock',
+              attrs: {
+                language: 'r',
+                executeable: true,
+              },
+              content: [{ type: 'text', text: '# Your R code here' }],
+            })
+            .run()
         },
       },
-      {
-        title: 'TypeScript Code',
-        icon: 'TS',
-        command: ({ editor, range }) => {
-          editor.chain().focus().deleteRange(range).setCodeBlock({ language: 'typescript' }).run()
-        },
-      },
-      {
-        title: 'R Code',
-        icon: 'R',
-        command: ({ editor, range }) => {
-          editor.chain().focus().deleteRange(range).setCodeBlock({ language: 'r' }).run()
-        },
-      },
-      {
-        title: 'SQL Code',
-        icon: 'SQL',
-        command: ({ editor, range }) => {
-          editor.chain().focus().deleteRange(range).setCodeBlock({ language: 'sql' }).run()
-        },
-      },
-      {
-        title: 'Shell Script',
-        icon: '$',
-        command: ({ editor, range }) => {
-          editor.chain().focus().deleteRange(range).setCodeBlock({ language: 'bash' }).run()
-        },
-      },
+
+      // Advanced
       {
         title: 'Table',
-        icon: '⊞',
+        category: 'Advanced',
+        icon: Table2,
         command: ({ editor, range }) => {
           editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3 }).run()
         },
       },
       {
         title: 'New Page',
-        icon: '📄',
+        category: 'Advanced',
+        icon: FilePlus,
         command: ({ editor, range }) => {
           const createPage = async () => {
             const store = useNotaStore()
@@ -107,7 +135,6 @@ export default {
 
             try {
               const newPage = await store.createPage(title, parentId)
-
               editor
                 .chain()
                 .focus()
@@ -130,51 +157,11 @@ export default {
           createPage()
         },
       },
-      {
-        title: 'Python Code Block',
-        icon: '🐍',
-        command: ({ editor, range }) => {
-          editor
-            .chain()
-            .focus()
-            .deleteRange(range)
-            .insertContent({
-              type: 'executableCodeBlock',
-              attrs: {
-                language: 'python',
-                executeable: true,
-              },
-              content: [{ type: 'text', text: '# Your Python code here' }],
-            })
-            .run()
-        },
-      },
-      {
-        title: 'R Code Block',
-        icon: 'R',
-        command: ({ editor, range }) => {
-          editor
-            .chain()
-            .focus()
-            .deleteRange(range)
-            .insertContent({
-              type: 'executableCodeBlock',
-              attrs: {
-                language: 'r',
-                executeable: true,
-              },
-              content: [{ type: 'text', text: '# Your R code here' }],
-            })
-            .run()
-        },
-      },
     ]
 
-    if (!query) return items
-
-    return items
-      .filter((item) => item.title.toLowerCase().includes(query.toLowerCase()))
-      .slice(0, 10)
+    return !query
+      ? items
+      : items.filter((item) => item.title.toLowerCase().includes(query.toLowerCase())).slice(0, 10)
   },
 
   render: () => {
@@ -196,12 +183,12 @@ export default {
           interactive: true,
           trigger: 'manual',
           placement: 'bottom-start',
+          theme: 'command-palette',
         })
       },
 
       onUpdate(props: any) {
         component.updateProps(props)
-
         popup[0].setProps({
           getReferenceClientRect: props.clientRect,
         })
@@ -212,7 +199,6 @@ export default {
           popup[0].hide()
           return true
         }
-
         return component?.ref?.onKeyDown(props)
       },
 

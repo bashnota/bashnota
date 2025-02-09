@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useEditor, EditorContent, BubbleMenu } from '@tiptap/vue-3'
+import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Table from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
@@ -21,7 +21,6 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import TableOfContents from './TableOfContents.vue'
 import { ExecutableCodeBlockExtension } from './editor/ExecutableCodeBlockExtension'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ListIcon } from 'lucide-vue-next'
 
@@ -90,7 +89,7 @@ const editor = useEditor({
     TableHeader,
     Image,
     Placeholder.configure({
-      placeholder: 'Press "/" for commands...',
+      placeholder: 'Type "/" for commands ...',
     }),
     SlashCommands.configure({
       suggestion,
@@ -129,10 +128,6 @@ const editor = useEditor({
       })
   },
 })
-
-const shouldShow = ({ editor, view, state, oldState, from, to }) => {
-  return editor.isActive('text') && view.state.selection.content().size > 0
-}
 
 // Watch for ID changes to update editor content
 watch(
@@ -209,24 +204,6 @@ const wordCount = computed(() => {
         <div class="h-full overflow-auto px-4 md:px-8 lg:px-12">
           <editor-content :editor="editor" class="max-w-4xl mx-auto py-8" />
         </div>
-
-        <!-- Bubble Menu -->
-        <bubble-menu
-          v-if="editor"
-          :editor="editor"
-          :should-show="shouldShow"
-          class="flex gap-1 p-1 rounded-lg border shadow-lg bg-background backdrop-blur-lg"
-        >
-          <Button
-            v-for="(action, index) in ['Bold', 'Italic', 'Code', 'Link']"
-            :key="index"
-            variant="ghost"
-            size="sm"
-            @click="editor.chain().focus()[`toggle${action}`]().run()"
-          >
-            {{ action }}
-          </Button>
-        </bubble-menu>
       </div>
     </div>
   </div>
