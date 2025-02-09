@@ -6,14 +6,7 @@ import { useCodeExecution } from '@/composables/useCodeExecution'
 import type { KernelConfig } from '@/types/jupyter'
 import { Copy, Check, Play } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
+import CodeMirror from './editor/CodeMirror.vue'
 
 const props = defineProps<{
   code: string
@@ -78,7 +71,7 @@ const currentServer = computed(() => {
 // Load initial configuration
 const loadConfig = async () => {
   await store.loadNotas()
-  await store.loadPages() // Also load pages to get parent relationships
+  await store.loadPages()
 }
 
 // Initialize
@@ -86,7 +79,6 @@ onMounted(async () => {
   await loadConfig()
   if (props.kernelPreference) {
     selectedServer.value = props.kernelPreference.serverId || 'none'
-    // Kernel will be selected in the server watch handler if available
   }
 })
 
@@ -94,7 +86,6 @@ onMounted(async () => {
 watch(selectedServer, (newServer) => {
   selectedKernel.value = 'none'
   if (newServer && newServer !== 'none' && props.kernelPreference?.kernelName) {
-    // Try to select the same kernel on the new server if available
     const kernel = availableKernels.value.find((k) => k.name === props.kernelPreference?.kernelName)
     if (kernel) {
       selectedKernel.value = kernel.name
@@ -102,14 +93,6 @@ watch(selectedServer, (newServer) => {
     }
   }
 })
-
-// Watch for route changes to reload configuration
-watch(
-  () => route.params.id,
-  async () => {
-    await loadConfig()
-  },
-)
 
 // Watch for external code changes
 watch(
@@ -121,16 +104,6 @@ watch(
   },
 )
 
-// Update kernel selection handler
-const handleKernelSelect = (kernel: string) => {
-  if (kernel === 'none') return
-  selectedKernel.value = kernel
-  if (selectedServer.value && selectedServer.value !== 'none') {
-    emit('kernel-select', kernel, selectedServer.value)
-  }
-}
-
-// Use selected kernel for execution
 const executeCode = async () => {
   if (selectedKernel.value === 'none') {
     output.value = 'Please select a kernel first'
@@ -158,10 +131,9 @@ const executeCode = async () => {
   }
 }
 
-const updateCode = (event: Event) => {
-  const textarea = event.target as HTMLTextAreaElement
-  codeValue.value = textarea.value
-  emit('update:code', textarea.value)
+const updateCode = (newCode: string) => {
+  codeValue.value = newCode
+  emit('update:code', newCode)
 }
 
 const copyCode = async () => {
@@ -185,34 +157,41 @@ const copyCode = async () => {
     >
       <div class="flex-1 grid grid-cols-2 gap-3">
         <!-- Server Selection -->
-        <Select :model-value="selectedServer" @update:model-value="selectedServer = $event">
-          <SelectTrigger>
-            <SelectValue :placeholder="selectedServer === 'none' ? 'Select Server' : undefined" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none" class="text-muted-foreground">Select Server</SelectItem>
-            <SelectItem v-for="server in availableServers" :key="server.ip" :value="server.ip">
+        <div class="relative">
+          <select
+            v-model="selectedServer"
+            class="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <option value="none" class="text-muted-foreground">Select Server</option>
+            <option
+              v-for="server in availableServers"
+              :key="server.ip"
+              :value="server.ip"
+              class="text-foreground"
+            >
               {{ server.displayName }}
-            </SelectItem>
-          </SelectContent>
-        </Select>
+            </option>
+          </select>
+        </div>
 
         <!-- Kernel Selection -->
-        <Select
-          :model-value="selectedKernel"
-          @update:model-value="selectedKernel = $event"
-          :disabled="!selectedServer || selectedServer === 'none'"
-        >
-          <SelectTrigger>
-            <SelectValue :placeholder="selectedKernel === 'none' ? 'Select Kernel' : undefined" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none" class="text-muted-foreground">Select Kernel</SelectItem>
-            <SelectItem v-for="kernel in availableKernels" :key="kernel.name" :value="kernel.name">
+        <div class="relative">
+          <select
+            v-model="selectedKernel"
+            :disabled="!selectedServer || selectedServer === 'none'"
+            class="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <option value="none" class="text-muted-foreground">Select Kernel</option>
+            <option
+              v-for="kernel in availableKernels"
+              :key="kernel.name"
+              :value="kernel.name"
+              class="text-foreground"
+            >
               {{ kernel.display_name }}
-            </SelectItem>
-          </SelectContent>
-        </Select>
+            </option>
+          </select>
+        </div>
       </div>
 
       <!-- Action Buttons -->
@@ -237,21 +216,20 @@ const copyCode = async () => {
         </Button>
       </div>
 
-      <Textarea
+      <CodeMirror
         v-model="codeValue"
-        class="font-mono resize-y min-h-[120px] p-4 rounded-none border-0 bg-background/50"
-        :class="{ 'opacity-50 cursor-wait': isExecuting }"
-        @input="updateCode"
-        spellcheck="false"
+        :language="language"
+        :disabled="isExecuting"
+        @update:modelValue="updateCode"
       />
     </div>
 
     <!-- Output Section -->
     <div v-if="output" class="border-t">
       <div class="flex items-center justify-between p-2 border-b">
-        <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          Output
-        </span>
+        <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider"
+          >Output</span
+        >
         <Button variant="ghost" size="sm" @click="copyOutput" class="h-6 w-6 p-0">
           <Copy v-if="!isCopied" class="h-3 w-3" />
           <Check v-else class="h-3 w-3" />
