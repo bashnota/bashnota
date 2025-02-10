@@ -1,60 +1,43 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { useNotaStore } from '@/stores/nota'
 import { onKeyStroke } from '@vueuse/core'
-import PageTree from '../PageTree.vue'
 import DarkModeToggle from './DarkModeToggle.vue'
-import {
-  PlusIcon,
-  MagnifyingGlassIcon,
-  PencilIcon,
-  TrashIcon,
-  DocumentTextIcon,
-  FolderIcon,
-  ChevronDownIcon,
-  ChevronRightIcon,
-} from '@heroicons/vue/24/solid'
+import { PlusIcon, MagnifyingGlassIcon, FolderIcon } from '@heroicons/vue/24/solid'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import NotaTree from '../NotaTree.vue'
 
 const router = useRouter()
-const route = useRoute()
 const notaStore = useNotaStore()
 const newNotaTitle = ref('')
 const searchQuery = ref('')
 const showNewNotaInput = ref<string | null>(null)
 const expandedItems = ref<Set<string>>(new Set())
-const showRenameInput = ref<string | null>(null)
-const renameTitle = ref('')
 
 onMounted(async () => {
   await notaStore.loadNotas()
 })
 
-const currentNotaId = computed(() => route.params.id as string)
-
 const filteredNotas = computed(() => {
   const query = searchQuery.value.toLowerCase()
   if (!query) return notaStore.rootItems
-  return notaStore.items.filter((nota) => 
-    nota.title.toLowerCase().includes(query)
-  )
+  return notaStore.items.filter((nota) => nota.title.toLowerCase().includes(query))
 })
 
 const createNewNota = async (parentId: string | null = null) => {
   if (!newNotaTitle.value.trim()) return
-  
+
   try {
     const nota = await notaStore.createItem(newNotaTitle.value, parentId)
     newNotaTitle.value = ''
     showNewNotaInput.value = null
-    
+
     if (parentId) {
       expandedItems.value.add(parentId)
     }
-    
+
     await router.push(`/nota/${nota.id}`)
   } catch (error) {
     console.error('Failed to create nota:', error)
@@ -65,34 +48,6 @@ const handleKeydown = (event: KeyboardEvent) => {
   if (event.key === 'Escape') {
     showNewNotaInput.value = null
     newNotaTitle.value = ''
-  }
-}
-
-const toggleNota = (notaId: string) => {
-  if (expandedItems.value.has(notaId)) {
-    expandedItems.value.delete(notaId)
-  } else {
-    expandedItems.value.add(notaId)
-  }
-}
-
-const startRename = (nota: { id: string; title: string }) => {
-  showRenameInput.value = nota.id
-  renameTitle.value = nota.title
-}
-
-const handleRename = async (notaId: string) => {
-  if (!renameTitle.value.trim()) return
-  await notaStore.renameItem(notaId, renameTitle.value)
-  showRenameInput.value = null
-}
-
-const handleDelete = async (notaId: string) => {
-  if (confirm('Are you sure you want to delete this nota?')) {
-    await notaStore.deleteItem(notaId)
-    if (currentNotaId.value === notaId) {
-      router.push('/')
-    }
   }
 }
 
@@ -155,20 +110,22 @@ onKeyStroke('/', (e) => {
 
     <!-- Unified Tree -->
     <div class="flex-1 overflow-y-auto p-4">
-      <NotaTree 
-        :items="filteredNotas" 
+      <NotaTree
+        :items="filteredNotas"
         :expanded-items="expandedItems"
         :show-new-input="showNewNotaInput"
         :new-nota-title="newNotaTitle"
-        @toggle="(id) => expandedItems.has(id) ? expandedItems.delete(id) : expandedItems.add(id)"
+        @toggle="(id) => (expandedItems.has(id) ? expandedItems.delete(id) : expandedItems.add(id))"
         @create="createNewNota"
-        @show-new-input="(id) => {
-          showNewNotaInput = id
-          newNotaTitle = ''
-        }"
-        @update:new-nota-title="(value) => newNotaTitle = value"
+        @show-new-input="
+          (id) => {
+            showNewNotaInput = id
+            newNotaTitle = ''
+          }
+        "
+        @update:new-nota-title="(value) => (newNotaTitle = value)"
       />
-      
+
       <!-- Empty State -->
       <div
         v-if="filteredNotas.length === 0"

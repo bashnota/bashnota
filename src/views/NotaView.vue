@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import NotaEditor from '@/components/editor/NotaEditor.vue'
 import NotaConfigPage from '@/components/NotaConfigPage.vue'
-import { watch, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { computed } from 'vue'
 import { Cog6ToothIcon, CheckCircleIcon, ArrowPathIcon } from '@heroicons/vue/24/outline'
@@ -13,7 +12,6 @@ const props = defineProps<{
   id: string
 }>()
 
-const route = useRoute()
 const store = useNotaStore()
 
 const nota = computed(() => store.getCurrentNota(props.id))

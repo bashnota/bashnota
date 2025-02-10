@@ -19,8 +19,8 @@ import {
 type CommandArgs = {
   editor: Editor
   range: Range
-  props: any 
-
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  props: any
 }
 
 export default {

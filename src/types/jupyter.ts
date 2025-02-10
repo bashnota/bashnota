@@ -36,6 +36,7 @@ export interface NotaConfig {
     token: string
   }>
   kernels: Record<string, KernelSpec[]>
+  kernelPreferences: Record<string, KernelConfig>
 }
 
 export interface KernelSpec {

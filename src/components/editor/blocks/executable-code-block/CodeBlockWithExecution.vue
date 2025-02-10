@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
 import { useNotaStore } from '@/stores/nota'
 import { useCodeExecution } from '@/composables/useCodeExecution'
 import type { KernelConfig, KernelSpec } from '@/types/jupyter'
@@ -39,7 +38,7 @@ const notaConfig = computed(() => {
   if (!nota?.config) {
     return {
       jupyterServers: [],
-      kernels: {},
+      kernels: {} as Record<string, KernelSpec[]>,
       notebooks: [],
     }
   }
@@ -57,7 +56,7 @@ const availableServers = computed(() => {
 // Get available kernels for selected server
 const availableKernels = computed(() => {
   if (!selectedServer.value || selectedServer.value === 'none') return []
-  return (notaConfig.value.kernels[selectedServer.value] || []) as KernelSpec[]
+  return notaConfig.value.kernels[selectedServer.value] || []
 })
 
 // Get the current server object

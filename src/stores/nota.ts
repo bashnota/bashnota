@@ -1,51 +1,49 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
 import { db } from '@/db'
-import { DocumentType, type Nota, type Page } from '@/types/nota'
+import { type Nota } from '@/types/nota'
 import type { NotaConfig } from '@/types/jupyter'
-
-export interface Nota {
-  id: string
-  title: string
-  content: string
-  parentId: string | null
-  config?: NotaConfig
-  createdAt: Date | string
-  updatedAt: Date | string
-}
 
 export const useNotaStore = defineStore('nota', {
   state: () => ({
     items: [] as Nota[],
     loading: false,
-    error: null as string | null
+    error: null as string | null,
   }),
 
   getters: {
     rootItems: (state) => {
-      return state.items.filter(item => !item.parentId)
+      return state.items.filter((item) => !item.parentId)
     },
 
     getChildren: (state) => (parentId: string) => {
-      return state.items.filter(item => item.parentId === parentId)
+      return state.items.filter((item) => item.parentId === parentId)
+    },
+
+    getParents: (state) => (id: string) => {
+      const findParents = (itemId: string): Nota[] => {
+        const item = state.items.find((i) => i.id === itemId)
+        if (!item?.parentId) return []
+        return [item, ...findParents(item.parentId)]
+      }
+      return findParents(id)
     },
 
     getItem: (state) => (id: string) => {
-      return state.items.find(item => item.id === id)
+      return state.items.find((item) => item.id === id)
     },
 
     getCurrentNota: (state) => (id: string) => {
-      return state.items.find(item => item.id === id)
+      return state.items.find((item) => item.id === id)
     },
 
     getRootNotaId: (state) => (id: string) => {
       const findRoot = (itemId: string): string => {
-        const item = state.items.find(i => i.id === itemId)
+        const item = state.items.find((i) => i.id === itemId)
         if (!item?.parentId) return itemId
         return findRoot(item.parentId)
       }
       return findRoot(id)
-    }
+    },
   },
 
   actions: {
@@ -57,14 +55,14 @@ export const useNotaStore = defineStore('nota', {
         content: '',
         parentId,
         createdAt: now,
-        updatedAt: now
+        updatedAt: now,
       }
 
       // If it has a parent, copy the parent's config
       if (parentId) {
-        const parent = this.items.find(i => i.id === parentId)
+        const parent = this.items.find((i) => i.id === parentId)
         if (parent?.config) {
-          item.config = { ...parent.config }
+          item.config = JSON.parse(JSON.stringify(parent.config))
         }
       }
 
@@ -80,7 +78,7 @@ export const useNotaStore = defineStore('nota', {
         this.items = results.map((nota) => ({
           ...nota,
           createdAt: nota.createdAt,
-          updatedAt: nota.updatedAt
+          updatedAt: nota.updatedAt,
         }))
       } catch (e) {
         this.error = 'Failed to load notas'
@@ -91,13 +89,13 @@ export const useNotaStore = defineStore('nota', {
     },
 
     async renameItem(id: string, newTitle: string) {
-      const item = this.items.find(i => i.id === id)
+      const item = this.items.find((i) => i.id === id)
       if (item) {
         item.title = newTitle
         item.updatedAt = new Date().toISOString()
-        await db.notas.update(id, { 
-          title: newTitle, 
-          updatedAt: new Date().toISOString() 
+        await db.notas.update(id, {
+          title: newTitle,
+          updatedAt: new Date().toISOString(),
         })
       }
     },
@@ -111,21 +109,21 @@ export const useNotaStore = defineStore('nota', {
 
       // Then delete the item itself
       await db.notas.delete(id)
-      this.items = this.items.filter(i => i.id !== id)
+      this.items = this.items.filter((i) => i.id !== id)
     },
 
     async saveNota(nota: Partial<Nota> & { id: string }) {
-      const notaToStore: Partial<Nota> = {
+      const notaToStore: Partial<Nota> & { updatedAt: string | Date } = {
         ...nota,
         updatedAt: new Date().toISOString(),
       }
 
       const index = this.items.findIndex((n) => n.id === nota.id)
       if (index !== -1) {
-        this.items[index] = { 
-          ...this.items[index], 
+        this.items[index] = {
+          ...this.items[index],
           ...nota,
-          updatedAt: notaToStore.updatedAt 
+          updatedAt: notaToStore.updatedAt,
         }
         await db.notas.update(nota.id, notaToStore)
       }
@@ -137,6 +135,7 @@ export const useNotaStore = defineStore('nota', {
         const config = nota.config || {
           jupyterServers: [],
           kernels: {},
+          kernelPreferences: {},
         }
 
         updater(config)
@@ -147,6 +146,6 @@ export const useNotaStore = defineStore('nota', {
           updatedAt: new Date().toISOString(),
         })
       }
-    }
-  }
+    },
+  },
 })

@@ -13,8 +13,8 @@ import {
 import { useRouter } from 'vue-router'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import type { Nota } from '@/stores/nota'
 import { withDefaults } from 'vue'
+import type { Nota } from '@/types/nota'
 
 interface Props {
   items: Nota[]
@@ -28,7 +28,7 @@ interface Props {
 const emit = defineEmits<{
   toggle: [id: string]
   create: [parentId: string | null]
-  'show-new-input': [id: string]
+  'show-new-input': [id: string | null]
   'update:newNotaTitle': [value: string]
 }>()
 
@@ -74,13 +74,6 @@ const handleDelete = async (id: string) => {
     router.push('/')
   }
 }
-
-// Get the root nota ID for any item to access config
-const getRootNotaId = (item: Nota): string => {
-  if (!item.parentId) return item.id
-  const parent = store.getItem(item.parentId)
-  return parent ? getRootNotaId(parent) : item.id
-}
 </script>
 
 <template>
@@ -112,10 +105,7 @@ const getRootNotaId = (item: Nota): string => {
           :to="`/nota/${item.id}`"
           class="flex items-center gap-2 flex-1 px-2 py-2 rounded-md hover:bg-slate-200"
         >
-          <FolderIcon
-            v-if="hasChildren(item.id)"
-            class="h-4 w-4 text-muted-foreground"
-          />
+          <FolderIcon v-if="hasChildren(item.id)" class="h-4 w-4 text-muted-foreground" />
           <DocumentTextIcon v-else class="h-4 w-4 text-muted-foreground" />
           {{ item.title }}
         </RouterLink>
@@ -155,7 +145,7 @@ const getRootNotaId = (item: Nota): string => {
       <div v-if="showNewInput === item.id" class="ml-8 mt-1">
         <Input
           :value="newNotaTitle"
-          @input="(e) => emit('update:newNotaTitle', (e.target as HTMLInputElement).value)"
+          @input="(e: Event) => emit('update:newNotaTitle', (e.target as HTMLInputElement).value)"
           placeholder="New sub-nota title..."
           class="text-sm"
           @keyup.enter="emit('create', item.id)"
@@ -165,8 +155,8 @@ const getRootNotaId = (item: Nota): string => {
       </div>
 
       <div v-if="expandedItems.has(item.id)" class="ml-4">
-        <NotaTree 
-          :items="store.getChildren(item.id)" 
+        <NotaTree
+          :items="store.getChildren(item.id)"
           :level="level + 1"
           :parent-id="item.id"
           :expanded-items="expandedItems"
@@ -180,4 +170,4 @@ const getRootNotaId = (item: Nota): string => {
       </div>
     </div>
   </div>
-</template> 
+</template>

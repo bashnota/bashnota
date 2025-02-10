@@ -101,7 +101,7 @@ defineExpose({ onKeyDown })
           <button
             v-for="item in items"
             :key="item.title"
-            class="relative flex justify-between cursor-pointer items-center w-full cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+            class="relative flex justify-between cursor-pointer items-center w-full select-none rounded-sm px-2 py-1.5 text-sm outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
             :class="[
               itemToGlobalIndex.get(item) === selectedIndex
                 ? 'bg-accent text-accent-foreground'

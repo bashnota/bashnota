@@ -11,25 +11,15 @@ const breadcrumbs = computed(() => {
   const items = []
   const id = route.params.id as string
 
-  if (route.name === 'nota') {
-    const nota = store.getCurrentNota(id)
-    if (nota) items.push({ name: nota.title, path: `/nota/${nota.id}` })
-  } else if (route.name === 'page') {
-    const page = store.getCurrentPage(id)
-    if (page) {
-      // Add parent nota or page
-      if (page.parentId) {
-        const parentNota = store.getCurrentNota(page.parentId)
-        if (parentNota) {
-          items.push({ name: parentNota.title, path: `/nota/${parentNota.id}` })
-        } else {
-          const parentPage = store.getCurrentPage(page.parentId)
-          if (parentPage) {
-            items.push({ name: parentPage.title, path: `/page/${parentPage.id}` })
-          }
-        }
-      }
-      items.push({ name: page.title, path: `/page/${page.id}` })
+  const nota = store.getCurrentNota(id)
+
+  if (nota) {
+    items.push({ name: nota.title, path: `/nota/${nota.id}` })
+
+    // Add parent notas to breadcrumbs
+    const parentNotas = store.getParents(nota.id)
+    for (const parentNota of parentNotas) {
+      items.push({ name: parentNota.title, path: `/nota/${parentNota.id}` })
     }
   }
 
