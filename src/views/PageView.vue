@@ -8,6 +8,6 @@ defineProps<{
 
 <template>
   <div>
-    <NotaEditor :page-id="id" />
+    <NotaEditor :nota-id="id" />
   </div>
 </template>
