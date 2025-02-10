@@ -17,50 +17,62 @@ import {
 } from '@heroicons/vue/24/solid'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import NotaTree from '../NotaTree.vue'
 
 const router = useRouter()
 const route = useRoute()
 const notaStore = useNotaStore()
 const newNotaTitle = ref('')
 const searchQuery = ref('')
-const showNewNotaInput = ref(false)
-const expandedNotas = ref<Set<string>>(new Set())
+const showNewNotaInput = ref<string | null>(null)
+const expandedItems = ref<Set<string>>(new Set())
 const showRenameInput = ref<string | null>(null)
 const renameTitle = ref('')
 
 onMounted(async () => {
   await notaStore.loadNotas()
-  await notaStore.loadPages()
 })
 
 const currentNotaId = computed(() => route.params.id as string)
 
 const filteredNotas = computed(() => {
   const query = searchQuery.value.toLowerCase()
-  if (!query) return notaStore.notas
-  return notaStore.notas.filter((nota) => nota.title.toLowerCase().includes(query))
+  if (!query) return notaStore.rootItems
+  return notaStore.items.filter((nota) => 
+    nota.title.toLowerCase().includes(query)
+  )
 })
 
-const createNewNota = async () => {
+const createNewNota = async (parentId: string | null = null) => {
   if (!newNotaTitle.value.trim()) return
-  const nota = await notaStore.createNota(newNotaTitle.value)
-  newNotaTitle.value = ''
-  showNewNotaInput.value = false
-  router.push(`/nota/${nota.id}`)
+  
+  try {
+    const nota = await notaStore.createItem(newNotaTitle.value, parentId)
+    newNotaTitle.value = ''
+    showNewNotaInput.value = null
+    
+    if (parentId) {
+      expandedItems.value.add(parentId)
+    }
+    
+    await router.push(`/nota/${nota.id}`)
+  } catch (error) {
+    console.error('Failed to create nota:', error)
+  }
 }
 
 const handleKeydown = (event: KeyboardEvent) => {
   if (event.key === 'Escape') {
-    showNewNotaInput.value = false
+    showNewNotaInput.value = null
     newNotaTitle.value = ''
   }
 }
 
 const toggleNota = (notaId: string) => {
-  if (expandedNotas.value.has(notaId)) {
-    expandedNotas.value.delete(notaId)
+  if (expandedItems.value.has(notaId)) {
+    expandedItems.value.delete(notaId)
   } else {
-    expandedNotas.value.add(notaId)
+    expandedItems.value.add(notaId)
   }
 }
 
@@ -71,13 +83,13 @@ const startRename = (nota: { id: string; title: string }) => {
 
 const handleRename = async (notaId: string) => {
   if (!renameTitle.value.trim()) return
-  await notaStore.renameNota(notaId, renameTitle.value)
+  await notaStore.renameItem(notaId, renameTitle.value)
   showRenameInput.value = null
 }
 
 const handleDelete = async (notaId: string) => {
   if (confirm('Are you sure you want to delete this nota?')) {
-    await notaStore.deleteNota(notaId)
+    await notaStore.deleteItem(notaId)
     if (currentNotaId.value === notaId) {
       router.push('/')
     }
@@ -88,7 +100,7 @@ const handleDelete = async (notaId: string) => {
 onKeyStroke('n', (e) => {
   if (e.metaKey || e.ctrlKey) {
     e.preventDefault()
-    showNewNotaInput.value = true
+    showNewNotaInput.value = null
   }
 })
 
@@ -117,21 +129,21 @@ onKeyStroke('/', (e) => {
         <Input v-model="searchQuery" placeholder="Search notas..." class="pl-8 text-sm" />
       </div>
 
-      <!-- New Nota Button/Input -->
+      <!-- New Root Nota Button/Input -->
       <div>
         <Input
-          v-if="showNewNotaInput"
+          v-if="showNewNotaInput === null"
           v-model="newNotaTitle"
           placeholder="New nota title..."
           class="text-sm"
-          @keyup.enter="createNewNota"
+          @keyup.enter="createNewNota()"
           @keydown="handleKeydown"
           ref="newNotaInput"
           autofocus
         />
         <Button
           v-else
-          @click="showNewNotaInput = true"
+          @click="showNewNotaInput = null"
           class="w-full justify-start gap-2 text-sm"
           variant="default"
         >
@@ -141,75 +153,22 @@ onKeyStroke('/', (e) => {
       </div>
     </div>
 
-    <!-- Nota List -->
-    <div class="flex-1 overflow-y-auto p-4 space-y-1">
-      <div v-for="nota in filteredNotas" :key="nota.id" class="group">
-        <div class="flex items-center gap-1 rounded-md py-1.5 text-sm">
-          <!-- Expand/Indent Button -->
-          <button
-            v-if="notaStore.getNotaPages(nota.id)?.length"
-            @click="toggleNota(nota.id)"
-            class="w-5 h-5 flex items-center justify-center text-muted-foreground hover:text-foreground"
-          >
-            <ChevronDownIcon v-if="expandedNotas.has(nota.id)" class="h-4 w-4" />
-            <ChevronRightIcon v-else class="h-4 w-4" />
-          </button>
-          <div v-else class="w-5"></div>
-
-          <!-- Title/Rename Input -->
-          <Input
-            v-if="showRenameInput === nota.id"
-            v-model="renameTitle"
-            class="h-7 text-sm"
-            @keyup.enter="handleRename(nota.id)"
-            @keyup.esc="showRenameInput = null"
-            @blur="handleRename(nota.id)"
-            ref="renameInput"
-            autofocus
-          />
-          <RouterLink
-            v-else
-            :to="`/nota/${nota.id}`"
-            class="flex items-center gap-2 flex-1 px-2 py-2 rounded-md hover:bg-slate-200"
-          >
-            <!-- Nota Icon -->
-            <FolderIcon
-              v-if="notaStore.getNotaPages(nota.id)?.length"
-              class="h-4 w-4 text-muted-foreground"
-            />
-            <DocumentTextIcon v-else class="h-4 w-4 text-muted-foreground" />
-            {{ nota.title }}
-          </RouterLink>
-
-          <!-- Actions -->
-          <div class="opacity-0 group-hover:opacity-100 flex items-center gap-1 pr-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-7 w-7"
-              @click="startRename(nota)"
-              title="Rename"
-            >
-              <PencilIcon class="h-3 w-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-7 w-7 hover:text-red-500"
-              @click="handleDelete(nota.id)"
-              title="Delete"
-            >
-              <TrashIcon class="h-3 w-3" />
-            </Button>
-          </div>
-        </div>
-
-        <!-- Page Tree -->
-        <div v-if="expandedNotas.has(nota.id)" class="ml-6 mt-1">
-          <PageTree :pages="notaStore.getNotaPages(nota.id)" />
-        </div>
-      </div>
-
+    <!-- Unified Tree -->
+    <div class="flex-1 overflow-y-auto p-4">
+      <NotaTree 
+        :items="filteredNotas" 
+        :expanded-items="expandedItems"
+        :show-new-input="showNewNotaInput"
+        :new-nota-title="newNotaTitle"
+        @toggle="(id) => expandedItems.has(id) ? expandedItems.delete(id) : expandedItems.add(id)"
+        @create="createNewNota"
+        @show-new-input="(id) => {
+          showNewNotaInput = id
+          newNotaTitle = ''
+        }"
+        @update:new-nota-title="(value) => newNotaTitle = value"
+      />
+      
       <!-- Empty State -->
       <div
         v-if="filteredNotas.length === 0"
@@ -219,7 +178,7 @@ onKeyStroke('/', (e) => {
           <FolderIcon v-if="!searchQuery" class="w-5 h-5" />
           <MagnifyingGlassIcon v-else class="w-5 h-5" />
         </div>
-        {{ searchQuery ? 'No notas found' : 'Create your first nota' }}
+        {{ searchQuery ? 'No items found' : 'Create your first nota' }}
       </div>
     </div>
   </div>

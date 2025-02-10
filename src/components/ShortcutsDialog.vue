@@ -35,29 +35,15 @@ defineExpose({ isOpen })
 
 <style scoped>
 .shortcuts-dialog {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  @apply fixed inset-0 z-50 flex items-center justify-center;
 }
 
 .dialog-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(4px);
+  @apply fixed inset-0 bg-background/80 backdrop-blur-sm;
 }
 
 .dialog-panel {
-  position: relative;
-  background: var(--color-background);
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-  max-width: 500px;
-  width: 90%;
+  @apply w-full max-w-md rounded-lg border bg-card p-6 shadow-lg;
 }
 
 h2 {

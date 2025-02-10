@@ -12,7 +12,9 @@ const props = defineProps<{
   disabled?: boolean
 }>()
 
-const emit = defineEmits(['update:modelValue'])
+const emit = defineEmits<{
+  'update:modelValue': [value: string]
+}>()
 
 const isDark = ref(false)
 

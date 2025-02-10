@@ -18,7 +18,6 @@ const props = defineProps<{
 const emit = defineEmits(['update:code', 'kernel-select'])
 
 const store = useNotaStore()
-const route = useRoute()
 const selectedServer = ref('none')
 const selectedKernel = ref('none')
 const codeValue = ref(props.code)
@@ -27,20 +26,16 @@ const isCodeCopied = ref(false)
 // Use the codeValue ref for code execution
 const { output, isExecuting, hasError, execute, copyOutput, isCopied } = useCodeExecution(codeValue)
 
-// Get the parent nota ID if we're on a page
-const parentNotaId = computed(() => {
-  if (route.name === 'page') {
-    const page = store.getCurrentPage(props.notaId)
-    return page?.parentId
-  }
-  return props.notaId
+// Get the root nota ID to access config
+const rootNotaId = computed(() => {
+  const currentNota = store.getCurrentNota(props.notaId)
+  if (!currentNota?.parentId) return props.notaId
+  return store.getRootNotaId(currentNota.parentId)
 })
 
-// Get the nota's configuration
+// Use root nota's configuration
 const notaConfig = computed(() => {
-  if (!parentNotaId.value) return { jupyterServers: [], kernels: {}, notebooks: [] }
-
-  const nota = store.getCurrentNota(parentNotaId.value)
+  const nota = store.getCurrentNota(rootNotaId.value)
   if (!nota?.config) {
     return {
       jupyterServers: [],
@@ -99,19 +94,10 @@ watch(
   },
 )
 
-const executeCode = async () => {
-  if (selectedKernel.value === 'none') {
-    output.value = 'Please select a kernel first'
-    return
-  }
-
-  if (selectedServer.value === 'none') {
-    output.value = 'Please select a server first'
-    return
-  }
-
+const handleExecution = async () => {
   if (!currentServer.value) {
     output.value = 'Invalid server selection'
+    hasError.value = true
     return
   }
 
@@ -121,6 +107,7 @@ const executeCode = async () => {
   } catch (error) {
     console.error('Execution error:', error)
     output.value = error instanceof Error ? error.message : 'Execution failed'
+    hasError.value = true
   } finally {
     isExecuting.value = false
   }
@@ -194,7 +181,7 @@ const copyCode = async () => {
         variant="default"
         size="sm"
         :disabled="isExecuting || selectedKernel === 'none'"
-        @click="executeCode"
+        @click="handleExecution"
         class="min-w-[80px]"
       >
         <Play v-if="!isExecuting" class="w-4 h-4 mr-2" />
