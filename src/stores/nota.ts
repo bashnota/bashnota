@@ -4,284 +4,149 @@ import { db } from '@/db'
 import { DocumentType, type Nota, type Page } from '@/types/nota'
 import type { NotaConfig } from '@/types/jupyter'
 
-export const useNotaStore = defineStore('nota', () => {
-  const notas = ref<Nota[]>([])
-  const pages = ref<Page[]>([])
-  const loading = ref(false)
-  const error = ref<string | null>(null)
+export interface Nota {
+  id: string
+  title: string
+  content: string
+  parentId: string | null
+  config?: NotaConfig
+  createdAt: Date | string
+  updatedAt: Date | string
+}
 
-  const loadNotas = async () => {
-    loading.value = true
-    try {
-      const results = await db.notas.toArray()
-      notas.value = results.map((nota) => ({
+export const useNotaStore = defineStore('nota', {
+  state: () => ({
+    items: [] as Nota[],
+    loading: false,
+    error: null as string | null
+  }),
+
+  getters: {
+    rootItems: (state) => {
+      return state.items.filter(item => !item.parentId)
+    },
+
+    getChildren: (state) => (parentId: string) => {
+      return state.items.filter(item => item.parentId === parentId)
+    },
+
+    getItem: (state) => (id: string) => {
+      return state.items.find(item => item.id === id)
+    },
+
+    getCurrentNota: (state) => (id: string) => {
+      return state.items.find(item => item.id === id)
+    },
+
+    getRootNotaId: (state) => (id: string) => {
+      const findRoot = (itemId: string): string => {
+        const item = state.items.find(i => i.id === itemId)
+        if (!item?.parentId) return itemId
+        return findRoot(item.parentId)
+      }
+      return findRoot(id)
+    }
+  },
+
+  actions: {
+    async createItem(title: string, parentId: string | null = null) {
+      const now = new Date().toISOString()
+      const item: Nota = {
+        id: crypto.randomUUID(),
+        title,
+        content: '',
+        parentId,
+        createdAt: now,
+        updatedAt: now
+      }
+
+      // If it has a parent, copy the parent's config
+      if (parentId) {
+        const parent = this.items.find(i => i.id === parentId)
+        if (parent?.config) {
+          item.config = { ...parent.config }
+        }
+      }
+
+      await db.notas.add(item)
+      this.items.push(item)
+      return item
+    },
+
+    async loadNotas() {
+      this.loading = true
+      try {
+        const results = await db.notas.toArray()
+        this.items = results.map((nota) => ({
+          ...nota,
+          createdAt: nota.createdAt,
+          updatedAt: nota.updatedAt
+        }))
+      } catch (e) {
+        this.error = 'Failed to load notas'
+        console.error(e)
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async renameItem(id: string, newTitle: string) {
+      const item = this.items.find(i => i.id === id)
+      if (item) {
+        item.title = newTitle
+        item.updatedAt = new Date().toISOString()
+        await db.notas.update(id, { 
+          title: newTitle, 
+          updatedAt: new Date().toISOString() 
+        })
+      }
+    },
+
+    async deleteItem(id: string) {
+      // First delete all children
+      const children = this.getChildren(id)
+      for (const child of children) {
+        await this.deleteItem(child.id)
+      }
+
+      // Then delete the item itself
+      await db.notas.delete(id)
+      this.items = this.items.filter(i => i.id !== id)
+    },
+
+    async saveNota(nota: Partial<Nota> & { id: string }) {
+      const notaToStore: Partial<Nota> = {
         ...nota,
-        createdAt: new Date(nota.createdAt),
-        updatedAt: new Date(nota.updatedAt),
-        pages: nota.pages || [],
-        config: nota.config || {
+        updatedAt: new Date().toISOString(),
+      }
+
+      const index = this.items.findIndex((n) => n.id === nota.id)
+      if (index !== -1) {
+        this.items[index] = { 
+          ...this.items[index], 
+          ...nota,
+          updatedAt: notaToStore.updatedAt 
+        }
+        await db.notas.update(nota.id, notaToStore)
+      }
+    },
+
+    async updateNotaConfig(notaId: string, updater: (config: NotaConfig) => void) {
+      const nota = this.getItem(notaId)
+      if (nota) {
+        const config = nota.config || {
           jupyterServers: [],
           kernels: {},
-        },
-      }))
-    } catch (e) {
-      error.value = 'Failed to load notas'
-      console.error(e)
-    } finally {
-      loading.value = false
-    }
-  }
+        }
 
-  const loadPages = async () => {
-    loading.value = true
-    try {
-      const results = await db.pages.toArray()
-      pages.value = results.map((page) => ({
-        ...page,
-        createdAt: new Date(page.createdAt),
-        updatedAt: new Date(page.updatedAt),
-        children: page.children || [],
-      }))
-    } catch (e) {
-      error.value = 'Failed to load pages'
-      console.error(e)
-    } finally {
-      loading.value = false
-    }
-  }
+        updater(config)
+        nota.config = config
 
-  const createNota = async (title: string) => {
-    const nota: Nota = {
-      id: crypto.randomUUID(),
-      title,
-      content: '',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      pages: [],
-      type: DocumentType.NOTA,
-    }
-
-    await db.notas.add(nota)
-    notas.value.push(nota)
-    return nota
-  }
-
-  const getCurrentNota = (id: string) => {
-    return notas.value.find((nota) => nota.id === id)
-  }
-
-  const createPage = async (title: string, parentId: string) => {
-    const page: Page = {
-      id: crypto.randomUUID(),
-      title,
-      content: '',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      parentId,
-      children: [],
-      type: DocumentType.PAGE,
-    }
-
-    await db.pages.add(page)
-    pages.value.push(page)
-
-    if (parentId) {
-      const parentNota = notas.value.find((n) => n.id === parentId)
-      if (parentNota) {
-        parentNota.pages.push(page.id)
-        await db.notas.update(parentId, {
-          pages: [...parentNota.pages],
+        await db.notas.update(notaId, {
+          config: JSON.parse(JSON.stringify(config)),
           updatedAt: new Date().toISOString(),
         })
-      } else {
-        const parentPage = pages.value.find((p) => p.id === parentId)
-        if (parentPage) {
-          parentPage.children.push(page.id)
-          await db.pages.update(parentId, {
-            children: [...parentPage.children],
-            updatedAt: new Date().toISOString(),
-          })
-        }
       }
     }
-
-    return page
-  }
-
-  const getNotaPages = (notaId: string) => {
-    const nota = notas.value.find((n) => n.id === notaId)
-    if (!nota?.pages) return []
-    // Get all pages that have this nota as their parent
-    return pages.value.filter((page) => page.parentId === notaId)
-  }
-
-  const getPageChildren = (pageId: string) => {
-    const page = pages.value.find((p) => p.id === pageId)
-    if (!page?.children) return []
-    // Get all pages that have this page as their parent
-    return pages.value.filter((p) => p.parentId === pageId)
-  }
-
-  const getCurrentPage = (id: string) => {
-    return pages.value.find((page) => page.id === id)
-  }
-
-  const getPageParentNota = (pageId: string) => {
-    const page = getCurrentPage(pageId)
-    if (page?.parentId) {
-      return notas.value.find((nota) => nota.id === page.parentId)
-    }
-    return null
-  }
-
-  const savePage = async (page: Partial<Page>) => {
-    if (!page.id) return
-
-    const pageToStore: Partial<Page> = {
-      ...page,
-      updatedAt: new Date().toISOString(),
-      children: page.children ? [...page.children] : undefined,
-    }
-
-    await db.pages.update(page.id, pageToStore)
-    const index = pages.value.findIndex((p) => p.id === page.id)
-    if (index !== -1) {
-      pages.value[index] = { ...pages.value[index], ...page }
-    }
-  }
-
-  const deletePage = async (id: string) => {
-    const page = pages.value.find((p) => p.id === id)
-    if (!page) return
-
-    if (page.parentId) {
-      const parentNota = notas.value.find((n) => n.id === page.parentId)
-      if (parentNota) {
-        const updatedPages = parentNota.pages.filter((pid) => pid !== id)
-        await db.notas.update(page.parentId, {
-          pages: [...updatedPages],
-          updatedAt: new Date().toISOString(),
-        })
-        parentNota.pages = updatedPages
-      } else {
-        const parentPage = pages.value.find((p) => p.id === page.parentId)
-        if (parentPage) {
-          const updatedChildren = parentPage.children.filter((pid) => pid !== id)
-          await db.pages.update(page.parentId, {
-            children: [...updatedChildren],
-            updatedAt: new Date().toISOString(),
-          })
-          parentPage.children = updatedChildren
-        }
-      }
-    }
-
-    const deleteChildren = async (pageId: string) => {
-      const childPage = pages.value.find((p) => p.id === pageId)
-      if (!childPage) return
-      const childrenToDelete = [...childPage.children]
-      for (const childId of childrenToDelete) {
-        await deleteChildren(childId)
-      }
-      await db.pages.delete(pageId)
-    }
-
-    const childrenToDelete = [...page.children]
-    for (const childId of childrenToDelete) {
-      await deleteChildren(childId)
-    }
-
-    await db.pages.delete(id)
-    pages.value = pages.value.filter((p) => p.id !== id)
-  }
-
-  const saveNota = async (nota: Partial<Nota> & { id: string }) => {
-    const notaToStore: Partial<Nota> = {
-      ...nota,
-      updatedAt: new Date().toISOString(),
-      pages: nota.pages ? [...nota.pages] : undefined,
-    }
-
-    const index = notas.value.findIndex((n) => n.id === nota.id)
-    if (index !== -1) {
-      notas.value[index] = { ...notas.value[index], ...nota }
-      await db.notas.update(nota.id, notaToStore)
-    }
-  }
-
-  const renameNota = async (id: string, newTitle: string) => {
-    const nota = notas.value.find((n) => n.id === id)
-    if (nota) {
-      nota.title = newTitle
-      nota.updatedAt = new Date()
-      await db.notas.update(id, { title: newTitle, updatedAt: new Date() })
-    }
-  }
-
-  const renamePage = async (id: string, newTitle: string) => {
-    const page = pages.value.find((p) => p.id === id)
-    if (page) {
-      page.title = newTitle
-      page.updatedAt = new Date()
-      await db.pages.update(id, {
-        title: newTitle,
-        updatedAt: new Date().toISOString(),
-      })
-    }
-  }
-
-  const deleteNota = async (id: string) => {
-    const nota = notas.value.find((n) => n.id === id)
-    if (!nota) return
-
-    if (nota.pages) {
-      for (const pageId of nota.pages) {
-        await deletePage(pageId)
-      }
-    }
-
-    notas.value = notas.value.filter((n) => n.id !== id)
-    await db.notas.delete(id)
-  }
-
-  const updateNotaConfig = async (notaId: string, updater: (config: NotaConfig) => void) => {
-    const nota = getCurrentNota(notaId)
-    if (nota) {
-      const config = nota.config || {
-        jupyterServers: [],
-        kernels: {},
-      }
-
-      updater(config)
-      nota.config = config
-
-      await db.notas.update(notaId, {
-        config: JSON.parse(JSON.stringify(config)),
-        updatedAt: new Date().toISOString(),
-      })
-    }
-  }
-
-  return {
-    notas,
-    pages,
-    loading,
-    error,
-    loadNotas,
-    loadPages,
-    createNota,
-    getCurrentNota,
-    saveNota,
-    renameNota,
-    deleteNota,
-    createPage,
-    getNotaPages,
-    getPageChildren,
-    getCurrentPage,
-    savePage,
-    deletePage,
-    renamePage,
-    updateNotaConfig,
-    getPageParentNota,
   }
 })

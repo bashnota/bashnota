@@ -19,6 +19,8 @@ import {
 type CommandArgs = {
   editor: Editor
   range: Range
+  props: any 
+
 }
 
 export default {
@@ -110,7 +112,7 @@ export default {
         category: 'Advanced',
         icon: FilePlus,
         command: ({ editor, range }: CommandArgs) => {
-          const createPage = async () => {
+          const createNewPage = async () => {
             const store = useNotaStore()
             const currentRoute = router.currentRoute.value
             const parentId = currentRoute.params.id as string
@@ -119,7 +121,7 @@ export default {
             if (!title) return
 
             try {
-              const newPage = await store.createPage(title, parentId)
+              const newPage = await store.createItem(title, parentId)
               editor
                 .chain()
                 .focus()
@@ -127,19 +129,19 @@ export default {
                 .insertContent({
                   type: 'pageLink',
                   attrs: {
-                    href: `/page/${newPage.id}`,
+                    href: `/nota/${newPage.id}`,
                     title: title,
                   },
                 })
                 .run()
 
-              router.push(`/page/${newPage.id}`)
+              router.push(`/nota/${newPage.id}`)
             } catch (error) {
               console.error('Failed to create page:', error)
             }
           }
 
-          createPage()
+          createNewPage()
         },
       },
     ]

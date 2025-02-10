@@ -20,7 +20,7 @@
 }
 
 .path {
-  stroke: var(--color-primary);
+  stroke: hsl(var(--primary));
   stroke-linecap: round;
   animation: dash 1.5s ease-in-out infinite;
 }
