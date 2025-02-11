@@ -139,22 +139,24 @@ const wordCount = computed(() => {
 </script>
 
 <template>
-  <div class="flex h-full">
+  <div class="flex">
     <!-- Sidebar -->
     <div
-      class="transition-all duration-300 ease-in-out border-r relative"
+      class="transition-all duration-300 ease-in-out relative"
       :class="{
-        'w-72 px-6 py-4': isSidebarOpen,
-        'w-0 p-0': !isSidebarOpen,
+        'w-72': isSidebarOpen,
+        'w-0': !isSidebarOpen,
       }"
     >
-      <ScrollArea class="h-full" v-show="isSidebarOpen">
-        <TableOfContents :editor="editor" />
-      </ScrollArea>
+      <div v-show="isSidebarOpen" class="fixed" :style="{ width: isSidebarOpen ? 'inherit' : '0' }">
+        <ScrollArea class="h-[calc(100vh-2rem)] px-6 py-4">
+          <TableOfContents :editor="editor" />
+        </ScrollArea>
+      </div>
     </div>
 
     <!-- Main Editor Area -->
-    <div class="flex-1 flex flex-col min-w-0">
+    <div class="flex-1 flex flex-col min-w-0" :class="{ 'border-l': isSidebarOpen }">
       <!-- Editor Toolbar -->
       <div class="border-b backdrop-blur sticky top-0 z-10">
         <EditorToolbar v-if="editor" :editor="editor" class="px-4 py-2" />
