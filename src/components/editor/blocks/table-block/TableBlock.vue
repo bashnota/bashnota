@@ -66,6 +66,8 @@ onMounted(async () => {
       }
       tableName.value = data.name
     } else {
+      const columnID = crypto.randomUUID()
+
       // Initialize new table
       const newTable = {
         id: props.node.attrs.tableId,
@@ -73,12 +75,19 @@ onMounted(async () => {
         name: 'Untitled',
         columns: [
           {
-            id: crypto.randomUUID(),
+            id: columnID,
             title: 'Title',
             type: 'text',
           },
         ],
-        rows: [],
+        rows: [
+          {
+            id: crypto.randomUUID(),
+            cells: {
+              [columnID]: '',
+            },
+          },
+        ],
       }
       await tableStore.createTable(newTable)
       // Set the data with spread operators to ensure reactivity
@@ -314,8 +323,8 @@ const updateColumnType = (columnId: string, newType: string) => {
         </div>
 
         <!-- Table Content -->
-        <ScrollArea class="h-[400px]">
-          <Table>
+        <ScrollArea class="max-h-[400px] overflow-auto">
+          <Table class="table-block-table-element">
             <TableHeader>
               <TableRow>
                 <TableHead
@@ -421,3 +430,9 @@ const updateColumnType = (columnId: string, newType: string) => {
     </div>
   </NodeViewWrapper>
 </template>
+
+<style>
+.table-block-table-element {
+  margin: 0 !important;
+}
+</style>
