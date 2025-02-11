@@ -63,6 +63,7 @@ const editor = useEditor({
     }),
     PageLink,
     Table.configure({
+      allowTableNodeSelection: true,
       resizable: true,
     }),
     TableRow,
