@@ -22,6 +22,8 @@ import { ExecutableCodeBlockExtension } from './extensions/ExecutableCodeBlockEx
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ListIcon } from 'lucide-vue-next'
+import { TableExtension } from './extensions/TableExtension'
+import { MathExtension } from './extensions/MathExtension'
 
 const props = defineProps<{
   notaId: string
@@ -72,6 +74,12 @@ const editor = useEditor({
     SlashCommands.configure({
       suggestion,
     }),
+    TableExtension.configure({
+      HTMLAttributes: {
+        class: 'data-table',
+      },
+    }),
+    MathExtension,
   ],
   editorProps: {
     attributes: {

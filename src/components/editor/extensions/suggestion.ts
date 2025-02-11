@@ -14,6 +14,8 @@ import {
   Table2,
   FilePlus,
   Heading3,
+  DatabaseIcon,
+  FunctionSquare,
 } from 'lucide-vue-next'
 
 type CommandArgs = {
@@ -73,6 +75,24 @@ export default {
         icon: ListOrdered,
         command: ({ editor, range }: CommandArgs) => {
           editor.chain().focus().deleteRange(range).toggleOrderedList().run()
+        },
+      },
+      {
+        title: 'Math Block',
+        category: 'Basic Blocks',
+        icon: FunctionSquare,
+        command: ({ editor, range }: CommandArgs) => {
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .insertContent({
+              type: 'mathBlock',
+              attrs: {
+                latex: '\\frac{1}{2}',
+              },
+            })
+            .run()
         },
       },
 
@@ -142,6 +162,20 @@ export default {
           }
 
           createNewPage()
+        },
+      },
+      {
+        title: 'Database Table',
+        category: 'Advanced',
+        icon: DatabaseIcon,
+        command: ({ editor, range }: CommandArgs) => {
+          const notaId = router.currentRoute.value.params.id as string
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .insertDataTable(notaId)
+            .run()
         },
       },
     ]
