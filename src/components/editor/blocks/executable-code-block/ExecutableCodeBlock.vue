@@ -4,7 +4,6 @@ import { NodeViewWrapper } from '@tiptap/vue-3'
 import CodeBlockWithExecution from './CodeBlockWithExecution.vue'
 import { useRoute } from 'vue-router'
 import { useNotaStore } from '@/stores/nota'
-import type { KernelConfig } from '@/types/jupyter'
 import { Card, CardContent } from '@/components/ui/card'
 
 const props = defineProps({
@@ -29,8 +28,11 @@ const props = defineProps({
 const route = useRoute()
 const store = useNotaStore()
 const blockId = computed(() => props.node.attrs.id || '')
-const isExecuteable = computed(() => props.node.attrs.executeable)
+const isExecutable = computed(() => props.node.attrs.executable)
 const language = computed(() => props.node.attrs.language)
+const output = computed(() => props.node.attrs.output)
+const kernelName = computed(() => props.node.attrs.kernelName)
+const serverID = computed(() => props.node.attrs.serverID)
 const code = computed(() => props.node.textContent || '')
 
 // Get saved kernel preference for this block
@@ -51,20 +53,12 @@ const updateCode = (newCode: string) => {
   props.editor.view.dispatch(transaction)
 }
 
-const onKernelSelect = async (kernelName: string, serverId: string) => {
-  if (!blockId.value) return
+const onKernelSelect = async (kernelName: string, serverID: string) => {
+  props.updateAttributes({ kernelName, serverID })
+}
 
-  const kernelConfig: KernelConfig = {
-    blockId: blockId.value,
-    kernelName,
-    serverId,
-    lastUsed: new Date().toISOString(),
-  }
-
-  await store.updateNotaConfig(route.params.id as string, (config) => {
-    if (!config.kernelPreferences) config.kernelPreferences = {}
-    config.kernelPreferences[blockId.value] = kernelConfig
-  })
+const updateOutput = (newOutput: string) => {
+  props.updateAttributes({ output: newOutput })
 }
 
 onMounted(() => {
@@ -78,15 +72,19 @@ onMounted(() => {
 
 <template>
   <NodeViewWrapper class="my-6">
-    <Card class="overflow-hidden" v-if="isExecuteable">
+    <Card class="overflow-hidden" v-if="isExecutable">
       <CardContent class="p-0">
         <CodeBlockWithExecution
           :code="code"
           :language="language"
+          :result="output"
+          :serverID="serverID"
+          :kernel-name="kernelName"
           :nota-id="route.params.id as string"
           :kernel-preference="kernelPreference"
           @update:code="updateCode"
           @kernel-select="onKernelSelect"
+          @update:output="updateOutput"
         />
       </CardContent>
     </Card>

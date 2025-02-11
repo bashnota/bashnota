@@ -10,15 +10,18 @@ import CodeMirror from './CodeMirror.vue'
 const props = defineProps<{
   code: string
   language: string
+  result: string | null
+  serverID: string | null
+  kernelName: string | null
   notaId: string
   kernelPreference?: KernelConfig | null
 }>()
 
-const emit = defineEmits(['update:code', 'kernel-select'])
+const emit = defineEmits(['update:code', 'kernel-select', 'update:output'])
 
 const store = useNotaStore()
-const selectedServer = ref('none')
-const selectedKernel = ref('none')
+const selectedServer = ref(props.serverID || 'none')
+const selectedKernel = ref(props.kernelName || 'none')
 const codeValue = ref(props.code)
 const isCodeCopied = ref(false)
 
@@ -69,18 +72,8 @@ onMounted(async () => {
   if (props.kernelPreference) {
     selectedServer.value = props.kernelPreference.serverId || 'none'
   }
-})
 
-// Watch for server changes and reset kernel
-watch(selectedServer, (newServer) => {
-  selectedKernel.value = 'none'
-  if (newServer && newServer !== 'none' && props.kernelPreference?.kernelName) {
-    const kernel = availableKernels.value.find((k) => k.name === props.kernelPreference?.kernelName)
-    if (kernel) {
-      selectedKernel.value = kernel.name
-      emit('kernel-select', kernel.name, newServer)
-    }
-  }
+  output.value = props.result || ''
 })
 
 // Watch for external code changes
@@ -110,6 +103,8 @@ const handleExecution = async () => {
   } finally {
     isExecuting.value = false
   }
+
+  emit('update:output', output.value)
 }
 
 const updateCode = (newCode: string) => {
@@ -141,6 +136,7 @@ const copyCode = async () => {
         <div class="relative">
           <select
             v-model="selectedServer"
+            @change="() => emit('kernel-select', selectedKernel, selectedServer)"
             class="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
           >
             <option value="none" class="text-muted-foreground">Select Server</option>
@@ -159,6 +155,7 @@ const copyCode = async () => {
         <div class="relative">
           <select
             v-model="selectedKernel"
+            @change="() => emit('kernel-select', selectedKernel, selectedServer)"
             :disabled="!selectedServer || selectedServer === 'none'"
             class="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
           >

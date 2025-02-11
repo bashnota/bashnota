@@ -9,26 +9,22 @@ export const ExecutableCodeBlockExtension = CodeBlock.extend({
     return {
       ...this.parent?.(),
       language: {
-        default: null,
-        parseHTML: (element) => element.getAttribute('data-language'),
-        renderHTML: (attributes) => ({
-          'data-language': attributes.language,
-          class: `language-${attributes.language}`,
-        }),
+        default: 'python',
       },
-      executeable: {
-        default: false,
-        parseHTML: (element) => element.getAttribute('data-executeable') === 'true',
-        renderHTML: (attributes) => ({
-          'data-executeable': attributes.executeable,
-        }),
+      executable: {
+        default: true,
+      },
+      output: {
+        default: null,
+      },
+      kernelName: {
+        default: null,
+      },
+      serverID: {
+        default: null,
       },
       id: {
         default: null,
-        parseHTML: (element) => element.getAttribute('data-block-id'),
-        renderHTML: (attributes) => ({
-          'data-block-id': attributes.id,
-        }),
       },
     }
   },
