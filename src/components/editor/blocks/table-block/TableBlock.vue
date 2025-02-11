@@ -16,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { PencilIcon } from 'lucide-vue-next'
+import { PencilIcon, Type, Hash, ListChecks, Calendar } from 'lucide-vue-next'
 
 const props = defineProps<{
   node: {
@@ -42,13 +42,13 @@ const isAddingColumn = ref(false)
 const newColumnTitle = ref('')
 const isEditingName = ref(false)
 const columnTypes = [
-  { value: 'text', label: 'Text' },
-  { value: 'number', label: 'Number' },
-  { value: 'select', label: 'Select' },
-  { value: 'date', label: 'Date' },
+  { value: 'text', label: 'Text', icon: Type },
+  { value: 'number', label: 'Number', icon: Hash },
+  { value: 'select', label: 'Select', icon: ListChecks },
+  { value: 'date', label: 'Date', icon: Calendar },
 ] as const
 
-const newColumnType = ref<typeof columnTypes[number]['value']>('text')
+const newColumnType = ref<(typeof columnTypes)[number]['value']>('text')
 
 // Add new ref for dropdown state
 const activeTypeDropdown = ref<string | null>(null)
@@ -102,27 +102,27 @@ watch(
         const sanitizedData = {
           id: newData.id,
           name: newData.name,
-          columns: newData.columns.map(column => ({
+          columns: newData.columns.map((column) => ({
             id: column.id,
             title: column.title,
-            type: column.type
+            type: column.type,
           })),
-          rows: newData.rows.map(row => ({
+          rows: newData.rows.map((row) => ({
             id: row.id,
-            cells: { ...row.cells }
-          }))
+            cells: { ...row.cells },
+          })),
         }
-        
+
         // Verify data is serializable
         JSON.parse(JSON.stringify(sanitizedData))
-        
+
         await tableStore.updateTable(sanitizedData)
       } catch (error) {
         console.error('Failed to update table:', error)
       }
     }
   },
-  { deep: true }
+  { deep: true },
 )
 
 const startEditingName = () => {
@@ -151,10 +151,13 @@ const addColumn = async () => {
 const addRow = async () => {
   const newRow = {
     id: crypto.randomUUID(),
-    cells: tableData.value.columns.reduce((acc, col) => {
-      acc[col.id] = ''
-      return acc
-    }, {} as Record<string, any>),
+    cells: tableData.value.columns.reduce(
+      (acc, col) => {
+        acc[col.id] = ''
+        return acc
+      },
+      {} as Record<string, any>,
+    ),
   }
 
   tableData.value.rows.push(newRow)
@@ -166,7 +169,7 @@ const updateCell = (rowId: string, columnId: string, value: any) => {
     // Create a new cells object to ensure reactivity
     row.cells = {
       ...row.cells,
-      [columnId]: value
+      [columnId]: value,
     }
     // Force update the tableData to trigger the watch
     tableData.value = { ...tableData.value }
@@ -186,7 +189,7 @@ const deleteColumn = (columnId: string) => {
 }
 
 const getColumnTypeLabel = (type: string) => {
-  return columnTypes.find(t => t.value === type)?.label || type
+  return columnTypes.find((t) => t.value === type)?.label || type
 }
 
 // Add method to toggle dropdown
@@ -195,9 +198,9 @@ const toggleTypeDropdown = (columnId: string | null) => {
 }
 
 const updateColumnType = (columnId: string, newType: string) => {
-  const column = tableData.value.columns.find(col => col.id === columnId)
+  const column = tableData.value.columns.find((col) => col.id === columnId)
   if (column) {
-    column.type = newType as typeof columnTypes[number]['value']
+    column.type = newType as (typeof columnTypes)[number]['value']
     // Force update to trigger reactivity
     tableData.value = { ...tableData.value }
   }
@@ -264,15 +267,21 @@ const updateColumnType = (columnId: string, newType: string) => {
             <div class="space-y-2">
               <label class="text-sm text-muted-foreground">Column type</label>
               <div class="relative">
-                <Button 
-                  variant="outline" 
-                  class="w-full justify-between"
+                <Button
+                  variant="outline"
+                  class="w-full justify-between flex items-center gap-2"
                   @click="toggleTypeDropdown('new')"
                 >
-                  {{ getColumnTypeLabel(newColumnType) }}
+                  <div class="flex items-center gap-2">
+                    <component
+                      :is="columnTypes.find((t) => t.value === newColumnType)?.icon"
+                      class="h-4 w-4"
+                    />
+                    {{ getColumnTypeLabel(newColumnType) }}
+                  </div>
                 </Button>
-                
-                <div 
+
+                <div
                   v-if="activeTypeDropdown === 'new'"
                   class="absolute top-full left-0 right-0 mt-1 rounded-md border bg-popover shadow-md z-50"
                 >
@@ -282,9 +291,15 @@ const updateColumnType = (columnId: string, newType: string) => {
                       :key="type.value"
                       variant="ghost"
                       size="sm"
-                      class="w-full justify-start"
-                      @click="newColumnType = type.value; toggleTypeDropdown(null)"
+                      class="w-full justify-start flex items-center gap-2"
+                      @click="
+                        () => {
+                          newColumnType = type.value
+                          toggleTypeDropdown(null)
+                        }
+                      "
                     >
+                      <component :is="type.icon" class="h-4 w-4" />
                       {{ type.label }}
                     </Button>
                   </div>
@@ -303,36 +318,47 @@ const updateColumnType = (columnId: string, newType: string) => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead v-for="column in tableData.columns" :key="column.id" class="relative">
+                <TableHead
+                  v-for="column in tableData.columns"
+                  :key="column.id"
+                  class="relative group"
+                >
                   <div class="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      class="h-6 w-6 p-1"
+                      @click="toggleTypeDropdown(column.id)"
+                    >
+                      <component
+                        :is="columnTypes.find((t) => t.value === column.type)?.icon"
+                        class="h-4 w-4"
+                      />
+                    </Button>
                     {{ column.title }}
-                    <div class="relative">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        class="h-6 px-2 text-xs"
-                        @click="toggleTypeDropdown(column.id)"
-                      >
-                        {{ getColumnTypeLabel(column.type) }}
-                      </Button>
-                      
-                      <!-- Dropdown Menu -->
-                      <div 
-                        v-if="activeTypeDropdown === column.id"
-                        class="absolute top-full left-0 mt-1 w-32 rounded-md border bg-popover shadow-md z-50"
-                      >
-                        <div class="p-1">
-                          <Button
-                            v-for="type in columnTypes"
-                            :key="type.value"
-                            variant="ghost"
-                            size="sm"
-                            class="w-full justify-start text-xs"
-                            @click="updateColumnType(column.id, type.value); toggleTypeDropdown(null)"
-                          >
-                            {{ type.label }}
-                          </Button>
-                        </div>
+
+                    <!-- Dropdown Menu -->
+                    <div
+                      v-if="activeTypeDropdown === column.id"
+                      class="absolute top-full left-0 mt-1 w-32 rounded-md border bg-popover shadow-md z-50"
+                    >
+                      <div class="p-1">
+                        <Button
+                          v-for="type in columnTypes"
+                          :key="type.value"
+                          variant="ghost"
+                          size="sm"
+                          class="w-full justify-start text-xs flex items-center gap-2"
+                          @click="
+                            () => {
+                              updateColumnType(column.id, type.value)
+                              toggleTypeDropdown(null)
+                            }
+                          "
+                        >
+                          <component :is="type.icon" class="h-3 w-3" />
+                          {{ type.label }}
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -394,4 +420,4 @@ const updateColumnType = (columnId: string, newType: string) => {
       </template>
     </div>
   </NodeViewWrapper>
-</template> 
+</template>
