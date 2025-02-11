@@ -31,6 +31,9 @@ export function useCodeExecution(codeRef: Ref<string>) {
       if (result.content.data['text/html']) {
         parts.push(result.content.data['text/html'])
       }
+      if (result.content.data['image/png']) {
+        parts.push(`<img src="data:image/png;base64,${result.content.data['image/png']}" />`)
+      }
     }
 
     // Add error if present
