@@ -1,6 +1,6 @@
 <template>
   <div class="w-full space-y-2">
-    <div class="flex flex-wrap gap-2 min-h-[2.5rem] p-2 bg-background rounded-md border focus-within:ring-1 focus-within:ring-primary">
+    <div class="flex flex-wrap gap-2 min-h-[32px] rounded-md focus-within:ring-1 focus-within:ring-primary">
       <Tag 
         v-for="tag in modelValue" 
         :key="tag"
@@ -13,7 +13,7 @@
         ref="inputRef"
         v-model="inputValue"
         type="text"
-        class="flex-1 min-w-[120px] bg-transparent text-sm focus:outline-none"
+        class="flex-1 min-w-[80px] bg-transparent text-sm focus:outline-none placeholder:text-muted-foreground/60"
         :placeholder="modelValue.length ? 'Add another tag...' : 'Add tags...'"
         @keydown.enter.prevent="addTag"
         @keydown.backspace="handleBackspace"
