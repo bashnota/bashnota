@@ -79,7 +79,7 @@ const getNotaPreview = (content: string | undefined) => {
 const toggleFavorite = async (id: string) => {
   const nota = store.rootItems.find((n) => n.id === id)
   if (nota) {
-    await store.updateItem(id, {
+    await store.saveItem({
       ...nota,
       favorite: !nota.favorite,
     })

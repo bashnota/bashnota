@@ -91,13 +91,6 @@ const closeContextMenu = () => {
   itemContextMenu.value = null
 }
 
-const handleDrop = (event: DragEvent, targetId: string) => {
-  const sourceId = event.dataTransfer?.getData('text/plain')
-  if (sourceId && sourceId !== targetId) {
-    store.moveItem(sourceId, targetId)
-  }
-}
-
 onMounted(() => {
   document.addEventListener('click', closeContextMenu)
 })
@@ -109,15 +102,7 @@ onUnmounted(() => {
 
 <template>
   <div :class="{ 'ml-4': level > 0 }">
-    <div
-      v-for="item in items"
-      :key="item.id"
-      class="group"
-      draggable="true"
-      @dragstart="(event) => event.dataTransfer?.setData('text/plain', item.id)"
-      @dragover.prevent
-      @drop="(event) => handleDrop(event, item.id)"
-    >
+    <div v-for="item in items" :key="item.id" class="group" draggable="true">
       <div
         class="flex items-center gap-1 rounded-md py-1.5 text-sm"
         @contextmenu="showContextMenu($event, item)"
@@ -206,13 +191,13 @@ onUnmounted(() => {
             { label: 'Rename', icon: PencilIcon, action: () => startRename(item) },
             { label: 'Delete', icon: TrashIcon, action: () => handleDelete(item.id) },
             {
-              label: 'Toggle Favorite',
+              label: item.favorite ? 'Remove Favorite' : 'Add Favorite',
               icon: StarIcon,
               action: () => store.toggleFavorite(item.id),
             },
           ]"
           :key="action.label"
-          class="flex items-center w-full gap-2 px-2 py-1.5 text-sm rounded-sm hover:bg-accent"
+          class="flex items-center text-start w-full gap-2 px-2 py-1.5 text-sm rounded-sm hover:bg-accent"
           @click="action.action"
         >
           <component :is="action.icon" class="h-4 w-4" />
