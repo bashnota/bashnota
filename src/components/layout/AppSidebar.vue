@@ -26,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import ShortcutsDialog from '../ShortcutsDialog.vue'
+import LogoSvg from '@/assets/logo.svg'
 
 const router = useRouter()
 const notaStore = useNotaStore()
@@ -140,7 +141,11 @@ const viewOptions = [
           class="flex items-center gap-2 px-4 py-2 hover:bg-muted/50 rounded-lg transition-colors"
         >
           <div class="flex items-center gap-2">
-            <CommandLineIcon class="h-6 w-6 text-primary" />
+            <img
+              src="@/assets/logo.svg"
+              alt="BashNota Logo"
+              class="h-8 w-auto text-primary"
+            />
             <span class="font-bold text-xl">BashNota</span>
           </div>
         </RouterLink>
