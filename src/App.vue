@@ -33,12 +33,14 @@ watch(isSidebarOpen, (newState) => {
 // Resize functionality
 const startResize = () => {
   isResizing.value = true
-  document.body.classList.add('select-none cursor-col-resize')
+  document.body.classList.add('select-none')
+  document.body.classList.add('cursor-col-resize')
 }
 
 const stopResize = () => {
   isResizing.value = false
-  document.body.classList.remove('select-none', 'cursor-col-resize')
+  document.body.classList.remove('select-none')
+  document.body.classList.remove('cursor-col-resize')
 }
 
 const handleMouseMove = (event: MouseEvent) => {

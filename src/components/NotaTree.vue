@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useNotaStore } from '@/stores/nota'
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import {
   ChevronDownIcon,
   ChevronRightIcon,
@@ -9,6 +9,7 @@ import {
   FolderIcon,
   DocumentTextIcon,
   PlusIcon,
+  StarIcon,
 } from '@heroicons/vue/24/solid'
 import { useRouter } from 'vue-router'
 import { Input } from '@/components/ui/input'
@@ -44,6 +45,8 @@ const router = useRouter()
 const store = useNotaStore()
 const showRenameInput = ref<string | null>(null)
 const renameTitle = ref('')
+const itemContextMenu = ref<string | null>(null)
+const contextMenuPosition = ref({ x: 0, y: 0 })
 
 const hasChildren = (id: string) => {
   return store.getChildren(id).length > 0
@@ -74,21 +77,60 @@ const handleDelete = async (id: string) => {
     router.push('/')
   }
 }
+
+const showContextMenu = (event: MouseEvent, item: Nota) => {
+  event.preventDefault()
+  itemContextMenu.value = item.id
+  contextMenuPosition.value = {
+    x: event.clientX,
+    y: event.clientY
+  }
+}
+
+const closeContextMenu = () => {
+  itemContextMenu.value = null
+}
+
+const handleDrop = (event: DragEvent, targetId: string) => {
+  const sourceId = event.dataTransfer?.getData('text/plain')
+  if (sourceId && sourceId !== targetId) {
+    store.moveItem(sourceId, targetId)
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', closeContextMenu)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', closeContextMenu)
+})
 </script>
 
 <template>
   <div :class="{ 'ml-4': level > 0 }">
-    <div v-for="item in items" :key="item.id" class="group">
-      <div class="flex items-center gap-1 rounded-md py-1.5 text-sm">
+    <div 
+      v-for="item in items" 
+      :key="item.id" 
+      class="group"
+      draggable="true"
+      @dragstart="event => event.dataTransfer?.setData('text/plain', item.id)"
+      @dragover.prevent
+      @drop="event => handleDrop(event, item.id)"
+    >
+      <div 
+        class="flex items-center gap-1 rounded-md py-1.5 text-sm"
+        @contextmenu="showContextMenu($event, item)"
+      >
         <button
           v-if="hasChildren(item.id)"
           @click="toggleItem(item.id)"
-          class="w-5 h-5 flex items-center justify-center text-muted-foreground hover:text-foreground"
+          class="w-5 h-5 flex items-center justify-center text-muted-foreground hover:text-foreground flex-shrink-0"
         >
           <ChevronDownIcon v-if="expandedItems.has(item.id)" class="h-4 w-4" />
           <ChevronRightIcon v-else class="h-4 w-4" />
         </button>
-        <div v-else class="w-5"></div>
+        <div v-else class="w-5 flex-shrink-0"></div>
 
         <Input
           v-if="showRenameInput === item.id"
@@ -103,14 +145,14 @@ const handleDelete = async (id: string) => {
         <RouterLink
           v-else
           :to="`/nota/${item.id}`"
-          class="flex items-center gap-2 flex-1 px-2 py-2 rounded-md hover:bg-slate-200"
+          class="flex items-center gap-2 flex-1 px-2 py-2 rounded-md hover:bg-slate-200 mr-2"
         >
-          <FolderIcon v-if="hasChildren(item.id)" class="h-4 w-4 text-muted-foreground" />
-          <DocumentTextIcon v-else class="h-4 w-4 text-muted-foreground" />
-          {{ item.title }}
+          <FolderIcon v-if="hasChildren(item.id)" class="h-4 w-4 text-muted-foreground flex-shrink-0" />
+          <DocumentTextIcon v-else class="h-4 w-4 text-muted-foreground flex-shrink-0" />
+          <span class="truncate min-w-0 flex-1">{{ item.title }}</span>
         </RouterLink>
 
-        <div class="opacity-0 group-hover:opacity-100 flex items-center gap-1 pr-1">
+        <div class="opacity-0 group-hover:opacity-100 flex items-center gap-1 flex-shrink-0">
           <Button
             variant="ghost"
             size="icon"
@@ -139,6 +181,31 @@ const handleDelete = async (id: string) => {
             <TrashIcon class="h-3 w-3" />
           </Button>
         </div>
+      </div>
+
+      <!-- Context Menu -->
+      <div
+        v-if="itemContextMenu === item.id"
+        class="fixed z-50 w-48 bg-popover rounded-md shadow-md border p-1"
+        :style="{
+          left: `${contextMenuPosition.x}px`,
+          top: `${contextMenuPosition.y}px`
+        }"
+      >
+        <button
+          v-for="action in [
+            { label: 'New Sub-Nota', icon: PlusIcon, action: () => emit('show-new-input', item.id) },
+            { label: 'Rename', icon: PencilIcon, action: () => startRename(item) },
+            { label: 'Delete', icon: TrashIcon, action: () => handleDelete(item.id) },
+            { label: 'Toggle Favorite', icon: StarIcon, action: () => store.toggleFavorite(item.id) }
+          ]"
+          :key="action.label"
+          class="flex items-center w-full gap-2 px-2 py-1.5 text-sm rounded-sm hover:bg-accent"
+          @click="action.action"
+        >
+          <component :is="action.icon" class="h-4 w-4" />
+          {{ action.label }}
+        </button>
       </div>
 
       <!-- New Sub-Nota Input -->
@@ -171,3 +238,9 @@ const handleDelete = async (id: string) => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.drag-over {
+  @apply bg-accent/20;
+}
+</style>
