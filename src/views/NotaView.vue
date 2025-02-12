@@ -71,7 +71,9 @@ const additionalExtensions = computed(() => [ImageExtension])
       <div class="flex-1">
         <div class="flex items-center gap-3">
           <div class="flex-1 flex items-center gap-4">
-            <h1 class="text-2xl font-semibold tracking-tight">{{ nota?.title || 'Untitled' }}</h1>
+            <h1 class="text-2xl font-semibold tracking-tight whitespace-nowrap">
+              {{ nota?.title || 'Untitled' }}
+            </h1>
 
             <!-- Save Status Indicator -->
             <div

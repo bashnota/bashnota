@@ -30,7 +30,7 @@ const headings = computed(() => {
   const headings: Heading[] = []
 
   const processNode = (node: Node, level = 0) => {
-    if (node.type === 'heading') {
+    if (node.type === 'heading' && node.content?.[0]?.text) {
       headings.push({
         level: node.attrs.level,
         text: node.content?.[0]?.text || '',
