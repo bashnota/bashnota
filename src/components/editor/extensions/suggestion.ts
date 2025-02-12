@@ -18,6 +18,7 @@ import {
   FunctionSquare,
   ImageIcon,
   ImagesIcon,
+  ChartScatter,
 } from 'lucide-vue-next'
 import { unified } from 'unified'
 import remarkParse from 'remark-parse'
@@ -261,6 +262,22 @@ export default {
           })
         },
         icon: 'clipboard-paste',
+      },
+      {
+        title: 'Scatter Plot',
+        description: 'Add a scatter plot visualization',
+        icon: ChartScatter,
+        command: ({ editor, range }) => {
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .setScatterPlot({
+              title: 'Scatter Plot',
+              apiUrl: ''
+            })
+            .run()
+        },
       },
     ]
 

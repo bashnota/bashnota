@@ -6,10 +6,13 @@ import { Bars3Icon as MenuIcon } from '@heroicons/vue/24/solid'
 import { ref, onMounted, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { useTheme } from '@/composables/theme'
 
 const isSidebarOpen = ref(true)
 const sidebarWidth = ref(300)
 const isResizing = ref(false)
+
+const { theme } = useTheme()
 
 onMounted(() => {
   const savedState = localStorage.getItem('sidebar-state')
