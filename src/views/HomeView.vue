@@ -20,7 +20,7 @@ import {
 import { useRouter } from 'vue-router'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import { useDebounceFn } from '@vueuse/core'
-import Tag from '@/components/ui/tag/Tag.vue'
+import Badge from '@/components/ui/badge/Badge.vue'
 
 const store = useNotaStore()
 const router = useRouter()
@@ -267,7 +267,7 @@ const viewOptions = [
       <div class="relative flex-1">
         <select
           v-model="selectedTag"
-          class="w-full pl-3 pr-10 py-2 text-sm border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+          class="w-full pl-3 pr-10 py-2 text-sm border rounded-md focus:outline-none dark:bg-gray-800"
         >
           <option value="">All tags</option>
           <option v-for="tag in allTags" :key="tag" :value="tag">
@@ -383,15 +383,15 @@ const viewOptions = [
                 </div>
               </CardHeader>
               <CardContent>
-                <div v-if="nota.tags?.length" class="flex flex-wrap gap-2">
-                  <Tag
+                <div v-if="nota.tags.length > 0" class="flex flex-wrap gap-2">
+                  <Badge
                     v-for="tag in nota.tags || []"
                     :key="tag"
-                    class="hover:bg-primary/10 cursor-pointer transition-colors"
                     @click.prevent="selectedTag = tag"
+                    class="cursor-pointer transition-colors"
                   >
                     {{ tag }}
-                  </Tag>
+                  </Badge>
                 </div>
                 <p v-else class="text-sm text-muted-foreground italic">No tags</p>
               </CardContent>
@@ -451,14 +451,14 @@ const viewOptions = [
                     {{ formatDate(nota.updatedAt) }}
                   </span>
                   <div class="flex flex-wrap gap-2">
-                    <Tag
+                    <Badge
                       v-for="tag in nota.tags || []"
                       :key="tag"
-                      class="hover:bg-primary/10 cursor-pointer transition-colors"
                       @click.prevent="selectedTag = tag"
+                      class="cursor-pointer transition-colors"
                     >
                       {{ tag }}
-                    </Tag>
+                    </Badge>
                   </div>
                 </div>
               </div>
@@ -479,11 +479,6 @@ const viewOptions = [
                 <ClockIcon class="w-3 h-3" />
                 {{ formatDate(nota.updatedAt) }}
               </span>
-              <div class="flex flex-wrap gap-2">
-                <Tag v-for="tag in nota.tags || []" :key="tag">
-                  {{ tag }}
-                </Tag>
-              </div>
             </div>
           </RouterLink>
         </div>
