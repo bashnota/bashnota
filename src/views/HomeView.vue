@@ -12,7 +12,8 @@ import {
   StarIcon,
   FolderPlusIcon,
   DocumentTextIcon,
-  XMarkIcon
+  XMarkIcon,
+  Cog6ToothIcon
 } from '@heroicons/vue/24/solid'
 import { useRouter } from 'vue-router'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
@@ -95,6 +96,27 @@ const clearSearch = () => {
 watch(() => store.rootItems, () => {
   isLoading.value = false
 }, { immediate: true })
+
+// Add this computed property after the other computed properties
+const getNotaPreview = (content: string | undefined) => {
+  if (!content) return 'No content'
+  
+  // Create a temporary div to parse HTML content
+  const div = document.createElement('div')
+  div.innerHTML = content
+  
+  // Get text content and trim it
+  const textContent = div.textContent || div.innerText || ''
+  return textContent.trim() || 'No content'
+}
+
+const toggleFavorite = (id: string) => {
+  // Implementation of toggleFavorite function
+}
+
+const openSettings = (id: string) => {
+  // Implementation of openSettings function
+}
 </script>
 
 <template>
@@ -195,11 +217,35 @@ watch(() => store.rootItems, () => {
                     </div>
                   </div>
                   <CardDescription class="line-clamp-2">
-                    {{ nota.content || 'No content' }}
+                    {{ getNotaPreview(nota.content) }}
                   </CardDescription>
                 </CardHeader>
               </Card>
             </RouterLink>
+            <div class="nota-header flex items-center justify-between">
+              <h3 class="text-lg font-medium">{{ nota.name }}</h3>
+              
+              <div class="flex items-center gap-2">
+                <button 
+                  class="icon-btn"
+                  :title="nota.isFavorite ? 'Remove from favorites' : 'Add to favorites'"
+                  @click="toggleFavorite(nota.id)"
+                >
+                  <StarIcon 
+                    class="w-5 h-5"
+                    :class="nota.isFavorite ? 'text-yellow-400 fill-yellow-400' : 'text-gray-400'"
+                  />
+                </button>
+
+                <button 
+                  class="icon-btn"
+                  title="Settings"
+                  @click="openSettings(nota.id)"
+                >
+                  <Cog6ToothIcon class="w-5 h-5 text-gray-400" />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
         <p v-if="searchQuery" class="text-sm text-muted-foreground mt-2">
@@ -209,3 +255,9 @@ watch(() => store.rootItems, () => {
     </Card>
   </div>
 </template>
+
+<style scoped>
+.icon-btn {
+  @apply p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors;
+}
+</style>

@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import NotaEditor from '@/components/editor/NotaEditor.vue'
 import NotaConfigPage from '@/components/NotaConfigPage.vue'
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { computed } from 'vue'
-import { Cog6ToothIcon, CheckCircleIcon, ArrowPathIcon } from '@heroicons/vue/24/outline'
+import { Cog6ToothIcon, CheckCircleIcon, ArrowPathIcon, StarIcon } from '@heroicons/vue/24/outline'
 import { Button } from '@/components/ui/button'
 import { formatDate } from '@/lib/utils'
 
@@ -13,11 +13,18 @@ const props = defineProps<{
 }>()
 
 const store = useNotaStore()
+const isReady = ref(false)
 
 const nota = computed(() => store.getCurrentNota(props.id))
 const showConfigPage = ref(false)
 const isSaving = ref(false)
 const showSaved = ref(false)
+
+onMounted(async () => {
+  // Ensure the nota is loaded before showing the editor
+  await store.loadNota(props.id)
+  isReady.value = true
+})
 
 const toggleConfigPage = () => {
   showConfigPage.value = !showConfigPage.value
@@ -40,7 +47,7 @@ const handleSaving = (saving: boolean) => {
     <header class="flex items-center justify-between px-6 py-4 border-b">
       <div class="flex flex-col gap-1">
         <div class="flex items-center gap-3">
-          <h1 class="text-2xl font-semibold tracking-tight">{{ nota?.title }}</h1>
+          <h1 class="text-2xl font-semibold tracking-tight">{{ nota?.title || 'Untitled' }}</h1>
 
           <!-- Save Status Indicator -->
           <div
@@ -63,15 +70,40 @@ const handleSaving = (saving: boolean) => {
         </span>
       </div>
 
-      <Button variant="outline" class="flex items-center gap-2" @click="toggleConfigPage">
-        <Cog6ToothIcon class="w-4 h-4" />
-        {{ showConfigPage ? 'Hide Settings' : 'Settings' }}
-      </Button>
+      <div class="flex items-center gap-2">
+        <Button 
+          variant="ghost" 
+          size="icon"
+          title="Star"
+          @click="store.toggleFavorite(id)"
+          v-if="nota"
+        >
+          <StarIcon 
+            class="w-5 h-5" 
+            :class="{ 'text-yellow-400 fill-yellow-400': nota?.favorite }" 
+          />
+        </Button>
+
+        <Button 
+          variant="ghost"
+          size="icon"
+          title="Settings"
+          @click="toggleConfigPage"
+          v-if="nota"
+        >
+          <Cog6ToothIcon class="w-5 h-5" />
+        </Button>
+      </div>
     </header>
 
     <main class="flex-1 overflow-auto">
-      <NotaEditor v-if="!showConfigPage" :nota-id="id" @saving="handleSaving" />
-      <NotaConfigPage v-else :nota-id="id" />
+      <template v-if="isReady">
+        <NotaEditor v-if="!showConfigPage && nota" :nota-id="id" @saving="handleSaving" />
+        <NotaConfigPage v-else-if="nota" :nota-id="id" />
+      </template>
+      <div v-else class="flex items-center justify-center h-full">
+        <p class="text-muted-foreground">Loading...</p>
+      </div>
     </main>
   </div>
 </template>

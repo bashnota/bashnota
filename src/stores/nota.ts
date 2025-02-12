@@ -147,5 +147,27 @@ export const useNotaStore = defineStore('nota', {
         })
       }
     },
+
+    async toggleFavorite(id: string) {
+      const nota = this.items.find(item => item.id === id)
+      if (nota) {
+        nota.favorite = !nota.favorite
+        nota.updatedAt = new Date().toISOString()
+        await db.notas.update(id, {
+          favorite: nota.favorite,
+          updatedAt: nota.updatedAt
+        })
+      }
+    },
+
+    async loadNota(id: string) {
+      try {
+        if (!this.getCurrentNota(id)) {
+          await this.fetchNota(id)
+        }
+      } catch (error) {
+        console.error('Failed to load nota:', error)
+      }
+    },
   },
 })

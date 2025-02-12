@@ -7,8 +7,8 @@ export class NotaDB extends Dexie {
 
   constructor() {
     super('notadb')
-    this.version(1).stores({
-      notas: 'id, title, createdAt, updatedAt',
+    this.version(2).stores({
+      notas: 'id, title, favorite, createdAt, updatedAt',
     })
   }
 }
