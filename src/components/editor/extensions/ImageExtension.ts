@@ -34,63 +34,61 @@ declare module '@tiptap/core' {
 
 export const ImageExtension = Node.create({
   name: 'notaImage',
-  
   group: 'block',
-  
   atom: true,
 
   addAttributes() {
     return {
       src: {
-        default: ''
+        default: '',
       },
       caption: {
-        default: null
+        default: null,
       },
       label: {
-        default: null
+        default: null,
       },
       isSubfigureContainer: {
         default: false,
-        parseHTML: element => element.hasAttribute('data-subfigure-container'),
-        renderHTML: attributes => {
+        parseHTML: (element) => element.hasAttribute('data-subfigure-container'),
+        renderHTML: (attributes) => {
           if (attributes.isSubfigureContainer) {
             return { 'data-subfigure-container': 'true' }
           }
           return {}
-        }
+        },
       },
       subfigures: {
         default: [],
-        parseHTML: element => {
+        parseHTML: (element) => {
           const subfiguresData = element.getAttribute('data-subfigures')
           return subfiguresData ? JSON.parse(subfiguresData) : []
         },
-        renderHTML: attributes => {
+        renderHTML: (attributes) => {
           if (attributes.subfigures?.length) {
             return { 'data-subfigures': JSON.stringify(attributes.subfigures) }
           }
           return {}
-        }
+        },
       },
       layout: {
-        default: 'horizontal'
+        default: 'horizontal',
       },
       width: {
-        default: '100%'
+        default: '100%',
       },
       alignment: {
-        default: 'center'
+        default: 'center',
       },
       objectFit: {
-        default: 'contain'
+        default: 'contain',
       },
       unifiedSize: {
-        default: false
+        default: false,
       },
       isLocked: {
-        default: false
-      }
+        default: false,
+      },
     }
   },
 
@@ -98,10 +96,10 @@ export const ImageExtension = Node.create({
     return [
       {
         tag: 'figure[data-subfigure-container]',
-        getAttrs: element => ({
+        getAttrs: (element) => ({
           isSubfigureContainer: true,
-          subfigures: JSON.parse((element as HTMLElement).getAttribute('data-subfigures') || '[]')
-        })
+          subfigures: JSON.parse((element as HTMLElement).getAttribute('data-subfigures') || '[]'),
+        }),
       },
       {
         tag: 'figure',
@@ -117,7 +115,7 @@ export const ImageExtension = Node.create({
     const attrs = {
       ...rest,
       ...(isSubfigureContainer ? { 'data-subfigure-container': 'true' } : {}),
-      ...(subfigures?.length ? { 'data-subfigures': JSON.stringify(subfigures) } : {})
+      ...(subfigures?.length ? { 'data-subfigures': JSON.stringify(subfigures) } : {}),
     }
     return ['figure', attrs]
   },
@@ -128,30 +126,34 @@ export const ImageExtension = Node.create({
 
   addCommands() {
     return {
-      setNotaImage: (options: ImageAttributes) => ({ commands }) => {
-        return commands.insertContent({
-          type: this.name,
-          attrs: options
-        })
-      },
-      setNotaImageSubfigureContainer: (options: Partial<ImageAttributes> = {}) => ({ commands }) => {
-        return commands.insertContent({
-          type: this.name,
-          attrs: {
-            isSubfigureContainer: true,
-            subfigures: [],
-            layout: 'horizontal',
-            ...options
-          }
-        })
-      }
+      setNotaImage:
+        (options: ImageAttributes) =>
+        ({ commands }) => {
+          return commands.insertContent({
+            type: this.name,
+            attrs: options,
+          })
+        },
+      setNotaImageSubfigureContainer:
+        (options: Partial<ImageAttributes> = {}) =>
+        ({ commands }) => {
+          return commands.insertContent({
+            type: this.name,
+            attrs: {
+              isSubfigureContainer: true,
+              subfigures: [],
+              layout: 'horizontal',
+              ...options,
+            },
+          })
+        },
     }
   },
 
   addKeyboardShortcuts() {
     return {
       'Mod-Alt-i': () => this.editor.commands.setNotaImage({ src: '' }),
-      'Mod-Alt-f': () => this.editor.commands.setNotaImageSubfigureContainer()
+      'Mod-Alt-f': () => this.editor.commands.setNotaImageSubfigureContainer(),
     }
-  }
-}) 
+  },
+})

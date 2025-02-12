@@ -4,10 +4,9 @@ import MathBlock from '@/components/editor/blocks/math-block/MathBlock.vue'
 
 export const MathExtension = Node.create({
   name: 'mathBlock',
-  
   group: 'block',
-  
   atom: true,
+  draggable: true,
 
   addAttributes() {
     return {
@@ -32,4 +31,4 @@ export const MathExtension = Node.create({
   addNodeView() {
     return VueNodeViewRenderer(MathBlock)
   },
-}) 
+})

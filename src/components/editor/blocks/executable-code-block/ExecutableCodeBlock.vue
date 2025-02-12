@@ -62,7 +62,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <NodeViewWrapper class="my-6">
+  <node-view-wrapper class="my-6">
     <Card class="overflow-hidden" v-if="isExecutable">
       <CardContent class="p-0">
         <CodeBlockWithExecution
@@ -87,5 +87,5 @@ onMounted(() => {
         </pre>
       </CardContent>
     </Card>
-  </NodeViewWrapper>
+  </node-view-wrapper>
 </template>
