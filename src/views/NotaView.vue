@@ -7,9 +7,12 @@ import { computed } from 'vue'
 import { Cog6ToothIcon, CheckCircleIcon, ArrowPathIcon, StarIcon } from '@heroicons/vue/24/outline'
 import { Button } from '@/components/ui/button'
 import { formatDate } from '@/lib/utils'
-import TagInput from '@/components/ui/tag/TagInput.vue'
-import Label from '@/components/ui/label/Label.vue'
 import { ImageExtension } from '@/components/editor/extensions/ImageExtension'
+import { TagsInput } from '@/components/ui/tags-input'
+import TagsInputItem from '@/components/ui/tags-input/TagsInputItem.vue'
+import TagsInputItemText from '@/components/ui/tags-input/TagsInputItemText.vue'
+import TagsInputItemDelete from '@/components/ui/tags-input/TagsInputItemDelete.vue'
+import TagsInputInput from '@/components/ui/tags-input/TagsInputInput.vue'
 
 const props = defineProps<{
   id: string
@@ -24,11 +27,14 @@ const isSaving = ref(false)
 const showSaved = ref(false)
 
 // Add watch to save changes when tags are updated
-watch(() => nota.value?.tags, async (newTags) => {
-  if (nota.value && newTags) {
-    await store.saveItem(nota.value)
-  }
-}, { deep: true })
+watch(
+  () => nota.value?.tags,
+  async (newTags) => {
+    if (nota.value && newTags) {
+      await store.saveItem(nota.value)
+    }
+  },
+)
 
 onMounted(async () => {
   // Ensure the nota is loaded before showing the editor
@@ -55,21 +61,8 @@ const handleSaving = (saving: boolean) => {
   }
 }
 
-// Add computed for all available tags
-const allTags = computed(() => {
-  const tagSet = new Set<string>()
-  store.rootItems.forEach(nota => {
-    nota.tags?.forEach(tag => tagSet.add(tag))
-  })
-  return Array.from(tagSet)
-})
-
 // Add ImageExtension to additional extensions
-const additionalExtensions = computed(() => [
-  ImageExtension,
-])
-
-// Pass these extensions to the NotaEditor component
+const additionalExtensions = computed(() => [ImageExtension])
 </script>
 
 <template>
@@ -79,7 +72,7 @@ const additionalExtensions = computed(() => [
         <div class="flex items-center gap-3">
           <div class="flex-1 flex items-center gap-4">
             <h1 class="text-2xl font-semibold tracking-tight">{{ nota?.title || 'Untitled' }}</h1>
-            
+
             <!-- Save Status Indicator -->
             <div
               class="flex items-center text-xs text-muted-foreground transition-opacity duration-200"
@@ -96,12 +89,14 @@ const additionalExtensions = computed(() => [
             </div>
 
             <!-- Tags moved here -->
-            <TagInput 
-              v-if="nota" 
-              v-model="nota.tags" 
-              :suggestions="allTags"
-              class="max-w-md"
-            />
+            <TagsInput v-if="nota" v-model="nota.tags" class="w-full border-none">
+              <TagsInputItem v-for="item in nota.tags" :key="item" :value="item">
+                <TagsInputItemText />
+                <TagsInputItemDelete />
+              </TagsInputItem>
+
+              <TagsInputInput placeholder="Enter Tags ..." />
+            </TagsInput>
           </div>
         </div>
 
@@ -111,26 +106,20 @@ const additionalExtensions = computed(() => [
       </div>
 
       <div class="flex items-center gap-2">
-        <Button 
-          variant="ghost" 
+        <Button
+          variant="ghost"
           size="icon"
           title="Star"
           @click="store.toggleFavorite(id)"
           v-if="nota"
         >
-          <StarIcon 
-            class="w-5 h-5" 
-            :class="{ 'text-yellow-400 fill-yellow-400': nota?.favorite }" 
+          <StarIcon
+            class="w-5 h-5"
+            :class="{ 'text-yellow-400 fill-yellow-400': nota?.favorite }"
           />
         </Button>
 
-        <Button 
-          variant="ghost"
-          size="icon"
-          title="Settings"
-          @click="toggleConfigPage"
-          v-if="nota"
-        >
+        <Button variant="ghost" size="icon" title="Settings" @click="toggleConfigPage" v-if="nota">
           <Cog6ToothIcon class="w-5 h-5" />
         </Button>
       </div>
@@ -138,11 +127,11 @@ const additionalExtensions = computed(() => [
 
     <main class="flex-1 overflow-auto">
       <template v-if="isReady">
-        <NotaEditor 
-          v-if="!showConfigPage && nota" 
-          :nota-id="id" 
-          @saving="handleSaving" 
-          :extensions="additionalExtensions" 
+        <NotaEditor
+          v-if="!showConfigPage && nota"
+          :nota-id="id"
+          @saving="handleSaving"
+          :extensions="additionalExtensions"
         />
         <NotaConfigPage v-else-if="nota" :nota-id="id" />
       </template>

@@ -31,6 +31,7 @@
     "@tiptap/vue-3": "^2.11.5",
     "@types/unist": "^3.0.3",
     "@types/ws": "^8.5.14",
+    "@vee-validate/zod": "^4.15.0",
     "@vueuse/core": "^12.5.0",
     "axios": "^1.7.9",
     "class-variance-authority": "^0.7.1",
@@ -63,10 +64,12 @@
     "unist": "^0.0.1",
     "unist-util-visit": "^5.0.0",
     "uuid": "^11.0.5",
+    "vee-validate": "^4.15.0",
     "vue": "^3.5.13",
     "vue-codemirror": "^6.1.1",
     "vue-router": "^4.5.0",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
     "@tsconfig/node22": "^22.0.0",
