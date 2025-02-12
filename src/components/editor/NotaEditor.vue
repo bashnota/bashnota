@@ -27,6 +27,7 @@ import GlobalDragHandle from 'tiptap-extension-global-drag-handle'
 import { MarkdownPasteExtension } from './extensions/MarkdownPasteExtension'
 import { MarkdownExtension } from './extensions/MarkdownExtension'
 import { Mermaid } from './extensions/mermaid'
+import { Youtube } from './extensions/youtube'
 
 const props = defineProps<{
   notaId: string
@@ -94,6 +95,7 @@ const baseExtensions = [
       class: 'mermaid-block',
     },
   }),
+  Youtube,
 ]
 
 // Combine base extensions with any additional extensions passed as props
