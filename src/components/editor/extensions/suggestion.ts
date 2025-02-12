@@ -217,6 +217,22 @@ export default {
         },
       },
       {
+        title: 'Mermaid Diagram',
+        category: 'Advanced',
+        icon: DatabaseIcon,
+        command: ({ editor, range }: CommandArgs) => {
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .setMermaid(`graph TD
+    A[Client] --> B[Load Balancer]
+    B --> C[Server1]
+    B --> D[Server2]`)
+            .run()
+        },
+      },
+      {
         title: 'Paste Markdown',
         command: ({ editor, range }) => {
           navigator.clipboard.readText().then((text) => {
