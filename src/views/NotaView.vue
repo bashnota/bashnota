@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import NotaEditor from '@/components/editor/NotaEditor.vue'
 import NotaConfigPage from '@/components/NotaConfigPage.vue'
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { computed } from 'vue'
 import { Cog6ToothIcon, CheckCircleIcon, ArrowPathIcon, StarIcon } from '@heroicons/vue/24/outline'
 import { Button } from '@/components/ui/button'
 import { formatDate } from '@/lib/utils'
+import TagInput from '@/components/ui/tag/TagInput.vue'
+import Label from '@/components/ui/label/Label.vue'
 
 const props = defineProps<{
   id: string
@@ -20,9 +22,20 @@ const showConfigPage = ref(false)
 const isSaving = ref(false)
 const showSaved = ref(false)
 
+// Add watch to save changes when tags are updated
+watch(() => nota.value?.tags, async (newTags) => {
+  if (nota.value && newTags) {
+    await store.saveItem(nota.value)
+  }
+}, { deep: true })
+
 onMounted(async () => {
   // Ensure the nota is loaded before showing the editor
-  await store.loadNota(props.id)
+  const loadedNota = await store.loadNota(props.id)
+  if (loadedNota && !loadedNota.tags) {
+    loadedNota.tags = []
+    await store.saveItem(loadedNota)
+  }
   isReady.value = true
 })
 
@@ -40,6 +53,15 @@ const handleSaving = (saving: boolean) => {
     }, 2000)
   }
 }
+
+// Add computed for all available tags
+const allTags = computed(() => {
+  const tagSet = new Set<string>()
+  store.rootItems.forEach(nota => {
+    nota.tags?.forEach(tag => tagSet.add(tag))
+  })
+  return Array.from(tagSet)
+})
 </script>
 
 <template>
@@ -63,6 +85,16 @@ const handleSaving = (saving: boolean) => {
               Saved
             </span>
           </div>
+        </div>
+
+        <!-- Move tags here, right under the title -->
+        <div class="flex items-center gap-2">
+          <TagInput 
+            v-if="nota" 
+            v-model="nota.tags" 
+            :suggestions="allTags"
+            class="max-w-xl"
+          />
         </div>
 
         <span v-if="nota?.updatedAt" class="text-xs text-muted-foreground">

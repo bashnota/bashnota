@@ -2,6 +2,32 @@ import { defineStore } from 'pinia'
 import { db } from '@/db'
 import { type Nota } from '@/types/nota'
 import type { NotaConfig } from '@/types/jupyter'
+import { nanoid } from 'nanoid'
+
+// Helper functions to convert dates and ensure data is serializable
+const serializeNota = (nota: Partial<Nota> & { id: string }): any => {
+  const serialized = {
+    ...nota,
+    tags: Array.isArray(nota.tags) ? [...nota.tags] : [], // Ensure tags is a new array
+    createdAt: nota.createdAt instanceof Date ? nota.createdAt.toISOString() : nota.createdAt,
+    updatedAt: nota.updatedAt instanceof Date ? nota.updatedAt.toISOString() : nota.updatedAt,
+  }
+
+  // If there's a config, deep clone it to ensure it's serializable
+  if (nota.config) {
+    serialized.config = JSON.parse(JSON.stringify(nota.config))
+  }
+
+  return serialized
+}
+
+const deserializeNota = (nota: any): Nota => ({
+  ...nota,
+  tags: Array.isArray(nota.tags) ? [...nota.tags] : [],
+  createdAt: nota.createdAt ? new Date(nota.createdAt) : new Date(),
+  updatedAt: nota.updatedAt ? new Date(nota.updatedAt) : new Date(),
+  config: nota.config ? JSON.parse(JSON.stringify(nota.config)) : undefined,
+})
 
 export const useNotaStore = defineStore('nota', {
   state: () => ({
@@ -47,45 +73,57 @@ export const useNotaStore = defineStore('nota', {
   },
 
   actions: {
-    async createItem(title: string, parentId: string | null = null) {
-      const now = new Date().toISOString()
-      const item: Nota = {
-        id: crypto.randomUUID(),
+    async createItem(title: string): Promise<Nota> {
+      const nota: Nota = {
+        id: nanoid(),
         title,
         content: '',
-        parentId,
-        createdAt: now,
-        updatedAt: now,
+        parentId: null,
+        tags: [],
+        createdAt: new Date(),
+        updatedAt: new Date()
       }
 
-      // If it has a parent, copy the parent's config
-      if (parentId) {
-        const parent = this.items.find((i) => i.id === parentId)
-        if (parent?.config) {
-          item.config = JSON.parse(JSON.stringify(parent.config))
-        }
+      const serialized = serializeNota(nota)
+      await db.notas.add(serialized)
+      this.items.push(nota)
+      return nota
+    },
+
+    async saveItem(nota: Nota) {
+      // Ensure tags is initialized
+      if (!nota.tags) {
+        nota.tags = []
       }
 
-      await db.notas.add(item)
-      this.items.push(item)
-      return item
+      // Update timestamps
+      nota.updatedAt = new Date()
+      
+      // Update in database with serialized data
+      const serialized = serializeNota(nota)
+      await db.notas.update(nota.id, serialized)
+
+      // Update in state
+      const index = this.items.findIndex(n => n.id === nota.id)
+      if (index !== -1) {
+        this.items[index] = { ...nota }
+      } else {
+        this.items.push({ ...nota })
+      }
     },
 
     async loadNotas() {
       this.loading = true
       try {
         const results = await db.notas.toArray()
-        this.items = results.map((nota) => ({
-          ...nota,
-          createdAt: nota.createdAt,
-          updatedAt: nota.updatedAt,
-        }))
+        this.items = results.map(deserializeNota)
       } catch (e) {
         this.error = 'Failed to load notas'
         console.error(e)
       } finally {
         this.loading = false
       }
+      return this.items
     },
 
     async renameItem(id: string, newTitle: string) {
@@ -113,17 +151,18 @@ export const useNotaStore = defineStore('nota', {
     },
 
     async saveNota(nota: Partial<Nota> & { id: string }) {
-      const notaToStore: Partial<Nota> & { updatedAt: string | Date } = {
+      const now = new Date()
+      const notaToStore = serializeNota({
         ...nota,
-        updatedAt: new Date().toISOString(),
-      }
+        updatedAt: now,
+      })
 
       const index = this.items.findIndex((n) => n.id === nota.id)
       if (index !== -1) {
         this.items[index] = {
           ...this.items[index],
           ...nota,
-          updatedAt: notaToStore.updatedAt,
+          updatedAt: now,
         }
         await db.notas.update(nota.id, notaToStore)
       }
@@ -140,11 +179,7 @@ export const useNotaStore = defineStore('nota', {
 
         updater(config)
         nota.config = config
-
-        await db.notas.update(notaId, {
-          config: JSON.parse(JSON.stringify(config)),
-          updatedAt: new Date().toISOString(),
-        })
+        await this.saveItem(nota)
       }
     },
 
@@ -152,21 +187,29 @@ export const useNotaStore = defineStore('nota', {
       const nota = this.items.find(item => item.id === id)
       if (nota) {
         nota.favorite = !nota.favorite
-        nota.updatedAt = new Date().toISOString()
-        await db.notas.update(id, {
-          favorite: nota.favorite,
-          updatedAt: nota.updatedAt
-        })
+        nota.updatedAt = new Date()
+        await this.saveItem(nota)
       }
     },
 
     async loadNota(id: string) {
       try {
         if (!this.getCurrentNota(id)) {
-          await this.fetchNota(id)
+          const nota = await db.notas.get(id)
+          if (nota) {
+            const deserialized = deserializeNota(nota)
+            // Ensure tags is initialized when loading
+            if (!deserialized.tags) {
+              deserialized.tags = []
+              await this.saveItem(deserialized)
+            }
+            this.items.push(deserialized)
+          }
         }
+        return this.getCurrentNota(id)
       } catch (error) {
         console.error('Failed to load nota:', error)
+        return null
       }
     },
   },
