@@ -1,11 +1,18 @@
 <script setup lang="ts">
 import { SelectValue, type SelectValueProps } from 'radix-vue'
 
-const props = defineProps<SelectValueProps>()
+interface Props extends SelectValueProps {
+  placeholder?: string
+}
+
+defineProps<Props>()
 </script>
 
 <template>
-  <SelectValue v-bind="props">
+  <SelectValue 
+    :placeholder="placeholder"
+    v-bind="$attrs"
+  >
     <slot />
   </SelectValue>
 </template>

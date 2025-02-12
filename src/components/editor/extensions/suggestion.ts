@@ -16,6 +16,8 @@ import {
   Heading3,
   DatabaseIcon,
   FunctionSquare,
+  ImageIcon,
+  ImagesIcon,
 } from 'lucide-vue-next'
 import { unified } from 'unified'
 import remarkParse from 'remark-parse'
@@ -122,6 +124,34 @@ export default {
               },
               content: [{ type: 'text', text: '# Your Python code here' }],
             })
+            .run()
+        },
+      },
+
+      // Images
+      {
+        title: 'Single Image',
+        category: 'Images',
+        icon: ImageIcon,
+        command: ({ editor, range }: CommandArgs) => {
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .setNotaImage({ src: '' })
+            .run()
+        },
+      },
+      {
+        title: 'Figure with Subfigures',
+        category: 'Images',
+        icon: ImagesIcon,
+        command: ({ editor, range }: CommandArgs) => {
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .setNotaImageSubfigureContainer()
             .run()
         },
       },

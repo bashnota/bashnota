@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { formatDate } from '@/lib/utils'
 import TagInput from '@/components/ui/tag/TagInput.vue'
 import Label from '@/components/ui/label/Label.vue'
+import { ImageExtension } from '@/components/editor/extensions/ImageExtension'
 
 const props = defineProps<{
   id: string
@@ -62,6 +63,13 @@ const allTags = computed(() => {
   })
   return Array.from(tagSet)
 })
+
+// Add ImageExtension to additional extensions
+const additionalExtensions = computed(() => [
+  ImageExtension,
+])
+
+// Pass these extensions to the NotaEditor component
 </script>
 
 <template>
@@ -130,7 +138,12 @@ const allTags = computed(() => {
 
     <main class="flex-1 overflow-auto">
       <template v-if="isReady">
-        <NotaEditor v-if="!showConfigPage && nota" :nota-id="id" @saving="handleSaving" />
+        <NotaEditor 
+          v-if="!showConfigPage && nota" 
+          :nota-id="id" 
+          @saving="handleSaving" 
+          :extensions="additionalExtensions" 
+        />
         <NotaConfigPage v-else-if="nota" :nota-id="id" />
       </template>
       <div v-else class="flex items-center justify-center h-full">

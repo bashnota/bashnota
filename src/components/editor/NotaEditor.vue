@@ -5,7 +5,6 @@ import Table from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
 import TableCell from '@tiptap/extension-table-cell'
 import TableHeader from '@tiptap/extension-table-header'
-import Image from '@tiptap/extension-image'
 import Placeholder from '@tiptap/extension-placeholder'
 import Link from '@tiptap/extension-link'
 import { PageLink } from './extensions/PageLinkExtension'
@@ -30,6 +29,7 @@ import { MarkdownExtension } from './extensions/MarkdownExtension'
 
 const props = defineProps<{
   notaId: string
+  extensions?: any[]
 }>()
 
 const emit = defineEmits<{
@@ -45,49 +45,56 @@ const content = computed(() => {
   return nota?.content || ''
 })
 
+// Create a base extensions array
+const baseExtensions = [
+  StarterKit.configure({
+    codeBlock: false,
+  }),
+  ExecutableCodeBlockExtension.configure({
+    HTMLAttributes: {
+      class: 'code-block',
+    },
+    languageClassPrefix: 'language-',
+  }),
+  Link.configure({
+    openOnClick: false,
+    HTMLAttributes: {
+      class: 'nota-link',
+    },
+  }),
+  PageLink,
+  Table.configure({
+    allowTableNodeSelection: true,
+    resizable: true,
+  }),
+  TableRow,
+  TableCell,
+  TableHeader,
+  Placeholder.configure({
+    placeholder: 'Type "/" for commands ...',
+  }),
+  SlashCommands.configure({
+    suggestion,
+  }),
+  TableExtension.configure({
+    HTMLAttributes: {
+      class: 'data-table',
+    },
+  }),
+  MathExtension,
+  GlobalDragHandle,
+  MarkdownPasteExtension,
+  MarkdownExtension,
+]
+
+// Combine base extensions with any additional extensions passed as props
+const allExtensions = computed(() => {
+  return [...baseExtensions, ...(props.extensions || [])]
+})
+
 const editor = useEditor({
   content: content.value,
-  extensions: [
-    StarterKit.configure({
-      codeBlock: false,
-    }),
-    ExecutableCodeBlockExtension.configure({
-      HTMLAttributes: {
-        class: 'code-block',
-      },
-      languageClassPrefix: 'language-',
-    }),
-    Link.configure({
-      openOnClick: false,
-      HTMLAttributes: {
-        class: 'nota-link',
-      },
-    }),
-    PageLink,
-    Table.configure({
-      allowTableNodeSelection: true,
-      resizable: true,
-    }),
-    TableRow,
-    TableCell,
-    TableHeader,
-    Image,
-    Placeholder.configure({
-      placeholder: 'Type "/" for commands ...',
-    }),
-    SlashCommands.configure({
-      suggestion,
-    }),
-    TableExtension.configure({
-      HTMLAttributes: {
-        class: 'data-table',
-      },
-    }),
-    MathExtension,
-    GlobalDragHandle,
-    MarkdownPasteExtension,
-    MarkdownExtension,
-  ],
+  extensions: allExtensions.value,
   editorProps: {
     attributes: {
       class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none',

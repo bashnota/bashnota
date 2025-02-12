@@ -1,15 +1,21 @@
 <script setup lang="ts">
-import type { SelectRootEmits, SelectRootProps } from 'radix-vue'
-import { SelectRoot, useForwardPropsEmits } from 'radix-vue'
+import { SelectRoot } from 'radix-vue'
 
-const props = defineProps<SelectRootProps>()
-const emits = defineEmits<SelectRootEmits>()
+defineProps<{
+  modelValue?: string
+}>()
 
-const forwarded = useForwardPropsEmits(props, emits)
+defineEmits<{
+  'update:modelValue': [value: string]
+}>()
 </script>
 
 <template>
-  <SelectRoot v-bind="forwarded">
+  <SelectRoot 
+    v-bind="$attrs" 
+    :model-value="modelValue" 
+    @update:model-value="$emit('update:modelValue', $event)"
+  >
     <slot />
   </SelectRoot>
 </template>
