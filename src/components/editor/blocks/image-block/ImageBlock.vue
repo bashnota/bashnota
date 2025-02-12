@@ -1,164 +1,132 @@
 <template>
-  <node-view-wrapper class="image-block">
-    <div 
-      class="image-container"
-      :class="{
-        'subfigure-container': attrs.isSubfigureContainer,
-        [attrs.layout]: true,
-        [attrs.alignment]: true
-      }"
-    >
+  <node-view-wrapper class="my-4 w-full">
+    <div class="flex flex-col gap-4 w-full">
       <template v-if="!attrs.isSubfigureContainer">
-        <div class="single-image">
-          <div class="image-controls" v-if="attrs.src && !isLocked">
-            <div class="control-group">
-              <Tooltip content="Image size">
-                <Select v-model="localWidth" @update:modelValue="updateWidth">
-                  <SelectTrigger class="w-24">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="25%">Small</SelectItem>
-                    <SelectItem value="50%">Medium</SelectItem>
-                    <SelectItem value="75%">Large</SelectItem>
-                    <SelectItem value="100%">Full</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Tooltip>
+        <div
+          class="flex flex-col gap-2 w-full"
+          :class="{
+            'items-start': attrs.alignment === 'left',
+            'items-center': attrs.alignment === 'center',
+            'items-end': attrs.alignment === 'right',
+          }"
+        >
+          <div
+            v-if="attrs.src && !isLocked"
+            class="flex items-center gap-1 mb-2 p-0.5 bg-muted/50 rounded-md w-fit"
+          >
+            <Button
+              v-for="size in ['25%', '50%', '75%', '100%']"
+              :key="size"
+              variant="ghost"
+              size="sm"
+              class="px-2 h-8"
+              :class="{ 'bg-background': localWidth === size }"
+              @click="updateWidth(size)"
+            >
+              <ImageIcon v-if="size === '25%'" class="w-3 h-3" />
+              <ImageIcon v-if="size === '50%'" class="w-4 h-4" />
+              <ImageIcon v-if="size === '75%'" class="w-5 h-5" />
+              <ImageIcon v-if="size === '100%'" class="w-6 h-6" />
+            </Button>
 
-              <Tooltip content="Alignment">
-                <Select v-model="localAlignment" @update:modelValue="updateAlignment">
-                  <SelectTrigger class="w-24">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="left">
-                      <AlignLeftIcon class="w-4 h-4 mr-2" />
-                      Left
-                    </SelectItem>
-                    <SelectItem value="center">
-                      <AlignCenterIcon class="w-4 h-4 mr-2" />
-                      Center
-                    </SelectItem>
-                    <SelectItem value="right">
-                      <AlignRightIcon class="w-4 h-4 mr-2" />
-                      Right
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </Tooltip>
+            <Separator orientation="vertical" class="mx-0.5 h-6" />
 
-              <Tooltip content="Object fit">
-                <Select v-model="localObjectFit" @update:modelValue="updateObjectFit">
-                  <SelectTrigger class="w-24">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="contain">Contain</SelectItem>
-                    <SelectItem value="cover">Cover</SelectItem>
-                    <SelectItem value="fill">Fill</SelectItem>
-                    <SelectItem value="scale-down">Scale</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Tooltip>
-            </div>
-            
-            <Tooltip :content="isLocked ? 'Unlock editing' : 'Lock editing'">
-              <Button
-                variant="ghost"
-                size="icon"
-                @click="toggleLock"
-                class="ml-auto"
-              >
-                <LockIcon v-if="isLocked" class="h-4 w-4" />
-                <UnlockIcon v-else class="h-4 w-4" />
-              </Button>
-            </Tooltip>
+            <Button
+              v-for="align in ['left', 'center', 'right']"
+              :key="align"
+              variant="ghost"
+              size="sm"
+              class="px-2 h-8"
+              :class="{ 'bg-background': localAlignment === align }"
+              @click="updateAlignment(align)"
+            >
+              <component :is="alignmentIcons[align]" class="w-4 h-4" />
+            </Button>
+
+            <Separator orientation="vertical" class="mx-0.5 h-6" />
+
+            <Button variant="ghost" size="sm" class="px-2 h-8" @click="toggleLock">
+              <LockIcon v-if="isLocked" class="h-4 w-4" />
+              <UnlockIcon v-else class="h-4 w-4" />
+            </Button>
           </div>
 
-          <div 
-            class="image-wrapper" 
-            :style="{ 
-              width: attrs.width,
-              objectFit: attrs.objectFit || 'contain'
-            }"
-          >
-            <img 
-              v-if="attrs.src" 
+          <div class="relative" :style="{ width: attrs.width }">
+            <img
+              v-if="attrs.src"
               :src="attrs.src"
               :style="{ objectFit: attrs.objectFit || 'contain' }"
+              class="w-full h-auto rounded-md"
               @dblclick="handleDoubleClick"
             />
-            <UploadZone 
-              v-else
-              @file-selected="handleImageUpload"
-              @file-dropped="handleDrop"
-            />
+            <UploadZone v-else @file-selected="handleImageUpload" @file-dropped="handleDrop" />
           </div>
 
-          <div v-if="attrs.src" class="caption-section">
+          <div v-if="attrs.src" class="flex flex-col gap-1 w-full mt-2">
+            <div
+              v-if="!isEditingLabel"
+              class="font-medium text-base hover:bg-muted/50 rounded px-2 py-1 cursor-text"
+              @click="isEditingLabel = true"
+            >
+              {{ localLabel || 'Click to add figure label' }}
+            </div>
             <Input
-              v-model="localLabel"
-              @blur="updateLabel"
+              v-else
+              :value="localLabel"
+              @input="localLabel = $event.target.value"
+              @blur="handleLabelBlur"
+              @keyup.enter="handleLabelBlur"
               placeholder="Figure label (e.g., Figure 1)"
-              class="label-input"
+              class="font-medium"
               :disabled="isLocked"
+              autofocus
             />
+
+            <div
+              v-if="!isEditingCaption"
+              class="text-sm text-muted-foreground hover:bg-muted/50 rounded px-2 py-1 cursor-text"
+              @click="isEditingCaption = true"
+            >
+              {{ localCaption || 'Click to add caption' }}
+            </div>
             <Input
-              v-model="localCaption"
-              @blur="updateCaption"
+              v-else
+              :value="localCaption"
+              @input="localCaption = $event.target.value"
+              @blur="handleCaptionBlur"
+              @keyup.enter="handleCaptionBlur"
               placeholder="Add caption..."
-              class="caption-input"
+              class="text-sm"
               :disabled="isLocked"
+              autofocus
             />
           </div>
         </div>
       </template>
 
       <template v-else>
-        <div class="subfigures-controls" v-if="!isLocked">
+        <div v-if="!isLocked" class="flex items-center justify-between w-full p-2 border-b">
           <div class="flex items-center gap-4">
-            <Tooltip content="Layout">
-              <div class="flex items-center gap-2 bg-muted p-1 rounded-md">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  class="h-8 px-2"
-                  :class="{ 'bg-background': localLayout === 'horizontal' }"
-                  @click="updateLayout('horizontal')"
-                >
-                  <FlipHorizontalIcon class="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  class="h-8 px-2"
-                  :class="{ 'bg-background': localLayout === 'vertical' }"
-                  @click="updateLayout('vertical')"
-                >
-                  <FlipVerticalIcon class="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  class="h-8 px-2"
-                  :class="{ 'bg-background': localLayout === 'grid' }"
-                  @click="updateLayout('grid')"
-                >
-                  <LayoutGridIcon class="w-4 h-4" />
-                </Button>
-              </div>
-            </Tooltip>
+            <div class="flex items-center gap-1 bg-muted p-1 rounded-md">
+              <Button
+                v-for="layout in ['horizontal', 'vertical', 'grid']"
+                :key="layout"
+                variant="ghost"
+                size="sm"
+                class="h-8 px-2"
+                :class="{ 'bg-background': localLayout === layout }"
+                @click="updateLayout(layout)"
+              >
+                <FlipHorizontalIcon v-if="layout === 'horizontal'" class="w-4 h-4" />
+                <FlipVerticalIcon v-if="layout === 'vertical'" class="w-4 h-4" />
+                <LayoutGridIcon v-if="layout === 'grid'" class="w-4 h-4" />
+              </Button>
+            </div>
 
-            <Tooltip content="Unify subfigure sizes">
-              <div class="flex items-center gap-2">
-                <Switch
-                  v-model="localUnifiedSize"
-                  @update:modelValue="updateUnifiedSize"
-                />
-                <span class="text-sm text-muted-foreground">Uniform size</span>
-              </div>
-            </Tooltip>
+            <div class="flex items-center gap-2">
+              <Switch v-model="localUnifiedSize" @update:modelValue="updateUnifiedSize" />
+              <span class="text-sm text-muted-foreground">Uniform size</span>
+            </div>
           </div>
 
           <div class="flex items-center gap-2">
@@ -167,46 +135,43 @@
               Add Subfigure
             </Button>
 
-            <Tooltip :content="isLocked ? 'Unlock editing' : 'Lock editing'">
-              <Button
-                variant="ghost"
-                size="icon"
-                @click="toggleLock"
-              >
-                <LockIcon v-if="isLocked" class="h-4 w-4" />
-                <UnlockIcon v-else class="h-4 w-4" />
-              </Button>
-            </Tooltip>
+            <Button variant="ghost" size="icon" @click="toggleLock">
+              <LockIcon v-if="isLocked" class="h-4 w-4" />
+              <UnlockIcon v-else class="h-4 w-4" />
+            </Button>
           </div>
         </div>
 
-        <div 
-          class="subfigures-grid" 
-          :class="[attrs.layout, { 'unified-size': attrs.unifiedSize }]"
+        <div
+          class="grid gap-6"
+          :class="{
+            'grid-cols-1': attrs.layout === 'vertical',
+            'grid-cols-2 md:grid-cols-3': attrs.layout === 'grid',
+            'grid-cols-1 md:grid-cols-2': attrs.layout === 'horizontal',
+          }"
         >
-          <div 
-            v-for="(subfig, index) in attrs.subfigures" 
-            :key="index" 
-            class="subfigure"
-          >
-            <div class="subfigure-content relative group">
-              <img 
-                v-if="subfig.src" 
+          <div v-for="(subfig, index) in attrs.subfigures" :key="index" class="relative group">
+            <div class="relative bg-muted p-2 rounded-lg overflow-hidden">
+              <img
+                v-if="subfig.src"
                 :src="subfig.src"
                 :style="{ objectFit: attrs.objectFit || 'contain' }"
+                :class="[
+                  'w-full rounded-md transition-transform hover:scale-102 cursor-zoom-in',
+                  { 'h-48': attrs.unifiedSize },
+                ]"
                 @dblclick="handleDoubleClick"
-                class="cursor-zoom-in transition-transform hover:scale-[1.02] rounded-md"
               />
-              <UploadZone 
+              <UploadZone
                 v-else
                 @file-selected="(e) => handleSubfigureUpload(e, index)"
                 @file-dropped="(e) => handleSubfigureDrop(e, index)"
                 class="rounded-md"
               />
-              
-              <Button 
+
+              <Button
                 v-if="!isLocked && subfig.src"
-                @click="removeSubfigure(index)" 
+                @click="removeSubfigure(index)"
                 variant="destructive"
                 size="icon"
                 class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -214,33 +179,70 @@
                 <TrashIcon class="w-4 h-4" />
               </Button>
 
-              <div class="subfigure-caption mt-2">
+              <div v-if="subfig.src" class="mt-2">
+                <div
+                  v-if="!isEditingSubfigureCaption[index]"
+                  class="text-sm hover:bg-muted/50 rounded px-2 py-1 cursor-text"
+                  @click="startEditingSubfigureCaption(index)"
+                >
+                  {{ subfig.caption || getSubfigureLabel(index) }}
+                </div>
                 <Input
-                  v-if="subfig.src"
-                  v-model="subfig.caption"
-                  @blur="updateSubfigureCaption(index)"
+                  v-else
+                  :value="subfig.caption"
+                  @input="
+                    (e) => {
+                      const subfigures = [...attrs.subfigures]
+                      subfigures[index].caption = e.target.value
+                      props.updateAttributes({ subfigures })
+                    }
+                  "
+                  @blur="handleSubfigureCaptionBlur(index)"
+                  @keyup.enter="handleSubfigureCaptionBlur(index)"
                   :placeholder="getSubfigureLabel(index)"
-                  class="caption-input text-sm"
+                  class="text-sm bg-transparent hover:bg-background focus:bg-background transition-colors"
                   :disabled="isLocked"
+                  autofocus
                 />
               </div>
             </div>
           </div>
         </div>
 
-        <div class="main-caption-section mt-4">
+        <div class="flex flex-col gap-2 w-full mt-4">
+          <div
+            v-if="!isEditingLabel"
+            class="font-medium text-base hover:bg-muted/50 rounded px-2 py-1 cursor-text"
+            @click="isEditingLabel = true"
+          >
+            {{ localLabel || 'Click to add figure label' }}
+          </div>
           <Input
-            v-model="localLabel"
-            @blur="updateLabel"
+            v-else
+            :value="localLabel"
+            @input="localLabel = $event.target.value"
+            @blur="handleLabelBlur"
+            @keyup.enter="handleLabelBlur"
             placeholder="Figure label (e.g., Figure 1)"
-            class="label-input font-medium"
+            class="font-medium"
             :disabled="isLocked"
           />
+
+          <div
+            v-if="!isEditingCaption"
+            class="text-sm text-muted-foreground hover:bg-muted/50 rounded px-2 py-1 cursor-text"
+            @click="isEditingCaption = true"
+          >
+            {{ localCaption || 'Click to add main caption' }}
+          </div>
           <Input
-            v-model="localCaption"
-            @blur="updateCaption"
-            placeholder="Add main figure caption..."
-            class="main-caption-input"
+            v-else
+            :value="localCaption"
+            @input="localCaption = $event.target.value"
+            @blur="handleCaptionBlur"
+            @keyup.enter="handleCaptionBlur"
+            placeholder="Add main caption..."
+            class="text-sm"
             :disabled="isLocked"
           />
         </div>
@@ -263,31 +265,39 @@ import {
   PlusIcon,
   TrashIcon,
   LockIcon,
-  UnlockIcon
+  UnlockIcon,
+  ImageIcon,
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
-import { Tooltip } from '@/components/ui/tooltip'
 import UploadZone from './UploadZone.vue'
-import ImageModal from './ImageModal.vue'
-import type { ImageFit } from '../../extensions/types'
 
 const props = defineProps<{
   node: any
   updateAttributes: (attrs: Record<string, any>) => void
 }>()
 
+// Reactive state
 const attrs = computed(() => props.node.attrs)
 const localCaption = ref(props.node.attrs.caption || '')
 const localLabel = ref(props.node.attrs.label || '')
 const localLayout = ref(props.node.attrs.layout || 'horizontal')
 const localWidth = ref(props.node.attrs.width || '100%')
 const localAlignment = ref(props.node.attrs.alignment || 'center')
-const localObjectFit = ref<ImageFit>(props.node.attrs.objectFit || 'contain')
 const localUnifiedSize = ref(props.node.attrs.unifiedSize || false)
 const isLocked = ref(props.node.attrs.isLocked || false)
+const isEditingLabel = ref(false)
+const isEditingCaption = ref(false)
+const isEditingSubfigureCaption = ref<Record<number, boolean>>({})
+
+// UI helpers
+const alignmentIcons = {
+  left: AlignLeftIcon,
+  center: AlignCenterIcon,
+  right: AlignRightIcon,
+}
 
 // File handling methods
 const handleDrop = async (event: DragEvent) => {
@@ -302,7 +312,7 @@ const handleFileUpload = async (file: File) => {
     const reader = new FileReader()
     reader.onload = (e) => {
       props.updateAttributes({
-        src: e.target?.result
+        src: e.target?.result,
       })
     }
     reader.readAsDataURL(file)
@@ -318,54 +328,61 @@ const handleImageUpload = async (event: Event) => {
   }
 }
 
+// Caption handling methods
+const handleLabelBlur = () => {
+  isEditingLabel.value = false
+  updateLabel()
+}
+
+const handleCaptionBlur = () => {
+  isEditingCaption.value = false
+  updateCaption()
+}
+
 // Update methods
 const updateCaption = () => {
   props.updateAttributes({
-    caption: localCaption.value
+    caption: localCaption.value,
   })
 }
 
 const updateLabel = () => {
   props.updateAttributes({
-    label: localLabel.value
+    label: localLabel.value,
   })
 }
 
 const updateLayout = (layout: string) => {
   localLayout.value = layout
   props.updateAttributes({
-    layout: layout
+    layout,
   })
 }
 
-const updateWidth = () => {
+const updateWidth = (width: string) => {
+  localWidth.value = width
   props.updateAttributes({
-    width: localWidth.value
+    width,
   })
 }
 
-const updateAlignment = () => {
+const updateAlignment = (alignment: string) => {
+  localAlignment.value = alignment
   props.updateAttributes({
-    alignment: localAlignment.value
-  })
-}
-
-const updateObjectFit = () => {
-  props.updateAttributes({
-    objectFit: localObjectFit.value
+    alignment,
   })
 }
 
 const updateUnifiedSize = () => {
   props.updateAttributes({
-    unifiedSize: localUnifiedSize.value
+    unifiedSize: localUnifiedSize.value,
   })
 }
 
 const toggleLock = () => {
   isLocked.value = !isLocked.value
   props.updateAttributes({
-    isLocked: isLocked.value
+    isLocked: isLocked.value,
   })
 }
 
@@ -379,9 +396,9 @@ const addSubfigure = () => {
     title: '',
     label: '',
   })
-  props.updateAttributes({ 
+  props.updateAttributes({
     subfigures,
-    isSubfigureContainer: true
+    isSubfigureContainer: true,
   })
 }
 
@@ -405,11 +422,11 @@ const handleSubfigureFileUpload = async (file: File, index: number) => {
       const subfigures = [...(attrs.value.subfigures || [])]
       subfigures[index] = {
         ...subfigures[index],
-        src: e.target?.result as string
+        src: e.target?.result as string,
       }
-      props.updateAttributes({ 
+      props.updateAttributes({
         subfigures,
-        isSubfigureContainer: true
+        isSubfigureContainer: true,
       })
     }
     reader.readAsDataURL(file)
@@ -425,11 +442,21 @@ const handleSubfigureUpload = async (event: Event, index: number) => {
   }
 }
 
+// New subfigure caption methods
+const startEditingSubfigureCaption = (index: number) => {
+  isEditingSubfigureCaption.value[index] = true
+}
+
+const handleSubfigureCaptionBlur = (index: number) => {
+  isEditingSubfigureCaption.value[index] = false
+  updateSubfigureCaption(index)
+}
+
 const updateSubfigureCaption = (index: number) => {
   const subfigures = [...(attrs.value.subfigures || [])]
-  props.updateAttributes({ 
+  props.updateAttributes({
     subfigures,
-    isSubfigureContainer: true
+    isSubfigureContainer: true,
   })
 }
 
@@ -437,39 +464,31 @@ const getSubfigureLabel = (index: number) => {
   return `${attrs.value.label || 'Figure X'}${String.fromCharCode(97 + index)}`
 }
 
-// Add a watcher for subfigures to ensure they're properly synced
-watch(() => props.node.attrs.subfigures, (newSubfigures) => {
-  if (newSubfigures) {
-    props.updateAttributes({
-      subfigures: newSubfigures.map((subfig: SubFigure) => ({
-        ...subfig,
-        src: subfig.src || '',
-        caption: subfig.caption || '',
-        label: subfig.label || '',
-        alt: subfig.alt || '',
-        title: subfig.title || ''
-      }))
-    })
-  }
-}, { deep: true })
+// Watchers
+watch(
+  () => props.node.attrs.subfigures,
+  (newSubfigures) => {
+    if (newSubfigures) {
+      props.updateAttributes({
+        subfigures: newSubfigures.map((subfig: SubFigure) => ({
+          ...subfig,
+          src: subfig.src || '',
+          caption: subfig.caption || '',
+          label: subfig.label || '',
+        })),
+      })
+    }
+  },
+  { deep: true },
+)
 
-// Initialize subfigures if they exist
+// Lifecycle hooks
 onMounted(() => {
   if (props.node.attrs.isSubfigureContainer && !props.node.attrs.subfigures) {
     props.updateAttributes({
-      subfigures: []
+      subfigures: [],
     })
   }
-})
-
-// Add keyboard shortcut handler
-const handleKeydown = (e: KeyboardEvent) => {
-  if (e.key === 'Escape') {
-    // Close modal if open
-  }
-}
-
-onMounted(() => {
   window.addEventListener('keydown', handleKeydown)
 })
 
@@ -477,191 +496,27 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
 })
 
+// Event handlers
+const handleKeydown = (e: KeyboardEvent) => {
+  if (e.key === 'Escape') {
+    isEditingLabel.value = false
+    isEditingCaption.value = false
+    // Reset all subfigure caption editing states
+    Object.keys(isEditingSubfigureCaption.value).forEach((index) => {
+      isEditingSubfigureCaption.value[Number(index)] = false
+    })
+  }
+}
+
 const handleDoubleClick = (event: MouseEvent) => {
   event.preventDefault()
   event.stopPropagation()
-  
+
   if (isLocked.value) {
     isLocked.value = false
     props.updateAttributes({
-      isLocked: false
+      isLocked: false,
     })
   }
 }
 </script>
-
-<style scoped>
-.image-block {
-  margin: 1em 0;
-}
-
-.image-container {
-  display: flex;
-  flex-direction: column;
-  gap: 1em;
-}
-
-.image-container.left {
-  align-items: flex-start;
-}
-
-.image-container.center {
-  align-items: center;
-}
-
-.image-container.right {
-  align-items: flex-end;
-}
-
-.image-controls {
-  display: flex;
-  gap: 1em;
-  margin-bottom: 0.5em;
-  justify-content: space-between;
-}
-
-.control-group {
-  display: flex;
-  gap: 0.5em;
-  align-items: center;
-}
-
-.size-control,
-.alignment-control {
-  padding: 0.25em 0.5em;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background: white;
-}
-
-.image-wrapper {
-  position: relative;
-}
-
-.image-wrapper img {
-  max-width: 100%;
-  height: auto;
-  transition: transform 0.2s ease-in-out;
-  user-select: none;
-}
-
-.image-wrapper img:hover {
-  transform: scale(1.02);
-}
-
-.subfigure-container {
-  border: 1px solid #ddd;
-  padding: 1em;
-  border-radius: 4px;
-}
-
-.subfigures-controls {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1em;
-  margin-bottom: 1em;
-  padding: 0.5em;
-  border-bottom: 1px solid var(--border);
-}
-
-.subfigures-grid {
-  display: grid;
-  gap: 1.5em;
-}
-
-.subfigures-grid.horizontal {
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-}
-
-.subfigures-grid.vertical {
-  grid-template-columns: 1fr;
-}
-
-.subfigures-grid.grid {
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-}
-
-.subfigure-content {
-  background: var(--muted);
-  padding: 0.5em;
-  border-radius: 0.5em;
-  overflow: hidden;
-}
-
-.subfigure-caption {
-  margin-top: 0.5em;
-}
-
-.caption-section,
-.main-caption-section,
-.subfigure-caption {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5em;
-  width: 100%;
-}
-
-.label-input,
-.caption-input,
-.main-caption-input {
-  width: 100%;
-  padding: 0.5em;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 0.9em;
-}
-
-.label-input {
-  font-weight: 600;
-  margin-bottom: 0.5em;
-}
-
-.upload-zone {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1em;
-  padding: 2em;
-  border: 2px dashed #ddd;
-  border-radius: 4px;
-  background: #f8f8f8;
-  transition: background-color 0.2s;
-}
-
-.upload-zone:hover {
-  background: #f0f0f0;
-}
-
-.hidden {
-  display: none;
-}
-
-.upload-zone.drag-over {
-  background-color: #e0e0e0;
-  border-color: #666;
-}
-
-.unified-size img {
-  width: 100%;
-  height: 200px;
-  object-fit: var(--object-fit, contain);
-}
-
-input:disabled,
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.caption-input {
-  background: transparent;
-  border: 1px solid transparent;
-}
-
-.caption-input:hover:not(:disabled),
-.caption-input:focus:not(:disabled) {
-  border-color: var(--border);
-  background: var(--background);
-}
-</style> 

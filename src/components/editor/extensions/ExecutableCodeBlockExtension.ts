@@ -4,6 +4,7 @@ import ExecutableCodeBlock from '../blocks/executable-code-block/ExecutableCodeB
 
 export const ExecutableCodeBlockExtension = CodeBlock.extend({
   name: 'executableCodeBlock',
+  atom: true,
 
   addAttributes() {
     return {
