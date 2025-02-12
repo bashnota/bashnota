@@ -26,6 +26,7 @@ import { MathExtension } from './extensions/MathExtension'
 import GlobalDragHandle from 'tiptap-extension-global-drag-handle'
 import { MarkdownPasteExtension } from './extensions/MarkdownPasteExtension'
 import { MarkdownExtension } from './extensions/MarkdownExtension'
+import { Mermaid } from './extensions/mermaid'
 
 const props = defineProps<{
   notaId: string
@@ -82,9 +83,17 @@ const baseExtensions = [
     },
   }),
   MathExtension,
-  GlobalDragHandle,
+  GlobalDragHandle.configure({
+    dragHandleWidth: 24,
+    shouldShow: () => true,
+  }),
   MarkdownPasteExtension,
   MarkdownExtension,
+  Mermaid.configure({
+    HTMLAttributes: {
+      class: 'mermaid-block',
+    },
+  }),
 ]
 
 // Combine base extensions with any additional extensions passed as props
@@ -116,16 +125,22 @@ const editor = useEditor({
     isLoading.value = false
   },
   onUpdate: ({ editor }) => {
-    emit('saving', true) // Emit instead of setting local ref
-    notaStore
-      .saveNota({
-        id: props.notaId,
-        content: editor.getHTML(),
-        updatedAt: new Date(),
-      })
-      .finally(() => {
-        emit('saving', false) // Emit instead of setting local ref
-      })
+    try {
+      emit('saving', true)
+      const content = editor.getHTML()
+      notaStore
+        .saveNota({
+          id: props.notaId,
+          content,
+          updatedAt: new Date(),
+        })
+        .finally(() => {
+          emit('saving', false)
+        })
+    } catch (error) {
+      console.error('Error saving content:', error)
+      emit('saving', false)
+    }
   },
 })
 
