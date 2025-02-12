@@ -75,37 +75,37 @@ const additionalExtensions = computed(() => [
 <template>
   <div class="flex flex-col flex-1 h-full overflow-hidden bg-background">
     <header class="flex items-center justify-between px-6 py-4 border-b">
-      <div class="flex flex-col gap-1">
+      <div class="flex-1">
         <div class="flex items-center gap-3">
-          <h1 class="text-2xl font-semibold tracking-tight">{{ nota?.title || 'Untitled' }}</h1>
+          <div class="flex-1 flex items-center gap-4">
+            <h1 class="text-2xl font-semibold tracking-tight">{{ nota?.title || 'Untitled' }}</h1>
+            
+            <!-- Save Status Indicator -->
+            <div
+              class="flex items-center text-xs text-muted-foreground transition-opacity duration-200"
+              :class="{ 'opacity-0': !isSaving && !showSaved }"
+            >
+              <span v-if="isSaving" class="flex items-center gap-1">
+                <ArrowPathIcon class="w-3 h-3 animate-spin" />
+                Saving
+              </span>
+              <span v-else-if="showSaved" class="flex items-center gap-1">
+                <CheckCircleIcon class="w-3 h-3 text-green-600" />
+                Saved
+              </span>
+            </div>
 
-          <!-- Save Status Indicator -->
-          <div
-            class="flex items-center text-xs text-muted-foreground transition-opacity duration-200"
-            :class="{ 'opacity-0': !isSaving && !showSaved }"
-          >
-            <span v-if="isSaving" class="flex items-center gap-1">
-              <ArrowPathIcon class="w-3 h-3 animate-spin" />
-              Saving
-            </span>
-            <span v-else-if="showSaved" class="flex items-center gap-1">
-              <CheckCircleIcon class="w-3 h-3 text-green-600" />
-              Saved
-            </span>
+            <!-- Tags moved here -->
+            <TagInput 
+              v-if="nota" 
+              v-model="nota.tags" 
+              :suggestions="allTags"
+              class="max-w-md"
+            />
           </div>
         </div>
 
-        <!-- Move tags here, right under the title -->
-        <div class="flex items-center gap-2">
-          <TagInput 
-            v-if="nota" 
-            v-model="nota.tags" 
-            :suggestions="allTags"
-            class="max-w-xl"
-          />
-        </div>
-
-        <span v-if="nota?.updatedAt" class="text-xs text-muted-foreground">
+        <span v-if="nota?.updatedAt" class="text-xs text-muted-foreground mt-1">
           Last updated {{ formatDate(nota.updatedAt) }}
         </span>
       </div>
