@@ -9,4 +9,5 @@ export interface Nota {
   favorite?: boolean
   createdAt: Date | string
   updatedAt: Date | string
+  tags: string[]
 }

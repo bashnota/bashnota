@@ -1,14 +1,13 @@
-import Dexie from 'dexie'
-import type { Table } from 'dexie'
-import type { Nota } from './types/nota'
+import Dexie, { type Table } from 'dexie'
+import type { Nota } from '@/types/nota'
 
 export class NotaDB extends Dexie {
   notas!: Table<Nota>
 
   constructor() {
-    super('notadb')
+    super('notaDB')
     this.version(2).stores({
-      notas: 'id, title, favorite, createdAt, updatedAt',
+      notas: '++id, title, parentId, tags, favorite, updatedAt',
     })
   }
 }
