@@ -4,9 +4,8 @@ import { useNotaStore } from '@/stores/nota'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { 
-  PlusIcon, 
-  FolderIcon,
+import {
+  PlusIcon,
   MagnifyingGlassIcon,
   ClockIcon,
   StarIcon,
@@ -16,13 +15,12 @@ import {
   Cog6ToothIcon,
   Squares2X2Icon,
   ListBulletIcon,
-  TableCellsIcon
+  TableCellsIcon,
 } from '@heroicons/vue/24/solid'
 import { useRouter } from 'vue-router'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import { useDebounceFn } from '@vueuse/core'
 import Tag from '@/components/ui/tag/Tag.vue'
-import Label from '@/components/ui/label/Label.vue'
 
 const store = useNotaStore()
 const router = useRouter()
@@ -41,10 +39,10 @@ const formatDate = (date: Date | string) => {
   if (days === 0) return 'Today'
   if (days === 1) return 'Yesterday'
   if (days < 7) return `${days} days ago`
-  return d.toLocaleDateString('en-US', { 
-    month: 'short', 
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
     day: 'numeric',
-    year: now.getFullYear() !== d.getFullYear() ? 'numeric' : undefined
+    year: now.getFullYear() !== d.getFullYear() ? 'numeric' : undefined,
   })
 }
 
@@ -60,26 +58,30 @@ watch(viewType, (newView) => {
   localStorage.setItem('home-view-type', newView)
 })
 
-watch(() => store.rootItems, () => {
-  isLoading.value = false
-}, { immediate: true })
+watch(
+  () => store.rootItems,
+  () => {
+    isLoading.value = false
+  },
+  { immediate: true },
+)
 
 const getNotaPreview = (content: string | undefined) => {
   if (!content) return 'No content'
-  
+
   const div = document.createElement('div')
   div.innerHTML = content
-  
+
   const textContent = div.textContent || div.innerText || ''
   return textContent.trim() || 'No content'
 }
 
 const toggleFavorite = async (id: string) => {
-  const nota = store.rootItems.find(n => n.id === id)
+  const nota = store.rootItems.find((n) => n.id === id)
   if (nota) {
     await store.updateItem(id, {
       ...nota,
-      favorite: !nota.favorite
+      favorite: !nota.favorite,
     })
   }
 }
@@ -96,9 +98,9 @@ const clearFilters = () => {
 
 const allTags = computed(() => {
   const tagSet = new Set<string>()
-  recentNotas.value.forEach(nota => {
+  recentNotas.value.forEach((nota) => {
     if (nota.tags) {
-      nota.tags.forEach(tag => tagSet.add(tag))
+      nota.tags.forEach((tag) => tagSet.add(tag))
     }
   })
   return Array.from(tagSet).sort()
@@ -106,35 +108,32 @@ const allTags = computed(() => {
 
 const filteredNotas = computed(() => {
   if (!selectedTag.value) return recentNotas.value
-  return recentNotas.value.filter(nota => 
-    nota.tags?.includes(selectedTag.value)
-  )
+  return recentNotas.value.filter((nota) => nota.tags?.includes(selectedTag.value))
 })
 
 const recentNotas = computed(() => {
-  let filtered = store.rootItems.map(nota => ({
+  let filtered = store.rootItems.map((nota) => ({
     ...nota,
-    tags: nota.tags || []
+    tags: nota.tags || [],
   }))
 
   if (showFavorites.value) {
-    filtered = filtered.filter(nota => nota.favorite)
+    filtered = filtered.filter((nota) => nota.favorite)
   }
-  
+
   if (searchQuery.value) {
-    filtered = filtered.filter(nota => 
-      nota.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      nota.content?.toLowerCase().includes(searchQuery.value.toLowerCase())
+    filtered = filtered.filter(
+      (nota) =>
+        nota.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+        nota.content?.toLowerCase().includes(searchQuery.value.toLowerCase()),
     )
   }
 
-  return filtered
-    .slice()
-    .sort((a, b) => {
-      const dateA = a.updatedAt instanceof Date ? a.updatedAt : new Date(a.updatedAt)
-      const dateB = b.updatedAt instanceof Date ? b.updatedAt : new Date(b.updatedAt)
-      return dateB.getTime() - dateA.getTime()
-    })
+  return filtered.slice().sort((a, b) => {
+    const dateA = a.updatedAt instanceof Date ? a.updatedAt : new Date(a.updatedAt)
+    const dateB = b.updatedAt instanceof Date ? b.updatedAt : new Date(b.updatedAt)
+    return dateB.getTime() - dateA.getTime()
+  })
 })
 
 const createNewNota = async () => {
@@ -146,20 +145,20 @@ const quickActions = [
   {
     title: 'New Nota',
     icon: PlusIcon,
-    action: createNewNota
+    action: createNewNota,
   },
   {
     title: 'Import',
     icon: FolderPlusIcon,
-    action: () => {} // TODO: Implement import functionality
+    action: () => {}, // TODO: Implement import functionality
   },
   {
     title: 'Favorites',
     icon: StarIcon,
     action: () => {
       showFavorites.value = !showFavorites.value
-    }
-  }
+    },
+  },
 ]
 
 const debouncedSearch = useDebounceFn((value: string) => {
@@ -173,7 +172,7 @@ const clearSearch = () => {
 const viewOptions = [
   { id: 'grid', icon: Squares2X2Icon, label: 'Grid View' },
   { id: 'list', icon: ListBulletIcon, label: 'List View' },
-  { id: 'compact', icon: TableCellsIcon, label: 'Compact View' }
+  { id: 'compact', icon: TableCellsIcon, label: 'Compact View' },
 ]
 </script>
 
@@ -187,11 +186,14 @@ const viewOptions = [
               <h1 class="text-4xl font-bold tracking-tight">Welcome to BashNota</h1>
               <div class="mt-3">
                 <p class="text-xl font-medium text-primary">More Than a Second Brain,</p>
-                <p class="text-xl font-medium text-muted-foreground">It's a Second Brain Cracked on Code</p>
+                <p class="text-xl font-medium text-muted-foreground">
+                  It's a Second Brain Cracked on Code
+                </p>
               </div>
             </div>
             <p class="text-muted-foreground max-w-2xl">
-              Transform your notes into powerful tools with code snippets, markdown support, and seamless organization.
+              Transform your notes into powerful tools with code snippets, markdown support, and
+              seamless organization.
             </p>
           </div>
           <Button @click="createNewNota" size="lg" class="gap-2">
@@ -203,10 +205,12 @@ const viewOptions = [
 
       <div class="flex items-center justify-between gap-4">
         <div class="relative flex-1">
-          <MagnifyingGlassIcon class="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
+          <MagnifyingGlassIcon
+            class="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
+          />
           <Input
             v-model="searchQuery"
-            class="pl-10"
+            class-name="pl-10"
             placeholder="Search your notas..."
             @input="(e: Event) => debouncedSearch((e.target as HTMLInputElement).value)"
           />
@@ -229,7 +233,9 @@ const viewOptions = [
             size="icon"
             class="h-9 w-9"
             :class="[
-              action.title === 'Favorites' && showFavorites && 'bg-primary/10 text-primary hover:bg-primary/20'
+              action.title === 'Favorites' &&
+                showFavorites &&
+                'bg-primary/10 text-primary hover:bg-primary/20',
             ]"
             :title="action.title"
             @click="action.action"
@@ -246,7 +252,7 @@ const viewOptions = [
             size="icon"
             :class="[
               'h-8 w-8',
-              viewType === option.id && 'bg-primary/10 text-primary hover:bg-primary/20'
+              viewType === option.id && 'bg-primary/10 text-primary hover:bg-primary/20',
             ]"
             @click="viewType = option.id as 'grid' | 'list' | 'compact'"
             :title="option.label"
@@ -259,8 +265,8 @@ const viewOptions = [
 
     <div class="flex items-center gap-4">
       <div class="relative flex-1">
-        <select 
-          v-model="selectedTag" 
+        <select
+          v-model="selectedTag"
           class="w-full pl-3 pr-10 py-2 text-sm border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
         >
           <option value="">All tags</option>
@@ -305,39 +311,35 @@ const viewOptions = [
         </div>
       </CardHeader>
       <CardContent>
-        <div 
-          v-if="!isLoading && recentNotas.length === 0" 
+        <div
+          v-if="!isLoading && recentNotas.length === 0"
           class="flex flex-col items-center justify-center p-12 text-center"
         >
-          <component 
-            :is="showFavorites ? StarIcon : DocumentTextIcon" 
-            class="w-12 h-12 text-muted-foreground/50 mb-4" 
+          <component
+            :is="showFavorites ? StarIcon : DocumentTextIcon"
+            class="w-12 h-12 text-muted-foreground/50 mb-4"
           />
           <h3 class="text-lg font-semibold mb-2">
             {{ showFavorites ? 'No Favorites Yet' : 'No Notas Yet' }}
           </h3>
           <p class="text-muted-foreground mb-4">
-            {{ showFavorites 
-              ? 'Star your important notas for quick access' 
-              : 'Create your first nota to get started' 
+            {{
+              showFavorites
+                ? 'Star your important notas for quick access'
+                : 'Create your first nota to get started'
             }}
           </p>
-          <Button 
-            v-if="!showFavorites" 
-            @click="createNewNota"
-          >
-            Create Nota
-          </Button>
+          <Button v-if="!showFavorites" @click="createNewNota"> Create Nota </Button>
         </div>
 
-        <div 
-          v-else-if="isLoading" 
-          class="flex justify-center items-center py-12"
-        >
+        <div v-else-if="isLoading" class="flex justify-center items-center py-12">
           <LoadingSpinner />
         </div>
 
-        <div v-else-if="viewType === 'grid'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div
+          v-else-if="viewType === 'grid'"
+          class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+        >
           <RouterLink v-for="nota in filteredNotas" :key="nota.id" :to="`/nota/${nota.id}`">
             <Card class="h-full hover:shadow-md transition-all group relative">
               <CardHeader>
@@ -353,9 +355,13 @@ const viewOptions = [
                       class="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
                       @click.prevent="toggleFavorite(nota.id)"
                     >
-                      <StarIcon 
+                      <StarIcon
                         class="w-5 h-5"
-                        :class="nota.favorite ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground'" 
+                        :class="
+                          nota.favorite
+                            ? 'text-yellow-400 fill-yellow-400'
+                            : 'text-muted-foreground'
+                        "
                       />
                     </Button>
                     <Button
@@ -378,8 +384,8 @@ const viewOptions = [
               </CardHeader>
               <CardContent>
                 <div v-if="nota.tags?.length" class="flex flex-wrap gap-2">
-                  <Tag 
-                    v-for="tag in (nota.tags || [])" 
+                  <Tag
+                    v-for="tag in nota.tags || []"
                     :key="tag"
                     class="hover:bg-primary/10 cursor-pointer transition-colors"
                     @click.prevent="selectedTag = tag"
@@ -395,24 +401,35 @@ const viewOptions = [
 
         <div v-else-if="viewType === 'list'" class="space-y-3">
           <RouterLink v-for="nota in filteredNotas" :key="nota.id" :to="`/nota/${nota.id}`">
-            <div class="flex items-start gap-4 p-4 rounded-lg hover:bg-muted/50 transition-colors group">
+            <div
+              class="flex items-start gap-4 p-4 rounded-lg hover:bg-muted/50 transition-colors group"
+            >
               <DocumentTextIcon class="w-5 h-5 text-muted-foreground mt-1" />
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 justify-between">
                   <div class="flex items-center gap-2 flex-1">
                     <h3 class="font-medium truncate">{{ nota.title }}</h3>
-                    <StarIcon v-if="nota.favorite" class="w-4 h-4 text-yellow-400 fill-yellow-400 flex-shrink-0" />
+                    <StarIcon
+                      v-if="nota.favorite"
+                      class="w-4 h-4 text-yellow-400 fill-yellow-400 flex-shrink-0"
+                    />
                   </div>
-                  <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div
+                    class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
                     <Button
                       variant="ghost"
                       size="icon"
                       class="h-8 w-8"
                       @click.prevent="toggleFavorite(nota.id)"
                     >
-                      <StarIcon 
+                      <StarIcon
                         class="w-4 h-4"
-                        :class="nota.favorite ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground'" 
+                        :class="
+                          nota.favorite
+                            ? 'text-yellow-400 fill-yellow-400'
+                            : 'text-muted-foreground'
+                        "
                       />
                     </Button>
                     <Button
@@ -434,8 +451,8 @@ const viewOptions = [
                     {{ formatDate(nota.updatedAt) }}
                   </span>
                   <div class="flex flex-wrap gap-2">
-                    <Tag 
-                      v-for="tag in (nota.tags || [])" 
+                    <Tag
+                      v-for="tag in nota.tags || []"
                       :key="tag"
                       class="hover:bg-primary/10 cursor-pointer transition-colors"
                       @click.prevent="selectedTag = tag"
@@ -454,13 +471,16 @@ const viewOptions = [
             <div class="flex items-center gap-3 py-2 hover:bg-muted/50 transition-colors px-2">
               <DocumentTextIcon class="w-4 h-4 text-muted-foreground flex-shrink-0" />
               <span class="font-medium truncate">{{ nota.title }}</span>
-              <StarIcon v-if="nota.favorite" class="w-4 h-4 text-yellow-400 fill-yellow-400 flex-shrink-0" />
+              <StarIcon
+                v-if="nota.favorite"
+                class="w-4 h-4 text-yellow-400 fill-yellow-400 flex-shrink-0"
+              />
               <span class="text-xs text-muted-foreground ml-auto flex items-center gap-1">
                 <ClockIcon class="w-3 h-3" />
                 {{ formatDate(nota.updatedAt) }}
               </span>
               <div class="flex flex-wrap gap-2">
-                <Tag v-for="tag in (nota.tags || [])" :key="tag">
+                <Tag v-for="tag in nota.tags || []" :key="tag">
                   {{ tag }}
                 </Tag>
               </div>

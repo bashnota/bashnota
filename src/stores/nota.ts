@@ -73,15 +73,15 @@ export const useNotaStore = defineStore('nota', {
   },
 
   actions: {
-    async createItem(title: string): Promise<Nota> {
+    async createItem(title: string, parentId: string | null = null): Promise<Nota> {
       const nota: Nota = {
         id: nanoid(),
         title,
         content: '',
-        parentId: null,
+        parentId: parentId,
         tags: [],
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       }
 
       const serialized = serializeNota(nota)
@@ -98,13 +98,13 @@ export const useNotaStore = defineStore('nota', {
 
       // Update timestamps
       nota.updatedAt = new Date()
-      
+
       // Update in database with serialized data
       const serialized = serializeNota(nota)
       await db.notas.update(nota.id, serialized)
 
       // Update in state
-      const index = this.items.findIndex(n => n.id === nota.id)
+      const index = this.items.findIndex((n) => n.id === nota.id)
       if (index !== -1) {
         this.items[index] = { ...nota }
       } else {
@@ -184,7 +184,7 @@ export const useNotaStore = defineStore('nota', {
     },
 
     async toggleFavorite(id: string) {
-      const nota = this.items.find(item => item.id === id)
+      const nota = this.items.find((item) => item.id === id)
       if (nota) {
         nota.favorite = !nota.favorite
         nota.updatedAt = new Date()

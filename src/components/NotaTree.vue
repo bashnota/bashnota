@@ -83,7 +83,7 @@ const showContextMenu = (event: MouseEvent, item: Nota) => {
   itemContextMenu.value = item.id
   contextMenuPosition.value = {
     x: event.clientX,
-    y: event.clientY
+    y: event.clientY,
   }
 }
 
@@ -109,16 +109,16 @@ onUnmounted(() => {
 
 <template>
   <div :class="{ 'ml-4': level > 0 }">
-    <div 
-      v-for="item in items" 
-      :key="item.id" 
+    <div
+      v-for="item in items"
+      :key="item.id"
       class="group"
       draggable="true"
-      @dragstart="event => event.dataTransfer?.setData('text/plain', item.id)"
+      @dragstart="(event) => event.dataTransfer?.setData('text/plain', item.id)"
       @dragover.prevent
-      @drop="event => handleDrop(event, item.id)"
+      @drop="(event) => handleDrop(event, item.id)"
     >
-      <div 
+      <div
         class="flex items-center gap-1 rounded-md py-1.5 text-sm"
         @contextmenu="showContextMenu($event, item)"
       >
@@ -134,7 +134,8 @@ onUnmounted(() => {
 
         <Input
           v-if="showRenameInput === item.id"
-          v-model="renameTitle"
+          :value="renameTitle"
+          @input="(e: Event) => (renameTitle = (e.target as HTMLInputElement).value)"
           class="h-7 text-sm"
           @keyup.enter="handleRename(item.id)"
           @keyup.esc="showRenameInput = null"
@@ -147,7 +148,10 @@ onUnmounted(() => {
           :to="`/nota/${item.id}`"
           class="flex items-center gap-2 flex-1 px-2 py-2 rounded-md hover:bg-slate-200 mr-2"
         >
-          <FolderIcon v-if="hasChildren(item.id)" class="h-4 w-4 text-muted-foreground flex-shrink-0" />
+          <FolderIcon
+            v-if="hasChildren(item.id)"
+            class="h-4 w-4 text-muted-foreground flex-shrink-0"
+          />
           <DocumentTextIcon v-else class="h-4 w-4 text-muted-foreground flex-shrink-0" />
           <span class="truncate min-w-0 flex-1">{{ item.title }}</span>
         </RouterLink>
@@ -189,15 +193,23 @@ onUnmounted(() => {
         class="fixed z-50 w-48 bg-popover rounded-md shadow-md border p-1"
         :style="{
           left: `${contextMenuPosition.x}px`,
-          top: `${contextMenuPosition.y}px`
+          top: `${contextMenuPosition.y}px`,
         }"
       >
         <button
           v-for="action in [
-            { label: 'New Sub-Nota', icon: PlusIcon, action: () => emit('show-new-input', item.id) },
+            {
+              label: 'New Sub-Nota',
+              icon: PlusIcon,
+              action: () => emit('show-new-input', item.id),
+            },
             { label: 'Rename', icon: PencilIcon, action: () => startRename(item) },
             { label: 'Delete', icon: TrashIcon, action: () => handleDelete(item.id) },
-            { label: 'Toggle Favorite', icon: StarIcon, action: () => store.toggleFavorite(item.id) }
+            {
+              label: 'Toggle Favorite',
+              icon: StarIcon,
+              action: () => store.toggleFavorite(item.id),
+            },
           ]"
           :key="action.label"
           class="flex items-center w-full gap-2 px-2 py-1.5 text-sm rounded-sm hover:bg-accent"

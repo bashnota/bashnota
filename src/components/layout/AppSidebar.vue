@@ -4,15 +4,15 @@ import { useRouter } from 'vue-router'
 import { useNotaStore } from '@/stores/nota'
 import { onKeyStroke } from '@vueuse/core'
 import DarkModeToggle from './DarkModeToggle.vue'
-import { 
-  PlusIcon, 
-  MagnifyingGlassIcon, 
-  FolderIcon, 
+import {
+  PlusIcon,
+  MagnifyingGlassIcon,
+  FolderIcon,
   CommandLineIcon,
   StarIcon,
   ClockIcon,
   Cog6ToothIcon,
-  QuestionMarkCircleIcon
+  QuestionMarkCircleIcon,
 } from '@heroicons/vue/24/solid'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -57,22 +57,25 @@ const filteredNotas = computed(() => {
   // Filter based on active view
   switch (activeView.value) {
     case 'favorites':
-      items = items.filter(nota => nota.favorite)
+      items = items.filter((nota) => nota.favorite)
       break
     case 'recent':
-      items = items.slice().sort((a, b) => {
-        const dateA = new Date(a.updatedAt)
-        const dateB = new Date(b.updatedAt)
-        return dateB.getTime() - dateA.getTime()
-      }).slice(0, 10) // Show only 10 most recent
+      items = items
+        .slice()
+        .sort((a, b) => {
+          const dateA = new Date(a.updatedAt)
+          const dateB = new Date(b.updatedAt)
+          return dateB.getTime() - dateA.getTime()
+        })
+        .slice(0, 10) // Show only 10 most recent
       break
   }
 
   // Apply search filter if query exists
   if (query) {
-    items = items.filter(nota => 
-      nota.title.toLowerCase().includes(query) ||
-      nota.content?.toLowerCase().includes(query)
+    items = items.filter(
+      (nota) =>
+        nota.title.toLowerCase().includes(query) || nota.content?.toLowerCase().includes(query),
     )
   }
 
@@ -80,6 +83,7 @@ const filteredNotas = computed(() => {
 })
 
 const createNewNota = async (parentId: string | null = null) => {
+  console.log('Creating new nota:', newNotaTitle.value)
   if (!newNotaTitle.value.trim()) return
 
   try {
@@ -131,16 +135,19 @@ const viewOptions = [
     <!-- Header -->
     <div class="p-6 border-b space-y-4">
       <div class="flex items-center justify-between">
-        <RouterLink to="/" class="flex items-center gap-2 px-4 py-2 hover:bg-muted/50 rounded-lg transition-colors">
+        <RouterLink
+          to="/"
+          class="flex items-center gap-2 px-4 py-2 hover:bg-muted/50 rounded-lg transition-colors"
+        >
           <div class="flex items-center gap-2">
             <CommandLineIcon class="h-6 w-6 text-primary" />
             <span class="font-bold text-xl">BashNota</span>
           </div>
         </RouterLink>
-        
+
         <div class="flex items-center gap-2">
           <DarkModeToggle />
-          
+
           <!-- Settings Dropdown -->
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -164,11 +171,13 @@ const viewOptions = [
 
       <!-- Search -->
       <div class="relative">
-        <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-        <Input 
-          v-model="searchQuery" 
-          placeholder="Search notas..." 
-          class="pl-8 text-sm search-input" 
+        <MagnifyingGlassIcon
+          class="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground"
+        />
+        <Input
+          v-model="searchQuery"
+          placeholder="Search notas..."
+          class-name="pl-8 text-sm search-input"
         />
       </div>
 
@@ -181,7 +190,7 @@ const viewOptions = [
           size="icon"
           :class="[
             'h-8 w-8',
-            activeView === option.id && 'bg-primary/10 text-primary hover:bg-primary/20'
+            activeView === option.id && 'bg-primary/10 text-primary hover:bg-primary/20',
           ]"
           @click="activeView = option.id as 'all' | 'favorites' | 'recent'"
           :title="option.label"
@@ -194,7 +203,8 @@ const viewOptions = [
       <div>
         <Input
           v-if="showNewNotaInput === null"
-          v-model="newNotaTitle"
+          :value="newNotaTitle"
+          @input="(e: Event) => (newNotaTitle = (e.target as HTMLInputElement).value)"
           placeholder="New nota title..."
           class="text-sm"
           @keyup.enter="createNewNota()"
@@ -222,12 +232,16 @@ const viewOptions = [
           :expanded-items="expandedItems"
           :show-new-input="showNewNotaInput"
           :new-nota-title="newNotaTitle"
-          @toggle="(id) => (expandedItems.has(id) ? expandedItems.delete(id) : expandedItems.add(id))"
+          @toggle="
+            (id) => (expandedItems.has(id) ? expandedItems.delete(id) : expandedItems.add(id))
+          "
           @create="createNewNota"
-          @show-new-input="(id) => {
-            showNewNotaInput = id
-            newNotaTitle = ''
-          }"
+          @show-new-input="
+            (id) => {
+              showNewNotaInput = id
+              newNotaTitle = ''
+            }
+          "
           @update:new-nota-title="(value) => (newNotaTitle = value)"
         />
 
