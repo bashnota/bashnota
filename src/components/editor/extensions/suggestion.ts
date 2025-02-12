@@ -37,7 +37,12 @@ export default {
         category: 'Basic Blocks',
         icon: TextIcon,
         command: ({ editor, range }: CommandArgs) => {
-          editor.chain().focus().deleteRange(range).setParagraph().run()
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .setParagraph()
+            .run()
         },
       },
       {

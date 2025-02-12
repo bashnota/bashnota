@@ -26,6 +26,7 @@ import { TableExtension } from './extensions/TableExtension'
 import { MathExtension } from './extensions/MathExtension'
 import GlobalDragHandle from 'tiptap-extension-global-drag-handle'
 import { MarkdownPasteExtension } from './extensions/MarkdownPasteExtension'
+import { MarkdownExtension } from './extensions/MarkdownExtension'
 
 const props = defineProps<{
   notaId: string
@@ -85,6 +86,7 @@ const editor = useEditor({
     MathExtension,
     GlobalDragHandle,
     MarkdownPasteExtension,
+    MarkdownExtension,
   ],
   editorProps: {
     attributes: {
@@ -365,5 +367,52 @@ const wordCount = computed(() => {
 
 .dark .drag-handle {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' style='fill: rgba(255, 255, 255, 0.5)'%3E%3Cpath d='M3,2 C2.44771525,2 2,1.55228475 2,1 C2,0.44771525 2.44771525,0 3,0 C3.55228475,0 4,0.44771525 4,1 C4,1.55228475 3.55228475,2 3,2 Z M3,6 C2.44771525,6 2,5.55228475 2,5 C2,4.44771525 2.44771525,4 3,4 C3.55228475,4 4,4.44771525 4,5 C4,5.55228475 3.55228475,6 3,6 Z M3,10 C2.44771525,10 2,9.55228475 2,9 C2,8.44771525 2.44771525,8 3,8 C3.55228475,8 4,8.44771525 4,9 C4,9.55228475 3.55228475,10 3,10 Z M7,2 C6.44771525,2 6,1.55228475 6,1 C6,0.44771525 6.44771525,0 7,0 C7.55228475,0 8,0.44771525 8,1 C8,1.55228475 7.55228475,2 7,2 Z M7,6 C6.44771525,6 6,5.55228475 6,5 C6,4.44771525 6.44771525,4 7,4 C7.55228475,4 8,4.44771525 8,5 C8,5.55228475 7.55228475,6 7,6 Z M7,10 C6.44771525,10 6,9.55228475 6,9 C6,8.44771525 6.44771525,8 7,8 C7.55228475,8 8,8.44771525 8,9 C8,9.55228475 7.55228475,10 7,10 Z'%3E%3C/path%3E%3C/svg%3E");
+}
+
+/* Markdown Styles */
+.markdown-bold {
+  font-weight: bold;
+}
+
+.markdown-italic {
+  font-style: italic;
+}
+
+.markdown-code {
+  background-color: rgba(97, 97, 97, 0.1);
+  border-radius: 0.25em;
+  padding: 0.2em 0.4em;
+  font-family: monospace;
+}
+
+/* KaTeX Styles */
+.katex-inline {
+  display: inline-block;
+  padding: 0 0.2em;
+  cursor: pointer;
+}
+
+.katex-display {
+  display: block;
+  text-align: center;
+  margin: 1em 0;
+  width: 100%;
+  cursor: pointer;
+}
+
+.katex-source {
+  background-color: rgba(97, 97, 97, 0.1);
+  border-radius: 0.25em;
+  padding: 0.2em 0.4em;
+}
+
+/* Make sure KaTeX is properly sized */
+.katex {
+  font-size: 1.1em;
+  text-rendering: auto;
+}
+
+.katex-display .katex {
+  font-size: 1.21em;
 }
 </style>
