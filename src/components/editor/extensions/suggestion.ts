@@ -17,6 +17,9 @@ import {
   DatabaseIcon,
   FunctionSquare,
 } from 'lucide-vue-next'
+import { unified } from 'unified'
+import remarkParse from 'remark-parse'
+import { visit } from 'unist-util-visit'
 
 type CommandArgs = {
   editor: Editor
@@ -177,6 +180,36 @@ export default {
             .insertDataTable(notaId)
             .run()
         },
+      },
+      {
+        title: 'Paste Markdown',
+        command: ({ editor, range }) => {
+          navigator.clipboard.readText().then((text) => {
+            editor.chain().focus().deleteRange(range).run()
+            
+            // Parse and insert markdown at current position
+            const processor = unified().use(remarkParse)
+            const tree = processor.parse(text)
+            
+            visit(tree, (node: any) => {
+              if (node.type === 'code') {
+                editor
+                  .chain()
+                  .focus()
+                  .insertContent('```' + (node.lang || '') + '\n' + node.value + '\n```\n')
+                  .run()
+              } else if (node.type === 'paragraph') {
+                const text = node.children
+                  ?.map((child: any) => (child.type === 'text' ? child.value : ''))
+                  .join('')
+                if (text) {
+                  editor.chain().focus().insertContent(text + '\n').run()
+                }
+              }
+            })
+          })
+        },
+        icon: 'clipboard-paste',
       },
     ]
 
