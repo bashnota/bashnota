@@ -25,6 +25,7 @@ import { ListIcon } from 'lucide-vue-next'
 import { TableExtension } from './extensions/TableExtension'
 import { MathExtension } from './extensions/MathExtension'
 import GlobalDragHandle from 'tiptap-extension-global-drag-handle'
+import { MarkdownPasteExtension } from './extensions/MarkdownPasteExtension'
 
 const props = defineProps<{
   notaId: string
@@ -83,6 +84,7 @@ const editor = useEditor({
     }),
     MathExtension,
     GlobalDragHandle,
+    MarkdownPasteExtension,
   ],
   editorProps: {
     attributes: {
