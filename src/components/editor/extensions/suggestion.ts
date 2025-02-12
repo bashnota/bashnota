@@ -18,6 +18,7 @@ import {
   FunctionSquare,
   ImageIcon,
   ImagesIcon,
+  VideoIcon,
 } from 'lucide-vue-next'
 import { unified } from 'unified'
 import remarkParse from 'remark-parse'
@@ -152,6 +153,24 @@ export default {
             .focus()
             .deleteRange(range)
             .setNotaImageSubfigureContainer()
+            .run()
+        },
+      },
+
+      // Add this new section before the Advanced category
+      {
+        title: 'YouTube Video',
+        category: 'Media',
+        icon: VideoIcon,
+        command: ({ editor, range }: CommandArgs) => {
+          const url = prompt('Enter YouTube URL:')
+          if (!url) return
+          
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .setYoutube(url)
             .run()
         },
       },
