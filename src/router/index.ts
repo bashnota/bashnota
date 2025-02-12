@@ -14,6 +14,11 @@ const router = createRouter({
       component: () => import('../views/NotaView.vue'),
       props: true,
     },
+    {
+      path: '/favorites',
+      name: 'favorites',
+      component: () => import('../views/FavoritesView.vue'),
+    },
     // 404 route should be the last route
     {
       path: '/:pathMatch(.*)*',

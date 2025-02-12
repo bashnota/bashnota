@@ -4,10 +4,11 @@ import { useRouter } from 'vue-router'
 import { useNotaStore } from '@/stores/nota'
 import { onKeyStroke } from '@vueuse/core'
 import DarkModeToggle from './DarkModeToggle.vue'
-import { PlusIcon, MagnifyingGlassIcon, FolderIcon } from '@heroicons/vue/24/solid'
+import { PlusIcon, MagnifyingGlassIcon, FolderIcon, CommandLineIcon } from '@heroicons/vue/24/solid'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import NotaTree from '../NotaTree.vue'
+import { RouterLink } from 'vue-router'
 
 const router = useRouter()
 const notaStore = useNotaStore()
@@ -72,7 +73,12 @@ onKeyStroke('/', (e) => {
     <!-- Header -->
     <div class="p-6 border-b space-y-4">
       <div class="flex items-center justify-between">
-        <h1 class="text-xl font-semibold">BashNota</h1>
+        <RouterLink to="/" class="flex items-center gap-2 px-4 py-2 hover:bg-muted/50 rounded-lg transition-colors">
+          <div class="flex items-center gap-2">
+            <CommandLineIcon class="h-6 w-6 text-primary" />
+            <span class="font-bold text-xl">BashNota</span>
+          </div>
+        </RouterLink>
         <DarkModeToggle />
       </div>
 

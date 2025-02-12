@@ -6,6 +6,7 @@ export interface Nota {
   content: string
   parentId: string | null
   config?: NotaConfig
+  favorite?: boolean
   createdAt: Date | string
   updatedAt: Date | string
 }

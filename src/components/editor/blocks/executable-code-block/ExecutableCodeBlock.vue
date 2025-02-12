@@ -1,29 +1,17 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, nextTick } from 'vue'
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import CodeBlockWithExecution from './CodeBlockWithExecution.vue'
 import { useRoute } from 'vue-router'
 import { useNotaStore } from '@/stores/nota'
 import { Card, CardContent } from '@/components/ui/card'
 
-const props = defineProps({
-  node: {
-    type: Object,
-    required: true,
-  },
-  updateAttributes: {
-    type: Function,
-    required: true,
-  },
-  editor: {
-    type: Object,
-    required: true,
-  },
-  getPos: {
-    type: Function,
-    required: true,
-  },
-})
+const props = defineProps<{
+  node: any
+  updateAttributes: (attrs: any) => void
+  editor: any
+  getPos: () => number | undefined
+}>()
 
 const route = useRoute()
 const store = useNotaStore()
@@ -62,10 +50,13 @@ const updateOutput = (newOutput: string) => {
 }
 
 onMounted(() => {
-  // Generate unique ID for the block if it doesn't have one
-  if (!blockId.value) {
-    const newId = `block-${Math.random().toString(36).substr(2, 9)}`
-    props.updateAttributes({ id: newId })
+  // Only update ID if it doesn't already exist
+  if (!props.node.attrs.id) {
+    const newId = crypto.randomUUID()
+    // Wrap in nextTick to ensure the node is fully mounted
+    nextTick(() => {
+      props.updateAttributes({ id: newId })
+    })
   }
 })
 </script>
