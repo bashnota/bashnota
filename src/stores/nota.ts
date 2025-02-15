@@ -77,7 +77,7 @@ export const useNotaStore = defineStore('nota', {
       const nota: Nota = {
         id: nanoid(),
         title,
-        content: '',
+        content: '{}',
         parentId: parentId,
         tags: [],
         createdAt: new Date(),

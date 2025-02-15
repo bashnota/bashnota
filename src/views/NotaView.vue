@@ -13,12 +13,16 @@ import TagsInputItem from '@/components/ui/tags-input/TagsInputItem.vue'
 import TagsInputItemText from '@/components/ui/tags-input/TagsInputItemText.vue'
 import TagsInputItemDelete from '@/components/ui/tags-input/TagsInputItemDelete.vue'
 import TagsInputInput from '@/components/ui/tags-input/TagsInputInput.vue'
+import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
+import { Loader2, PlayCircle } from 'lucide-vue-next'
 
 const props = defineProps<{
   id: string
 }>()
 
 const store = useNotaStore()
+const codeExecutionStore = useCodeExecutionStore()
+const isExecutingAll = ref(false)
 const isReady = ref(false)
 
 const nota = computed(() => store.getCurrentNota(props.id))
@@ -45,6 +49,17 @@ onMounted(async () => {
   }
   isReady.value = true
 })
+
+const executeAllCells = async () => {
+  isExecutingAll.value = true
+  try {
+    await codeExecutionStore.executeAll()
+  } catch (error) {
+    console.error('Error executing all cells:', error)
+  } finally {
+    isExecutingAll.value = false
+  }
+}
 
 const toggleConfigPage = () => {
   showConfigPage.value = !showConfigPage.value
@@ -108,6 +123,12 @@ const additionalExtensions = computed(() => [ImageExtension])
       </div>
 
       <div class="flex items-center gap-2">
+        <Button title="Run All" @click="executeAllCells" :disabled="isExecutingAll" v-if="nota">
+          <Loader2 v-if="isExecutingAll" class="w-5 h-5 animate-spin" />
+          <PlayCircle class="w-5 h-5" v-else />
+          Run All
+        </Button>
+
         <Button
           variant="ghost"
           size="icon"

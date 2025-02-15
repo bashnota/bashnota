@@ -66,6 +66,7 @@ onMounted(() => {
     <Card class="overflow-hidden" v-if="isExecutable">
       <CardContent class="p-0">
         <CodeBlockWithExecution
+          :id="blockId"
           :code="code"
           :language="language"
           :result="output"

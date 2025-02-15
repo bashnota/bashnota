@@ -3,7 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { useCodeExecution } from '@/composables/useCodeExecution'
 import type { KernelConfig, KernelSpec } from '@/types/jupyter'
-import { Copy, Check, Play } from 'lucide-vue-next'
+import { Copy, Check, Play, Loader2 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import CodeMirror from './CodeMirror.vue'
 
@@ -11,6 +11,7 @@ const props = defineProps<{
   code: string
   language: string
   result: string | null
+  id: string
   serverID: string | null
   kernelName: string | null
   notaId: string
@@ -25,8 +26,10 @@ const selectedKernel = ref(props.kernelName || 'none')
 const codeValue = ref(props.code)
 const isCodeCopied = ref(false)
 
+const output = ref('')
+
 // Use the codeValue ref for code execution
-const { output, isExecuting, hasError, execute, copyOutput, isCopied } = useCodeExecution(codeValue)
+const { cell, execute, copyOutput, isCopied } = useCodeExecution(props.id)
 
 // Get the root nota ID to access config
 const rootNotaId = computed(() => {
@@ -62,11 +65,6 @@ const availableKernels = computed(() => {
   return notaConfig.value.kernels[selectedServer.value] || []
 })
 
-// Get the current server object
-const currentServer = computed(() => {
-  return availableServers.value.find((s) => s.ip === selectedServer.value)
-})
-
 // Initialize
 onMounted(async () => {
   if (props.kernelPreference) {
@@ -87,24 +85,8 @@ watch(
 )
 
 const handleExecution = async () => {
-  if (!currentServer.value) {
-    output.value = 'Invalid server selection'
-    hasError.value = true
-    return
-  }
-
-  isExecuting.value = true
-  try {
-    await execute(currentServer.value, selectedKernel.value)
-  } catch (error) {
-    console.error('Execution error:', error)
-    output.value = error instanceof Error ? error.message : 'Execution failed'
-    hasError.value = true
-  } finally {
-    isExecuting.value = false
-  }
-
-  emit('update:output', output.value)
+  await execute()
+  emit('update:output', cell.value?.output || '')
 }
 
 const updateCode = (newCode: string) => {
@@ -176,12 +158,13 @@ const copyCode = async () => {
       <Button
         variant="default"
         size="sm"
-        :disabled="isExecuting || selectedKernel === 'none'"
+        :disabled="cell?.isExecuting || selectedKernel === 'none'"
         @click="handleExecution"
         class="min-w-[80px]"
       >
-        <Play v-if="!isExecuting" class="w-4 h-4 mr-2" />
-        <span>{{ isExecuting ? 'Running...' : 'Run' }}</span>
+        <Loader2 class="w-5 h-5 animate-spin mr-2" v-if="cell?.isExecuting" />
+        <Play class="w-4 h-4 mr-2" v-else />
+        Run
       </Button>
     </div>
 
@@ -197,17 +180,17 @@ const copyCode = async () => {
       <CodeMirror
         v-model="codeValue"
         :language="language"
-        :disabled="isExecuting"
+        :disabled="cell?.isExecuting"
         @update:modelValue="updateCode"
       />
     </div>
 
     <!-- Output Section -->
-    <div v-if="output" class="border-t">
+    <div v-if="cell?.output" class="border-t">
       <div class="flex items-center justify-between p-2 border-b">
-        <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider"
-          >Output</span
-        >
+        <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          Output
+        </span>
         <Button variant="ghost" size="sm" @click="copyOutput" class="h-6 w-6 p-0">
           <Copy v-if="!isCopied" class="h-3 w-3" />
           <Check v-else class="h-3 w-3" />
@@ -215,8 +198,8 @@ const copyCode = async () => {
       </div>
       <div
         class="font-mono text-sm whitespace-pre-wrap break-words p-4"
-        :class="{ 'bg-red-50 dark:bg-red-950 text-destructive dark:text-red-200': hasError }"
-        v-html="output"
+        :class="{ 'bg-red-50 dark:bg-red-950 text-destructive dark:text-red-200': cell?.hasError }"
+        v-html="cell?.output"
       ></div>
     </div>
   </div>

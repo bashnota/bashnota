@@ -12,7 +12,7 @@ import { useNotaStore } from '@/stores/nota'
 import EditorToolbar from './EditorToolbar.vue'
 import SlashCommands from './extensions/Commands'
 import suggestion from './extensions/suggestion'
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onUnmounted } from 'vue'
 import 'highlight.js/styles/github.css'
 import { useRouter } from 'vue-router'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
@@ -29,9 +29,11 @@ import { MarkdownExtension } from './extensions/MarkdownExtension'
 import { Mermaid } from './extensions/mermaid'
 import { ScatterPlot } from './extensions/scatter-plot'
 import { Youtube } from './extensions/youtube'
+import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
 
 const props = defineProps<{
   notaId: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   extensions?: any[]
 }>()
 
@@ -40,12 +42,16 @@ const emit = defineEmits<{
 }>()
 
 const notaStore = useNotaStore()
+const codeExecutionStore = useCodeExecutionStore()
 const router = useRouter()
 const isSidebarOpen = ref(true)
 
+const currentNota = computed(() => {
+  return notaStore.getCurrentNota(props.notaId)
+})
+
 const content = computed(() => {
-  const nota = notaStore.getCurrentNota(props.notaId)
-  return nota?.content || ''
+  return currentNota.value?.content || ''
 })
 
 // Create a base extensions array
@@ -105,8 +111,42 @@ const allExtensions = computed(() => {
   return [...baseExtensions, ...(props.extensions || [])]
 })
 
+const registerCodeCells = (content: any) => {
+  // Find all executable code blocks in the content
+  const findCodeBlocks = (node: any): any[] => {
+    const blocks = []
+    if (node.type === 'executableCodeBlock') {
+      blocks.push(node)
+    }
+    if (node.content) {
+      node.content.forEach((child: any) => {
+        blocks.push(...findCodeBlocks(child))
+      })
+    }
+    return blocks
+  }
+
+  const codeBlocks = findCodeBlocks(content)
+  const servers = currentNota.value?.config?.jupyterServers || []
+
+  // Register each code block with the store
+  codeBlocks.forEach((block) => {
+    const { attrs, content } = block
+    const code = content.map((c: any) => c.text).join('\n')
+    const server = servers.find((s: any) => s.ip === attrs.serverID)
+
+    codeExecutionStore.addCell({
+      id: attrs.id,
+      code,
+      serverConfig: server,
+      kernelName: attrs.kernelName,
+      output: attrs.output,
+    })
+  })
+}
+
 const editor = useEditor({
-  content: content.value,
+  content: JSON.parse(content.value),
   extensions: allExtensions.value,
   editorProps: {
     attributes: {
@@ -114,6 +154,8 @@ const editor = useEditor({
     },
   },
   onCreate({ editor }) {
+    registerCodeCells(editor.getJSON())
+
     editor.view.dom.addEventListener('click', (event) => {
       const target = event.target as HTMLElement
       // Find the closest link element (either the target or its parent)
@@ -131,11 +173,15 @@ const editor = useEditor({
   onUpdate: ({ editor }) => {
     try {
       emit('saving', true)
-      const content = editor.getHTML()
+      const content = editor.getJSON()
+
+      // Register/update code cells on content change
+      registerCodeCells(content)
+
       notaStore
         .saveNota({
           id: props.notaId,
-          content,
+          content: JSON.stringify(content),
           updatedAt: new Date(),
         })
         .finally(() => {
@@ -168,6 +214,10 @@ const wordCount = computed(() => {
   if (!editor.value) return 0
   const text = editor.value.getText()
   return text.split(/\s+/).filter((word) => word.length > 0).length
+})
+
+onUnmounted(() => {
+  codeExecutionStore.cleanup()
 })
 </script>
 
