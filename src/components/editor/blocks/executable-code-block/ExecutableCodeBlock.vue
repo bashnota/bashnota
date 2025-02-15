@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, nextTick } from 'vue'
+import { computed } from 'vue'
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import CodeBlockWithExecution from './CodeBlockWithExecution.vue'
 import { useRoute } from 'vue-router'
@@ -48,17 +48,6 @@ const onKernelSelect = async (kernelName: string, serverID: string) => {
 const updateOutput = (newOutput: string) => {
   props.updateAttributes({ output: newOutput })
 }
-
-onMounted(() => {
-  // Only update ID if it doesn't already exist
-  if (!props.node.attrs.id) {
-    const newId = crypto.randomUUID()
-    // Wrap in nextTick to ensure the node is fully mounted
-    nextTick(() => {
-      props.updateAttributes({ id: newId })
-    })
-  }
-})
 </script>
 
 <template>

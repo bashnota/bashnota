@@ -132,7 +132,7 @@ const registerCodeCells = (content: any) => {
   // Register each code block with the store
   codeBlocks.forEach((block) => {
     const { attrs, content } = block
-    const code = content.map((c: any) => c.text).join('\n')
+    const code = content ? content.map((c: any) => c.text).join('\n') : ''
     const server = servers.find((s: any) => s.ip === attrs.serverID)
 
     codeExecutionStore.addCell({
