@@ -24,9 +24,8 @@ const store = useNotaStore()
 const selectedServer = ref(props.serverID || 'none')
 const selectedKernel = ref(props.kernelName || 'none')
 const codeValue = ref(props.code)
+const output = ref(props.result)
 const isCodeCopied = ref(false)
-
-const output = ref('')
 
 // Use the codeValue ref for code execution
 const { cell, execute, copyOutput, isCopied } = useCodeExecution(props.id)
@@ -70,8 +69,6 @@ onMounted(async () => {
   if (props.kernelPreference) {
     selectedServer.value = props.kernelPreference.serverId || 'none'
   }
-
-  output.value = props.result || ''
 })
 
 // Watch for external code changes
@@ -80,6 +77,17 @@ watch(
   (newCode) => {
     if (newCode !== codeValue.value) {
       codeValue.value = newCode
+    }
+  },
+)
+
+watch(
+  () => cell.value?.output,
+  (newOutput) => {
+    if (!newOutput) return
+    if (newOutput !== output.value) {
+      output.value = newOutput
+      emit('update:output', newOutput)
     }
   },
 )
