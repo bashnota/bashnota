@@ -8,7 +8,6 @@ import {
   PlusIcon,
   MagnifyingGlassIcon,
   FolderIcon,
-  CommandLineIcon,
   StarIcon,
   ClockIcon,
   Cog6ToothIcon,
@@ -26,7 +25,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import ShortcutsDialog from '../ShortcutsDialog.vue'
-import LogoSvg from '@/assets/logo.svg'
 
 const router = useRouter()
 const notaStore = useNotaStore()
@@ -84,7 +82,6 @@ const filteredNotas = computed(() => {
 })
 
 const createNewNota = async (parentId: string | null = null) => {
-  console.log('Creating new nota:', newNotaTitle.value)
   if (!newNotaTitle.value.trim()) return
 
   try {
@@ -141,11 +138,7 @@ const viewOptions = [
           class="flex items-center gap-2 px-4 py-2 hover:bg-muted/50 rounded-lg transition-colors"
         >
           <div class="flex items-center gap-2">
-            <img
-              src="@/assets/logo.svg"
-              alt="BashNota Logo"
-              class="h-8 w-auto text-primary"
-            />
+            <img src="@/assets/logo.svg" alt="BashNota Logo" class="h-8 w-auto text-primary" />
             <span class="font-bold text-xl">BashNota</span>
           </div>
         </RouterLink>
