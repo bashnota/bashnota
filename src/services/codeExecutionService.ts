@@ -97,6 +97,7 @@ export class CodeExecutionService {
     serverConfig: JupyterServer,
     kernelId: string,
     codeBlocks: CodeBlock[],
+    onOutput?: (blockId: string, output: string) => void,
   ): Promise<ExecutionResult[]> {
     return new Promise((resolve, reject) => {
       const results: Map<string, string> = new Map()
@@ -121,30 +122,31 @@ export class CodeExecutionService {
 
         const status = messageStatus.get(parentMsgId)!
         const content = msg.content
+        let newOutput = ''
 
         switch (msgType) {
           case 'stream':
-            status.output += content.text || ''
-            messageStatus.set(parentMsgId, status)
+            newOutput = content.text || ''
+            status.output += newOutput
             break
 
           case 'execute_result':
           case 'display_data':
             if (content.data['text/plain']) {
-              status.output += content.data['text/plain'] + '\n'
+              newOutput += content.data['text/plain'] + '\n'
             }
             if (content.data['text/html']) {
-              status.output += content.data['text/html'] + '\n'
+              newOutput += content.data['text/html'] + '\n'
             }
             if (content.data['image/png']) {
-              status.output += `<img src="data:image/png;base64,${content.data['image/png']}" />\n`
+              newOutput += `<img src="data:image/png;base64,${content.data['image/png']}" />\n`
             }
-            messageStatus.set(parentMsgId, status)
+            status.output += newOutput
             break
 
           case 'error':
-            status.output += `Error: ${content.ename}\n${content.evalue}\n${content.traceback.join('\n')}`
-            messageStatus.set(parentMsgId, status)
+            newOutput = `Error: ${content.ename}\n${content.evalue}\n${content.traceback.join('\n')}`
+            status.output += newOutput
             break
 
           case 'status':
@@ -174,6 +176,12 @@ export class CodeExecutionService {
             }
             break
         }
+
+        // Stream output if callback is provided
+        if (newOutput && onOutput) {
+          onOutput(codeBlocks[currentBlockIndex].id, newOutput)
+        }
+        messageStatus.set(parentMsgId, status)
       }
 
       ws.onerror = (error) => {
@@ -199,10 +207,14 @@ export class CodeExecutionService {
     serverConfig: JupyterServer,
     kernelId: string,
     code: string,
+    onOutput?: (output: string) => void,
   ): Promise<ExecutionResult> {
-    const results = await this.executeNotebookBlocks(serverConfig, kernelId, [
-      { id: 'single', notebookId: 'temp', code },
-    ])
+    const results = await this.executeNotebookBlocks(
+      serverConfig,
+      kernelId,
+      [{ id: 'single', notebookId: 'temp', code }],
+      (_, output) => onOutput?.(output),
+    )
     return results[0]
   }
 }

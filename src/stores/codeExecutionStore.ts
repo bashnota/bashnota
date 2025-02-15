@@ -70,13 +70,21 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
         session.cells.push(cellId)
       }
 
-      // Execute code
+      // Execute code with streaming updates
       const results = await executionService.executeNotebookBlocks(
         cell.serverConfig,
         session.kernelId,
         [{ id: cellId, notebookId: sessionKey, code: cell.code }],
+        (blockId, output) => {
+          const updatedCell = cells.value.get(blockId)
+          if (updatedCell) {
+            updatedCell.output += output
+            cells.value.set(blockId, { ...updatedCell })
+          }
+        },
       )
 
+      // Final output update
       const result = results[0]
       if (result) {
         cell.output = result.output
@@ -87,7 +95,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
       cell.output = cell.error.message
     } finally {
       cell.isExecuting = false
-      cells.value.set(cellId, cell)
+      cells.value.set(cellId, { ...cell })
     }
   }
 
@@ -144,9 +152,16 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
             session.serverConfig,
             session.kernelId,
             codeBlocks,
+            (blockId, output) => {
+              const cell = cells.value.get(blockId)
+              if (cell) {
+                cell.output += output
+                cells.value.set(blockId, { ...cell })
+              }
+            },
           )
 
-          // Update cell outputs
+          // Final output update
           results.forEach((result) => {
             const cell = cells.value.get(result.id)
             if (cell) {
