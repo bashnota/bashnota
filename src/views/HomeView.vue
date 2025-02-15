@@ -374,9 +374,6 @@ const viewOptions = [
                     </Button>
                   </div>
                 </div>
-                <CardDescription class="line-clamp-2 mt-2">
-                  {{ getNotaPreview(nota.content) }}
-                </CardDescription>
                 <div class="flex items-center text-sm text-muted-foreground mt-2">
                   <ClockIcon class="w-4 h-4 mr-1" />
                   {{ formatDate(nota.updatedAt) }}
@@ -442,9 +439,6 @@ const viewOptions = [
                     </Button>
                   </div>
                 </div>
-                <p class="text-sm text-muted-foreground line-clamp-1 mt-1">
-                  {{ getNotaPreview(nota.content) }}
-                </p>
                 <div class="flex items-center gap-4 mt-2">
                   <span class="text-xs text-muted-foreground flex items-center">
                     <ClockIcon class="w-3 h-3 mr-1" />

@@ -5,6 +5,7 @@ export interface CodeCell {
   code: string
   serverConfig?: JupyterServer
   kernelName: string
+  sessionId: string
   output: string
   isExecuting: boolean
   hasError: boolean
@@ -12,20 +13,24 @@ export interface CodeCell {
 }
 
 export interface KernelSession {
+  id: string
   kernelId: string
   serverConfig: JupyterServer
   kernelName: string
   cells: string[]
+  name: string
 }
 
 export interface CodeBlock {
   id: string
   notebookId: string
+  hasError?: boolean
   code: string
 }
 
 export interface ExecutionResult {
   id: string
+  hasError?: boolean
   output: string
 }
 
@@ -49,4 +54,12 @@ export interface JupyterMessage {
 export interface MessageStatus {
   done: boolean
   output: string
+}
+
+export interface SessionManager {
+  sessions: Map<string, KernelSession>
+  activeSession: string | null
+  createSession(name: string): string
+  deleteSession(id: string): void
+  setActiveSession(id: string): void
 }

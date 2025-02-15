@@ -24,8 +24,11 @@ export const ExecutableCodeBlockExtension = CodeBlock.extend({
       serverID: {
         default: null,
       },
+      sessionId: {
+        default: null,
+      },
       id: {
-        default: crypto.randomUUID(),
+        default: null,
       },
     }
   },

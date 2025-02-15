@@ -145,8 +145,9 @@ export class CodeExecutionService {
             break
 
           case 'error':
-            newOutput = `Error: ${content.ename}\n${content.evalue}\n${content.traceback.join('\n')}`
+            newOutput += `Error: ${content.ename}\n${content.evalue}\n${content.traceback.join('\n')}`
             status.output += newOutput
+            codeBlocks[currentBlockIndex].hasError = true
             break
 
           case 'status':
@@ -169,6 +170,7 @@ export class CodeExecutionService {
                 resolve(
                   codeBlocks.map((block) => ({
                     id: block.id,
+                    hasError: block.hasError,
                     output: results.get(block.id) || '',
                   })),
                 )

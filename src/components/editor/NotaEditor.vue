@@ -30,6 +30,7 @@ import { Mermaid } from './extensions/mermaid'
 import { ScatterPlot } from './extensions/scatter-plot'
 import { Youtube } from './extensions/youtube'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
+import UniqueId from 'tiptap-unique-id'
 
 const props = defineProps<{
   notaId: string
@@ -51,13 +52,18 @@ const currentNota = computed(() => {
 })
 
 const content = computed(() => {
-  return currentNota.value?.content || ''
+  return currentNota.value?.content
 })
 
 // Create a base extensions array
 const baseExtensions = [
   StarterKit.configure({
     codeBlock: false,
+  }),
+  UniqueId.configure({
+    attributeName: 'id',
+    types: ['executableCodeBlock'],
+    createId: () => crypto.randomUUID(),
   }),
   ExecutableCodeBlockExtension.configure({
     HTMLAttributes: {
@@ -141,6 +147,7 @@ const registerCodeCells = (content: any) => {
       serverConfig: server,
       kernelName: attrs.kernelName,
       output: attrs.output,
+      sessionId: attrs.sessionId,
     })
   })
 }

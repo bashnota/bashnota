@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import CodeBlockWithExecution from './CodeBlockWithExecution.vue'
 import { useRoute } from 'vue-router'
 import { useNotaStore } from '@/stores/nota'
+import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
 import { Card, CardContent } from '@/components/ui/card'
 
 const props = defineProps<{
@@ -15,12 +16,15 @@ const props = defineProps<{
 
 const route = useRoute()
 const store = useNotaStore()
+const codeExecutionStore = useCodeExecutionStore()
+
 const blockId = computed(() => props.node.attrs.id || '')
 const isExecutable = computed(() => props.node.attrs.executable)
 const language = computed(() => props.node.attrs.language)
 const output = computed(() => props.node.attrs.output)
 const kernelName = computed(() => props.node.attrs.kernelName)
 const serverID = computed(() => props.node.attrs.serverID)
+const sessionId = computed(() => props.node.attrs.sessionId)
 const code = computed(() => props.node.textContent || '')
 
 // Get saved kernel preference for this block
@@ -28,6 +32,21 @@ const kernelPreference = computed(() => {
   const nota = store.getCurrentNota(route.params.id as string)
   if (!nota?.config?.kernelPreferences) return null
   return nota.config.kernelPreferences[blockId.value] || null
+})
+
+// Initialize session if saved
+onMounted(() => {
+  if (sessionId.value) {
+    const existingSession = codeExecutionStore.kernelSessions.get(sessionId.value)
+    if (!existingSession) {
+      // Recreate the session if it doesn't exist
+      const sessionNumber = parseInt(sessionId.value.split('-').pop() || '1')
+      const newSession = codeExecutionStore.createSession(`Session ${sessionNumber}`)
+      if (blockId.value) {
+        codeExecutionStore.addCellToSession(blockId.value, newSession)
+      }
+    }
+  }
 })
 
 const updateCode = (newCode: string) => {
@@ -48,6 +67,10 @@ const onKernelSelect = async (kernelName: string, serverID: string) => {
 const updateOutput = (newOutput: string) => {
   props.updateAttributes({ output: newOutput })
 }
+
+const onSessionSelect = (sessionId: string) => {
+  props.updateAttributes({ sessionId })
+}
 </script>
 
 <template>
@@ -61,11 +84,13 @@ const updateOutput = (newOutput: string) => {
           :result="output"
           :serverID="serverID"
           :kernel-name="kernelName"
+          :session-id="sessionId"
           :nota-id="route.params.id as string"
           :kernel-preference="kernelPreference"
           @update:code="updateCode"
           @kernel-select="onKernelSelect"
           @update:output="updateOutput"
+          @update:session-id="onSessionSelect"
         />
       </CardContent>
     </Card>
