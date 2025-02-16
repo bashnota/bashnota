@@ -155,6 +155,7 @@ const additionalExtensions = computed(() => [ImageExtension])
           :nota-id="id"
           @saving="handleSaving"
           :extensions="additionalExtensions"
+          :key="id"
         />
         <NotaConfigPage v-else-if="nota" :nota-id="id" />
       </template>
