@@ -20,6 +20,7 @@ import {
   ImagesIcon,
   ChartScatter,
   VideoIcon,
+  ChartPieIcon,
 } from 'lucide-vue-next'
 
 type CommandArgs = {
@@ -210,7 +211,7 @@ export default {
       {
         title: 'Mermaid Diagram',
         category: 'Advanced',
-        icon: DatabaseIcon,
+        icon: ChartPieIcon,
         command: ({ editor, range }: CommandArgs) => {
           editor
             .chain()

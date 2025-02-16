@@ -231,7 +231,8 @@ const updateColumnType = (columnId: string, newType: string) => {
             <div class="flex items-center gap-2">
               <Input
                 v-if="isEditingName"
-                v-model="tableName"
+                :value="tableName"
+                @input="tableName = $event.target.value"
                 class="h-8 text-lg font-semibold"
                 @keyup.enter="saveName"
                 @blur="saveName"
@@ -267,7 +268,8 @@ const updateColumnType = (columnId: string, newType: string) => {
             <div class="space-y-2">
               <label class="text-sm text-muted-foreground">Column name</label>
               <Input
-                v-model="newColumnTitle"
+                :value="newColumnTitle"
+                @input="newColumnTitle = $event.target.value"
                 placeholder="Column name"
                 @keyup.enter="addColumn"
                 @keyup.esc="isAddingColumn = false"

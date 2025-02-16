@@ -29,17 +29,9 @@ export const TableExtension = Node.create({
     return {
       tableId: {
         default: null,
-        parseHTML: (element) => element.getAttribute('data-table-id'),
-        renderHTML: (attributes) => ({
-          'data-table-id': attributes.tableId,
-        }),
       },
       notaId: {
         default: null,
-        parseHTML: (element) => element.getAttribute('data-nota-id'),
-        renderHTML: (attributes) => ({
-          'data-nota-id': attributes.notaId,
-        }),
       },
     }
   },
