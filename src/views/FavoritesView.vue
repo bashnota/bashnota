@@ -1,28 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useNotaStore } from '@/stores/nota'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DocumentTextIcon, ClockIcon, StarIcon } from '@heroicons/vue/24/solid'
 import { formatDate } from '@/lib/utils'
-import LoadingSpinner from '@/components/LoadingSpinner.vue'
 
 const store = useNotaStore()
 
-const getNotaPreview = (content: string | undefined) => {
-  if (!content) return 'No content'
-  
-  // Create a temporary div to parse HTML content
-  const div = document.createElement('div')
-  div.innerHTML = content
-  
-  // Get text content and trim it
-  const textContent = div.textContent || div.innerText || ''
-  return textContent.trim() || 'No content'
-}
-
 const favoriteNotas = computed(() => {
   return store.items
-    .filter(nota => nota.favorite)
+    .filter((nota) => nota.favorite)
     .sort((a, b) => {
       const dateA = a.updatedAt instanceof Date ? a.updatedAt : new Date(a.updatedAt)
       const dateB = b.updatedAt instanceof Date ? b.updatedAt : new Date(b.updatedAt)
@@ -43,7 +30,10 @@ const favoriteNotas = computed(() => {
 
     <Card>
       <CardContent class="pt-6">
-        <div v-if="favoriteNotas.length === 0" class="flex flex-col items-center justify-center p-12 text-center">
+        <div
+          v-if="favoriteNotas.length === 0"
+          class="flex flex-col items-center justify-center p-12 text-center"
+        >
           <StarIcon class="w-12 h-12 text-muted-foreground/50 mb-4" />
           <h3 class="text-lg font-semibold mb-2">No Favorites Yet</h3>
           <p class="text-muted-foreground">Star your important notas for quick access</p>
@@ -63,9 +53,6 @@ const favoriteNotas = computed(() => {
                       {{ formatDate(nota.updatedAt) }}
                     </div>
                   </div>
-                  <CardDescription class="line-clamp-2">
-                    {{ getNotaPreview(nota.content) }}
-                  </CardDescription>
                 </CardHeader>
               </Card>
             </RouterLink>
@@ -74,4 +61,4 @@ const favoriteNotas = computed(() => {
       </CardContent>
     </Card>
   </div>
-</template> 
+</template>
