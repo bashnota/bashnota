@@ -81,7 +81,7 @@ const additionalExtensions = computed(() => [ImageExtension])
 </script>
 
 <template>
-  <div class="flex flex-col flex-1 h-full overflow-hidden bg-background">
+  <div class="bg-background">
     <header class="flex items-center justify-between px-6 py-4 border-b">
       <div class="flex-1">
         <div class="flex items-center gap-3">
@@ -148,7 +148,7 @@ const additionalExtensions = computed(() => [ImageExtension])
       </div>
     </header>
 
-    <main class="flex-1 overflow-auto">
+    <main>
       <template v-if="isReady">
         <NotaEditor
           v-if="!showConfigPage && nota"

@@ -4,9 +4,18 @@ import { useNotaStore } from '@/stores/nota'
 import { useCodeExecution } from '@/composables/useCodeExecution'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
 import type { KernelConfig, KernelSpec } from '@/types/jupyter'
-import { Copy, Check, Play, Loader2, Plus } from 'lucide-vue-next'
+import { Copy, Check, Play, Loader2, Plus, CircleDot, Server, Layers, Box } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import CodeMirror from './CodeMirror.vue'
+import Popover from '@/components/ui/popover/Popover.vue'
+import PopoverTrigger from '@/components/ui/popover/PopoverTrigger.vue'
+import PopoverContent from '@/components/ui/popover/PopoverContent.vue'
+import Command from '@/components/ui/command/Command.vue'
+import CommandInput from '@/components/ui/command/CommandInput.vue'
+import CommandEmpty from '@/components/ui/command/CommandEmpty.vue'
+import CommandGroup from '@/components/ui/command/CommandGroup.vue'
+import CommandItem from '@/components/ui/command/CommandItem.vue'
+import CommandList from '@/components/ui/command/CommandList.vue'
 
 const props = defineProps<{
   code: string
@@ -32,6 +41,11 @@ const output = ref(props.result)
 const isCodeCopied = ref(false)
 
 const { cell, execute, copyOutput, isCopied } = useCodeExecution(props.id)
+
+// Selection states and labels
+const isServerOpen = ref(false)
+const isKernelOpen = ref(false)
+const isSessionOpen = ref(false)
 
 // Get available sessions
 const availableSessions = computed(() => {
@@ -147,80 +161,147 @@ const copyCode = async () => {
 <template>
   <div class="flex flex-col bg-slate-100 dark:bg-slate-900 rounded-lg overflow-hidden">
     <div
-      class="flex items-center gap-4 p-3 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+      class="flex items-center gap-2 p-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
     >
-      <div class="flex-1 grid grid-cols-3 gap-3">
-        <!-- Session Selection -->
-        <div class="flex gap-2">
-          <select
-            v-model="selectedSession"
-            @change="handleSessionChange"
-            class="flex-1 h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <option value="" class="text-muted-foreground">Select Session</option>
-            <option
-              v-for="session in availableSessions"
-              :key="session.id"
-              :value="session.id"
-              class="text-foreground"
-            >
-              {{ session.name }}
-            </option>
-          </select>
-          <Button variant="outline" size="sm" @click="createNewSession" class="h-9 w-9 p-0">
-            <Plus class="h-4 w-4" />
+      <!-- Session Selector -->
+      <Popover v-model:open="isSessionOpen">
+        <PopoverTrigger as-child>
+          <Button variant="outline" size="sm" class="gap-2 h-8">
+            <Layers class="h-4 w-4" />
           </Button>
-        </div>
+        </PopoverTrigger>
+        <PopoverContent class="w-[200px] p-0" align="start">
+          <Command>
+            <CommandInput placeholder="Search sessions..." />
+            <div class="p-1 border-t">
+              <Button size="sm" variant="outline" class="w-full gap-2" @click="createNewSession">
+                <Plus class="h-4 w-4" />
+                New Session
+              </Button>
+            </div>
+            <CommandList>
+              <CommandEmpty>No sessions found.</CommandEmpty>
+              <CommandGroup>
+                <CommandItem
+                  v-for="session in availableSessions"
+                  :key="session.id"
+                  :value="session.id"
+                  @select="
+                    (value) => {
+                      if (typeof value.detail.value === 'string') {
+                        selectedSession = value.detail.value
+                        handleSessionChange()
+                      }
+                      isSessionOpen = false
+                    }
+                  "
+                >
+                  <CircleDot
+                    class="h-4 w-4 mr-2 text-5xl"
+                    :class="selectedSession === session.id ? 'opacity-100' : 'opacity-0'"
+                  />
+                  {{ session.name }}
+                </CommandItem>
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
 
-        <!-- Server Selection -->
-        <div class="relative">
-          <select
-            v-model="selectedServer"
-            @change="() => emit('kernel-select', selectedKernel, selectedServer)"
-            class="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <option value="none" class="text-muted-foreground">Select Server</option>
-            <option
-              v-for="server in availableServers"
-              :key="server.ip"
-              :value="server.ip"
-              class="text-foreground"
-            >
-              {{ server.displayName }}
-            </option>
-          </select>
-        </div>
+      <!-- Server Selector -->
+      <Popover v-model:open="isServerOpen">
+        <PopoverTrigger as-child>
+          <Button variant="outline" size="sm" class="gap-2 h-8">
+            <Server class="h-4 w-4" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent class="w-[200px] p-0" align="start">
+          <Command>
+            <CommandInput placeholder="Search servers..." />
+            <CommandList>
+              <CommandEmpty>No servers found.</CommandEmpty>
+              <CommandGroup>
+                <CommandItem
+                  v-for="server in availableServers"
+                  :key="server.ip"
+                  :value="server.ip"
+                  @select="
+                    (value) => {
+                      if (typeof value.detail.value === 'string') {
+                        selectedServer = value.detail.value
+                        emit('kernel-select', selectedKernel, selectedServer)
+                      }
+                      isServerOpen = false
+                    }
+                  "
+                >
+                  <CircleDot
+                    class="h-4 w-4 mr-2"
+                    :class="selectedServer === server.ip ? 'opacity-100' : 'opacity-0'"
+                  />
+                  {{ server.displayName }}
+                </CommandItem>
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
 
-        <!-- Kernel Selection -->
-        <div class="relative">
-          <select
-            v-model="selectedKernel"
-            @change="() => emit('kernel-select', selectedKernel, selectedServer)"
+      <!-- Kernel Selector -->
+      <Popover v-model:open="isKernelOpen">
+        <PopoverTrigger as-child>
+          <Button
+            variant="outline"
+            size="sm"
+            class="gap-2 h-8"
             :disabled="!selectedServer || selectedServer === 'none'"
-            class="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <option value="none" class="text-muted-foreground">Select Kernel</option>
-            <option
-              v-for="kernel in availableKernels"
-              :key="kernel.name"
-              :value="kernel.name"
-              class="text-foreground"
-            >
-              {{ kernel.spec.display_name }}
-            </option>
-          </select>
-        </div>
-      </div>
+            <Box class="h-4 w-4" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent class="w-[200px] p-0" align="start">
+          <Command>
+            <CommandInput placeholder="Search kernels..." />
+            <CommandList>
+              <CommandEmpty>No kernels found.</CommandEmpty>
+              <CommandGroup>
+                <CommandItem
+                  v-for="kernel in availableKernels"
+                  :key="kernel.name"
+                  :value="kernel.name"
+                  @select="
+                    (value) => {
+                      if (typeof value.detail.value === 'string') {
+                        selectedKernel = value.detail.value
+                        emit('kernel-select', selectedKernel, selectedServer)
+                      }
+                      isKernelOpen = false
+                    }
+                  "
+                >
+                  <CircleDot
+                    class="h-4 w-4 mr-2"
+                    :class="selectedKernel === kernel.name ? 'opacity-100' : 'opacity-0'"
+                  />
+                  {{ kernel.spec.display_name }}
+                </CommandItem>
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
 
-      <!-- Action Buttons -->
+      <div class="flex-1"></div>
+
+      <!-- Run Button -->
       <Button
         variant="default"
         size="sm"
         :disabled="cell?.isExecuting || selectedKernel === 'none'"
         @click="handleExecution"
-        class="min-w-[80px]"
+        class="h-8"
       >
-        <Loader2 class="w-5 h-5 animate-spin mr-2" v-if="cell?.isExecuting" />
+        <Loader2 class="w-4 h-4 animate-spin mr-2" v-if="cell?.isExecuting" />
         <Play class="w-4 h-4 mr-2" v-else />
         Run
       </Button>
@@ -262,3 +343,17 @@ const copyCode = async () => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.cmd-group {
+  @apply py-1.5 px-2 text-xs font-semibold text-muted-foreground;
+}
+
+.cmd-item {
+  @apply relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50;
+}
+
+.cmd-empty {
+  @apply py-6 text-center text-sm text-muted-foreground;
+}
+</style>
