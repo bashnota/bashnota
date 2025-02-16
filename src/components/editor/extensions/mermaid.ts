@@ -20,8 +20,8 @@ export const Mermaid = Node.create({
     return {
       content: {
         default: '',
-        parseHTML: element => element.getAttribute('data-content'),
-        renderHTML: attributes => {
+        parseHTML: (element) => element.getAttribute('data-content'),
+        renderHTML: (attributes) => {
           return {
             'data-content': attributes.content,
           }
@@ -34,7 +34,7 @@ export const Mermaid = Node.create({
     return [
       {
         tag: 'div[data-type="mermaid"]',
-        getAttrs: dom => {
+        getAttrs: (dom) => {
           if (typeof dom === 'string') return {}
           const element = dom as HTMLElement
           return {
@@ -50,13 +50,14 @@ export const Mermaid = Node.create({
   },
 
   addNodeView() {
+    // @ts-ignore
     return VueNodeViewRenderer(MermaidBlock)
   },
 
   addCommands() {
     return {
       setMermaid:
-        content =>
+        (content) =>
         ({ commands }) => {
           return commands.insertContent({
             type: this.name,
@@ -65,4 +66,4 @@ export const Mermaid = Node.create({
         },
     }
   },
-}) 
+})

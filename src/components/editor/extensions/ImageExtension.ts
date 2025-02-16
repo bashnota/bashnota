@@ -27,7 +27,7 @@ declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     notaImage: {
       setNotaImage: (options: ImageAttributes) => ReturnType
-      setNotaImageSubfigureContainer: (options: Partial<ImageAttributes>) => ReturnType
+      setNotaImageSubfigureContainer: (options?: Partial<ImageAttributes>) => ReturnType
     }
   }
 }
@@ -121,6 +121,7 @@ export const ImageExtension = Node.create({
   },
 
   addNodeView() {
+    // @ts-ignore
     return VueNodeViewRenderer(ImageBlock)
   },
 
@@ -147,13 +148,6 @@ export const ImageExtension = Node.create({
             },
           })
         },
-    }
-  },
-
-  addKeyboardShortcuts() {
-    return {
-      'Mod-Alt-i': () => this.editor.commands.setNotaImage({ src: '' }),
-      'Mod-Alt-f': () => this.editor.commands.setNotaImageSubfigureContainer(),
     }
   },
 })

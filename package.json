@@ -61,6 +61,7 @@
     "tailwindcss-animate": "^1.0.7",
     "tippy.js": "^6.3.7",
     "tiptap-extension-global-drag-handle": "^0.1.16",
+    "tiptap-markdown": "^0.8.10",
     "tiptap-unique-id": "^2.10.3",
     "unified": "^11.0.5",
     "unist": "^0.0.1",

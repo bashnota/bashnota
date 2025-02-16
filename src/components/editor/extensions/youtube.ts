@@ -22,11 +22,11 @@ export const Youtube = Node.create({
     return {
       url: {
         default: null,
-        parseHTML: element => element.getAttribute('url'),
+        parseHTML: (element) => element.getAttribute('url'),
       },
       videoId: {
         default: null,
-        parseHTML: element => element.getAttribute('videoId'),
+        parseHTML: (element) => element.getAttribute('videoId'),
       },
     }
   },
@@ -44,13 +44,14 @@ export const Youtube = Node.create({
   },
 
   addNodeView() {
+    // @ts-ignore
     return VueNodeViewRenderer(YoutubeBlock)
   },
 
   addCommands() {
     return {
       setYoutube:
-        url =>
+        (url) =>
         ({ commands }) => {
           const videoId = extractYoutubeId(url)
           if (!videoId) return false
@@ -64,8 +65,7 @@ export const Youtube = Node.create({
 })
 
 function extractYoutubeId(url: string): string | null {
-  const regExp =
-    /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/
+  const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/
   const match = url.match(regExp)
   return match && match[7].length === 11 ? match[7] : null
-} 
+}

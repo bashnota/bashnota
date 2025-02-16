@@ -5,14 +5,12 @@ import { computed, ref, watch } from 'vue'
 interface CommandItem {
   title: string
   icon: FunctionConstructor
-  // eslint-disable-next-line
   command: (props: any) => void
   category: string
 }
 
 const props = defineProps<{
   items: Array<CommandItem>
-  // eslint-disable-next-line
   command: (props: any) => void
 }>()
 

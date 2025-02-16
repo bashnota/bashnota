@@ -69,7 +69,7 @@ onMounted(async () => {
       const columnID = crypto.randomUUID()
 
       // Initialize new table
-      const newTable = {
+      const newTable: TableData & { notaId: string } = {
         id: props.node.attrs.tableId,
         notaId: props.node.attrs.notaId,
         name: 'Untitled',

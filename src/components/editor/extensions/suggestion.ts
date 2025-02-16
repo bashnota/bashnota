@@ -21,14 +21,10 @@ import {
   ChartScatter,
   VideoIcon,
 } from 'lucide-vue-next'
-import { unified } from 'unified'
-import remarkParse from 'remark-parse'
-import { visit } from 'unist-util-visit'
 
 type CommandArgs = {
   editor: Editor
   range: Range
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   props: any
 }
 
@@ -41,12 +37,7 @@ export default {
         category: 'Basic Blocks',
         icon: TextIcon,
         command: ({ editor, range }: CommandArgs) => {
-          editor
-            .chain()
-            .focus()
-            .deleteRange(range)
-            .setParagraph()
-            .run()
+          editor.chain().focus().deleteRange(range).setParagraph().run()
         },
       },
       {
@@ -136,12 +127,7 @@ export default {
         category: 'Images',
         icon: ImageIcon,
         command: ({ editor, range }: CommandArgs) => {
-          editor
-            .chain()
-            .focus()
-            .deleteRange(range)
-            .setNotaImage({ src: '' })
-            .run()
+          editor.chain().focus().deleteRange(range).setNotaImage({ src: '' }).run()
         },
       },
       {
@@ -149,12 +135,7 @@ export default {
         category: 'Images',
         icon: ImagesIcon,
         command: ({ editor, range }: CommandArgs) => {
-          editor
-            .chain()
-            .focus()
-            .deleteRange(range)
-            .setNotaImageSubfigureContainer()
-            .run()
+          editor.chain().focus().deleteRange(range).setNotaImageSubfigureContainer().run()
         },
       },
 
@@ -166,13 +147,8 @@ export default {
         command: ({ editor, range }: CommandArgs) => {
           const url = prompt('Enter YouTube URL:')
           if (!url) return
-          
-          editor
-            .chain()
-            .focus()
-            .deleteRange(range)
-            .setYoutube(url)
-            .run()
+
+          editor.chain().focus().deleteRange(range).setYoutube(url).run()
         },
       },
 
@@ -228,12 +204,7 @@ export default {
         icon: DatabaseIcon,
         command: ({ editor, range }: CommandArgs) => {
           const notaId = router.currentRoute.value.params.id as string
-          editor
-            .chain()
-            .focus()
-            .deleteRange(range)
-            .insertDataTable(notaId)
-            .run()
+          editor.chain().focus().deleteRange(range).insertDataTable(notaId).run()
         },
       },
       {
@@ -245,55 +216,27 @@ export default {
             .chain()
             .focus()
             .deleteRange(range)
-            .setMermaid(`graph TD
+            .setMermaid(
+              `graph TD
     A[Client] --> B[Load Balancer]
     B --> C[Server1]
-    B --> D[Server2]`)
+    B --> D[Server2]`,
+            )
             .run()
         },
-      },
-      {
-        title: 'Paste Markdown',
-        command: ({ editor, range }) => {
-          navigator.clipboard.readText().then((text) => {
-            editor.chain().focus().deleteRange(range).run()
-            
-            // Parse and insert markdown at current position
-            const processor = unified().use(remarkParse)
-            const tree = processor.parse(text)
-            
-            visit(tree, (node: any) => {
-              if (node.type === 'code') {
-                editor
-                  .chain()
-                  .focus()
-                  .insertContent('```' + (node.lang || '') + '\n' + node.value + '\n```\n')
-                  .run()
-              } else if (node.type === 'paragraph') {
-                const text = node.children
-                  ?.map((child: any) => (child.type === 'text' ? child.value : ''))
-                  .join('')
-                if (text) {
-                  editor.chain().focus().insertContent(text + '\n').run()
-                }
-              }
-            })
-          })
-        },
-        icon: 'clipboard-paste',
       },
       {
         title: 'Scatter Plot',
         description: 'Add a scatter plot visualization',
         icon: ChartScatter,
-        command: ({ editor, range }) => {
+        command: ({ editor, range }: CommandArgs) => {
           editor
             .chain()
             .focus()
             .deleteRange(range)
             .setScatterPlot({
               title: 'Scatter Plot',
-              apiUrl: ''
+              apiUrl: '',
             })
             .run()
         },
@@ -307,18 +250,15 @@ export default {
 
   render: () => {
     let component: VueRenderer
-    // eslint-disable-next-line
     let popup: any
 
     return {
-      // eslint-disable-next-line
       onStart: (props: any) => {
         component = new VueRenderer(CommandsList, {
           props,
           editor: props.editor,
         })
 
-        // eslint-disable-next-line
         // @ts-ignore
         popup = tippy('body', {
           getReferenceClientRect: props.clientRect,
@@ -332,7 +272,6 @@ export default {
         })
       },
 
-      // eslint-disable-next-line
       onUpdate(props: any) {
         component.updateProps(props)
         popup[0].setProps({
@@ -340,7 +279,6 @@ export default {
         })
       },
 
-      // eslint-disable-next-line
       onKeyDown(props: any) {
         if (props.event.key === 'Escape') {
           popup[0].hide()

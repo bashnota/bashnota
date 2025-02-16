@@ -191,7 +191,7 @@
                   v-else
                   :value="subfig.caption"
                   @input="
-                    (e) => {
+                    (e: any) => {
                       const subfigures = [...attrs.subfigures]
                       subfigures[index].caption = e.target.value
                       props.updateAttributes({ subfigures })
@@ -253,7 +253,7 @@
 
 <script setup lang="ts">
 import { NodeViewWrapper } from '@tiptap/vue-3'
-import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
+import { ref, computed, onMounted, watch, onUnmounted, type FunctionalComponent } from 'vue'
 import type { SubFigure } from '../../extensions/ImageExtension'
 import {
   AlignLeftIcon,
@@ -293,7 +293,7 @@ const isEditingCaption = ref(false)
 const isEditingSubfigureCaption = ref<Record<number, boolean>>({})
 
 // UI helpers
-const alignmentIcons = {
+const alignmentIcons: Record<string, FunctionalComponent> = {
   left: AlignLeftIcon,
   center: AlignCenterIcon,
   right: AlignRightIcon,
@@ -449,10 +449,10 @@ const startEditingSubfigureCaption = (index: number) => {
 
 const handleSubfigureCaptionBlur = (index: number) => {
   isEditingSubfigureCaption.value[index] = false
-  updateSubfigureCaption(index)
+  updateSubfigureCaption()
 }
 
-const updateSubfigureCaption = (index: number) => {
+const updateSubfigureCaption = () => {
   const subfigures = [...(attrs.value.subfigures || [])]
   props.updateAttributes({
     subfigures,

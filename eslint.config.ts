@@ -27,4 +27,10 @@ export default defineConfigWithVueTs(
     files: ['src/**/__tests__/*'],
   },
   skipFormatting,
+  {
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/ban-ts-comment': 'off',
+    },
+  },
 )

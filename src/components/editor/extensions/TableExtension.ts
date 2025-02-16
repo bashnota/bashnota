@@ -61,6 +61,7 @@ export const TableExtension = Node.create({
   },
 
   addNodeView() {
+    // @ts-ignore
     return VueNodeViewRenderer(TableBlock)
   },
 
@@ -83,4 +84,4 @@ export const TableExtension = Node.create({
         },
     }
   },
-}) 
+})

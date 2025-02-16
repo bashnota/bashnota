@@ -42,11 +42,8 @@ export interface JupyterMessage {
     msg_type: string
     version: string
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   parent_header: Record<string, any>
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata: Record<string, any>
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   content: Record<string, any>
   channel: string
 }

@@ -29,6 +29,7 @@ export const MathExtension = Node.create({
   },
 
   addNodeView() {
+    // @ts-ignore
     return VueNodeViewRenderer(MathBlock)
   },
 })

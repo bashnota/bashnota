@@ -10,7 +10,6 @@ export default Extension.create({
     return {
       suggestion: {
         char: '/',
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         command: ({ editor, range, props }: { editor: Editor; range: Range; props: any }) => {
           props.command({ editor, range })
         },

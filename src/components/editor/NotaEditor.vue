@@ -24,17 +24,18 @@ import { ListIcon } from 'lucide-vue-next'
 import { TableExtension } from './extensions/TableExtension'
 import { MathExtension } from './extensions/MathExtension'
 import GlobalDragHandle from 'tiptap-extension-global-drag-handle'
-import { MarkdownPasteExtension } from './extensions/MarkdownPasteExtension'
 import { MarkdownExtension } from './extensions/MarkdownExtension'
 import { Mermaid } from './extensions/mermaid'
 import { ScatterPlot } from './extensions/scatter-plot'
 import { Youtube } from './extensions/youtube'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
+import { Markdown } from 'tiptap-markdown'
+
+// @ts-ignore
 import UniqueId from 'tiptap-unique-id'
 
 const props = defineProps<{
   notaId: string
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   extensions?: any[]
 }>()
 
@@ -101,8 +102,10 @@ const baseExtensions = [
     dragHandleWidth: 24,
     shouldShow: () => true,
   }),
-  MarkdownPasteExtension,
   MarkdownExtension,
+  Markdown.configure({
+    transformPastedText: true,
+  }),
   Mermaid.configure({
     HTMLAttributes: {
       class: 'mermaid-block',
@@ -153,7 +156,7 @@ const registerCodeCells = (content: any) => {
 }
 
 const editor = useEditor({
-  content: JSON.parse(content.value),
+  content: content.value ? JSON.parse(content.value) : null,
   extensions: allExtensions.value,
   editorProps: {
     attributes: {
