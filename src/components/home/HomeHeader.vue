@@ -46,7 +46,7 @@ const features = [
           <div class="space-y-2">
             <p class="text-xl font-medium text-primary">More Than a Second Brain,</p>
             <p class="text-xl font-medium text-muted-foreground">
-              It's a Second Brain Cracked on Code
+              It's a Second Brain Cracked on Code and AI
             </p>
           </div>
         </div>
@@ -76,7 +76,7 @@ const features = [
 
       <!-- Description -->
       <p class="text-muted-foreground max-w-2xl">
-        Transform your notes into powerful tools with code snippets, markdown support, and seamless
+        Transform your notes into powerful tools with code snippets execution, markdown and latex support, and seamless
         organization. Built for developers, designed for productivity.
       </p>
     </div>
