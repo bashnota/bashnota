@@ -221,5 +221,56 @@ export const useNotaStore = defineStore('nota', {
         return null
       }
     },
+
+    async exportNota(id: string): Promise<Nota[]> {
+      const nota = this.getCurrentNota(id)
+      if (!nota) return []
+
+      const exportedNotas = [nota]
+      const children = this.getChildren(id)
+      
+      // Recursively get all children
+      for (const child of children) {
+        const childExport = await this.exportNota(child.id)
+        exportedNotas.push(...childExport)
+      }
+
+      return exportedNotas
+    },
+
+    async importNotas(file: File) {
+      try {
+        const content = await file.text()
+        const notas = JSON.parse(content)
+        
+        // Validate the imported data
+        if (!Array.isArray(notas)) throw new Error('Invalid nota file format')
+        
+        // Import each nota
+        for (const nota of notas) {
+          if (!nota.id || !nota.title) continue
+          
+          // Check if nota already exists
+          const existingNota = await db.notas.get(nota.id)
+          if (existingNota) continue
+          
+          // Ensure dates are properly formatted
+          const notaToSave = {
+            ...nota,
+            createdAt: new Date(nota.createdAt),
+            updatedAt: new Date(nota.updatedAt),
+            tags: Array.isArray(nota.tags) ? nota.tags : []
+          }
+          
+          await db.notas.add(notaToSave)
+          this.items.push(notaToSave)
+        }
+        
+        return true
+      } catch (error) {
+        console.error('Failed to import notas:', error)
+        return false
+      }
+    },
   },
 })
