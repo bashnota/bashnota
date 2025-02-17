@@ -46,10 +46,19 @@ export const useNotaStore = defineStore('nota', {
     },
 
     getParents: (state) => (id: string) => {
-      const findParents = (itemId: string): Nota[] => {
+      const findParents = (itemId: string, chain: Nota[] = []): Nota[] => {
         const item = state.items.find((i) => i.id === itemId)
-        if (!item?.parentId) return []
-        return [item, ...findParents(item.parentId)]
+        if (!item) return chain
+        
+        // If this item has a parent, recursively get its parent
+        if (item.parentId) {
+          const parent = state.items.find((i) => i.id === item.parentId)
+          if (parent) {
+            return findParents(parent.id, [parent, ...chain])
+          }
+        }
+        
+        return chain
       }
       return findParents(id)
     },
