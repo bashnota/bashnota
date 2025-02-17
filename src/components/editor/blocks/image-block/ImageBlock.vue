@@ -273,6 +273,7 @@ import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import UploadZone from './UploadZone.vue'
+import { useDebounceFn } from '@vueuse/core'
 
 const props = defineProps<{
   node: any
@@ -353,10 +354,17 @@ const updateLabel = () => {
 }
 
 const updateLayout = (layout: string) => {
-  localLayout.value = layout
-  props.updateAttributes({
-    layout,
-  })
+  try {
+    localLayout.value = layout
+    props.updateAttributes({
+      layout,
+      // Ensure subfigures exists
+      subfigures: attrs.value.subfigures || [],
+      isSubfigureContainer: true
+    })
+  } catch (error) {
+    console.error('Error updating layout:', error)
+  }
 }
 
 const updateWidth = (width: string) => {
@@ -465,22 +473,115 @@ const getSubfigureLabel = (index: number) => {
 }
 
 // Watchers
+// Watch for changes in subfigures
 watch(
   () => props.node.attrs.subfigures,
   (newSubfigures) => {
-    if (newSubfigures) {
-      props.updateAttributes({
-        subfigures: newSubfigures.map((subfig: SubFigure) => ({
+    try {
+      if (!newSubfigures) return
+      
+      // Add a check to prevent unnecessary updates
+      const currentSubfigures = JSON.stringify(newSubfigures)
+      const lastSubfigures = JSON.stringify(props.node.attrs.subfigures)
+      if (currentSubfigures === lastSubfigures) return
+
+      // Create a new array with default values for missing properties
+      const updatedSubfigures = newSubfigures.map((subfig: SubFigure) => {
+        const base = {
+          src: '',
+          caption: '',
+          label: '',
+          alt: '',
+          title: '',
+        }
+        return {
+          ...base,
           ...subfig,
-          src: subfig.src || '',
-          caption: subfig.caption || '',
-          label: subfig.label || '',
-        })),
+        }
       })
+
+      // Only update if there are actual changes
+      if (JSON.stringify(updatedSubfigures) !== lastSubfigures) {
+        props.updateAttributes({
+          subfigures: updatedSubfigures,
+          isSubfigureContainer: true
+        })
+      }
+    } catch (error) {
+      console.error('Error updating subfigures:', error)
     }
   },
-  { deep: true },
+  { deep: true }
 )
+
+// Modify the other watchers to prevent infinite loops
+watch(
+  () => props.node.attrs,
+  (newAttrs, oldAttrs) => {
+    try {
+      // Only update if values actually changed
+      if (newAttrs.caption !== localCaption.value) {
+        localCaption.value = newAttrs.caption || ''
+      }
+      if (newAttrs.label !== localLabel.value) {
+        localLabel.value = newAttrs.label || ''
+      }
+      if (newAttrs.layout !== localLayout.value) {
+        localLayout.value = newAttrs.layout || 'horizontal'
+      }
+      if (newAttrs.width !== localWidth.value) {
+        localWidth.value = newAttrs.width || '100%'
+      }
+      if (newAttrs.alignment !== localAlignment.value) {
+        localAlignment.value = newAttrs.alignment || 'center'
+      }
+      if (newAttrs.unifiedSize !== localUnifiedSize.value) {
+        localUnifiedSize.value = newAttrs.unifiedSize || false
+      }
+      if (newAttrs.isLocked !== isLocked.value) {
+        isLocked.value = newAttrs.isLocked || false
+      }
+    } catch (error) {
+      console.error('Error updating local state from attrs:', error)
+    }
+  },
+  { deep: true }
+)
+
+// Watch for changes in local values with debounce
+const updateAttributes = useDebounceFn(() => {
+  try {
+    const updates = {
+      caption: localCaption.value,
+      label: localLabel.value,
+      layout: localLayout.value,
+      width: localWidth.value,
+      alignment: localAlignment.value,
+      unifiedSize: localUnifiedSize.value,
+      isLocked: isLocked.value,
+    }
+
+    // Only update if values are different from current attrs
+    const currentAttrs = props.node.attrs
+    const hasChanges = Object.entries(updates).some(
+      ([key, value]) => currentAttrs[key] !== value
+    )
+
+    if (hasChanges) {
+      props.updateAttributes(updates)
+    }
+  } catch (error) {
+    console.error('Error updating attributes from local state:', error)
+  }
+}, 100)
+
+watch(
+  [localCaption, localLabel, localLayout, localWidth, localAlignment, localUnifiedSize, isLocked],
+  () => {
+    updateAttributes()
+  }
+)
+
 
 // Lifecycle hooks
 onMounted(() => {
