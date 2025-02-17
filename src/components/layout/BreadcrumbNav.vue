@@ -10,17 +10,19 @@ const store = useNotaStore()
 const breadcrumbs = computed(() => {
   const items = []
   const id = route.params.id as string
-
   const nota = store.getCurrentNota(id)
 
   if (nota) {
-    items.push({ name: nota.title, path: `/nota/${nota.id}` })
-
-    // Add parent notas to breadcrumbs
+    // Get all parents up to root
     const parentNotas = store.getParents(nota.id)
-    for (const parentNota of parentNotas) {
+    
+    // Add all parents (they're already in order from root to immediate parent)
+    parentNotas.forEach(parentNota => {
       items.push({ name: parentNota.title, path: `/nota/${parentNota.id}` })
-    }
+    })
+    
+    // Add current nota last
+    items.push({ name: nota.title, path: `/nota/${nota.id}` })
   }
 
   return items
