@@ -10,6 +10,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import ServerListItem from './ServerListItem.vue'
 
 const props = defineProps<{
   notaId: string
@@ -19,7 +20,11 @@ const store = useNotaStore()
 const jupyterService = new JupyterService()
 
 // Form states
-const serverForm = ref({
+const serverForm = ref<{
+  ip: string
+  port: string
+  token: string
+}>({
   ip: 'localhost',
   port: '8888',
   token: '',
@@ -46,13 +51,15 @@ const testConnection = async (server: JupyterServer) => {
   isTestingConnection.value = true
   try {
     const result = await jupyterService.testConnection(server)
-    testResults.value[server.ip] = result
+    const serverKey = `${server.ip}:${server.port}`
+    testResults.value[serverKey] = result
     if (result.success) {
       // Load available kernels
       await refreshKernels(server)
     }
   } catch (error) {
-    testResults.value[server.ip] = {
+    const serverKey = `${server.ip}:${server.port}`
+    testResults.value[serverKey] = {
       success: false,
       message: error instanceof Error ? error.message : 'Connection failed',
     }
@@ -79,19 +86,37 @@ const refreshKernels = async (server: JupyterServer) => {
 
 // Add new server
 const addServer = async () => {
+  
   const server = {
-    ip: serverForm.value.ip,
-    port: serverForm.value.port,
-    token: serverForm.value.token,
+    ip: serverForm.value.ip.trim(),
+    port: serverForm.value.port.trim(),
+    token: serverForm.value.token.trim(),
+  }
+  
+
+  // Check if server with same IP and port already exists
+  const serverExists = config.value.jupyterServers.some(
+    s => s.ip === server.ip && s.port === server.port
+  )
+
+  if (serverExists) {
+    alert('A server with this IP and port already exists')
+    return
   }
 
   // Test connection before adding
   await testConnection(server)
 
-  if (testResults.value[server.ip]?.success) {
+  const serverKey = `${server.ip}:${server.port}`
+  if (testResults.value[serverKey]?.success) {
     await store.updateNotaConfig(props.notaId, (config) => {
       if (!config.jupyterServers) config.jupyterServers = []
-      config.jupyterServers.push(server)
+      const newServer = {
+        ip: server.ip,
+        port: server.port,
+        token: server.token,
+      }
+      config.jupyterServers.push(newServer)
     })
 
     // Reset form
@@ -104,12 +129,14 @@ const addServer = async () => {
 }
 
 // Remove server
-const removeServer = async (server: JupyterServer) => {
+const removeServer = async (serverToRemove: JupyterServer) => {
   if (confirm('Are you sure you want to remove this server?')) {
     await store.updateNotaConfig(props.notaId, (config) => {
-      config.jupyterServers = config.jupyterServers.filter((s) => s.ip !== server.ip)
+      config.jupyterServers = config.jupyterServers.filter(
+        (s) => !(s.ip === serverToRemove.ip && s.port === serverToRemove.port)
+      )
       if (config.kernels) {
-        delete config.kernels[server.ip]
+        delete config.kernels[serverToRemove.ip]
       }
     })
   }
@@ -160,40 +187,13 @@ const removeServer = async (server: JupyterServer) => {
               </div>
 
               <div v-else class="space-y-4">
-                <div
+                <ServerListItem
                   v-for="server in config.jupyterServers"
-                  :key="server.ip"
-                  class="rounded-lg border p-4 space-y-4 bg-slate-50 dark:bg-slate-900"
-                >
-                  <div class="flex items-center justify-between">
-                    <div class="space-y-1">
-                      <h4 class="font-medium">{{ server.ip }}:{{ server.port }}</h4>
-                      <p
-                        class="text-sm"
-                        :class="{
-                          'text-green-600': testResults[server.ip]?.success,
-                          'text-red-600': testResults[server.ip]?.success === false,
-                        }"
-                      >
-                        {{ testResults[server.ip]?.message || 'Not tested' }}
-                      </p>
-                    </div>
-                    <div class="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        @click="testConnection(server)"
-                        :disabled="isTestingConnection"
-                      >
-                        <LoadingSpinner v-if="isTestingConnection" />
-                        <span v-else>Test Connection</span>
-                      </Button>
-                      <Button variant="destructive" size="sm" @click="removeServer(server)">
-                        Remove
-                      </Button>
-                    </div>
-                  </div>
-                </div>
+                  :key="`${server.ip}:${server.port}`"
+                  :server="server"
+                  @remove="removeServer"
+                  @kernels-updated="refreshKernels"
+                />
               </div>
             </CardContent>
           </Card>
@@ -206,11 +206,25 @@ const removeServer = async (server: JupyterServer) => {
               <form @submit.prevent="addServer" class="space-y-4">
                 <div class="space-y-2">
                   <label class="text-sm font-medium">Server IP</label>
-                  <Input v-model="serverForm.ip" placeholder="localhost" required />
+                  <Input 
+                    v-model.trim="serverForm.ip"
+                    type="text"
+                    placeholder="localhost"
+                    required
+                    @input="(e: Event) => serverForm.ip = (e.target as HTMLInputElement).value"
+                  />
                 </div>
                 <div class="space-y-2">
                   <label class="text-sm font-medium">Port</label>
-                  <Input v-model="serverForm.port" placeholder="8888" required />
+                  <Input 
+                    v-model.trim="serverForm.port"
+                    type="text"
+                    inputmode="numeric"
+                    pattern="[0-9]*"
+                    placeholder="8888"
+                    required
+                    @input="(e: Event) => serverForm.port = (e.target as HTMLInputElement).value"
+                  />
                 </div>
                 <div class="space-y-2">
                   <label class="text-sm font-medium">Token</label>
