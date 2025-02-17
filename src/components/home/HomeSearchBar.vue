@@ -12,6 +12,8 @@ import {
   TableCellsIcon,
 } from '@heroicons/vue/24/solid'
 import { useDebounceFn } from '@vueuse/core'
+import { ref } from 'vue'
+import { useNotaStore } from '@/stores/nota'
 
 const props = defineProps<{
   search: string
@@ -26,25 +28,6 @@ const emit = defineEmits<{
   (e: 'create-nota'): void
 }>()
 
-const quickActions = [
-  {
-    title: 'New Nota',
-    icon: PlusIcon,
-    action: () => emit('create-nota'),
-  },
-  {
-    title: 'Import',
-    icon: FolderPlusIcon,
-    action: () => {}, // TODO: Implement import functionality
-  },
-  {
-    title: 'Favorites',
-    icon: StarIcon,
-    action: () => {
-      emit('update:showFavorites', !props.showFavorites)
-    },
-  },
-]
 
 const viewOptions = [
   { id: 'grid', icon: Squares2X2Icon, label: 'Grid View' },
@@ -59,6 +42,54 @@ const debouncedSearch = useDebounceFn((value: string) => {
 const clearSearch = () => {
   emit('update:search', '')
 }
+
+const fileInput = ref<HTMLInputElement | null>(null)
+const store = useNotaStore()
+
+const handleImport = () => {
+  fileInput.value?.click()
+}
+
+const handleFileSelect = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  if (!input.files?.length) return
+  
+  const file = input.files[0]
+  if (!file.name.endsWith('.nota')) {
+    alert('Please select a .nota file')
+    return
+  }
+  
+  const success = await store.importNotas(file)
+  if (success) {
+    // Reload notas after successful import
+    await store.loadNotas()
+    alert('Notas imported successfully')
+  } else {
+    alert('Failed to import notas')
+  }
+  
+  // Reset input
+  input.value = ''
+}
+
+const quickActions = [
+  {
+    title: 'New Nota',
+    icon: PlusIcon,
+    action: () => emit('create-nota'),
+  },
+  {
+    title: 'Import',
+    icon: FolderPlusIcon,
+    action: handleImport,
+  },
+  {
+    title: 'Favorites',
+    icon: StarIcon,
+    action: () => emit('update:showFavorites', !props.showFavorites),
+  },
+]
 </script>
 
 <template>
@@ -120,4 +151,12 @@ const clearSearch = () => {
       </Button>
     </div>
   </div>
+
+  <input
+    type="file"
+    accept=".nota"
+    class="hidden"
+    ref="fileInput"
+    @change="handleFileSelect"
+  />
 </template>
