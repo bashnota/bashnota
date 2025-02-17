@@ -173,7 +173,7 @@ const editor = useEditor({
       if (linkElement) {
         event.preventDefault()
         const href = linkElement.getAttribute('href')
-        if (href?.startsWith('/page/')) {
+        if (href?.startsWith('/nota/')) {
           router.push(href)
         }
       }
