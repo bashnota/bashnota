@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import NotaEditor from '@/components/editor/NotaEditor.vue'
 import NotaConfigPage from '@/components/NotaConfigPage.vue'
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, nextTick } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { computed } from 'vue'
 import { Cog6ToothIcon, CheckCircleIcon, ArrowPathIcon, StarIcon } from '@heroicons/vue/24/outline'
@@ -29,6 +29,9 @@ const nota = computed(() => store.getCurrentNota(props.id))
 const showConfigPage = ref(false)
 const isSaving = ref(false)
 const showSaved = ref(false)
+const isEditingTitle = ref(false)
+const editedTitle = ref('')
+const titleInput = ref<HTMLInputElement | null>(null)
 
 // Add watch to save changes when tags are updated
 watch(
@@ -78,6 +81,32 @@ const handleSaving = (saving: boolean) => {
 
 // Add ImageExtension to additional extensions
 const additionalExtensions = computed(() => [ImageExtension])
+
+const startTitleEdit = () => {
+  editedTitle.value = nota.value?.title || ''
+  isEditingTitle.value = true
+  nextTick(() => {
+    titleInput.value?.focus()
+    titleInput.value?.select()
+  })
+}
+
+const saveTitle = async () => {
+  if (!nota.value || !editedTitle.value.trim()) {
+    cancelTitleEdit()
+    return
+  }
+
+  if (editedTitle.value !== nota.value.title) {
+    await store.renameItem(nota.value.id, editedTitle.value)
+  }
+  isEditingTitle.value = false
+}
+
+const cancelTitleEdit = () => {
+  isEditingTitle.value = false
+  editedTitle.value = nota.value?.title || ''
+}
 </script>
 
 <template>
@@ -86,8 +115,25 @@ const additionalExtensions = computed(() => [ImageExtension])
       <div class="flex-1">
         <div class="flex items-center gap-3">
           <div class="flex-1 flex items-center gap-4">
-            <h1 class="text-2xl font-semibold tracking-tight whitespace-nowrap">
-              {{ nota?.title || 'Untitled' }}
+            <h1 class="text-2xl font-semibold tracking-tight whitespace-nowrap flex items-center gap-2">
+              <template v-if="isEditingTitle">
+                <input
+                  v-model="editedTitle"
+                  class="bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-primary px-1 rounded"
+                  @keyup.enter="saveTitle"
+                  @keyup.esc="cancelTitleEdit"
+                  @blur="saveTitle"
+                  ref="titleInput"
+                  :class="{ 'border-red-500': editedTitle.trim() === '' }"
+                />
+              </template>
+              <span
+                v-else
+                class="cursor-pointer hover:text-primary transition-colors"
+                @click="startTitleEdit"
+              >
+                {{ nota?.title || 'Untitled' }}
+              </span>
             </h1>
 
             <!-- Save Status Indicator -->
