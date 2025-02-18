@@ -129,7 +129,7 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
-public
+public/
 .firebaserc
 firebase.json
 .firebase/
