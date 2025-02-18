@@ -4,7 +4,7 @@ import { useNotaStore } from '@/stores/nota'
 import { useCodeExecution } from '@/composables/useCodeExecution'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
 import type { KernelConfig, KernelSpec } from '@/types/jupyter'
-import { Copy, Check, Play, Loader2, Plus, CircleDot, Server, Layers, Box } from 'lucide-vue-next'
+import { Copy, Check, Play, Loader2, Plus, CircleDot, Server, Layers, Box, Eye, EyeOff } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import CodeMirror from './CodeMirror.vue'
 import Popover from '@/components/ui/popover/Popover.vue'
@@ -39,6 +39,7 @@ const selectedSession = ref(props.sessionId || '')
 const codeValue = ref(props.code)
 const output = ref(props.result)
 const isCodeCopied = ref(false)
+const isCodeVisible = ref(true)
 
 const { cell, execute, copyOutput, isCopied } = useCodeExecution(props.id)
 
@@ -207,6 +208,16 @@ const copyCode = async () => {
           </Command>
         </PopoverContent>
       </Popover>
+      <Button 
+    variant="outline" 
+    size="sm" 
+    class="gap-2 h-8"
+    @click="isCodeVisible = !isCodeVisible"
+  >
+    <Eye v-if="isCodeVisible" class="h-4 w-4" />
+    <EyeOff v-else class="h-4 w-4" />
+  </Button>
+
 
       <!-- Server Selector -->
       <Popover v-model:open="isServerOpen">
@@ -308,7 +319,7 @@ const copyCode = async () => {
     </div>
 
     <!-- Code Section -->
-    <div class="relative group">
+    <div v-show="isCodeVisible" class="relative group">
       <div class="absolute right-2 top-2 z-10 opacity-0 transition-opacity group-hover:opacity-100">
         <Button variant="ghost" size="sm" @click="copyCode" class="h-8 w-8 p-0">
           <Copy v-if="!isCodeCopied" class="h-4 w-4" />
