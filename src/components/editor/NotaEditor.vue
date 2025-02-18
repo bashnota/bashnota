@@ -143,8 +143,10 @@ const registerCodeCells = (content: any) => {
     const { attrs, content } = block
     const code = content ? content.map((c: any) => c.text).join('\n') : ''
 
-    const serverID = attrs.serverID.split(':')
-    const server = servers.find((s: any) => s.ip === serverID[0] && s.port === serverID[1])
+    const serverID = attrs.serverID ? attrs.serverID.split(':') : null
+    const server = serverID
+      ? servers.find((s: any) => s.ip === serverID[0] && s.port === serverID[1])
+      : undefined
 
     codeExecutionStore.addCell({
       id: attrs.id,
