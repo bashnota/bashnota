@@ -202,7 +202,7 @@ const removeServer = async (serverToRemove: JupyterServer) => {
                       <label class="text-sm font-medium">Server IP</label>
                       <Input 
                         :value="serverForm.ip"
-                        @input="(e) => serverForm.ip = (e.target as HTMLInputElement).value"
+                        @input="(e: Event) => serverForm.ip = (e.target as HTMLInputElement).value"
                         type="text"
                         placeholder="localhost"
                         required
@@ -212,7 +212,7 @@ const removeServer = async (serverToRemove: JupyterServer) => {
                       <label class="text-sm font-medium">Port</label>
                       <Input 
                         :value="serverForm.port"
-                        @input="(e) => serverForm.port = (e.target as HTMLInputElement).value"
+                        @input="(e: Event) => serverForm.port = (e.target as HTMLInputElement).value"
                         type="text"
                         inputmode="numeric"
                         pattern="[0-9]*"
@@ -225,7 +225,7 @@ const removeServer = async (serverToRemove: JupyterServer) => {
                     <label class="text-sm font-medium">Token</label>
                     <Input 
                       :value="serverForm.token"
-                      @input="(e) => serverForm.token = (e.target as HTMLInputElement).value"
+                      @input="(e: Event) => serverForm.token = (e.target as HTMLInputElement).value"
                       type="password" 
                       placeholder="Jupyter token" 
                     />
