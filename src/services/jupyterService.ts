@@ -8,8 +8,13 @@ export class JupyterService {
     return `${protocol}${server.ip}:${server.port}/api`
   }
 
-  private getUrlWithToken(server: JupyterServer, endpoint: string): string {
-    return `${this.getBaseUrl(server)}${endpoint}`
+  private getUrlWithToken(serverConfig: JupyterServer, endpoint: string): string {
+    const url = `${this.getBaseUrl(serverConfig)}${endpoint}`
+
+    if (serverConfig.token) {
+      return `${url}?token=${serverConfig.token}`
+    }
+    return url
   }
 
   private handleError(error: unknown, message: string): never {
