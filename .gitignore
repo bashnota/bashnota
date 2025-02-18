@@ -132,3 +132,4 @@ dist
 public
 .firebaserc
 firebase.json
+.firebase/
