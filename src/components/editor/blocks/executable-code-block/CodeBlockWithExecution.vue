@@ -223,8 +223,8 @@ const copyCode = async () => {
               <CommandGroup>
                 <CommandItem
                   v-for="server in availableServers"
-                  :key="server.ip"
-                  :value="server.ip"
+                  :key="server.displayName"
+                  :value="server.displayName"
                   @select="
                     (value) => {
                       if (typeof value.detail.value === 'string') {
@@ -237,7 +237,7 @@ const copyCode = async () => {
                 >
                   <CircleDot
                     class="h-4 w-4 mr-2"
-                    :class="selectedServer === server.ip ? 'opacity-100' : 'opacity-0'"
+                    :class="selectedServer === server.displayName ? 'opacity-100' : 'opacity-0'"
                   />
                   {{ server.displayName }}
                 </CommandItem>

@@ -2,9 +2,14 @@
 import { ref, computed } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { JupyterService } from '@/services/jupyterService'
-import LoadingSpinner from './LoadingSpinner.vue'
 import type { JupyterServer, KernelSpec } from '@/types/jupyter'
-import { ServerIcon, CpuChipIcon, ArrowPathIcon, Cog6ToothIcon, PlusIcon } from '@heroicons/vue/24/outline'
+import {
+  ServerIcon,
+  CpuChipIcon,
+  ArrowPathIcon,
+  Cog6ToothIcon,
+  PlusIcon,
+} from '@heroicons/vue/24/outline'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -76,7 +81,8 @@ const refreshKernels = async (server: JupyterServer) => {
     const kernels = await jupyterService.getAvailableKernels(server)
     await store.updateNotaConfig(props.notaId, (config) => {
       if (!config.kernels) config.kernels = {}
-      config.kernels[server.ip] = kernels
+      const serverKey = `${server.ip}:${server.port}`
+      config.kernels[serverKey] = kernels
     })
   } catch (error) {
     console.error('Failed to refresh kernels:', error)
@@ -101,7 +107,7 @@ const addServer = async () => {
 
   // Check if server with same IP and port already exists
   const serverExists = config.value.jupyterServers.some(
-    s => s.ip.toLowerCase() === server.ip.toLowerCase() && s.port === server.port
+    (s) => s.ip.toLowerCase() === server.ip.toLowerCase() && s.port === server.port,
   )
 
   if (serverExists) {
@@ -139,10 +145,11 @@ const removeServer = async (serverToRemove: JupyterServer) => {
   if (confirm('Are you sure you want to remove this server?')) {
     await store.updateNotaConfig(props.notaId, (config) => {
       config.jupyterServers = config.jupyterServers.filter(
-        (s) => !(s.ip === serverToRemove.ip && s.port === serverToRemove.port)
+        (s) => !(s.ip === serverToRemove.ip && s.port === serverToRemove.port),
       )
       if (config.kernels) {
-        delete config.kernels[serverToRemove.ip]
+        const serverKey = `${serverToRemove.ip}:${serverToRemove.port}`
+        delete config.kernels[serverKey]
       }
     })
   }
@@ -187,7 +194,11 @@ const removeServer = async (serverToRemove: JupyterServer) => {
                   <CardTitle>Connected Servers</CardTitle>
                   <CardDescription>Manage your Jupyter server connections</CardDescription>
                 </div>
-                <Button @click="showServerForm = !showServerForm" variant="outline" class="flex items-center gap-2">
+                <Button
+                  @click="showServerForm = !showServerForm"
+                  variant="outline"
+                  class="flex items-center gap-2"
+                >
                   <PlusIcon class="w-4 h-4" />
                   Add Server
                 </Button>
@@ -200,9 +211,11 @@ const removeServer = async (serverToRemove: JupyterServer) => {
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="space-y-2">
                       <label class="text-sm font-medium">Server IP</label>
-                      <Input 
+                      <Input
                         :value="serverForm.ip"
-                        @input="(e: Event) => serverForm.ip = (e.target as HTMLInputElement).value"
+                        @input="
+                          (e: Event) => (serverForm.ip = (e.target as HTMLInputElement).value)
+                        "
                         type="text"
                         placeholder="localhost"
                         required
@@ -210,9 +223,11 @@ const removeServer = async (serverToRemove: JupyterServer) => {
                     </div>
                     <div class="space-y-2">
                       <label class="text-sm font-medium">Port</label>
-                      <Input 
+                      <Input
                         :value="serverForm.port"
-                        @input="(e: Event) => serverForm.port = (e.target as HTMLInputElement).value"
+                        @input="
+                          (e: Event) => (serverForm.port = (e.target as HTMLInputElement).value)
+                        "
                         type="text"
                         inputmode="numeric"
                         pattern="[0-9]*"
@@ -223,23 +238,27 @@ const removeServer = async (serverToRemove: JupyterServer) => {
                   </div>
                   <div class="space-y-2">
                     <label class="text-sm font-medium">Token</label>
-                    <Input 
+                    <Input
                       :value="serverForm.token"
-                      @input="(e: Event) => serverForm.token = (e.target as HTMLInputElement).value"
-                      type="password" 
-                      placeholder="Jupyter token" 
+                      @input="
+                        (e: Event) => (serverForm.token = (e.target as HTMLInputElement).value)
+                      "
+                      type="password"
+                      placeholder="Jupyter token"
                     />
                   </div>
                   <div class="flex items-center gap-2 justify-end">
-                    <Button 
-                      type="button" 
-                      variant="ghost" 
-                      @click="() => {
-                        showServerForm = false
-                        serverForm.ip = ''
-                        serverForm.port = ''
-                        serverForm.token = ''
-                      }"
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      @click="
+                        () => {
+                          showServerForm = false
+                          serverForm.ip = ''
+                          serverForm.port = ''
+                          serverForm.token = ''
+                        }
+                      "
                     >
                       Cancel
                     </Button>
@@ -304,7 +323,7 @@ const removeServer = async (serverToRemove: JupyterServer) => {
               </CardHeader>
               <CardContent class="border-t pt-6">
                 <div
-                  v-if="!config.kernels[server.ip]?.length"
+                  v-if="!config.kernels[`${server.ip}:${server.port}`]?.length"
                   class="rounded-lg border border-dashed p-8 text-center"
                 >
                   <CpuChipIcon class="w-10 h-10 mx-auto mb-4 text-muted-foreground/50" />
@@ -316,7 +335,7 @@ const removeServer = async (serverToRemove: JupyterServer) => {
 
                 <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div
-                    v-for="kernel in config.kernels[server.ip]"
+                    v-for="kernel in config.kernels[`${server.ip}:${server.port}`]"
                     :key="kernel.name"
                     class="group rounded-lg border bg-slate-50 dark:bg-slate-900 hover:shadow-sm transition-all duration-200 p-4"
                   >
