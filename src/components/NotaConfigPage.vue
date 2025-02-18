@@ -4,9 +4,9 @@ import { useNotaStore } from '@/stores/nota'
 import { JupyterService } from '@/services/jupyterService'
 import LoadingSpinner from './LoadingSpinner.vue'
 import type { JupyterServer, KernelSpec } from '@/types/jupyter'
-import { ServerIcon, CpuChipIcon, ArrowPathIcon, Cog6ToothIcon } from '@heroicons/vue/24/outline'
+import { ServerIcon, CpuChipIcon, ArrowPathIcon, Cog6ToothIcon, PlusIcon } from '@heroicons/vue/24/outline'
 import { Button } from '@/components/ui/button'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -25,14 +25,15 @@ const serverForm = ref<{
   port: string
   token: string
 }>({
-  ip: 'localhost',
-  port: '8888',
+  ip: '',
+  port: '',
   token: '',
 })
 
 const isTestingConnection = ref(false)
 const isRefreshingKernels = ref(false)
 const testResults = ref<Record<string, { success: boolean; message: string }>>({})
+const showServerForm = ref(false)
 
 // Load config from store
 const config = computed(() => {
@@ -86,17 +87,21 @@ const refreshKernels = async (server: JupyterServer) => {
 
 // Add new server
 const addServer = async () => {
-  
+  // Validate form values
+  if (!serverForm.value.ip || !serverForm.value.port) {
+    alert('Please fill in both IP and Port fields')
+    return
+  }
+
   const server = {
     ip: serverForm.value.ip.trim(),
     port: serverForm.value.port.trim(),
     token: serverForm.value.token.trim(),
   }
-  
 
   // Check if server with same IP and port already exists
   const serverExists = config.value.jupyterServers.some(
-    s => s.ip === server.ip && s.port === server.port
+    s => s.ip.toLowerCase() === server.ip.toLowerCase() && s.port === server.port
   )
 
   if (serverExists) {
@@ -119,12 +124,13 @@ const addServer = async () => {
       config.jupyterServers.push(newServer)
     })
 
-    // Reset form
+    // Reset form and hide it after successful addition
     serverForm.value = {
-      ip: 'localhost',
-      port: '8888',
+      ip: '',
+      port: '',
       token: '',
     }
+    showServerForm.value = false
   }
 }
 
@@ -176,9 +182,73 @@ const removeServer = async (serverToRemove: JupyterServer) => {
         <TabsContent value="servers" class="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Connected Servers</CardTitle>
+              <div class="flex items-center justify-between">
+                <div>
+                  <CardTitle>Connected Servers</CardTitle>
+                  <CardDescription>Manage your Jupyter server connections</CardDescription>
+                </div>
+                <Button @click="showServerForm = !showServerForm" variant="outline" class="flex items-center gap-2">
+                  <PlusIcon class="w-4 h-4" />
+                  Add Server
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
+              <!-- New Server Form -->
+              <div v-if="showServerForm" class="mb-6 border rounded-lg p-4 bg-muted/50">
+                <form @submit.prevent="addServer" class="space-y-4">
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="space-y-2">
+                      <label class="text-sm font-medium">Server IP</label>
+                      <Input 
+                        :value="serverForm.ip"
+                        @input="(e) => serverForm.ip = (e.target as HTMLInputElement).value"
+                        type="text"
+                        placeholder="localhost"
+                        required
+                      />
+                    </div>
+                    <div class="space-y-2">
+                      <label class="text-sm font-medium">Port</label>
+                      <Input 
+                        :value="serverForm.port"
+                        @input="(e) => serverForm.port = (e.target as HTMLInputElement).value"
+                        type="text"
+                        inputmode="numeric"
+                        pattern="[0-9]*"
+                        placeholder="8888"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div class="space-y-2">
+                    <label class="text-sm font-medium">Token</label>
+                    <Input 
+                      :value="serverForm.token"
+                      @input="(e) => serverForm.token = (e.target as HTMLInputElement).value"
+                      type="password" 
+                      placeholder="Jupyter token" 
+                    />
+                  </div>
+                  <div class="flex items-center gap-2 justify-end">
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      @click="() => {
+                        showServerForm = false
+                        serverForm.ip = ''
+                        serverForm.port = ''
+                        serverForm.token = ''
+                      }"
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit">Add Server</Button>
+                  </div>
+                </form>
+              </div>
+
+              <!-- Server List -->
               <div
                 v-if="config.jupyterServers.length === 0"
                 class="rounded-lg border border-dashed p-8 text-center text-muted-foreground"
@@ -195,43 +265,6 @@ const removeServer = async (serverToRemove: JupyterServer) => {
                   @kernels-updated="refreshKernels"
                 />
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Add New Server</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form @submit.prevent="addServer" class="space-y-4">
-                <div class="space-y-2">
-                  <label class="text-sm font-medium">Server IP</label>
-                  <Input 
-                    v-model.trim="serverForm.ip"
-                    type="text"
-                    placeholder="localhost"
-                    required
-                    @input="(e: Event) => serverForm.ip = (e.target as HTMLInputElement).value"
-                  />
-                </div>
-                <div class="space-y-2">
-                  <label class="text-sm font-medium">Port</label>
-                  <Input 
-                    v-model.trim="serverForm.port"
-                    type="text"
-                    inputmode="numeric"
-                    pattern="[0-9]*"
-                    placeholder="8888"
-                    required
-                    @input="(e: Event) => serverForm.port = (e.target as HTMLInputElement).value"
-                  />
-                </div>
-                <div class="space-y-2">
-                  <label class="text-sm font-medium">Token</label>
-                  <Input v-model="serverForm.token" type="password" placeholder="Jupyter token" />
-                </div>
-                <Button type="submit" class="w-full">Add Server</Button>
-              </form>
             </CardContent>
           </Card>
         </TabsContent>
