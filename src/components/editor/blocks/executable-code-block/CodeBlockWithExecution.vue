@@ -347,7 +347,7 @@ const copyCode = async () => {
         </Button>
       </div>
       <div
-        class="font-mono text-sm whitespace-pre-wrap break-words p-4"
+        class="text-sm whitespace-pre-wrap break-words p-4"
         :class="{ 'bg-red-50 dark:bg-red-950 text-destructive dark:text-red-200': cell?.hasError }"
         v-html="cell?.output"
       ></div>

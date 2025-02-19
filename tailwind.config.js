@@ -85,7 +85,7 @@ export const theme = {
       'collapsible-up': 'collapsible-up 0.2s ease-in-out',
     },
     fontFamily: {
-      sans: ['Google Sans', 'sans-serif'],
+      sans: ['Fira Code', 'sans-serif'],
     },
   },
 }
