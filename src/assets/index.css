@@ -3,8 +3,7 @@
 @tailwind utilities;
 
 @font-face {
-  font-family: 'Google Sans';
-  src: url('/fonts/google-sans.woff2') format('woff2');
+  font-family: 'Fira Code';
 }
 
 body {
