@@ -4,10 +4,15 @@ import NotaConfigPage from '@/components/NotaConfigPage.vue'
 import { ref, onMounted, watch, nextTick } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { computed } from 'vue'
-import { Cog6ToothIcon, CheckCircleIcon, ArrowPathIcon, StarIcon, ArrowDownTrayIcon } from '@heroicons/vue/24/outline'
+import {
+  Cog6ToothIcon,
+  CheckCircleIcon,
+  ArrowPathIcon,
+  StarIcon,
+  ArrowDownTrayIcon,
+} from '@heroicons/vue/24/outline'
 import { Button } from '@/components/ui/button'
 import { formatDate } from '@/lib/utils'
-import { ImageExtension } from '@/components/editor/extensions/ImageExtension'
 import { TagsInput } from '@/components/ui/tags-input'
 import TagsInputItem from '@/components/ui/tags-input/TagsInputItem.vue'
 import TagsInputItemText from '@/components/ui/tags-input/TagsInputItemText.vue'
@@ -79,9 +84,6 @@ const handleSaving = (saving: boolean) => {
   }
 }
 
-// Add ImageExtension to additional extensions
-const additionalExtensions = computed(() => [ImageExtension])
-
 const startTitleEdit = () => {
   editedTitle.value = nota.value?.title || ''
   isEditingTitle.value = true
@@ -110,23 +112,23 @@ const cancelTitleEdit = () => {
 
 const exportNota = async () => {
   const notas = await store.exportNota(props.id)
-  
+
   // Create file content
   const fileContent = JSON.stringify(notas, null, 2)
-  
+
   // Create blob and download link
   const blob = new Blob([fileContent], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
-  
+
   // Create download link
   const link = document.createElement('a')
   link.href = url
   link.download = `${nota.value?.title || 'nota'}.nota`
-  
+
   // Trigger download
   document.body.appendChild(link)
   link.click()
-  
+
   // Cleanup
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
@@ -139,7 +141,9 @@ const exportNota = async () => {
       <div class="flex-1">
         <div class="flex items-center gap-3">
           <div class="flex-1 flex items-center gap-4">
-            <h1 class="text-2xl font-semibold tracking-tight whitespace-nowrap flex items-center gap-2">
+            <h1
+              class="text-2xl font-semibold tracking-tight whitespace-nowrap flex items-center gap-2"
+            >
               <template v-if="isEditingTitle">
                 <input
                   v-model="editedTitle"
@@ -193,7 +197,12 @@ const exportNota = async () => {
       </div>
 
       <div class="flex items-center gap-2">
-        <Button title="Run All" @click="executeAllCells" :disabled="isExecutingAll" v-if="nota">
+        <Button
+          title="Run All"
+          @click="executeAllCells"
+          :disabled="isExecutingAll"
+          v-if="nota && nota.config?.savedSessions && nota.config?.savedSessions.length > 0"
+        >
           <Loader2 v-if="isExecutingAll" class="w-5 h-5 animate-spin" />
           <PlayCircle class="w-5 h-5" v-else />
           Run All
@@ -224,13 +233,7 @@ const exportNota = async () => {
 
     <main>
       <template v-if="isReady">
-        <NotaEditor
-          v-if="!showConfigPage && nota"
-          :nota-id="id"
-          @saving="handleSaving"
-          :extensions="additionalExtensions"
-          :key="id"
-        />
+        <NotaEditor v-if="!showConfigPage && nota" :nota-id="id" @saving="handleSaving" :key="id" />
         <NotaConfigPage v-else-if="nota" :nota-id="id" />
       </template>
       <div v-else class="flex items-center justify-center h-full">

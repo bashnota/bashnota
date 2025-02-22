@@ -37,6 +37,7 @@ export default {
         title: 'Text',
         category: 'Basic Blocks',
         icon: TextIcon,
+        keywords: ['text', 'paragraph', 'p'],
         command: ({ editor, range }: CommandArgs) => {
           editor.chain().focus().deleteRange(range).setParagraph().run()
         },
@@ -45,6 +46,7 @@ export default {
         title: 'Heading 1',
         category: 'Basic Blocks',
         icon: Heading1,
+        keywords: ['h1', 'title', 'heading1', 'heading 1'],
         command: ({ editor, range }: CommandArgs) => {
           editor.chain().focus().deleteRange(range).setHeading({ level: 1 }).run()
         },
@@ -53,6 +55,7 @@ export default {
         title: 'Heading 2',
         category: 'Basic Blocks',
         icon: Heading2,
+        keywords: ['h2', 'subtitle', 'heading2', 'heading 2'],
         command: ({ editor, range }: CommandArgs) => {
           editor.chain().focus().deleteRange(range).setHeading({ level: 2 }).run()
         },
@@ -61,6 +64,7 @@ export default {
         title: 'Heading 3',
         category: 'Basic Blocks',
         icon: Heading3,
+        keywords: ['h3', 'heading3', 'heading 3'],
         command: ({ editor, range }: CommandArgs) => {
           editor.chain().focus().deleteRange(range).setHeading({ level: 3 }).run()
         },
@@ -69,6 +73,7 @@ export default {
         title: 'Bullet List',
         category: 'Basic Blocks',
         icon: List,
+        keywords: ['ul', 'list', 'bullet', 'unordered'],
         command: ({ editor, range }: CommandArgs) => {
           editor.chain().focus().deleteRange(range).toggleBulletList().run()
         },
@@ -77,6 +82,7 @@ export default {
         title: 'Numbered List',
         category: 'Basic Blocks',
         icon: ListOrdered,
+        keywords: ['ol', 'ordered', 'numbered', 'list'],
         command: ({ editor, range }: CommandArgs) => {
           editor.chain().focus().deleteRange(range).toggleOrderedList().run()
         },
@@ -85,6 +91,7 @@ export default {
         title: 'Math Block',
         category: 'Basic Blocks',
         icon: FunctionSquare,
+        keywords: ['math', 'equation', 'latex', 'formula'],
         command: ({ editor, range }: CommandArgs) => {
           editor
             .chain()
@@ -105,6 +112,7 @@ export default {
         title: 'Python Code Block',
         category: 'Code Blocks',
         icon: FileCode,
+        keywords: ['py', 'python', 'code', 'script'],
         command: ({ editor, range }: CommandArgs) => {
           editor
             .chain()
@@ -127,24 +135,27 @@ export default {
         title: 'Single Image',
         category: 'Images',
         icon: ImageIcon,
+        keywords: ['img', 'image', 'picture', 'photo'],
         command: ({ editor, range }: CommandArgs) => {
-          editor.chain().focus().deleteRange(range).setNotaImage({ src: '' }).run()
+          editor.chain().focus().deleteRange(range).setImage({ src: '' }).run()
         },
       },
       {
         title: 'Figure with Subfigures',
         category: 'Images',
         icon: ImagesIcon,
+        keywords: ['subfig', 'figures', 'multiple', 'images'],
         command: ({ editor, range }: CommandArgs) => {
-          editor.chain().focus().deleteRange(range).setNotaImageSubfigureContainer().run()
+          editor.chain().focus().deleteRange(range).setSubfigures().run()
         },
       },
 
-      // Add this new section before the Advanced category
+      // Media
       {
         title: 'YouTube Video',
         category: 'Media',
         icon: VideoIcon,
+        keywords: ['yt', 'video', 'youtube', 'embed'],
         command: ({ editor, range }: CommandArgs) => {
           const url = prompt('Enter YouTube URL:')
           if (!url) return
@@ -158,6 +169,7 @@ export default {
         title: 'Table',
         category: 'Advanced',
         icon: Table2,
+        keywords: ['table', 'grid', 'matrix'],
         command: ({ editor, range }: CommandArgs) => {
           editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3 }).run()
         },
@@ -166,6 +178,7 @@ export default {
         title: 'New Page',
         category: 'Advanced',
         icon: FilePlus,
+        keywords: ['page', 'new', 'create', 'nota'],
         command: ({ editor, range }: CommandArgs) => {
           const createNewPage = async () => {
             const store = useNotaStore()
@@ -203,6 +216,7 @@ export default {
         title: 'Database Table',
         category: 'Advanced',
         icon: DatabaseIcon,
+        keywords: ['db', 'database', 'data', 'table'],
         command: ({ editor, range }: CommandArgs) => {
           const notaId = router.currentRoute.value.params.id as string
           editor.chain().focus().deleteRange(range).insertDataTable(notaId).run()
@@ -212,6 +226,7 @@ export default {
         title: 'Mermaid Diagram',
         category: 'Advanced',
         icon: ChartPieIcon,
+        keywords: ['diagram', 'chart', 'mermaid', 'flow'],
         command: ({ editor, range }: CommandArgs) => {
           editor
             .chain()
@@ -228,8 +243,9 @@ export default {
       },
       {
         title: 'Scatter Plot',
-        description: 'Add a scatter plot visualization',
+        category: 'Advanced',
         icon: ChartScatter,
+        keywords: ['scatter', 'plot', 'chart', 'graph'],
         command: ({ editor, range }: CommandArgs) => {
           editor
             .chain()
@@ -246,7 +262,15 @@ export default {
 
     return !query
       ? items
-      : items.filter((item) => item.title.toLowerCase().includes(query.toLowerCase())).slice(0, 10)
+      : items
+          .filter((item) => {
+            const searchQuery = query.toLowerCase()
+            return (
+              item.title.toLowerCase().includes(searchQuery) ||
+              item.keywords.some((keyword) => keyword.toLowerCase().includes(searchQuery))
+            )
+          })
+          .slice(0, 10)
   },
 
   render: () => {

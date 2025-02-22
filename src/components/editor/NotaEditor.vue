@@ -28,11 +28,13 @@ import { MarkdownExtension } from './extensions/MarkdownExtension'
 import { Mermaid } from './extensions/mermaid'
 import { ScatterPlot } from './extensions/scatter-plot'
 import { Youtube } from './extensions/youtube'
+import { SubfigureExtension } from './extensions/SubfigureExtension'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
 import { Markdown } from 'tiptap-markdown'
 
 // @ts-ignore
 import UniqueId from 'tiptap-unique-id'
+import { ImageExtension } from './extensions/ImageExtension'
 
 const props = defineProps<{
   notaId: string
@@ -57,7 +59,7 @@ const content = computed(() => {
 })
 
 // Create a base extensions array
-const baseExtensions = [
+const editorExtensions = [
   StarterKit.configure({
     codeBlock: false,
   }),
@@ -113,12 +115,9 @@ const baseExtensions = [
   }),
   ScatterPlot,
   Youtube,
+  SubfigureExtension,
+  ImageExtension,
 ]
-
-// Combine base extensions with any additional extensions passed as props
-const allExtensions = computed(() => {
-  return [...baseExtensions, ...(props.extensions || [])]
-})
 
 const registerCodeCells = (content: any) => {
   // Find all executable code blocks in the content
@@ -161,13 +160,17 @@ const registerCodeCells = (content: any) => {
 
 const editor = useEditor({
   content: content.value ? JSON.parse(content.value) : null,
-  extensions: allExtensions.value,
+  extensions: editorExtensions,
   editorProps: {
     attributes: {
       class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none',
     },
   },
   onCreate({ editor }) {
+    // Load saved sessions first
+    codeExecutionStore.loadSavedSessions(props.notaId)
+
+    // Then register code cells which will associate them with sessions
     registerCodeCells(editor.getJSON())
 
     editor.view.dom.addEventListener('click', (event) => {
@@ -191,6 +194,9 @@ const editor = useEditor({
 
       // Register/update code cells on content change
       registerCodeCells(content)
+
+      // Save sessions whenever content updates
+      codeExecutionStore.saveSessions(props.notaId)
 
       notaStore
         .saveNota({

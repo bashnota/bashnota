@@ -3,8 +3,20 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { useCodeExecution } from '@/composables/useCodeExecution'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
-import type { KernelConfig, KernelSpec } from '@/types/jupyter'
-import { Copy, Check, Play, Loader2, Plus, CircleDot, Server, Layers, Box, Eye, EyeOff } from 'lucide-vue-next'
+import type { KernelConfig } from '@/types/jupyter'
+import {
+  Copy,
+  Check,
+  Play,
+  Loader2,
+  Plus,
+  CircleDot,
+  Server,
+  Layers,
+  Box,
+  Eye,
+  EyeOff,
+} from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import CodeMirror from './CodeMirror.vue'
 import Popover from '@/components/ui/popover/Popover.vue'
@@ -43,17 +55,17 @@ const isCodeVisible = ref(true)
 
 const { cell, execute, copyOutput, isCopied } = useCodeExecution(props.id)
 
-// Selection states and labels
+// Selection states
 const isServerOpen = ref(false)
 const isKernelOpen = ref(false)
 const isSessionOpen = ref(false)
 
-// Get available sessions
+// Get available sessions from store
 const availableSessions = computed(() => {
   return codeExecutionStore.getAllSessions
 })
 
-// Rest of your computed properties
+// Get root nota for config
 const rootNotaId = computed(() => {
   const currentNota = store.getCurrentNota(props.notaId)
   if (!currentNota?.parentId) return props.notaId
@@ -85,28 +97,43 @@ const availableKernels = computed(() => {
 })
 
 // Session management methods
-const createNewSession = () => {
-  const sessionCount = availableSessions.value.length + 1
-  const sessionId = codeExecutionStore.createSession(`Session ${sessionCount}`)
+const createNewSession = async () => {
+  const sessionName = `Session ${availableSessions.value.length + 1}`
+
+  // Create new session
+  const sessionId = codeExecutionStore.createSession(sessionName)
+
+  // Select the new session
   selectedSession.value = sessionId
   codeExecutionStore.addCellToSession(props.id, sessionId)
   emit('update:session-id', sessionId)
+
+  // Save sessions to config
+  await codeExecutionStore.saveSessions(props.notaId)
 }
 
-const handleSessionChange = () => {
+const handleSessionChange = async () => {
   if (selectedSession.value) {
     codeExecutionStore.addCellToSession(props.id, selectedSession.value)
     emit('update:session-id', selectedSession.value)
+    await codeExecutionStore.saveSessions(props.notaId)
   }
 }
 
-// Initialize
+// Initialize component
 onMounted(async () => {
+  // Load any kernel preferences
   if (props.kernelPreference) {
     selectedServer.value = props.kernelPreference.serverId || 'none'
   }
+
+  // If this cell has a session, make sure it's selected
+  if (props.sessionId) {
+    selectedSession.value = props.sessionId
+  }
 })
 
+// Watch for code changes
 watch(
   () => props.code,
   (newCode) => {
@@ -116,6 +143,7 @@ watch(
   },
 )
 
+// Watch for output changes
 watch(
   () => cell.value?.output,
   (newOutput) => {
@@ -127,6 +155,7 @@ watch(
   },
 )
 
+// Watch for session changes from parent
 watch(
   () => props.sessionId,
   (newSessionId) => {
@@ -208,16 +237,10 @@ const copyCode = async () => {
           </Command>
         </PopoverContent>
       </Popover>
-      <Button 
-    variant="outline" 
-    size="sm" 
-    class="gap-2 h-8"
-    @click="isCodeVisible = !isCodeVisible"
-  >
-    <Eye v-if="isCodeVisible" class="h-4 w-4" />
-    <EyeOff v-else class="h-4 w-4" />
-  </Button>
-
+      <Button variant="outline" size="sm" class="gap-2 h-8" @click="isCodeVisible = !isCodeVisible">
+        <Eye v-if="isCodeVisible" class="h-4 w-4" />
+        <EyeOff v-else class="h-4 w-4" />
+      </Button>
 
       <!-- Server Selector -->
       <Popover v-model:open="isServerOpen">
