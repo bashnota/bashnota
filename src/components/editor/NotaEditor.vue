@@ -28,6 +28,7 @@ import { MarkdownExtension } from './extensions/MarkdownExtension'
 import { Mermaid } from './extensions/mermaid'
 import { ScatterPlot } from './extensions/scatter-plot'
 import { Youtube } from './extensions/youtube'
+import { SubfigureExtension } from './extensions/SubfigureExtension'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
 import { Markdown } from 'tiptap-markdown'
 
@@ -57,7 +58,7 @@ const content = computed(() => {
 })
 
 // Create a base extensions array
-const baseExtensions = [
+const editorExtensions = [
   StarterKit.configure({
     codeBlock: false,
   }),
@@ -113,12 +114,8 @@ const baseExtensions = [
   }),
   ScatterPlot,
   Youtube,
+  SubfigureExtension,
 ]
-
-// Combine base extensions with any additional extensions passed as props
-const allExtensions = computed(() => {
-  return [...baseExtensions, ...(props.extensions || [])]
-})
 
 const registerCodeCells = (content: any) => {
   // Find all executable code blocks in the content
@@ -161,7 +158,7 @@ const registerCodeCells = (content: any) => {
 
 const editor = useEditor({
   content: content.value ? JSON.parse(content.value) : null,
-  extensions: allExtensions.value,
+  extensions: editorExtensions,
   editorProps: {
     attributes: {
       class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none',

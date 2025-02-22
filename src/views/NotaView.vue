@@ -13,7 +13,6 @@ import {
 } from '@heroicons/vue/24/outline'
 import { Button } from '@/components/ui/button'
 import { formatDate } from '@/lib/utils'
-import { ImageExtension } from '@/components/editor/extensions/ImageExtension'
 import { TagsInput } from '@/components/ui/tags-input'
 import TagsInputItem from '@/components/ui/tags-input/TagsInputItem.vue'
 import TagsInputItemText from '@/components/ui/tags-input/TagsInputItemText.vue'
@@ -84,9 +83,6 @@ const handleSaving = (saving: boolean) => {
     }, 2000)
   }
 }
-
-// Add ImageExtension to additional extensions
-const additionalExtensions = computed(() => [ImageExtension])
 
 const startTitleEdit = () => {
   editedTitle.value = nota.value?.title || ''
@@ -237,13 +233,7 @@ const exportNota = async () => {
 
     <main>
       <template v-if="isReady">
-        <NotaEditor
-          v-if="!showConfigPage && nota"
-          :nota-id="id"
-          @saving="handleSaving"
-          :extensions="additionalExtensions"
-          :key="id"
-        />
+        <NotaEditor v-if="!showConfigPage && nota" :nota-id="id" @saving="handleSaving" :key="id" />
         <NotaConfigPage v-else-if="nota" :nota-id="id" />
       </template>
       <div v-else class="flex items-center justify-center h-full">

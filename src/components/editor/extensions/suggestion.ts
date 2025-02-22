@@ -136,7 +136,7 @@ export default {
         category: 'Images',
         icon: ImagesIcon,
         command: ({ editor, range }: CommandArgs) => {
-          editor.chain().focus().deleteRange(range).setNotaImageSubfigureContainer().run()
+          editor.chain().focus().deleteRange(range).setSubfigures().run()
         },
       },
 
