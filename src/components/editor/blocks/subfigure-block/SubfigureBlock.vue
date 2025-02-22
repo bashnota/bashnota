@@ -161,7 +161,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
-import UploadZone from './UploadZone.vue'
+import UploadZone from '@/components/UploadZone.vue'
 
 const props = defineProps<{
   node: any

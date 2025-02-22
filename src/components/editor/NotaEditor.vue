@@ -34,6 +34,7 @@ import { Markdown } from 'tiptap-markdown'
 
 // @ts-ignore
 import UniqueId from 'tiptap-unique-id'
+import { ImageExtension } from './extensions/ImageExtension'
 
 const props = defineProps<{
   notaId: string
@@ -115,6 +116,7 @@ const editorExtensions = [
   ScatterPlot,
   Youtube,
   SubfigureExtension,
+  ImageExtension,
 ]
 
 const registerCodeCells = (content: any) => {
