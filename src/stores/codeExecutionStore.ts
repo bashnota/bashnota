@@ -3,11 +3,13 @@ import { ref, computed } from 'vue'
 import { CodeExecutionService } from '../services/codeExecutionService'
 import type { CodeCell, KernelSession } from '@/types/codeExecution'
 import type { JupyterServer } from '@/types/jupyter'
+import { useNotaStore } from './nota'
 
 export const useCodeExecutionStore = defineStore('codeExecution', () => {
   const cells = ref<Map<string, CodeCell>>(new Map())
   const kernelSessions = ref<Map<string, KernelSession>>(new Map())
   const executionService = new CodeExecutionService()
+  const notaStore = useNotaStore()
 
   // Getters
   const getCellById = computed(() => (id: string) => cells.value.get(id))
@@ -17,9 +19,42 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
   })
   const getAllSessions = computed(() => Array.from(kernelSessions.value.values()))
 
+  // Load saved sessions from nota config
+  const loadSavedSessions = (notaId: string) => {
+    const nota = notaStore.getCurrentNota(notaId)
+    if (!nota?.config?.savedSessions) return
+
+    // Clear existing sessions first
+    kernelSessions.value.clear()
+
+    // Restore saved sessions
+    nota.config.savedSessions.forEach((savedSession) => {
+      kernelSessions.value.set(savedSession.id, {
+        id: savedSession.id,
+        kernelId: '', // Will be set when actually connecting
+        serverConfig: {} as JupyterServer, // Will be set when cells are registered
+        kernelName: '', // Will be set when cells are registered
+        cells: [],
+        name: savedSession.name,
+      })
+    })
+  }
+
+  // Save current sessions to nota config
+  const saveSessions = async (notaId: string) => {
+    const savedSessions = Array.from(kernelSessions.value.values()).map((session) => ({
+      id: session.id,
+      name: session.name,
+    }))
+
+    await notaStore.updateNotaConfig(notaId, (config) => {
+      config.savedSessions = savedSessions
+    })
+  }
+
   // Session Management
   function createSession(name: string) {
-    const sessionId = name.toLowerCase().replace(/\s/g, '-')
+    const sessionId = `session-${Date.now()}-${Math.random().toString(36).slice(2)}`
     kernelSessions.value.set(sessionId, {
       id: sessionId,
       kernelId: '',
@@ -29,6 +64,55 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
       name,
     })
     return sessionId
+  }
+
+  // Register code cells (keep existing logic)
+  const registerCodeCells = (content: any, notaId: string) => {
+    const findCodeBlocks = (node: any): any[] => {
+      const blocks = []
+      if (node.type === 'executableCodeBlock') {
+        blocks.push(node)
+      }
+      if (node.content) {
+        node.content.forEach((child: any) => {
+          blocks.push(...findCodeBlocks(child))
+        })
+      }
+      return blocks
+    }
+
+    const codeBlocks = findCodeBlocks(content)
+    const nota = notaStore.getCurrentNota(notaId)
+    const servers = nota?.config?.jupyterServers || []
+
+    codeBlocks.forEach((block) => {
+      const { attrs, content } = block
+      const code = content ? content.map((c: any) => c.text).join('\n') : ''
+
+      const serverID = attrs.serverID ? attrs.serverID.split(':') : null
+      const server = serverID
+        ? servers.find((s: any) => s.ip === serverID[0] && s.port === serverID[1])
+        : undefined
+
+      // If block has a session, ensure session has server config and kernel info
+      if (attrs.sessionId && kernelSessions.value.has(attrs.sessionId)) {
+        const session = kernelSessions.value.get(attrs.sessionId)!
+        if (server) {
+          session.serverConfig = server
+          session.kernelName = attrs.kernelName
+          kernelSessions.value.set(attrs.sessionId, { ...session })
+        }
+      }
+
+      addCell({
+        id: attrs.id,
+        code,
+        serverConfig: server,
+        kernelName: attrs.kernelName,
+        output: attrs.output,
+        sessionId: attrs.sessionId,
+      })
+    })
   }
 
   function deleteSession(sessionId: string) {
@@ -61,7 +145,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
         session.cells.push(cellId)
       }
       cell.sessionId = sessionId
-      cells.value.set(cellId, cell)
+      cells.value.set(cellId, { ...cell })
     }
   }
 
@@ -71,7 +155,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
     if (session && cell) {
       session.cells = session.cells.filter((id) => id !== cellId)
       cell.sessionId = ''
-      cells.value.set(cellId, cell)
+      cells.value.set(cellId, { ...cell })
     }
   }
 
@@ -285,5 +369,8 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
     deleteSession,
     addCellToSession,
     removeCellFromSession,
+    registerCodeCells,
+    loadSavedSessions,
+    saveSessions,
   }
 })

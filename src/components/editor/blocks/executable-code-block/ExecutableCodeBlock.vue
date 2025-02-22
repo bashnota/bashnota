@@ -18,6 +18,7 @@ const route = useRoute()
 const store = useNotaStore()
 const codeExecutionStore = useCodeExecutionStore()
 
+const notaId = computed(() => route.params.id as string)
 const blockId = computed(() => props.node.attrs.id || '')
 const isExecutable = computed(() => props.node.attrs.executable)
 const language = computed(() => props.node.attrs.language)
@@ -85,7 +86,7 @@ const onSessionSelect = (sessionId: string) => {
           :serverID="serverID"
           :kernel-name="kernelName"
           :session-id="sessionId"
-          :nota-id="route.params.id as string"
+          :nota-id="notaId"
           :kernel-preference="kernelPreference"
           @update:code="updateCode"
           @kernel-select="onKernelSelect"

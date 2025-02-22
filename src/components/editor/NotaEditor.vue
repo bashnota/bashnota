@@ -168,6 +168,10 @@ const editor = useEditor({
     },
   },
   onCreate({ editor }) {
+    // Load saved sessions first
+    codeExecutionStore.loadSavedSessions(props.notaId)
+
+    // Then register code cells which will associate them with sessions
     registerCodeCells(editor.getJSON())
 
     editor.view.dom.addEventListener('click', (event) => {
@@ -191,6 +195,9 @@ const editor = useEditor({
 
       // Register/update code cells on content change
       registerCodeCells(content)
+
+      // Save sessions whenever content updates
+      codeExecutionStore.saveSessions(props.notaId)
 
       notaStore
         .saveNota({

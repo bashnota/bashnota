@@ -37,6 +37,10 @@ export interface NotaConfig {
   }>
   kernels: Record<string, KernelSpec[]>
   kernelPreferences: Record<string, KernelConfig>
+  savedSessions: Array<{
+    id: string
+    name: string
+  }>
 }
 
 export interface KernelSpec {
