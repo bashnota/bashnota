@@ -202,8 +202,11 @@ const handleFullScreen = () => {
       <!-- Session Selector -->
       <Popover v-model:open="isSessionOpen">
         <PopoverTrigger as-child>
-          <Button variant="outline" size="sm" class="gap-2 h-8">
+          <Button variant="outline" size="sm" class="gap-2 h-8 relative"
+            :class="{ 'bg-red-500/20 hover:bg-red-500/30': !selectedSession }"
+            :title="selectedSession ? 'Current Session' : 'Select Session'">
             <Layers class="h-4 w-4" />
+            <span v-if="selectedSession" class="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full"></span>
           </Button>
         </PopoverTrigger>
         <PopoverContent class="w-[200px] p-0" align="start">
@@ -236,7 +239,8 @@ const handleFullScreen = () => {
           </Command>
         </PopoverContent>
       </Popover>
-      <Button variant="outline" size="sm" class="gap-2 h-8" @click="isCodeVisible = !isCodeVisible">
+      <Button variant="outline" size="sm" class="gap-2 h-8" @click="isCodeVisible = !isCodeVisible"
+        :title="isCodeVisible ? 'Hide Code' : 'Show Code'">
         <Eye v-if="isCodeVisible" class="h-4 w-4" />
         <EyeOff v-else class="h-4 w-4" />
       </Button>
@@ -244,8 +248,12 @@ const handleFullScreen = () => {
       <!-- Server Selector -->
       <Popover v-model:open="isServerOpen">
         <PopoverTrigger as-child>
-          <Button variant="outline" size="sm" class="gap-2 h-8">
+          <Button variant="outline" size="sm" class="gap-2 h-8 relative"
+            :class="{ 'bg-red-500/20 hover:bg-red-500/30': !selectedServer || selectedServer === 'none' }"
+            :title="selectedServer && selectedServer !== 'none' ? `Server: ${selectedServer}` : 'Select Server'">
             <Server class="h-4 w-4" />
+            <span v-if="selectedServer && selectedServer !== 'none'"
+              class="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full"></span>
           </Button>
         </PopoverTrigger>
         <PopoverContent class="w-[200px] p-0" align="start">
@@ -277,9 +285,18 @@ const handleFullScreen = () => {
       <!-- Kernel Selector -->
       <Popover v-model:open="isKernelOpen">
         <PopoverTrigger as-child>
-          <Button variant="outline" size="sm" class="gap-2 h-8"
-            :disabled="!selectedServer || selectedServer === 'none'">
+          <Button variant="outline" size="sm" class="gap-2 h-8 relative min-w-[32px]" :class="{
+            'bg-red-500/20 hover:bg-red-500/30': !selectedKernel || selectedKernel === 'none',
+            'pl-2 pr-3': selectedKernel && selectedKernel !== 'none'
+          }" :disabled="!selectedServer || selectedServer === 'none'"
+            :title="selectedKernel && selectedKernel !== 'none' ? `Kernel: ${selectedKernel}` : 'Select Kernel'">
             <Box class="h-4 w-4" />
+            <span v-if="selectedKernel && selectedKernel !== 'none'"
+              class="ml-1 text-xs font-medium truncate max-w-[60px]">
+              {{ selectedKernel }}
+            </span>
+            <span v-if="selectedKernel && selectedKernel !== 'none'"
+              class="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full"></span>
           </Button>
         </PopoverTrigger>
         <PopoverContent class="w-[200px] p-0" align="start">
@@ -311,13 +328,13 @@ const handleFullScreen = () => {
 
       <!-- Run Button -->
       <Button variant="default" size="sm" :disabled="cell?.isExecuting || selectedKernel === 'none'"
-        @click="handleExecution" class="h-8">
+        @click="handleExecution" class="h-8" :title="cell?.isExecuting ? 'Executing...' : 'Run Code'">
         <Loader2 class="w-4 h-4 animate-spin mr-2" v-if="cell?.isExecuting" />
         <Play class="w-4 h-4 mr-2" v-else />
         Run
       </Button>
 
-      <Button variant="ghost" size="sm" class="h-8 w-8 p-0" @click="handleFullScreen">
+      <Button variant="ghost" size="sm" class="h-8 w-8 p-0" @click="handleFullScreen" title="Full Screen Mode">
         <Maximize2 class="h-4 w-4" />
       </Button>
     </div>
