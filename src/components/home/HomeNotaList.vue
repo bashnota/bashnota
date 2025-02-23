@@ -106,12 +106,12 @@ const filteredNotas = computed(() => {
     <RouterLink v-for="nota in filteredNotas" :key="nota.id" :to="`/nota/${nota.id}`">
       <Card class="h-full hover:shadow-md transition-all group relative">
         <CardHeader>
-          <div class="flex items-center justify-between flex-wrap">
-            <div class="flex items-center gap-2">
-              <DocumentTextIcon class="w-5 h-5 text-muted-foreground" />
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center gap-2 min-w-0 flex-1">
+              <DocumentTextIcon class="w-5 h-5 text-muted-foreground flex-shrink-0" />
               <CardTitle class="text-lg truncate">{{ nota.title }}</CardTitle>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-shrink-0">
               <Button
                 variant="ghost"
                 size="icon"
@@ -120,9 +120,7 @@ const filteredNotas = computed(() => {
               >
                 <StarIcon
                   class="w-5 h-5"
-                  :class="
-                    nota.favorite ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground'
-                  "
+                  :class="nota.favorite ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground'"
                 />
               </Button>
               <Button
@@ -136,7 +134,7 @@ const filteredNotas = computed(() => {
             </div>
           </div>
           <div class="flex items-center text-sm text-muted-foreground mt-2">
-            <ClockIcon class="w-4 h-4 mr-1" />
+            <ClockIcon class="w-4 h-4 mr-1 flex-shrink-0" />
             {{ formatDate(nota.updatedAt) }}
           </div>
         </CardHeader>
@@ -146,7 +144,7 @@ const filteredNotas = computed(() => {
               v-for="tag in nota.tags"
               :key="tag"
               @click.prevent="$emit('update:selectedTag', tag)"
-              class="cursor-pointer transition-colors"
+              class="cursor-pointer transition-colors truncate max-w-full"
             >
               {{ tag }}
             </Badge>
@@ -159,47 +157,31 @@ const filteredNotas = computed(() => {
 
   <div v-else-if="viewType === 'list'" class="flex flex-col space-y-3">
     <RouterLink v-for="nota in filteredNotas" :key="nota.id" :to="`/nota/${nota.id}`">
-      <div
-        class="flex items-start gap-4 p-4 rounded-lg hover:bg-muted/50 transition-colors group border"
-      >
-        <DocumentTextIcon class="w-5 h-5 text-muted-foreground mt-1" />
+      <div class="flex items-start gap-4 p-4 rounded-lg hover:bg-muted/50 transition-colors group border">
+        <DocumentTextIcon class="w-5 h-5 text-muted-foreground mt-1 flex-shrink-0" />
         <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2 justify-between">
-            <div class="flex items-center gap-2 flex-1">
+          <div class="flex items-center gap-2 justify-between flex-wrap">
+            <div class="flex items-center gap-2 flex-1 min-w-0">
               <h3 class="font-medium truncate">{{ nota.title }}</h3>
               <StarIcon
                 v-if="nota.favorite"
                 class="w-4 h-4 text-yellow-400 fill-yellow-400 flex-shrink-0"
               />
             </div>
-            <div
-              class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <Button
-                variant="ghost"
-                size="icon"
-                class="h-8 w-8"
-                @click.prevent="toggleFavorite(nota.id)"
-              >
+            <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+              <Button variant="ghost" size="icon" class="h-8 w-8" @click.prevent="toggleFavorite(nota.id)">
                 <StarIcon
                   class="w-4 h-4"
-                  :class="
-                    nota.favorite ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground'
-                  "
+                  :class="nota.favorite ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground'"
                 />
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                class="h-8 w-8"
-                @click.prevent="openSettings(nota.id)"
-              >
+              <Button variant="ghost" size="icon" class="h-8 w-8" @click.prevent="openSettings(nota.id)">
                 <Cog6ToothIcon class="w-4 h-4 text-muted-foreground" />
               </Button>
             </div>
           </div>
-          <div class="flex items-center gap-4 mt-2">
-            <span class="text-xs text-muted-foreground flex items-center">
+          <div class="flex items-center gap-4 mt-2 flex-wrap">
+            <span class="text-xs text-muted-foreground flex items-center flex-shrink-0">
               <ClockIcon class="w-3 h-3 mr-1" />
               {{ formatDate(nota.updatedAt) }}
             </span>
@@ -208,7 +190,7 @@ const filteredNotas = computed(() => {
                 v-for="tag in nota.tags"
                 :key="tag"
                 @click.prevent="$emit('update:selectedTag', tag)"
-                class="cursor-pointer transition-colors"
+                class="cursor-pointer transition-colors truncate max-w-[200px]"
               >
                 {{ tag }}
               </Badge>
@@ -248,5 +230,12 @@ const filteredNotas = computed(() => {
 
 :deep(.tag) {
   @apply text-xs px-2 py-1 rounded-md bg-muted hover:bg-muted/80 transition-colors;
+}
+
+/* Add responsive breakpoints for tag max-width */
+@media (max-width: 640px) {
+  :deep(.tag) {
+    @apply max-w-[150px];
+  }
 }
 </style>
