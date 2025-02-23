@@ -133,3 +133,5 @@ public/
 .firebaserc
 firebase.json
 .firebase/
+
+.vscode/

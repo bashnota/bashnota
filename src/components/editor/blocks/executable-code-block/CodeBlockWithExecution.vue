@@ -16,6 +16,7 @@ import {
   Box,
   Eye,
   EyeOff,
+  Maximize2,
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import CodeMirror from './CodeMirror.vue'
@@ -28,6 +29,7 @@ import CommandEmpty from '@/components/ui/command/CommandEmpty.vue'
 import CommandGroup from '@/components/ui/command/CommandGroup.vue'
 import CommandItem from '@/components/ui/command/CommandItem.vue'
 import CommandList from '@/components/ui/command/CommandList.vue'
+import FullScreenCodeBlock from './FullScreenCodeBlock.vue'
 
 const props = defineProps<{
   code: string
@@ -52,6 +54,7 @@ const codeValue = ref(props.code)
 const output = ref(props.result)
 const isCodeCopied = ref(false)
 const isCodeVisible = ref(true)
+const isFullScreen = ref(false)
 
 const { cell, execute, copyOutput, isCopied } = useCodeExecution(props.id)
 
@@ -186,13 +189,16 @@ const copyCode = async () => {
     console.error('Failed to copy code:', err)
   }
 }
+
+const handleFullScreen = () => {
+  isFullScreen.value = true
+}
 </script>
 
 <template>
   <div class="flex flex-col bg-slate-100 dark:bg-slate-900 rounded-lg overflow-hidden">
     <div
-      class="flex items-center gap-2 p-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
-    >
+      class="flex items-center gap-2 p-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <!-- Session Selector -->
       <Popover v-model:open="isSessionOpen">
         <PopoverTrigger as-child>
@@ -212,24 +218,17 @@ const copyCode = async () => {
             <CommandList>
               <CommandEmpty>No sessions found.</CommandEmpty>
               <CommandGroup>
-                <CommandItem
-                  v-for="session in availableSessions"
-                  :key="session.id"
-                  :value="session.id"
-                  @select="
-                    (value) => {
-                      if (typeof value.detail.value === 'string') {
-                        selectedSession = value.detail.value
-                        handleSessionChange()
-                      }
-                      isSessionOpen = false
+                <CommandItem v-for="session in availableSessions" :key="session.id" :value="session.id" @select="
+                  (value) => {
+                    if (typeof value.detail.value === 'string') {
+                      selectedSession = value.detail.value
+                      handleSessionChange()
                     }
-                  "
-                >
-                  <CircleDot
-                    class="h-4 w-4 mr-2 text-5xl"
-                    :class="selectedSession === session.id ? 'opacity-100' : 'opacity-0'"
-                  />
+                    isSessionOpen = false
+                  }
+                ">
+                  <CircleDot class="h-4 w-4 mr-2 text-5xl"
+                    :class="selectedSession === session.id ? 'opacity-100' : 'opacity-0'" />
                   {{ session.name }}
                 </CommandItem>
               </CommandGroup>
@@ -255,10 +254,7 @@ const copyCode = async () => {
             <CommandList>
               <CommandEmpty>No servers found.</CommandEmpty>
               <CommandGroup>
-                <CommandItem
-                  v-for="server in availableServers"
-                  :key="server.displayName"
-                  :value="server.displayName"
+                <CommandItem v-for="server in availableServers" :key="server.displayName" :value="server.displayName"
                   @select="
                     (value) => {
                       if (typeof value.detail.value === 'string') {
@@ -267,12 +263,9 @@ const copyCode = async () => {
                       }
                       isServerOpen = false
                     }
-                  "
-                >
-                  <CircleDot
-                    class="h-4 w-4 mr-2"
-                    :class="selectedServer === server.displayName ? 'opacity-100' : 'opacity-0'"
-                  />
+                  ">
+                  <CircleDot class="h-4 w-4 mr-2"
+                    :class="selectedServer === server.displayName ? 'opacity-100' : 'opacity-0'" />
                   {{ server.displayName }}
                 </CommandItem>
               </CommandGroup>
@@ -284,12 +277,8 @@ const copyCode = async () => {
       <!-- Kernel Selector -->
       <Popover v-model:open="isKernelOpen">
         <PopoverTrigger as-child>
-          <Button
-            variant="outline"
-            size="sm"
-            class="gap-2 h-8"
-            :disabled="!selectedServer || selectedServer === 'none'"
-          >
+          <Button variant="outline" size="sm" class="gap-2 h-8"
+            :disabled="!selectedServer || selectedServer === 'none'">
             <Box class="h-4 w-4" />
           </Button>
         </PopoverTrigger>
@@ -299,24 +288,17 @@ const copyCode = async () => {
             <CommandList>
               <CommandEmpty>No kernels found.</CommandEmpty>
               <CommandGroup>
-                <CommandItem
-                  v-for="kernel in availableKernels"
-                  :key="kernel.name"
-                  :value="kernel.name"
-                  @select="
-                    (value) => {
-                      if (typeof value.detail.value === 'string') {
-                        selectedKernel = value.detail.value
-                        emit('kernel-select', selectedKernel, selectedServer)
-                      }
-                      isKernelOpen = false
+                <CommandItem v-for="kernel in availableKernels" :key="kernel.name" :value="kernel.name" @select="
+                  (value) => {
+                    if (typeof value.detail.value === 'string') {
+                      selectedKernel = value.detail.value
+                      emit('kernel-select', selectedKernel, selectedServer)
                     }
-                  "
-                >
-                  <CircleDot
-                    class="h-4 w-4 mr-2"
-                    :class="selectedKernel === kernel.name ? 'opacity-100' : 'opacity-0'"
-                  />
+                    isKernelOpen = false
+                  }
+                ">
+                  <CircleDot class="h-4 w-4 mr-2"
+                    :class="selectedKernel === kernel.name ? 'opacity-100' : 'opacity-0'" />
                   {{ kernel.spec.display_name }}
                 </CommandItem>
               </CommandGroup>
@@ -328,16 +310,15 @@ const copyCode = async () => {
       <div class="flex-1"></div>
 
       <!-- Run Button -->
-      <Button
-        variant="default"
-        size="sm"
-        :disabled="cell?.isExecuting || selectedKernel === 'none'"
-        @click="handleExecution"
-        class="h-8"
-      >
+      <Button variant="default" size="sm" :disabled="cell?.isExecuting || selectedKernel === 'none'"
+        @click="handleExecution" class="h-8">
         <Loader2 class="w-4 h-4 animate-spin mr-2" v-if="cell?.isExecuting" />
         <Play class="w-4 h-4 mr-2" v-else />
         Run
+      </Button>
+
+      <Button variant="ghost" size="sm" class="h-8 w-8 p-0" @click="handleFullScreen">
+        <Maximize2 class="h-4 w-4" />
       </Button>
     </div>
 
@@ -350,12 +331,8 @@ const copyCode = async () => {
         </Button>
       </div>
 
-      <CodeMirror
-        v-model="codeValue"
-        :language="language"
-        :disabled="cell?.isExecuting"
-        @update:modelValue="updateCode"
-      />
+      <CodeMirror v-model="codeValue" :language="language" :disabled="cell?.isExecuting"
+        @update:modelValue="updateCode" />
     </div>
 
     <!-- Output Section -->
@@ -369,12 +346,14 @@ const copyCode = async () => {
           <Check v-else class="h-3 w-3" />
         </Button>
       </div>
-      <div
-        class="text-sm whitespace-pre-wrap break-words p-4"
+      <div class="text-sm whitespace-pre-wrap break-words p-4"
         :class="{ 'bg-red-50 dark:bg-red-950 text-destructive dark:text-red-200': cell?.hasError }"
-        v-html="cell?.output"
-      ></div>
+        v-html="cell?.output"></div>
     </div>
+
+    <FullScreenCodeBlock v-if="isFullScreen" :code="codeValue" :output="cell?.output" :language="language"
+      :is-open="isFullScreen" :is-executing="cell?.isExecuting" @update:is-open="isFullScreen = $event"
+      :on-close="() => isFullScreen = false" :on-update="updateCode" :on-execute="handleExecution" />
   </div>
 </template>
 
