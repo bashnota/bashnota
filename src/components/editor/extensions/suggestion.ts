@@ -91,7 +91,7 @@ export default {
         title: 'Math Block',
         category: 'Basic Blocks',
         icon: FunctionSquare,
-        keywords: ['math', 'equation', 'latex', 'formula'],
+        keywords: ['math', 'equation', 'latex', 'formula', '$', '$$'],
         command: ({ editor, range }: CommandArgs) => {
           editor
             .chain()
@@ -100,7 +100,7 @@ export default {
             .insertContent({
               type: 'mathBlock',
               attrs: {
-                latex: '\\frac{1}{2}',
+                latex: '\\frac{(a \cdot b)^2}{||a - b||^2}',
               },
             })
             .run()
@@ -109,10 +109,10 @@ export default {
 
       // Code Blocks
       {
-        title: 'Python Code Block',
+        title: 'Code Block',
         category: 'Code Blocks',
         icon: FileCode,
-        keywords: ['py', 'python', 'code', 'script'],
+        keywords: ['py', 'python', 'code', 'script', 'exe'],
         command: ({ editor, range }: CommandArgs) => {
           editor
             .chain()
@@ -124,7 +124,7 @@ export default {
                 language: 'python',
                 executeable: true,
               },
-              content: [{ type: 'text', text: '# Your Python code here' }],
+              content: [{ type: 'text', text: 'print("Hello, Bashers!")' }],
             })
             .run()
         },
@@ -144,7 +144,7 @@ export default {
         title: 'Figure with Subfigures',
         category: 'Images',
         icon: ImagesIcon,
-        keywords: ['subfig', 'figures', 'multiple', 'images'],
+        keywords: ['subfig', 'figures', 'multiple', 'images', 'imgs'],
         command: ({ editor, range }: CommandArgs) => {
           editor.chain().focus().deleteRange(range).setSubfigures().run()
         },
@@ -175,17 +175,17 @@ export default {
         },
       },
       {
-        title: 'New Page',
+        title: 'New Sub Nota',
         category: 'Advanced',
         icon: FilePlus,
-        keywords: ['page', 'new', 'create', 'nota'],
+        keywords: ['page', 'new', 'create', 'nota', 'subnota'],
         command: ({ editor, range }: CommandArgs) => {
           const createNewPage = async () => {
             const store = useNotaStore()
             const currentRoute = router.currentRoute.value
             const parentId = currentRoute.params.id as string
 
-            const title = prompt('Enter page title:')
+            const title = prompt('Enter Nota title:')
             if (!title) return
 
             try {
@@ -205,7 +205,7 @@ export default {
 
               router.push(`/nota/${newPage.id}`)
             } catch (error) {
-              console.error('Failed to create page:', error)
+              console.error('Failed to create nota:', error)
             }
           }
 
