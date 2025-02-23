@@ -60,3 +60,42 @@ export interface SessionManager {
   deleteSession(id: string): void
   setActiveSession(id: string): void
 }
+
+export type ControlType = 'slider' | 'range' | 'number' | 'select' | 'checkbox' | 'color' | 'datetime' | 'text'
+
+export interface ControlOptions {
+  min?: number
+  max?: number
+  step?: number
+  defaultValue?: any
+  required?: boolean
+  choices?: string[]
+  label?: string
+  description?: string
+  placeholder?: string
+  pattern?: string
+  isFloat?: boolean
+  multiple?: boolean
+}
+
+export interface CodeFormControl {
+  name: string
+  value: any
+  type: ControlType
+  options: {
+    min?: number
+    max?: number
+    step?: number
+    isFloat?: boolean
+    defaultValue?: any
+    required?: boolean
+    choices?: string[]
+    [key: string]: any
+  }
+}
+
+export interface ParsedControl {
+  name: string
+  rawValue: string
+  typeString: string
+}

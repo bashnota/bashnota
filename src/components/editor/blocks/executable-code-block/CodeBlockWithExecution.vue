@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { useCodeExecution } from '@/composables/useCodeExecution'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
@@ -30,6 +30,9 @@ import CommandGroup from '@/components/ui/command/CommandGroup.vue'
 import CommandItem from '@/components/ui/command/CommandItem.vue'
 import CommandList from '@/components/ui/command/CommandList.vue'
 import FullScreenCodeBlock from './FullScreenCodeBlock.vue'
+import { parseCodeControls } from '@/utils/codeParser'
+import CodeControls from '@/components/editor/blocks/executable-code-block/CodeControls.vue'
+import type { CodeFormControl } from '@/types/codeExecution'
 
 const props = defineProps<{
   code: string
@@ -99,6 +102,79 @@ const availableKernels = computed(() => {
   return notaConfig.value.kernels[selectedServer.value] || []
 })
 
+// Add to existing refs
+const codeControls = computed(() => {
+  const controls = parseCodeControls(codeValue.value)
+  console.log('📊 Parsed Controls:', controls)
+  return controls
+})
+
+const formatValue = (control: CodeFormControl) => {
+  // Handle string values for select and text types
+  if (control.type === 'select' || control.type === 'text') {
+    return `"${control.value}"`
+  }
+
+  // Handle numeric values for number and slider types
+  if (control.type === 'number' || control.type === 'slider') {
+    if (control.options?.isFloat) {
+      // For floats, ensure decimal point is present
+      return parseFloat(control.value).toFixed(1)
+    }
+    // For integers, round the value
+    return Math.round(control.value)
+  }
+
+  return control.value
+}
+
+const handleControlUpdate = (updatedControl: CodeFormControl) => {
+  console.log('🎮 Control Update Triggered:', updatedControl)
+  const lines = codeValue.value.split('\n')
+  let hasChanges = false
+
+  const updatedLines = lines.map(line => {
+    // More precise regex to match the entire line including comments
+    const varRegex = new RegExp(`^\\s*${updatedControl.name}\\s*=.*?(#.*)?$`)
+    if (varRegex.test(line)) {
+      hasChanges = true
+      let valueStr = ''
+
+      switch (updatedControl.type) {
+        case 'text':
+          // Special handling for text to preserve quotes
+          valueStr = `"${String(updatedControl.value).replace(/"/g, '\\"')}"`
+          break
+        case 'datetime':
+        case 'color':
+        case 'select':
+          valueStr = `"${updatedControl.value}"`
+          break
+        case 'checkbox':
+          valueStr = updatedControl.value ? 'True' : 'False'
+          break
+        default:
+          valueStr = String(updatedControl.value)
+      }
+
+      // Preserve the entire comment part
+      const commentMatch = line.match(/#.*$/)
+      const comment = commentMatch ? ` ${commentMatch[0]}` : ''
+
+      const newLine = `${updatedControl.name}=${valueStr}${comment}`
+      console.log('📝 Line update:', { old: line, new: newLine })
+      return newLine
+    }
+    return line
+  })
+
+  if (hasChanges) {
+    const newCode = updatedLines.join('\n')
+    console.log('💫 Updating code:', newCode)
+    updateCode(newCode)
+  }
+}
+
 // Session management methods
 const createNewSession = async () => {
   const sessionName = `Session ${availableSessions.value.length + 1}`
@@ -137,14 +213,16 @@ onMounted(async () => {
 })
 
 // Watch for code changes
-watch(
-  () => props.code,
-  (newCode) => {
-    if (newCode !== codeValue.value) {
-      codeValue.value = newCode
-    }
-  },
-)
+watch(() => props.code, (newCode) => {
+  console.log('📄 Props code changed:', {
+    current: codeValue.value,
+    new: newCode,
+    different: newCode !== codeValue.value
+  })
+  if (newCode !== codeValue.value) {
+    codeValue.value = newCode
+  }
+})
 
 // Watch for output changes
 watch(
@@ -174,8 +252,19 @@ const handleExecution = async () => {
 }
 
 const updateCode = (newCode: string) => {
-  codeValue.value = newCode
-  emit('update:code', newCode)
+  console.log('📝 UpdateCode called:', {
+    current: codeValue.value,
+    new: newCode,
+    different: newCode !== codeValue.value
+  })
+
+  if (newCode !== codeValue.value) {
+    codeValue.value = newCode
+    emit('update:code', newCode)
+    console.log('✅ Code updated successfully')
+  } else {
+    console.log('⚠️ Code update skipped - no changes')
+  }
 }
 
 const copyCode = async () => {
@@ -193,6 +282,63 @@ const copyCode = async () => {
 const handleFullScreen = () => {
   isFullScreen.value = true
 }
+
+// Add a watch for control updates
+watch(codeControls, (newControls) => {
+  console.log('👀 Watch triggered - New Controls:', newControls)
+  const lines = codeValue.value.split('\n')
+  let hasChanges = false
+
+  const updatedLines = lines.map(line => {
+    const control = newControls.find(c => {
+      const varRegex = new RegExp(`^\\s*${c.name}\\s*=\\s*([^#]*?)(?:\\s*#.*)?$`)
+      return varRegex.test(line)
+    })
+
+    if (control) {
+      hasChanges = true
+      let valueStr = ''
+
+      switch (control.type) {
+        case 'text':
+        case 'datetime':
+        case 'color':
+        case 'select':
+          valueStr = `"${control.value}"`
+          break
+        case 'checkbox':
+          valueStr = control.value ? 'True' : 'False'
+          break
+        default:
+          valueStr = String(control.value)
+      }
+
+      const commentMatch = line.match(/(#.*)$/)
+      const comment = commentMatch ? ` ${commentMatch[1]}` : ''
+
+      const newLine = `${control.name}=${valueStr}${comment}`
+      console.log('📝 Updating line:', {
+        original: line,
+        new: newLine,
+        control: control,
+        matched: true
+      })
+      return newLine
+    }
+    return line
+  })
+
+  if (hasChanges) {
+    console.log('✨ Changes detected, updating code')
+    const newCode = updatedLines.join('\n')
+    updateCode(newCode)
+  } else {
+    console.log('⚠️ No changes detected in watch', {
+      controls: newControls,
+      lines: lines
+    })
+  }
+}, { deep: true })
 </script>
 
 <template>
@@ -347,6 +493,8 @@ const handleFullScreen = () => {
           <Check v-else class="h-4 w-4" />
         </Button>
       </div>
+
+      <CodeControls :controls="codeControls" @update:control="handleControlUpdate" :key="codeValue" />
 
       <CodeMirror v-model="codeValue" :language="language" :disabled="cell?.isExecuting"
         @update:modelValue="updateCode" />
