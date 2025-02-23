@@ -3,6 +3,7 @@ import { db } from '@/db'
 import { type Nota } from '@/types/nota'
 import type { NotaConfig } from '@/types/jupyter'
 import { nanoid } from 'nanoid'
+import { toast } from '@/lib/utils'
 
 // Helper functions to convert dates and ensure data is serializable
 const serializeNota = (nota: Partial<Nota> & { id: string }): any => {
@@ -49,7 +50,7 @@ export const useNotaStore = defineStore('nota', {
       const findParents = (itemId: string, chain: Nota[] = []): Nota[] => {
         const item = state.items.find((i) => i.id === itemId)
         if (!item) return chain
-        
+
         // If this item has a parent, recursively get its parent
         if (item.parentId) {
           const parent = state.items.find((i) => i.id === item.parentId)
@@ -57,7 +58,7 @@ export const useNotaStore = defineStore('nota', {
             return findParents(parent.id, [parent, ...chain])
           }
         }
-        
+
         return chain
       }
       return findParents(id)
@@ -96,6 +97,9 @@ export const useNotaStore = defineStore('nota', {
       const serialized = serializeNota(nota)
       await db.notas.add(serialized)
       this.items.push(nota)
+
+      toast(`Nota "${title}" created successfully`)
+
       return nota
     },
 
@@ -154,9 +158,15 @@ export const useNotaStore = defineStore('nota', {
         await this.deleteItem(child.id)
       }
 
+      // Get the item to delete
+      const item = this.items.find((i) => i.id === id)
+      if (!item) return
+
       // Then delete the item itself
       await db.notas.delete(id)
       this.items = this.items.filter((i) => i.id !== id)
+
+      toast(`Nota "${item.title}" deleted successfully`)
     },
 
     async saveNota(nota: Partial<Nota> & { id: string }) {
@@ -184,6 +194,7 @@ export const useNotaStore = defineStore('nota', {
           jupyterServers: [],
           kernels: {},
           kernelPreferences: {},
+          savedSessions: [],
         }
 
         updater(config)
@@ -198,6 +209,8 @@ export const useNotaStore = defineStore('nota', {
         nota.favorite = !nota.favorite
         nota.updatedAt = new Date()
         await this.saveItem(nota)
+
+        toast(`Nota ${nota.favorite ? 'added to' : 'removed from'} favorites successfully`)
       }
     },
 
@@ -228,12 +241,14 @@ export const useNotaStore = defineStore('nota', {
 
       const exportedNotas = [nota]
       const children = this.getChildren(id)
-      
+
       // Recursively get all children
       for (const child of children) {
         const childExport = await this.exportNota(child.id)
         exportedNotas.push(...childExport)
       }
+
+      toast(`Nota "${nota.title}" exported successfully`)
 
       return exportedNotas
     },
@@ -242,30 +257,32 @@ export const useNotaStore = defineStore('nota', {
       try {
         const content = await file.text()
         const notas = JSON.parse(content)
-        
+
         // Validate the imported data
         if (!Array.isArray(notas)) throw new Error('Invalid nota file format')
-        
+
         // Import each nota
         for (const nota of notas) {
           if (!nota.id || !nota.title) continue
-          
+
           // Check if nota already exists
           const existingNota = await db.notas.get(nota.id)
           if (existingNota) continue
-          
+
           // Ensure dates are properly formatted
           const notaToSave = {
             ...nota,
             createdAt: new Date(nota.createdAt),
             updatedAt: new Date(nota.updatedAt),
-            tags: Array.isArray(nota.tags) ? nota.tags : []
+            tags: Array.isArray(nota.tags) ? nota.tags : [],
           }
-          
+
           await db.notas.add(notaToSave)
           this.items.push(notaToSave)
         }
-        
+
+        toast('Notas imported successfully')
+
         return true
       } catch (error) {
         console.error('Failed to import notas:', error)

@@ -14,6 +14,7 @@ import {
 import { useDebounceFn } from '@vueuse/core'
 import { ref } from 'vue'
 import { useNotaStore } from '@/stores/nota'
+import { toast } from '@/lib/utils'
 
 const props = defineProps<{
   search: string
@@ -27,7 +28,6 @@ const emit = defineEmits<{
   (e: 'update:showFavorites', value: boolean): void
   (e: 'create-nota'): void
 }>()
-
 
 const viewOptions = [
   { id: 'grid', icon: Squares2X2Icon, label: 'Grid View' },
@@ -53,22 +53,21 @@ const handleImport = () => {
 const handleFileSelect = async (event: Event) => {
   const input = event.target as HTMLInputElement
   if (!input.files?.length) return
-  
+
   const file = input.files[0]
   if (!file.name.endsWith('.nota')) {
     alert('Please select a .nota file')
     return
   }
-  
+
   const success = await store.importNotas(file)
   if (success) {
     // Reload notas after successful import
     await store.loadNotas()
-    alert('Notas imported successfully')
   } else {
-    alert('Failed to import notas')
+    toast('Failed to import notas')
   }
-  
+
   // Reset input
   input.value = ''
 }
@@ -152,11 +151,5 @@ const quickActions = [
     </div>
   </div>
 
-  <input
-    type="file"
-    accept=".nota"
-    class="hidden"
-    ref="fileInput"
-    @change="handleFileSelect"
-  />
+  <input type="file" accept=".nota" class="hidden" ref="fileInput" @change="handleFileSelect" />
 </template>

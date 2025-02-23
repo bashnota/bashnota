@@ -10,7 +10,7 @@ import Badge from '@/components/ui/badge/Badge.vue'
 import type { Nota } from '@/types/nota'
 
 const router = useRouter()
-const store = useNotaStore()
+const { toggleFavorite } = useNotaStore()
 
 const props = defineProps<{
   isLoading: boolean
@@ -40,16 +40,6 @@ const formatDate = (date: Date | string) => {
     day: 'numeric',
     year: now.getFullYear() !== d.getFullYear() ? 'numeric' : undefined,
   })
-}
-
-const toggleFavorite = async (id: string) => {
-  const nota = props.notas.find((n) => n.id === id)
-  if (nota) {
-    await store.saveItem({
-      ...nota,
-      favorite: !nota.favorite,
-    })
-  }
 }
 
 const openSettings = (id: string) => {

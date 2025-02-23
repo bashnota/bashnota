@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import ServerListItem from './ServerListItem.vue'
+import { toast } from '@/lib/utils'
 
 const props = defineProps<{
   notaId: string
@@ -41,10 +42,10 @@ const testResults = ref<Record<string, { success: boolean; message: string }>>({
 const showServerForm = ref(false)
 
 // Load config from store
+const currentNota = computed(() => store.getCurrentNota(props.notaId))
 const config = computed(() => {
-  const nota = store.getCurrentNota(props.notaId)
   return (
-    nota?.config || {
+    currentNota.value?.config || {
       jupyterServers: [],
       notebooks: [],
       kernels: {} as Record<string, KernelSpec[]>,
@@ -137,6 +138,8 @@ const addServer = async () => {
       token: '',
     }
     showServerForm.value = false
+
+    toast(`Server ${server.ip}:${server.port} added successfully to ${currentNota.value?.title}`)
   }
 }
 
