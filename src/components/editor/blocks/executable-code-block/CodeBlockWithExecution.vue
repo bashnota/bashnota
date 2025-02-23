@@ -3,7 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { useCodeExecution } from '@/composables/useCodeExecution'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
-import type { KernelConfig } from '@/types/jupyter'
+import type { KernelConfig, KernelSpec } from '@/types/jupyter'
 import {
   Copy,
   Check,
