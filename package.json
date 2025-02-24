@@ -33,6 +33,8 @@
     "@types/ws": "^8.5.14",
     "@vee-validate/zod": "^4.15.0",
     "@vueuse/core": "^12.5.0",
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0",
     "axios": "^1.7.9",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

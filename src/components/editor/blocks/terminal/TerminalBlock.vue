@@ -32,24 +32,14 @@
 
             <CardContent>
                 <div class="relative">
-                    <!-- Copy button -->
-                    <Button v-if="output.length > 0" size="sm" variant="ghost" class="absolute top-2 right-2 z-10"
+                    <Button v-if="xterm" size="sm" variant="ghost" class="absolute top-2 right-2 z-10"
                         @click="copyOutput">
                         <Copy v-if="!isCopied" class="h-4 w-4" />
                         <Check v-else class="h-4 w-4" />
                         <span class="sr-only">Copy output</span>
                     </Button>
 
-                    <div class="terminal-output" ref="outputRef">
-                        <div v-for="(line, index) in output" :key="index" class="terminal-line">
-                            {{ line }}
-                        </div>
-                    </div>
-                </div>
-
-                <div class="terminal-input">
-                    <input v-model="command" @keyup.enter="sendCommand" :disabled="!isConnected"
-                        placeholder="Enter command..." class="w-full bg-transparent border-none focus:outline-none" />
+                    <div ref="terminalDiv" class="terminal-output" tabindex="0" @click="xterm?.focus()"></div>
                 </div>
             </CardContent>
         </Card>
@@ -72,7 +62,9 @@ import {
 import { TerminalService } from '@/services/terminalService'
 import { useNotaStore } from '@/stores/nota'
 import { useRoute } from 'vue-router'
-import type { JupyterServer } from '@/types/jupyter'
+import { Terminal as XTerm } from '@xterm/xterm'
+import { FitAddon } from '@xterm/addon-fit'
+import '@xterm/xterm/css/xterm.css'
 
 const props = defineProps<{
     node: any
@@ -90,6 +82,10 @@ const isConnected = ref(false)
 const outputRef = ref<HTMLElement>()
 const selectedServerId = ref<string>('none')
 const isCopied = ref(false)
+
+const terminalDiv = ref<HTMLElement>()
+const xterm = ref<XTerm>()
+const fitAddon = ref<FitAddon>()
 
 const rootNotaId = computed(() => {
     const currentNota = notaStore.getCurrentNota(route.params.id as string)
@@ -119,6 +115,58 @@ const selectedServer = computed(() => {
     return availableServers.value.find(s => s.displayName === selectedServerId.value)
 })
 
+const initializeXTerm = () => {
+    if (!terminalDiv.value) return
+
+    xterm.value = new XTerm({
+        cursorBlink: true,
+        fontSize: 14,
+        fontFamily: 'monospace',
+        convertEol: true,
+        theme: {
+            background: '#1e1e1e',
+            foreground: '#ffffff',
+            cursor: '#ffffff',
+        }
+    })
+
+    fitAddon.value = new FitAddon()
+    xterm.value.loadAddon(fitAddon.value)
+    xterm.value.open(terminalDiv.value)
+    fitAddon.value.fit()
+
+    // Focus terminal on click
+    terminalDiv.value.addEventListener('click', () => {
+        xterm.value?.focus()
+    })
+
+    // Handle terminal input
+    xterm.value.onData((data) => {
+        if (ws.value && isConnected.value) {
+            // Echo the input locally
+            xterm.value?.write(data)
+            // Send to server
+            ws.value.send(JSON.stringify(['stdin', data]))
+        }
+    })
+
+    // Handle terminal key input
+    xterm.value.onKey(({ key, domEvent }) => {
+        const ev = domEvent as KeyboardEvent
+
+        // Handle special keys
+        if (ev.keyCode === 13) { // Enter
+            if (ws.value && isConnected.value) {
+                ws.value.send(JSON.stringify(['stdin', '\r\n']))
+            }
+        } else if (ev.keyCode === 8) { // Backspace
+            if (ws.value && isConnected.value) {
+                ws.value.send(JSON.stringify(['stdin', '\b']))
+            }
+        }
+    })
+}
+
 const connectTerminal = async () => {
     if (!selectedServer.value) return
 
@@ -131,20 +179,55 @@ const connectTerminal = async () => {
 
         ws.value = terminalService.connectToTerminal(selectedServer.value, terminal.name)
         ws.value.onmessage = (event) => {
-            output.value.push(event.data)
-            scrollToBottom()
+            if (xterm.value) {
+                try {
+                    // Parse the incoming messages
+                    const messages = event.data.split('][').map((msg: string) => {
+                        // Clean up the message format
+                        msg = msg.replace(/^\[|\]$/g, '')
+                        return JSON.parse(`[${msg}]`)
+                    })
+
+                    // Process each message
+                    messages.forEach((msg: [string, any]) => {
+                        const [msgType, content] = msg
+                        switch (msgType) {
+                            case 'stdout':
+                            case 'stderr':
+                                xterm.value?.write(content)
+                                break
+                            case 'setup':
+                                // Setup messages can be ignored
+                                break
+                            default:
+                                console.log('Unknown message type:', msgType)
+                        }
+                    })
+                } catch (error) {
+                    console.error('Failed to parse terminal message:', error)
+                    // If parsing fails, write the raw data
+                    xterm.value.write(event.data)
+                }
+            }
         }
         ws.value.onopen = () => {
             isConnected.value = true
-            output.value.push('Connected to terminal')
+            if (xterm.value) {
+                xterm.value.write('Connected to terminal\r\n')
+                xterm.value.focus()
+            }
         }
         ws.value.onclose = () => {
             isConnected.value = false
-            output.value.push('Disconnected from terminal')
+            if (xterm.value) {
+                xterm.value.write('\r\nDisconnected from terminal\r\n')
+            }
         }
     } catch (error: any) {
         console.error('Failed to connect to terminal:', error)
-        output.value.push(`Error: ${error.message || 'Failed to connect'}`)
+        if (xterm.value) {
+            xterm.value.write(`Error: ${error.message || 'Failed to connect'}\r\n`)
+        }
     }
 }
 
@@ -164,14 +247,6 @@ const disconnectTerminal = async () => {
     props.updateAttributes({ terminalId: null })
 }
 
-const sendCommand = () => {
-    if (ws.value && command.value) {
-        ws.value.send(command.value + '\n')
-        output.value.push(`$ ${command.value}`)
-        command.value = ''
-    }
-}
-
 const scrollToBottom = () => {
     if (outputRef.value) {
         outputRef.value.scrollTop = outputRef.value.scrollHeight
@@ -179,8 +254,10 @@ const scrollToBottom = () => {
 }
 
 const copyOutput = async () => {
+    if (!xterm.value) return
     try {
-        await navigator.clipboard.writeText(output.value.join('\n'))
+        const selection = xterm.value.getSelection()
+        await navigator.clipboard.writeText(selection)
         isCopied.value = true
         setTimeout(() => {
             isCopied.value = false
@@ -191,6 +268,8 @@ const copyOutput = async () => {
 }
 
 onMounted(() => {
+    initializeXTerm()
+
     if (props.node.attrs.serverId) {
         selectedServerId.value = props.node.attrs.serverId
     }
@@ -198,10 +277,22 @@ onMounted(() => {
     if (props.node.attrs.terminalId && selectedServer.value) {
         connectTerminal()
     }
-})
 
-onBeforeUnmount(() => {
-    disconnectTerminal()
+    // Handle window resize
+    const handleResize = () => {
+        if (fitAddon.value) {
+            fitAddon.value.fit()
+        }
+    }
+    window.addEventListener('resize', handleResize)
+
+    onBeforeUnmount(() => {
+        window.removeEventListener('resize', handleResize)
+        disconnectTerminal()
+        if (xterm.value) {
+            xterm.value.dispose()
+        }
+    })
 })
 
 watch(selectedServerId, (newValue) => {
@@ -218,35 +309,44 @@ watch(selectedServerId, (newValue) => {
 }
 
 .terminal-output {
+    min-height: 300px;
     background-color: #1e1e1e;
-    color: #fff;
-    padding: 1em;
-    font-family: monospace;
-    height: 300px;
-    overflow-y: auto;
     position: relative;
-    /* For copy button positioning */
 }
 
-.terminal-input {
-    background-color: #1e1e1e;
-    color: #fff;
-    padding: 0.5em 1em;
-    font-family: monospace;
-    border-top: 1px solid #333;
+/* Make sure xterm fits properly in the container */
+:deep(.xterm) {
+    padding: 8px;
+    height: 300px;
 }
 
-.terminal-line {
-    white-space: pre-wrap;
-    word-break: break-all;
+:deep(.xterm-cursor) {
+    background-color: #fff;
+}
+
+:deep(.xterm-cursor.xterm-cursor-blink) {
+    animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+    0% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0;
+    }
+
+    100% {
+        opacity: 1;
+    }
 }
 
 :deep(.terminal-container) {
     @apply border-2;
 }
 
-:deep(.dark .terminal-output),
-:deep(.dark .terminal-input) {
+:deep(.dark .terminal-container) {
     background-color: #000;
 }
 
