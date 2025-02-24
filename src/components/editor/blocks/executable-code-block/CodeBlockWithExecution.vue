@@ -10,7 +10,6 @@ import {
   Play,
   Loader2,
   Plus,
-  CircleDot,
   Server,
   Layers,
   Box,
@@ -23,13 +22,8 @@ import CodeMirror from './CodeMirror.vue'
 import Popover from '@/components/ui/popover/Popover.vue'
 import PopoverTrigger from '@/components/ui/popover/PopoverTrigger.vue'
 import PopoverContent from '@/components/ui/popover/PopoverContent.vue'
-import Command from '@/components/ui/command/Command.vue'
-import CommandInput from '@/components/ui/command/CommandInput.vue'
-import CommandEmpty from '@/components/ui/command/CommandEmpty.vue'
-import CommandGroup from '@/components/ui/command/CommandGroup.vue'
-import CommandItem from '@/components/ui/command/CommandItem.vue'
-import CommandList from '@/components/ui/command/CommandList.vue'
 import FullScreenCodeBlock from './FullScreenCodeBlock.vue'
+import CustomSelect from '@/components/CustomSelect.vue'
 
 const props = defineProps<{
   code: string
@@ -218,40 +212,27 @@ const handleFullScreen = () => {
           </Button>
         </PopoverTrigger>
         <PopoverContent class="w-[200px] p-0" align="start">
-          <Command>
-            <CommandInput placeholder="Search sessions..." />
-            <div class="p-1 border-t">
-              <Button size="sm" variant="outline" class="w-full gap-2" @click="createNewSession">
-                <Plus class="h-4 w-4" />
-                New Session
-              </Button>
-            </div>
-            <CommandList>
-              <CommandEmpty>No sessions found.</CommandEmpty>
-              <CommandGroup>
-                <CommandItem
-                  v-for="session in availableSessions"
-                  :key="session.id"
-                  :value="session.id"
-                  @select="
-                    (value) => {
-                      if (typeof value.detail.value === 'string') {
-                        selectedSession = value.detail.value
-                        handleSessionChange()
-                      }
-                      isSessionOpen = false
-                    }
-                  "
-                >
-                  <CircleDot
-                    class="h-4 w-4 mr-2 text-5xl"
-                    :class="selectedSession === session.id ? 'opacity-100' : 'opacity-0'"
-                  />
-                  {{ session.name }}
-                </CommandItem>
-              </CommandGroup>
-            </CommandList>
-          </Command>
+          <div class="p-1 border-t">
+            <Button size="sm" variant="outline" class="w-full gap-2" @click="createNewSession">
+              <Plus class="h-4 w-4" />
+              New Session
+            </Button>
+          </div>
+          <CustomSelect
+            :options="
+              availableSessions.map((session) => ({ value: session.id, label: session.name }))
+            "
+            :model-value="selectedSession"
+            placeholder="Search sessions..."
+            :searchable="true"
+            @select="
+              (value) => {
+                selectedSession = value
+                handleSessionChange()
+                isSessionOpen = false
+              }
+            "
+          />
         </PopoverContent>
       </Popover>
       <Button
@@ -289,34 +270,24 @@ const handleFullScreen = () => {
           </Button>
         </PopoverTrigger>
         <PopoverContent class="w-[200px] p-0" align="start">
-          <Command>
-            <CommandInput placeholder="Search servers..." />
-            <CommandList>
-              <CommandEmpty>No servers found.</CommandEmpty>
-              <CommandGroup>
-                <CommandItem
-                  v-for="server in availableServers"
-                  :key="server.displayName"
-                  :value="server.displayName"
-                  @select="
-                    (value) => {
-                      if (typeof value.detail.value === 'string') {
-                        selectedServer = value.detail.value
-                        emit('kernel-select', selectedKernel, selectedServer)
-                      }
-                      isServerOpen = false
-                    }
-                  "
-                >
-                  <CircleDot
-                    class="h-4 w-4 mr-2"
-                    :class="selectedServer === server.displayName ? 'opacity-100' : 'opacity-0'"
-                  />
-                  {{ server.displayName }}
-                </CommandItem>
-              </CommandGroup>
-            </CommandList>
-          </Command>
+          <CustomSelect
+            :options="
+              availableServers.map((server) => ({
+                value: server.displayName,
+                label: server.displayName,
+              }))
+            "
+            :model-value="selectedServer"
+            placeholder="Search servers..."
+            :searchable="true"
+            @select="
+              (value) => {
+                selectedServer = value
+                emit('kernel-select', selectedKernel, selectedServer)
+                isServerOpen = false
+              }
+            "
+          />
         </PopoverContent>
       </Popover>
 
@@ -352,34 +323,24 @@ const handleFullScreen = () => {
           </Button>
         </PopoverTrigger>
         <PopoverContent class="w-[200px] p-0" align="start">
-          <Command>
-            <CommandInput placeholder="Search kernels..." />
-            <CommandList>
-              <CommandEmpty>No kernels found.</CommandEmpty>
-              <CommandGroup>
-                <CommandItem
-                  v-for="kernel in availableKernels"
-                  :key="kernel.name"
-                  :value="kernel.name"
-                  @select="
-                    (value) => {
-                      if (typeof value.detail.value === 'string') {
-                        selectedKernel = value.detail.value
-                        emit('kernel-select', selectedKernel, selectedServer)
-                      }
-                      isKernelOpen = false
-                    }
-                  "
-                >
-                  <CircleDot
-                    class="h-4 w-4 mr-2"
-                    :class="selectedKernel === kernel.name ? 'opacity-100' : 'opacity-0'"
-                  />
-                  {{ kernel.spec.display_name }}
-                </CommandItem>
-              </CommandGroup>
-            </CommandList>
-          </Command>
+          <CustomSelect
+            :options="
+              availableKernels.map((kernel) => ({
+                value: kernel.name,
+                label: kernel.spec.display_name,
+              }))
+            "
+            :model-value="selectedKernel"
+            placeholder="Search kernels..."
+            :searchable="true"
+            @select="
+              (value) => {
+                selectedKernel = value
+                emit('kernel-select', selectedKernel, selectedServer)
+                isKernelOpen = false
+              }
+            "
+          />
         </PopoverContent>
       </Popover>
 
