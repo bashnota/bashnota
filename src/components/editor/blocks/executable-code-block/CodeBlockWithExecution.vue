@@ -198,15 +198,23 @@ const handleFullScreen = () => {
 <template>
   <div class="flex flex-col bg-slate-100 dark:bg-slate-900 rounded-lg overflow-hidden">
     <div
-      class="flex items-center gap-2 p-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      class="flex items-center gap-2 p-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+    >
       <!-- Session Selector -->
       <Popover v-model:open="isSessionOpen">
         <PopoverTrigger as-child>
-          <Button variant="outline" size="sm" class="gap-2 h-8 relative"
+          <Button
+            variant="outline"
+            size="sm"
+            class="gap-2 h-8 relative"
             :class="{ 'bg-red-500/20 hover:bg-red-500/30': !selectedSession }"
-            :title="selectedSession ? 'Current Session' : 'Select Session'">
+            :title="selectedSession ? 'Current Session' : 'Select Session'"
+          >
             <Layers class="h-4 w-4" />
-            <span v-if="selectedSession" class="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full"></span>
+            <span
+              v-if="selectedSession"
+              class="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full"
+            ></span>
           </Button>
         </PopoverTrigger>
         <PopoverContent class="w-[200px] p-0" align="start">
@@ -221,17 +229,24 @@ const handleFullScreen = () => {
             <CommandList>
               <CommandEmpty>No sessions found.</CommandEmpty>
               <CommandGroup>
-                <CommandItem v-for="session in availableSessions" :key="session.id" :value="session.id" @select="
-                  (value) => {
-                    if (typeof value.detail.value === 'string') {
-                      selectedSession = value.detail.value
-                      handleSessionChange()
+                <CommandItem
+                  v-for="session in availableSessions"
+                  :key="session.id"
+                  :value="session.id"
+                  @select="
+                    (value) => {
+                      if (typeof value.detail.value === 'string') {
+                        selectedSession = value.detail.value
+                        handleSessionChange()
+                      }
+                      isSessionOpen = false
                     }
-                    isSessionOpen = false
-                  }
-                ">
-                  <CircleDot class="h-4 w-4 mr-2 text-5xl"
-                    :class="selectedSession === session.id ? 'opacity-100' : 'opacity-0'" />
+                  "
+                >
+                  <CircleDot
+                    class="h-4 w-4 mr-2 text-5xl"
+                    :class="selectedSession === session.id ? 'opacity-100' : 'opacity-0'"
+                  />
                   {{ session.name }}
                 </CommandItem>
               </CommandGroup>
@@ -239,8 +254,13 @@ const handleFullScreen = () => {
           </Command>
         </PopoverContent>
       </Popover>
-      <Button variant="outline" size="sm" class="gap-2 h-8" @click="isCodeVisible = !isCodeVisible"
-        :title="isCodeVisible ? 'Hide Code' : 'Show Code'">
+      <Button
+        variant="outline"
+        size="sm"
+        class="gap-2 h-8"
+        @click="isCodeVisible = !isCodeVisible"
+        :title="isCodeVisible ? 'Hide Code' : 'Show Code'"
+      >
         <Eye v-if="isCodeVisible" class="h-4 w-4" />
         <EyeOff v-else class="h-4 w-4" />
       </Button>
@@ -248,12 +268,24 @@ const handleFullScreen = () => {
       <!-- Server Selector -->
       <Popover v-model:open="isServerOpen">
         <PopoverTrigger as-child>
-          <Button variant="outline" size="sm" class="gap-2 h-8 relative"
-            :class="{ 'bg-red-500/20 hover:bg-red-500/30': !selectedServer || selectedServer === 'none' }"
-            :title="selectedServer && selectedServer !== 'none' ? `Server: ${selectedServer}` : 'Select Server'">
+          <Button
+            variant="outline"
+            size="sm"
+            class="gap-2 h-8 relative"
+            :class="{
+              'bg-red-500/20 hover:bg-red-500/30': !selectedServer || selectedServer === 'none',
+            }"
+            :title="
+              selectedServer && selectedServer !== 'none'
+                ? `Server: ${selectedServer}`
+                : 'Select Server'
+            "
+          >
             <Server class="h-4 w-4" />
-            <span v-if="selectedServer && selectedServer !== 'none'"
-              class="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full"></span>
+            <span
+              v-if="selectedServer && selectedServer !== 'none'"
+              class="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full"
+            ></span>
           </Button>
         </PopoverTrigger>
         <PopoverContent class="w-[200px] p-0" align="start">
@@ -262,7 +294,10 @@ const handleFullScreen = () => {
             <CommandList>
               <CommandEmpty>No servers found.</CommandEmpty>
               <CommandGroup>
-                <CommandItem v-for="server in availableServers" :key="server.displayName" :value="server.displayName"
+                <CommandItem
+                  v-for="server in availableServers"
+                  :key="server.displayName"
+                  :value="server.displayName"
                   @select="
                     (value) => {
                       if (typeof value.detail.value === 'string') {
@@ -271,9 +306,12 @@ const handleFullScreen = () => {
                       }
                       isServerOpen = false
                     }
-                  ">
-                  <CircleDot class="h-4 w-4 mr-2"
-                    :class="selectedServer === server.displayName ? 'opacity-100' : 'opacity-0'" />
+                  "
+                >
+                  <CircleDot
+                    class="h-4 w-4 mr-2"
+                    :class="selectedServer === server.displayName ? 'opacity-100' : 'opacity-0'"
+                  />
                   {{ server.displayName }}
                 </CommandItem>
               </CommandGroup>
@@ -285,18 +323,32 @@ const handleFullScreen = () => {
       <!-- Kernel Selector -->
       <Popover v-model:open="isKernelOpen">
         <PopoverTrigger as-child>
-          <Button variant="outline" size="sm" class="gap-2 h-8 relative min-w-[32px]" :class="{
-            'bg-red-500/20 hover:bg-red-500/30': !selectedKernel || selectedKernel === 'none',
-            'pl-2 pr-3': selectedKernel && selectedKernel !== 'none'
-          }" :disabled="!selectedServer || selectedServer === 'none'"
-            :title="selectedKernel && selectedKernel !== 'none' ? `Kernel: ${selectedKernel}` : 'Select Kernel'">
+          <Button
+            variant="outline"
+            size="sm"
+            class="gap-2 h-8 relative min-w-[32px]"
+            :class="{
+              'bg-red-500/20 hover:bg-red-500/30': !selectedKernel || selectedKernel === 'none',
+              'pl-2 pr-3': selectedKernel && selectedKernel !== 'none',
+            }"
+            :disabled="!selectedServer || selectedServer === 'none'"
+            :title="
+              selectedKernel && selectedKernel !== 'none'
+                ? `Kernel: ${selectedKernel}`
+                : 'Select Kernel'
+            "
+          >
             <Box class="h-4 w-4" />
-            <span v-if="selectedKernel && selectedKernel !== 'none'"
-              class="ml-1 text-xs font-medium truncate max-w-[60px]">
+            <span
+              v-if="selectedKernel && selectedKernel !== 'none'"
+              class="ml-1 text-xs font-medium truncate max-w-[60px]"
+            >
               {{ selectedKernel }}
             </span>
-            <span v-if="selectedKernel && selectedKernel !== 'none'"
-              class="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full"></span>
+            <span
+              v-if="selectedKernel && selectedKernel !== 'none'"
+              class="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full"
+            ></span>
           </Button>
         </PopoverTrigger>
         <PopoverContent class="w-[200px] p-0" align="start">
@@ -305,17 +357,24 @@ const handleFullScreen = () => {
             <CommandList>
               <CommandEmpty>No kernels found.</CommandEmpty>
               <CommandGroup>
-                <CommandItem v-for="kernel in availableKernels" :key="kernel.name" :value="kernel.name" @select="
-                  (value) => {
-                    if (typeof value.detail.value === 'string') {
-                      selectedKernel = value.detail.value
-                      emit('kernel-select', selectedKernel, selectedServer)
+                <CommandItem
+                  v-for="kernel in availableKernels"
+                  :key="kernel.name"
+                  :value="kernel.name"
+                  @select="
+                    (value) => {
+                      if (typeof value.detail.value === 'string') {
+                        selectedKernel = value.detail.value
+                        emit('kernel-select', selectedKernel, selectedServer)
+                      }
+                      isKernelOpen = false
                     }
-                    isKernelOpen = false
-                  }
-                ">
-                  <CircleDot class="h-4 w-4 mr-2"
-                    :class="selectedKernel === kernel.name ? 'opacity-100' : 'opacity-0'" />
+                  "
+                >
+                  <CircleDot
+                    class="h-4 w-4 mr-2"
+                    :class="selectedKernel === kernel.name ? 'opacity-100' : 'opacity-0'"
+                  />
                   {{ kernel.spec.display_name }}
                 </CommandItem>
               </CommandGroup>
@@ -327,14 +386,26 @@ const handleFullScreen = () => {
       <div class="flex-1"></div>
 
       <!-- Run Button -->
-      <Button variant="default" size="sm" :disabled="cell?.isExecuting || selectedKernel === 'none'"
-        @click="handleExecution" class="h-8" :title="cell?.isExecuting ? 'Executing...' : 'Run Code'">
+      <Button
+        variant="default"
+        size="sm"
+        :disabled="cell?.isExecuting || selectedKernel === 'none'"
+        @click="handleExecution"
+        class="h-8"
+        :title="cell?.isExecuting ? 'Executing...' : 'Run Code'"
+      >
         <Loader2 class="w-4 h-4 animate-spin mr-2" v-if="cell?.isExecuting" />
         <Play class="w-4 h-4 mr-2" v-else />
         Run
       </Button>
 
-      <Button variant="ghost" size="sm" class="h-8 w-8 p-0" @click="handleFullScreen" title="Full Screen Mode">
+      <Button
+        variant="ghost"
+        size="sm"
+        class="h-8 w-8 p-0"
+        @click="handleFullScreen"
+        title="Full Screen Mode"
+      >
         <Maximize2 class="h-4 w-4" />
       </Button>
     </div>
@@ -348,8 +419,12 @@ const handleFullScreen = () => {
         </Button>
       </div>
 
-      <CodeMirror v-model="codeValue" :language="language" :disabled="cell?.isExecuting"
-        @update:modelValue="updateCode" />
+      <CodeMirror
+        v-model="codeValue"
+        :language="language"
+        :disabled="cell?.isExecuting"
+        @update:modelValue="updateCode"
+      />
     </div>
 
     <!-- Output Section -->
@@ -363,14 +438,25 @@ const handleFullScreen = () => {
           <Check v-else class="h-3 w-3" />
         </Button>
       </div>
-      <div class="text-sm whitespace-pre-wrap break-words p-4"
+      <div
+        class="text-sm whitespace-pre-wrap break-words p-4"
         :class="{ 'bg-red-50 dark:bg-red-950 text-destructive dark:text-red-200': cell?.hasError }"
-        v-html="cell?.output"></div>
+        v-html="cell?.output"
+      ></div>
     </div>
 
-    <FullScreenCodeBlock v-if="isFullScreen" :code="codeValue" :output="cell?.output" :language="language"
-      :is-open="isFullScreen" :is-executing="cell?.isExecuting" @update:is-open="isFullScreen = $event"
-      :on-close="() => isFullScreen = false" :on-update="updateCode" :on-execute="handleExecution" />
+    <FullScreenCodeBlock
+      v-if="isFullScreen"
+      :code="codeValue"
+      :output="cell?.output"
+      :language="language"
+      :is-open="isFullScreen"
+      :is-executing="cell?.isExecuting"
+      @update:is-open="isFullScreen = $event"
+      :on-close="() => (isFullScreen = false)"
+      :on-update="updateCode"
+      :on-execute="handleExecution"
+    />
   </div>
 </template>
 
