@@ -35,6 +35,7 @@ import { Markdown } from 'tiptap-markdown'
 // @ts-ignore
 import UniqueId from 'tiptap-unique-id'
 import { ImageExtension } from './extensions/ImageExtension'
+import { PyodideCodeBlockExtension } from './extensions/PyodideCodeBlockExtension'
 
 const props = defineProps<{
   notaId: string
@@ -117,6 +118,11 @@ const editorExtensions = [
   Youtube,
   SubfigureExtension,
   ImageExtension,
+  PyodideCodeBlockExtension.configure({
+    HTMLAttributes: {
+      class: 'code-block',
+    },
+  }),
 ]
 
 const registerCodeCells = (content: any) => {
@@ -244,13 +250,10 @@ onUnmounted(() => {
 <template>
   <div class="flex">
     <!-- Sidebar -->
-    <div
-      class="transition-all duration-300 ease-in-out sticky top-0 h-full"
-      :class="{
-        'w-72': isSidebarOpen,
-        'w-0': !isSidebarOpen,
-      }"
-    >
+    <div class="transition-all duration-300 ease-in-out sticky top-0 h-full" :class="{
+      'w-72': isSidebarOpen,
+      'w-0': !isSidebarOpen,
+    }">
       <div v-show="isSidebarOpen" :style="{ width: isSidebarOpen ? 'inherit' : '0' }">
         <ScrollArea class="h-[calc(100vh-2rem)] px-6 py-4">
           <TableOfContents :editor="editor" />
@@ -265,15 +268,8 @@ onUnmounted(() => {
         <EditorToolbar v-if="editor" :editor="editor" class="px-4 py-2" />
 
         <!-- Editor Info Bar -->
-        <div
-          class="flex items-center justify-between px-4 py-2 text-sm text-muted-foreground border-t"
-        >
-          <Button
-            variant="ghost"
-            size="sm"
-            class="flex items-center gap-2"
-            @click="isSidebarOpen = !isSidebarOpen"
-          >
+        <div class="flex items-center justify-between px-4 py-2 text-sm text-muted-foreground border-t">
+          <Button variant="ghost" size="sm" class="flex items-center gap-2" @click="isSidebarOpen = !isSidebarOpen">
             <ListIcon class="h-4 w-4" />
             <span class="text-xs">Contents</span>
           </Button>
@@ -284,10 +280,8 @@ onUnmounted(() => {
       <!-- Editor Content -->
       <div class="flex-1 relative">
         <!-- Loading State -->
-        <div
-          v-if="isLoading"
-          class="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm"
-        >
+        <div v-if="isLoading"
+          class="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm">
           <LoadingSpinner class="w-8 h-8" />
         </div>
 
@@ -332,8 +326,8 @@ onUnmounted(() => {
 }
 
 /* Nested Lists */
-.ProseMirror li > ul,
-.ProseMirror li > ol {
+.ProseMirror li>ul,
+.ProseMirror li>ol {
   @apply my-2 ml-6;
 }
 
@@ -404,11 +398,11 @@ onUnmounted(() => {
   @apply flex items-start gap-2;
 }
 
-.ProseMirror ul[data-type='taskList'] li > label {
+.ProseMirror ul[data-type='taskList'] li>label {
   @apply mt-1;
 }
 
-.ProseMirror ul[data-type='taskList'] li > div {
+.ProseMirror ul[data-type='taskList'] li>div {
   @apply flex-1;
 }
 

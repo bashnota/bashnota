@@ -129,6 +129,27 @@ export default {
             .run()
         },
       },
+      {
+        title: 'Browser Python',
+        category: 'Code Blocks',
+        icon: FileCode,
+        keywords: ['pyodide', 'python', 'browser', 'local'],
+        command: ({ editor, range }: CommandArgs) => {
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .insertContent({
+              type: 'pyodideCodeBlock',
+              attrs: {
+                language: 'python',
+                id: crypto.randomUUID(),
+              },
+              content: [{ type: 'text', text: 'print("Hello from the browser!")' }],
+            })
+            .run()
+        },
+      },
 
       // Images
       {
