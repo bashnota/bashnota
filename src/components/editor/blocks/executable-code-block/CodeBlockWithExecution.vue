@@ -494,7 +494,7 @@ watch(codeControls, (newControls) => {
         </Button>
       </div>
 
-      <CodeControls :controls="codeControls" @update:control="handleControlUpdate" :key="codeValue" />
+      <CodeControls :controls="codeControls" :code="codeValue" @update:code="updateCode" />
 
       <CodeMirror v-model="codeValue" :language="language" :disabled="cell?.isExecuting"
         @update:modelValue="updateCode" />

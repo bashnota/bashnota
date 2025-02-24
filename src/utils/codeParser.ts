@@ -1,5 +1,10 @@
 import type { CodeFormControl } from '@/types/codeExecution'
 
+interface ParsedValue {
+  raw: string
+  processed: any
+}
+
 export function parseCodeControls(code: string): CodeFormControl[] {
   const controls: CodeFormControl[] = []
   const lines = code.split('\n')
@@ -9,32 +14,39 @@ export function parseCodeControls(code: string): CodeFormControl[] {
   
   lines.forEach(line => {
     const match = line.match(paramRegex)
-    if (match) {
-      const [_, name, rawValue, type] = match
-      
-      // Parse the value based on type
-      let value = rawValue.trim()
-      if (type.includes('checkbox')) {
-        value = value.toLowerCase() === 'true'
-      } else if (type.includes('number') || type.includes('slider') || type.includes('range')) {
-        value = parseFloat(value)
-      } else {
-        // Remove quotes from string values
-        value = value.replace(/^["']|["']$/g, '')
-      }
-      
-      const control: CodeFormControl = {
-        name,
-        value,
-        type: parseControlType(type),
-        options: parseOptions(type)
-      }
-      
-      controls.push(control)
+    if (!match) return
+    
+    const [_, name, rawValue, type] = match
+    const parsedValue = parseValue(rawValue.trim(), type)
+    
+    const control: CodeFormControl = {
+      name,
+      value: parsedValue.processed,
+      type: parseControlType(type),
+      options: parseOptions(type, parsedValue.raw)
     }
+    
+    controls.push(control)
   })
   
   return controls
+}
+
+function parseValue(rawValue: string, type: string): ParsedValue {
+  const trimmedValue = rawValue.trim()
+  
+  // Keep original string value for options parsing
+  const raw = trimmedValue.replace(/^["']|["']$/g, '')
+  
+  let processed: any = raw
+  
+  if (type.includes('checkbox')) {
+    processed = raw.toLowerCase() === 'true'
+  } else if (type.includes('number') || type.includes('slider') || type.includes('range')) {
+    processed = parseFloat(raw)
+  }
+  
+  return { raw, processed }
 }
 
 function parseControlType(type: string): CodeFormControl['type'] {
@@ -48,8 +60,10 @@ function parseControlType(type: string): CodeFormControl['type'] {
   return 'text'
 }
 
-function parseOptions(type: string) {
-  const options: CodeFormControl['options'] = {}
+function parseOptions(type: string, defaultValue: string) {
+  const options: CodeFormControl['options'] = {
+    defaultValue
+  }
   
   // Parse all options using a more flexible regex
   const optionsRegex = /(\w+)=([^|\}]+)/g
@@ -57,28 +71,7 @@ function parseOptions(type: string) {
   
   while ((match = optionsRegex.exec(type)) !== null) {
     const [_, key, value] = match
-    
-    switch (key) {
-      case 'min':
-      case 'max':
-      case 'step':
-        options[key] = parseFloat(value)
-        break
-      case 'defaultValue':
-        options[key] = type.includes('checkbox') ? value.toLowerCase() === 'true' : value
-        break
-      case 'required':
-        options[key] = value.toLowerCase() === 'true'
-        break
-      case 'choices':
-        const choicesMatch = value.match(/\[(.*?)\]/)
-        if (choicesMatch) {
-          options.choices = choicesMatch[1].split(',').map(c => c.trim())
-        }
-        break
-      default:
-        options[key] = value
-    }
+    parseOptionValue(key, value, type, options)
   }
   
   // Handle float detection for numeric types
@@ -91,4 +84,37 @@ function parseOptions(type: string) {
   }
   
   return options
+}
+
+function parseOptionValue(key: string, value: string, type: string, options: NonNullable<CodeFormControl['options']>) {
+  const trimmedValue = value.trim()
+  
+  switch (key) {
+    case 'min':
+    case 'max':
+    case 'step':
+      options[key] = parseFloat(trimmedValue)
+      break
+      
+    case 'required':
+      options[key] = trimmedValue.toLowerCase() === 'true'
+      break
+      
+    case 'choices':
+      const choicesMatch = trimmedValue.match(/\[(.*?)\]/)
+      if (choicesMatch) {
+        options.choices = choicesMatch[1].split(',').map(c => c.trim())
+      }
+      break
+      
+    case 'label':
+    case 'description':
+    case 'placeholder':
+    case 'pattern':
+      options[key] = trimmedValue.replace(/^["']|["']$/g, '')
+      break
+      
+    default:
+      options[key] = trimmedValue
+  }
 }
