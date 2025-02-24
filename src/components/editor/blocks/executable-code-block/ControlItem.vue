@@ -1,13 +1,19 @@
 <script setup lang="ts">
 import { FormItem } from '@/components/ui/form'
 import { Label } from '@/components/ui/label'
-import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Switch } from '@/components/ui/switch'
-import { Select, SelectTrigger, SelectContent, SelectItem } from '@/components/ui/select'
 import { Copy, RotateCcw } from 'lucide-vue-next'
 import type { CodeFormControl } from '@/types/codeExecution'
 import { computed } from 'vue'
+import { useNumericControl } from '@/composables/useNumericControl'
+
+// Import control components
+import NumericControl from './controls/NumericControl.vue'
+import BooleanControl from './controls/BooleanControl.vue'
+import SelectControl from './controls/SelectControl.vue'
+import TextControl from './controls/TextControl.vue'
+import ColorControl from './controls/ColorControl.vue'
+import DateTimeControl from './controls/DateTimeControl.vue'
 
 interface Props {
     control: CodeFormControl
@@ -24,54 +30,63 @@ const emit = defineEmits<{
     'copy': []
 }>()
 
-const inputValue = computed({
-    get: () => props.modelValue,
-    set: (value) => emit('update:modelValue', value)
+const { handleNumericValue } = useNumericControl(props.control)
+
+// Computed properties
+const controlValue = computed({
+    get: () => props.modelValue ?? getDefaultValue(),
+    set: (value) => handleValueUpdate(value)
 })
 
-const displayValue = computed(() => {
-    return props.modelValue !== null ? String(props.modelValue) : ''
-})
-
-const isNumericType = computed(() => {
-    return ['number', 'slider', 'range'].includes(props.control.type)
-})
-
-const processValue = (value: any): any => {
-    if (value === null || value === undefined) return null
-
+const getDefaultValue = () => {
     switch (props.control.type) {
-        case 'text':
-        case 'color':
-        case 'datetime':
-        case 'select':
-            return String(value)
         case 'number':
         case 'slider':
         case 'range':
-            const numValue = Number(value)
-            return props.control.options?.isFloat
-                ? Number(numValue.toFixed(3))
-                : Math.round(numValue)
+            return props.control.options?.min ?? 0
+        case 'text':
+            return ''
         case 'checkbox':
-            return Boolean(value)
+            return false
+        case 'select':
+            return props.control.options?.choices?.[0] ?? ''
+        case 'color':
+            return '#000000'
+        case 'datetime':
+            return new Date().toISOString().slice(0, 16)
         default:
-            return value
+            return null
     }
 }
 
+// Event handlers
 const handleValueUpdate = (value: any) => {
-    const processedValue = processValue(value)
+    let processedValue = value
+
+    switch (props.control.type) {
+        case 'number':
+        case 'slider':
+        case 'range':
+            processedValue = handleNumericValue(Number(value))
+            break
+        case 'checkbox':
+            processedValue = Boolean(value)
+            break
+        case 'text':
+        case 'datetime':
+        case 'color':
+            processedValue = String(value ?? '')
+            break
+        case 'select':
+            processedValue = value
+            break
+    }
+
     emit('update:modelValue', processedValue)
 }
 
-const handleReset = () => {
-    emit('reset')
-}
-
-const handleCopy = () => {
-    emit('copy')
-}
+const handleReset = () => emit('reset')
+const handleCopy = () => emit('copy')
 </script>
 
 <template>
@@ -98,46 +113,21 @@ const handleCopy = () => {
 
         <!-- Controls -->
         <div class="space-y-2">
-            <!-- Slider/Range Input -->
-            <template v-if="control.type === 'slider' || control.type === 'range'">
-                <input type="range" :min="control.options?.min" :max="control.options?.max"
-                    :step="control.options?.step" :value="modelValue"
-                    @input="e => handleValueUpdate(Number((e.target as HTMLInputElement).value))"
-                    class="range-input w-full" />
-                <div class="flex items-center gap-2">
-                    <Input type="number" :value="modelValue" @update:modelValue="handleValueUpdate"
-                        :min="control.options?.min" :max="control.options?.max" :step="control.options?.step"
-                        class="w-20 h-8" />
-                </div>
-            </template>
+            <component :is="control.type === 'checkbox' ? 'div' : 'div'" class="space-y-2">
+                <NumericControl v-if="['number', 'slider', 'range'].includes(control.type)" v-model="controlValue"
+                    :control="control" />
 
-            <!-- Checkbox -->
-            <div v-else-if="control.type === 'checkbox'" class="flex items-center space-x-2">
-                <Switch :checked="modelValue" @update:checked="handleValueUpdate" />
-                <span class="text-sm text-muted-foreground">
-                    {{ modelValue ? 'Yes' : 'No' }}
-                </span>
-            </div>
+                <BooleanControl v-else-if="control.type === 'checkbox'" v-model="controlValue" />
 
-            <!-- Select -->
-            <Select v-else-if="control.type === 'select'" :model-value="modelValue"
-                @update:model-value="handleValueUpdate">
-                <SelectTrigger>{{ displayValue }}</SelectTrigger>
-                <SelectContent>
-                    <SelectItem v-for="choice in control.options?.choices" :key="choice" :value="choice">
-                        {{ choice }}
-                    </SelectItem>
-                </SelectContent>
-            </Select>
+                <SelectControl v-else-if="control.type === 'select'" v-model="controlValue"
+                    :choices="control.options?.choices" />
 
-            <!-- Text input -->
-            <Input v-else-if="control.type === 'text'" type="text" :value="modelValue"
-                @update:modelValue="handleValueUpdate" :placeholder="control.options?.placeholder" />
+                <TextControl v-else-if="control.type === 'text'" v-model="controlValue" :control="control" />
 
-            <!-- Number input -->
-            <Input v-else-if="control.type === 'number'" type="number" :value="modelValue"
-                @update:modelValue="value => handleValueUpdate(Number(value))" :min="control.options?.min"
-                :max="control.options?.max" :step="control.options?.step" :placeholder="control.options?.placeholder" />
+                <ColorControl v-else-if="control.type === 'color'" v-model="controlValue" />
+
+                <DateTimeControl v-else-if="control.type === 'datetime'" v-model="controlValue" />
+            </component>
         </div>
     </FormItem>
 </template>
@@ -153,5 +143,19 @@ const handleCopy = () => {
 
 .range-input::-moz-range-thumb {
     @apply w-4 h-4 rounded-full bg-primary border-2 border-background hover:bg-primary/90 transition-all;
+}
+
+/* Color picker styles */
+input[type="color"] {
+    @apply border border-input bg-transparent;
+    -webkit-appearance: none;
+}
+
+input[type="color"]::-webkit-color-swatch-wrapper {
+    @apply p-0;
+}
+
+input[type="color"]::-webkit-color-swatch {
+    @apply border-none rounded-md;
 }
 </style>

@@ -17,6 +17,9 @@ import {
   Eye,
   EyeOff,
   Maximize2,
+  ChevronDown,
+  ChevronRight,
+  Sliders,
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import CodeMirror from './CodeMirror.vue'
@@ -58,6 +61,7 @@ const output = ref(props.result)
 const isCodeCopied = ref(false)
 const isCodeVisible = ref(true)
 const isFullScreen = ref(false)
+const showControls = ref(true)
 
 const { cell, execute, copyOutput, isCopied } = useCodeExecution(props.id)
 
@@ -128,50 +132,11 @@ const formatValue = (control: CodeFormControl) => {
   return control.value
 }
 
-const handleControlUpdate = (updatedControl: CodeFormControl) => {
-  console.log('🎮 Control Update Triggered:', updatedControl)
-  const lines = codeValue.value.split('\n')
-  let hasChanges = false
-
-  const updatedLines = lines.map(line => {
-    // More precise regex to match the entire line including comments
-    const varRegex = new RegExp(`^\\s*${updatedControl.name}\\s*=.*?(#.*)?$`)
-    if (varRegex.test(line)) {
-      hasChanges = true
-      let valueStr = ''
-
-      switch (updatedControl.type) {
-        case 'text':
-          // Special handling for text to preserve quotes
-          valueStr = `"${String(updatedControl.value).replace(/"/g, '\\"')}"`
-          break
-        case 'datetime':
-        case 'color':
-        case 'select':
-          valueStr = `"${updatedControl.value}"`
-          break
-        case 'checkbox':
-          valueStr = updatedControl.value ? 'True' : 'False'
-          break
-        default:
-          valueStr = String(updatedControl.value)
-      }
-
-      // Preserve the entire comment part
-      const commentMatch = line.match(/#.*$/)
-      const comment = commentMatch ? ` ${commentMatch[0]}` : ''
-
-      const newLine = `${updatedControl.name}=${valueStr}${comment}`
-      console.log('📝 Line update:', { old: line, new: newLine })
-      return newLine
-    }
-    return line
-  })
-
-  if (hasChanges) {
-    const newCode = updatedLines.join('\n')
-    console.log('💫 Updating code:', newCode)
-    updateCode(newCode)
+const handleControlUpdate = (control: CodeFormControl) => {
+  console.log('Control updated:', control)
+  // Make sure the code is updated when controls change
+  if (codeValue.value !== undefined) {
+    updateCode(codeValue.value)
   }
 }
 
@@ -262,8 +227,6 @@ const updateCode = (newCode: string) => {
     codeValue.value = newCode
     emit('update:code', newCode)
     console.log('✅ Code updated successfully')
-  } else {
-    console.log('⚠️ Code update skipped - no changes')
   }
 }
 
@@ -339,6 +302,12 @@ watch(codeControls, (newControls) => {
     })
   }
 }, { deep: true })
+
+// Add immediate watch for code value changes
+watch(codeValue, (newCode) => {
+  console.log('Code value changed:', newCode)
+  emit('update:code', newCode)
+}, { immediate: true })
 </script>
 
 <template>
@@ -385,11 +354,6 @@ watch(codeControls, (newControls) => {
           </Command>
         </PopoverContent>
       </Popover>
-      <Button variant="outline" size="sm" class="gap-2 h-8" @click="isCodeVisible = !isCodeVisible"
-        :title="isCodeVisible ? 'Hide Code' : 'Show Code'">
-        <Eye v-if="isCodeVisible" class="h-4 w-4" />
-        <EyeOff v-else class="h-4 w-4" />
-      </Button>
 
       <!-- Server Selector -->
       <Popover v-model:open="isServerOpen">
@@ -472,6 +436,18 @@ watch(codeControls, (newControls) => {
 
       <div class="flex-1"></div>
 
+      <!-- Control visibility buttons -->
+      <Button v-if="codeControls.length > 0" variant="outline" size="sm" class="h-8 w-8 p-0"
+        @click="showControls = !showControls" :title="showControls ? 'Hide Controls' : 'Show Controls'">
+        <Sliders class="h-4 w-4" :class="{ 'opacity-50': !showControls }" />
+      </Button>
+
+      <Button variant="outline" size="sm" class="h-8 w-8 p-0" @click="isCodeVisible = !isCodeVisible"
+        :title="isCodeVisible ? 'Hide Code' : 'Show Code'">
+        <Eye v-if="isCodeVisible" class="h-4 w-4" />
+        <EyeOff v-else class="h-4 w-4" />
+      </Button>
+
       <!-- Run Button -->
       <Button variant="default" size="sm" :disabled="cell?.isExecuting || selectedKernel === 'none'"
         @click="handleExecution" class="h-8" :title="cell?.isExecuting ? 'Executing...' : 'Run Code'">
@@ -494,7 +470,8 @@ watch(codeControls, (newControls) => {
         </Button>
       </div>
 
-      <CodeControls :controls="codeControls" :code="codeValue" @update:code="updateCode" />
+      <CodeControls v-if="codeControls.length > 0" v-show="showControls" :controls="codeControls" :code="codeValue"
+        @update:code="updateCode" @update:control="handleControlUpdate" />
 
       <CodeMirror v-model="codeValue" :language="language" :disabled="cell?.isExecuting"
         @update:modelValue="updateCode" />

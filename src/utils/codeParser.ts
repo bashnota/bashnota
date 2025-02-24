@@ -35,8 +35,9 @@ export function parseCodeControls(code: string): CodeFormControl[] {
 function parseValue(rawValue: string, type: string): ParsedValue {
   const trimmedValue = rawValue.trim()
   
-  // Keep original string value for options parsing
-  const raw = trimmedValue.replace(/^["']|["']$/g, '')
+  // Handle quoted strings better
+  const stringMatch = trimmedValue.match(/^["'](.*?)["']$/s)
+  const raw = stringMatch ? stringMatch[1] : trimmedValue.replace(/^["']|["']$/g, '')
   
   let processed: any = raw
   
@@ -44,6 +45,14 @@ function parseValue(rawValue: string, type: string): ParsedValue {
     processed = raw.toLowerCase() === 'true'
   } else if (type.includes('number') || type.includes('slider') || type.includes('range')) {
     processed = parseFloat(raw)
+    if (isNaN(processed)) processed = 0
+  } else if (type.includes('datetime')) {
+    // Handle datetime strings
+    try {
+      processed = new Date(raw).toISOString().slice(0, 16)
+    } catch {
+      processed = new Date().toISOString().slice(0, 16)
+    }
   }
   
   return { raw, processed }

@@ -62,94 +62,125 @@ watch(() => props.controls, (newControls) => {
     }, {} as Record<string, any>)
 }, { immediate: true })
 
-const formatValueForCode = (value: any, type: CodeFormControl['type']): string => {
-    if (value === null || value === undefined) return 'None'
+const formatValueForCode = (value: any, type: CodeFormControl['type'], control?: CodeFormControl): string => {
+    try {
+        if (value === null || value === undefined) return 'None'
 
-    switch (type) {
-        case 'text':
-        case 'select':
-            return `"${String(value).replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`
-        case 'checkbox':
-            return value ? 'True' : 'False'
-        case 'number':
-        case 'slider':
-        case 'range':
-            if (Number.isInteger(value)) {
+        switch (type) {
+            case 'text':
+            case 'select':
+            case 'datetime':
+            case 'color':
+                // Unified string handling for all string types
+                const strValue = String(value)
+                if (strValue === '') return '""'
+                return `"${strValue
+                    .replace(/\\/g, '\\\\')
+                    .replace(/"/g, '\\"')
+                    .replace(/\n/g, '\\n')
+                    }"`
+            case 'checkbox':
+                return value ? 'True' : 'False'
+            case 'number':
+            case 'slider':
+            case 'range':
+                if (control?.options?.isFloat) {
+                    const step = control.options?.step
+                    const precision = step ? String(step).split('.')[1]?.length || 6 : 6
+                    return Number(value).toFixed(precision).replace(/\.?0+$/, '')
+                }
                 return String(Math.round(value))
-            }
-            return Number(value).toFixed(6).replace(/\.?0+$/, '')
-        default:
-            return String(value)
+            default:
+                return String(value)
+        }
+    } catch (error) {
+        console.error('Error formatting value:', error)
+        return String(value)
     }
 }
 
 const updateCodeWithValue = (name: string, value: any, type: CodeFormControl['type']) => {
-    const lines = props.code.split('\n')
-    let updated = false
+    try {
+        const lines = props.code.split('\n')
+        let updated = false
 
-    const updatedLines = lines.map(line => {
-        const varRegex = new RegExp(`^(\\s*)(${name})\\s*=\\s*([^#]*?)(?:\\s*(#.*))?$`)
-        const match = line.match(varRegex)
+        const updatedLines = lines.map(line => {
+            // More precise regex that handles quotes and comments better
+            const varRegex = new RegExp(`^(\\s*)(${name})\\s*=\\s*([^#]*?)(?:\\s*(#.*))?$`)
+            const match = line.match(varRegex)
 
-        if (match) {
-            updated = true
-            const [, indent, varName, , comment = ''] = match
-            const formattedValue = formatValueForCode(value, type)
-            return `${indent}${varName}=${formattedValue}${comment ? ' ' + comment : ''}`
+            if (match) {
+                updated = true
+                const [, indent, varName, , comment = ''] = match
+                const control = props.controls.find(c => c.name === name)
+                const formattedValue = formatValueForCode(value, type, control)
+                // Ensure consistent spacing
+                return `${indent}${varName} = ${formattedValue}${comment ? ' ' + comment : ''}`
+            }
+            return line
+        })
+
+        if (updated) {
+            const newCode = updatedLines.join('\n')
+            // Only emit if the code actually changed
+            if (newCode !== props.code) {
+                emit('update:code', newCode)
+            }
         }
-        return line
-    })
-
-    if (updated) {
-        emit('update:code', updatedLines.join('\n'))
+    } catch (error) {
+        console.error('Error updating code:', error)
     }
 }
 
 const handleControlUpdate = (control: CodeFormControl, value: any) => {
-    console.log('Control Update:', { control, value }) // Debug log
+    try {
+        let processedValue = value
 
-    let processedValue = value
+        switch (control.type) {
+            case 'text':
+                // Handle text values more carefully
+                processedValue = value === null || value === undefined ? '' : String(value)
+                break
+            case 'number':
+            case 'slider':
+            case 'range':
+                processedValue = Number(value)
+                if (!isNaN(processedValue)) {
+                    if (control.options?.min !== undefined) {
+                        processedValue = Math.max(control.options.min, processedValue)
+                    }
+                    if (control.options?.max !== undefined) {
+                        processedValue = Math.min(control.options.max, processedValue)
+                    }
+                    if (control.options?.step) {
+                        const step = Number(control.options.step)
+                        processedValue = Math.round(processedValue / step) * step
+                    }
+                }
+                break
+            case 'select':
+                processedValue = value
+                break
+            case 'checkbox':
+                processedValue = Boolean(value)
+                break
+            case 'datetime':
+            case 'color':
+                processedValue = String(value ?? '')
+                break
+        }
 
-    switch (control.type) {
-        case 'number':
-        case 'slider':
-        case 'range':
-            processedValue = Number(value)
-            if (!isNaN(processedValue)) {
-                if (control.options?.min !== undefined) {
-                    processedValue = Math.max(control.options.min, processedValue)
-                }
-                if (control.options?.max !== undefined) {
-                    processedValue = Math.min(control.options.max, processedValue)
-                }
-            }
-            break
-        case 'text':
-            processedValue = String(value ?? '')
-            break
-        case 'select':
-            processedValue = value
-            break
-        case 'checkbox':
-            processedValue = Boolean(value)
-            break
-        default:
-            processedValue = value
+        // Update the control value first
+        controlValues.value[control.name] = processedValue
+
+        // Then update the code
+        updateCodeWithValue(control.name, processedValue, control.type)
+
+        // Finally emit the control update
+        updateValue(control, processedValue)
+    } catch (error) {
+        console.error('Error handling control update:', error)
     }
-
-    // Update the control value
-    controlValues.value[control.name] = processedValue
-
-    // Update the code
-    updateCodeWithValue(control.name, processedValue, control.type)
-
-    // Emit control update
-    updateValue(control, processedValue)
-
-    console.log('Updated Values:', {
-        controlValues: controlValues.value,
-        processedValue
-    }) // Debug log
 }
 
 const handleReset = (control: CodeFormControl) => {
