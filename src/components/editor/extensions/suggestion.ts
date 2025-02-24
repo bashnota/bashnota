@@ -21,6 +21,7 @@ import {
   ChartScatter,
   VideoIcon,
   ChartPieIcon,
+  Terminal as TerminalIcon,
 } from 'lucide-vue-next'
 
 type CommandArgs = {
@@ -254,6 +255,22 @@ export default {
             .setScatterPlot({
               title: 'Scatter Plot',
               apiUrl: '',
+            })
+            .run()
+        },
+      },
+      {
+        title: 'Terminal',
+        category: 'Advanced',
+        icon: TerminalIcon,
+        keywords: ['terminal', 'shell', 'bash', 'command'],
+        command: ({ editor, range }: CommandArgs) => {
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .setTerminal({
+              name: 'Terminal'
             })
             .run()
         },
