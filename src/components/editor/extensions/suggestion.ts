@@ -129,6 +129,25 @@ export default {
             .run()
         },
       },
+      {
+        title: 'JavaScript Code Block',
+        category: 'Code Blocks',
+        icon: FileCode,
+        keywords: ['js', 'javascript', 'code'],
+        command: ({ editor, range }: CommandArgs) => {
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .insertContent({
+              type: 'javascriptCodeBlock',
+              attrs: {
+                id: crypto.randomUUID(),
+              },
+            })
+            .run()
+        },
+      },
 
       // Images
       {
