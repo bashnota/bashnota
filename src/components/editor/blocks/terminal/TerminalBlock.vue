@@ -65,6 +65,10 @@ import { useRoute } from 'vue-router'
 import { Terminal as XTerm } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
+import { WebLinksAddon } from '@xterm/addon-web-links'
+import { SearchAddon } from '@xterm/addon-search'
+import { Unicode11Addon } from '@xterm/addon-unicode11'
+import { useTheme } from '@/composables/useTheme'
 
 const props = defineProps<{
     node: any
@@ -74,6 +78,7 @@ const props = defineProps<{
 const route = useRoute()
 const notaStore = useNotaStore()
 const terminalService = new TerminalService()
+const { isDark } = useTheme()
 
 const command = ref('')
 const output = ref<string[]>([])
@@ -121,49 +126,89 @@ const initializeXTerm = () => {
     xterm.value = new XTerm({
         cursorBlink: true,
         fontSize: 14,
-        fontFamily: 'monospace',
+        fontFamily: 'MesloLGS NF, Menlo, Monaco, Consolas, monospace',
         convertEol: true,
+        scrollback: 5000,
+        allowProposedApi: true,
         theme: {
-            background: '#1e1e1e',
-            foreground: '#ffffff',
-            cursor: '#ffffff',
-        }
+            background: isDark.value ? '#1a1b26' : '#ffffff',
+            foreground: isDark.value ? '#a9b1d6' : '#24283b',
+            cursor: isDark.value ? '#c0caf5' : '#24283b',
+            black: '#32344a',
+            red: '#f7768e',
+            green: '#9ece6a',
+            yellow: '#e0af68',
+            blue: '#7aa2f7',
+            magenta: '#ad8ee6',
+            cyan: '#449dab',
+            white: '#787c99',
+            brightBlack: '#444b6a',
+            brightRed: '#ff7a93',
+            brightGreen: '#b9f27c',
+            brightYellow: '#ff9e64',
+            brightBlue: '#7da6ff',
+            brightMagenta: '#bb9af7',
+            brightCyan: '#0db9d7',
+            brightWhite: '#acb0d0',
+        },
+        allowTransparency: true,
     })
 
+    const webLinksAddon = new WebLinksAddon()
+    const searchAddon = new SearchAddon()
+    const unicode11Addon = new Unicode11Addon()
     fitAddon.value = new FitAddon()
+
+    xterm.value.loadAddon(webLinksAddon)
+    xterm.value.loadAddon(searchAddon)
+    xterm.value.loadAddon(unicode11Addon)
     xterm.value.loadAddon(fitAddon.value)
+
     xterm.value.open(terminalDiv.value)
     fitAddon.value.fit()
 
-    // Focus terminal on click
+    const searchRef = searchAddon
+
     terminalDiv.value.addEventListener('click', () => {
         xterm.value?.focus()
     })
 
-    // Handle terminal input
     xterm.value.onData((data) => {
         if (ws.value && isConnected.value) {
-            // Echo the input locally
-            xterm.value?.write(data)
-            // Send to server
             ws.value.send(JSON.stringify(['stdin', data]))
         }
     })
 
-    // Handle terminal key input
     xterm.value.onKey(({ key, domEvent }) => {
         const ev = domEvent as KeyboardEvent
 
-        // Handle special keys
-        if (ev.keyCode === 13) { // Enter
-            if (ws.value && isConnected.value) {
-                ws.value.send(JSON.stringify(['stdin', '\r\n']))
-            }
-        } else if (ev.keyCode === 8) { // Backspace
-            if (ws.value && isConnected.value) {
-                ws.value.send(JSON.stringify(['stdin', '\b']))
+        if (ev.ctrlKey && ev.key === 'c') {
+            if (xterm.value?.hasSelection()) {
+                copyOutput()
+            } else {
+                ws.value?.send(JSON.stringify(['stdin', '\x03']))
             }
         }
+        else if (ev.ctrlKey && ev.key === 'v') {
+            navigator.clipboard.readText().then(text => {
+                ws.value?.send(JSON.stringify(['stdin', text]))
+            })
+        }
+        else if (ev.ctrlKey && ev.key === 'l') {
+            xterm.value?.clear()
+        }
+        else if (ev.ctrlKey && ev.key === 'f') {
+            searchRef.findNext('')
+        }
+    })
+
+    const resizeObserver = new ResizeObserver(() => {
+        fitAddon.value?.fit()
+    })
+    resizeObserver.observe(terminalDiv.value)
+
+    onBeforeUnmount(() => {
+        resizeObserver.disconnect()
     })
 }
 
@@ -181,14 +226,11 @@ const connectTerminal = async () => {
         ws.value.onmessage = (event) => {
             if (xterm.value) {
                 try {
-                    // Parse the incoming messages
                     const messages = event.data.split('][').map((msg: string) => {
-                        // Clean up the message format
                         msg = msg.replace(/^\[|\]$/g, '')
                         return JSON.parse(`[${msg}]`)
                     })
 
-                    // Process each message
                     messages.forEach((msg: [string, any]) => {
                         const [msgType, content] = msg
                         switch (msgType) {
@@ -197,7 +239,6 @@ const connectTerminal = async () => {
                                 xterm.value?.write(content)
                                 break
                             case 'setup':
-                                // Setup messages can be ignored
                                 break
                             default:
                                 console.log('Unknown message type:', msgType)
@@ -205,7 +246,6 @@ const connectTerminal = async () => {
                     })
                 } catch (error) {
                     console.error('Failed to parse terminal message:', error)
-                    // If parsing fails, write the raw data
                     xterm.value.write(event.data)
                 }
             }
@@ -257,11 +297,13 @@ const copyOutput = async () => {
     if (!xterm.value) return
     try {
         const selection = xterm.value.getSelection()
-        await navigator.clipboard.writeText(selection)
-        isCopied.value = true
-        setTimeout(() => {
-            isCopied.value = false
-        }, 2000)
+        if (selection) {
+            await navigator.clipboard.writeText(selection)
+            isCopied.value = true
+            setTimeout(() => {
+                isCopied.value = false
+            }, 2000)
+        }
     } catch (error) {
         console.error('Failed to copy output:', error)
     }
@@ -278,7 +320,6 @@ onMounted(() => {
         connectTerminal()
     }
 
-    // Handle window resize
     const handleResize = () => {
         if (fitAddon.value) {
             fitAddon.value.fit()
@@ -309,37 +350,34 @@ watch(selectedServerId, (newValue) => {
 }
 
 .terminal-output {
-    min-height: 300px;
-    background-color: #1e1e1e;
+    min-height: 400px;
+    background-color: v-bind('isDark ? "#1a1b26" : "#ffffff"');
     position: relative;
+    border-radius: 0.5rem;
+    overflow: hidden;
 }
 
-/* Make sure xterm fits properly in the container */
 :deep(.xterm) {
-    padding: 8px;
-    height: 300px;
+    padding: 1rem;
+    height: 400px;
 }
 
-:deep(.xterm-cursor) {
-    background-color: #fff;
+:deep(.xterm-viewport) {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }
 
-:deep(.xterm-cursor.xterm-cursor-blink) {
-    animation: blink 1s step-end infinite;
+:deep(.xterm-viewport::-webkit-scrollbar) {
+    width: 8px;
 }
 
-@keyframes blink {
-    0% {
-        opacity: 1;
-    }
+:deep(.xterm-viewport::-webkit-scrollbar-track) {
+    background: transparent;
+}
 
-    50% {
-        opacity: 0;
-    }
-
-    100% {
-        opacity: 1;
-    }
+:deep(.xterm-viewport::-webkit-scrollbar-thumb) {
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
 }
 
 :deep(.terminal-container) {
@@ -350,7 +388,6 @@ watch(selectedServerId, (newValue) => {
     background-color: #000;
 }
 
-/* Add hover effect for copy button */
 :deep(.terminal-container:hover) .copy-button {
     opacity: 1;
 }
