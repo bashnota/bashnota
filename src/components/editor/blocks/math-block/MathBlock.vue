@@ -73,10 +73,13 @@ const stopEditing = () => {
   })
 }
 
-watch(() => props.node.attrs.latex, (newLatex) => {
-  latex.value = newLatex
-  renderMath()
-})
+watch(
+  () => props.node.attrs.latex,
+  (newLatex) => {
+    latex.value = newLatex
+    renderMath()
+  },
+)
 
 onMounted(() => {
   // Wait for MathJax to be loaded
@@ -118,4 +121,4 @@ onMounted(() => {
   border-radius: 4px;
   font-family: monospace;
 }
-</style> 
+</style>

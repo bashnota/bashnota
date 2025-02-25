@@ -37,17 +37,4 @@ export const ExecutableCodeBlockExtension = CodeBlock.extend({
     // @ts-ignore
     return VueNodeViewRenderer(ExecutableCodeBlock)
   },
-
-  parseHTML() {
-    return [
-      {
-        tag: 'pre',
-        preserveWhitespace: 'full',
-      },
-    ]
-  },
-
-  renderHTML({ HTMLAttributes }) {
-    return ['pre', HTMLAttributes, ['code', {}, 0]]
-  },
 })
