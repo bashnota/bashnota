@@ -17,10 +17,31 @@ onMounted(() => {
   if (savedState) {
     isSidebarOpen.value = JSON.parse(savedState)
   }
-  const savedWidth = localStorage.getItem('sidebar-width')
-  if (savedWidth) {
-    sidebarWidth.value = parseInt(savedWidth)
+  
+  // Load sidebar width from interface settings
+  const savedInterfaceSettings = localStorage.getItem('interface-settings')
+  if (savedInterfaceSettings) {
+    try {
+      const settings = JSON.parse(savedInterfaceSettings)
+      if (settings.sidebarWidth && settings.sidebarWidth[0]) {
+        sidebarWidth.value = settings.sidebarWidth[0]
+      }
+    } catch (e) {
+      console.error('Failed to parse saved interface settings', e)
+    }
+  } else {
+    const savedWidth = localStorage.getItem('sidebar-width')
+    if (savedWidth) {
+      sidebarWidth.value = parseInt(savedWidth)
+    }
   }
+
+  // Listen for settings changes
+  window.addEventListener('interface-settings-changed', ((event: CustomEvent) => {
+    if (event.detail?.sidebarWidth && event.detail.sidebarWidth[0]) {
+      sidebarWidth.value = event.detail.sidebarWidth[0]
+    }
+  }) as EventListener)
 
   // Setup resize handling
   document.addEventListener('mousemove', handleMouseMove)

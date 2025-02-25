@@ -12,7 +12,7 @@ import { useNotaStore } from '@/stores/nota'
 import EditorToolbar from './EditorToolbar.vue'
 import SlashCommands from './extensions/Commands'
 import suggestion from './extensions/suggestion'
-import { ref, watch, computed, onUnmounted, onMounted } from 'vue'
+import { ref, watch, computed, onUnmounted, onMounted, reactive } from 'vue'
 import 'highlight.js/styles/github.css'
 import { useRouter } from 'vue-router'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
@@ -53,6 +53,7 @@ const notaStore = useNotaStore()
 const codeExecutionStore = useCodeExecutionStore()
 const router = useRouter()
 const isSidebarOpen = ref(true)
+const autoSaveEnabled = ref(true)
 
 const currentNota = computed(() => {
   return notaStore.getCurrentNota(props.notaId)
@@ -172,6 +173,17 @@ const registerCodeCells = (content: any) => {
     })
   })
 }
+
+const editorSettings = reactive({
+  fontSize: 16,
+  lineHeight: 1.6,
+  spellCheck: true,
+  tabSize: 2,
+  indentWithTabs: false,
+  wordWrap: true,
+  dragHandleWidth: 24,
+  autoSave: true
+})
 
 const editor = useEditor({
   content: content.value ? JSON.parse(content.value) : null,
@@ -323,6 +335,42 @@ const handleKeyboardShortcuts = (event: KeyboardEvent) => {
 onMounted(() => {
   // Add keyboard shortcut event listener
   document.addEventListener('keydown', handleKeyboardShortcuts)
+  
+  // Load saved editor settings
+  const savedEditorSettings = localStorage.getItem('editor-settings')
+  if (savedEditorSettings) {
+    try {
+      const settings = JSON.parse(savedEditorSettings)
+      if (settings.fontSize && settings.fontSize[0]) editorSettings.fontSize = settings.fontSize[0]
+      if (settings.lineHeight && settings.lineHeight[0]) editorSettings.lineHeight = settings.lineHeight[0]
+      if (settings.spellCheck !== undefined) editorSettings.spellCheck = settings.spellCheck
+      if (settings.tabSize && settings.tabSize[0]) editorSettings.tabSize = settings.tabSize[0]
+      if (settings.indentWithTabs !== undefined) editorSettings.indentWithTabs = settings.indentWithTabs
+      if (settings.wordWrap !== undefined) editorSettings.wordWrap = settings.wordWrap
+      if (settings.dragHandleWidth && settings.dragHandleWidth[0]) editorSettings.dragHandleWidth = settings.dragHandleWidth[0]
+      if (settings.autoSave !== undefined) editorSettings.autoSave = settings.autoSave
+      
+      applyEditorSettings()
+    } catch (e) {
+      console.error('Failed to parse saved editor settings', e)
+    }
+  }
+  
+  // Listen for settings changes
+  window.addEventListener('editor-settings-changed', ((event: CustomEvent) => {
+    if (event.detail) {
+      if (event.detail.fontSize && event.detail.fontSize[0]) editorSettings.fontSize = event.detail.fontSize[0]
+      if (event.detail.lineHeight && event.detail.lineHeight[0]) editorSettings.lineHeight = event.detail.lineHeight[0]
+      if (event.detail.spellCheck !== undefined) editorSettings.spellCheck = event.detail.spellCheck
+      if (event.detail.tabSize && event.detail.tabSize[0]) editorSettings.tabSize = event.detail.tabSize[0]
+      if (event.detail.indentWithTabs !== undefined) editorSettings.indentWithTabs = event.detail.indentWithTabs
+      if (event.detail.wordWrap !== undefined) editorSettings.wordWrap = event.detail.wordWrap
+      if (event.detail.dragHandleWidth && event.detail.dragHandleWidth[0]) editorSettings.dragHandleWidth = event.detail.dragHandleWidth[0]
+      if (event.detail.autoSave !== undefined) editorSettings.autoSave = event.detail.autoSave
+      
+      applyEditorSettings()
+    }
+  }) as EventListener)
 })
 
 onUnmounted(() => {
@@ -330,6 +378,34 @@ onUnmounted(() => {
   document.removeEventListener('keydown', handleKeyboardShortcuts)
   codeExecutionStore.cleanup()
 })
+
+// Function to apply settings to the editor
+function applyEditorSettings() {
+  if (!editor.value) return
+  
+  // Apply settings to editor
+  editor.value.setOptions({
+    editorProps: {
+      attributes: {
+        class: `prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none editor-font-size-${editorSettings.fontSize}`,
+        spellcheck: editorSettings.spellCheck.toString()
+      }
+    }
+  })
+  
+  // Update CSS variables for the editor
+  const editorElement = document.querySelector('.ProseMirror')
+  if (editorElement) {
+    editorElement.style.setProperty('--editor-font-size', `${editorSettings.fontSize}px`)
+    editorElement.style.setProperty('--editor-line-height', editorSettings.lineHeight.toString())
+    editorElement.style.setProperty('--editor-tab-size', editorSettings.tabSize.toString())
+    editorElement.style.setProperty('--drag-handle-width', `${editorSettings.dragHandleWidth}px`)
+    editorElement.style.setProperty('--word-wrap', editorSettings.wordWrap ? 'break-word' : 'normal')
+  }
+  
+  // Update auto-save behavior
+  autoSaveEnabled.value = editorSettings.autoSave
+}
 </script>
 
 <template>
@@ -394,6 +470,10 @@ onUnmounted(() => {
 <style>
 .ProseMirror {
   @apply outline-none min-h-[calc(100vh-10rem)];
+  font-size: var(--editor-font-size, 16px);
+  line-height: var(--editor-line-height, 1.6);
+  tab-size: var(--editor-tab-size, 2);
+  white-space: var(--word-wrap, break-word);
 }
 
 .ProseMirror .has-focus {
@@ -545,6 +625,7 @@ onUnmounted(() => {
   height: 1.5rem;
   z-index: 50;
   cursor: grab;
+  width: var(--drag-handle-width, 24px);
 }
 
 .drag-handle:hover {
@@ -612,4 +693,13 @@ onUnmounted(() => {
 .katex-display .katex {
   font-size: 1.21em;
 }
+
+/* Dynamic font size classes */
+.editor-font-size-12 { --editor-font-size: 12px; }
+.editor-font-size-14 { --editor-font-size: 14px; }
+.editor-font-size-16 { --editor-font-size: 16px; }
+.editor-font-size-18 { --editor-font-size: 18px; }
+.editor-font-size-20 { --editor-font-size: 20px; }
+.editor-font-size-22 { --editor-font-size: 22px; }
+.editor-font-size-24 { --editor-font-size: 24px; }
 </style>
