@@ -394,7 +394,7 @@ function applyEditorSettings() {
   })
   
   // Update CSS variables for the editor
-  const editorElement = document.querySelector('.ProseMirror')
+  const editorElement = document.querySelector('.ProseMirror') as HTMLElement
   if (editorElement) {
     editorElement.style.setProperty('--editor-font-size', `${editorSettings.fontSize}px`)
     editorElement.style.setProperty('--editor-line-height', editorSettings.lineHeight.toString())

@@ -289,5 +289,36 @@ export const useNotaStore = defineStore('nota', {
         return false
       }
     },
+
+    async exportAllNotas() {
+      try {
+        // Get all notas
+        const allNotas = [...this.items]
+        
+        // Create a JSON file
+        const data = JSON.stringify(allNotas, null, 2)
+        const blob = new Blob([data], { type: 'application/json' })
+        const url = URL.createObjectURL(blob)
+        
+        // Create a download link and trigger it
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `notas-export-${new Date().toISOString().split('T')[0]}.json`
+        document.body.appendChild(a)
+        a.click()
+        
+        // Clean up
+        URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+        
+        toast('All notas exported successfully')
+        
+        return allNotas
+      } catch (error) {
+        console.error('Failed to export notas:', error)
+        toast('Failed to export notas')
+        return []
+      }
+    },
   },
 })

@@ -54,7 +54,7 @@ const editorSettings = ref({
 
 // Keyboard shortcuts
 const isEditingShortcut = ref(false)
-const currentEditingShortcut = ref(null)
+const currentEditingShortcut = ref<{ id?: string; key: string; description: string; category?: string } | null>(null)
 const newShortcutKey = ref('')
 
 // Computed properties for display
@@ -111,7 +111,7 @@ onMounted(() => {
 })
 
 // Update theme
-const updateTheme = (newTheme) => {
+const updateTheme = (newTheme: string) => {
   theme.value = newTheme
   document.documentElement.classList.toggle('dark', newTheme === 'dark' || 
     (newTheme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches))
@@ -195,12 +195,12 @@ const resetAllSettings = () => {
   }
 }
 
-function updateFontSize(newSize) {
+function updateFontSize(newSize: number) {
   editorSettings.value.fontSize = [newSize]
 }
 
 // Add this function to edit a shortcut
-function editShortcut(shortcut) {
+function editShortcut(shortcut: { id?: string; key: string; description: string; category?: string }) {
   currentEditingShortcut.value = shortcut
   newShortcutKey.value = shortcut.key
   isEditingShortcut.value = true
@@ -209,8 +209,11 @@ function editShortcut(shortcut) {
 // Add this function to save the edited shortcut
 function saveShortcut() {
   if (currentEditingShortcut.value && newShortcutKey.value) {
+    // Add a check for id existence or provide a default
+    const shortcutId = currentEditingShortcut.value.id || '';
+    
     shortcutsStore.updateShortcut(
-      currentEditingShortcut.value.id, 
+      shortcutId, 
       { ...currentEditingShortcut.value, key: newShortcutKey.value }
     )
     
@@ -227,7 +230,7 @@ function saveShortcut() {
 }
 
 // Update the captureKey function to provide visual feedback
-function captureKey(event) {
+function captureKey(event: KeyboardEvent) {
   event.preventDefault()
   event.stopPropagation()
   
@@ -284,7 +287,7 @@ function resetShortcuts() {
 }
 
 // Add this function to format the shortcut key for display
-function formatShortcutKey(key) {
+function formatShortcutKey(key: string) {
   return key.split('+').map(part => {
     return `<kbd class="px-2 py-1 mx-1 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg dark:bg-gray-600 dark:text-gray-100 dark:border-gray-500">${part}</kbd>`
   }).join('')
