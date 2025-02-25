@@ -64,6 +64,21 @@ const animationSpeedLabel = computed(() => {
   return 'Normal'
 })
 
+// Add these computed properties to access browser information safely
+const browserInfo = computed(() => {
+  if (typeof navigator !== 'undefined') {
+    return {
+      browser: navigator.userAgent.includes('Chrome') 
+        ? 'Chrome' 
+        : navigator.userAgent.includes('Firefox') 
+          ? 'Firefox' 
+          : 'Other',
+      platform: navigator.platform
+    }
+  }
+  return { browser: 'Unknown', platform: 'Unknown' }
+})
+
 onMounted(() => {
   // Load saved theme preference
   const savedTheme = localStorage.getItem('theme')
@@ -690,11 +705,11 @@ function formatShortcutKey(key) {
                     </div>
                     <div class="space-y-1">
                       <p class="text-sm text-muted-foreground">Browser</p>
-                      <p class="font-medium">{{ navigator.userAgent.includes('Chrome') ? 'Chrome' : navigator.userAgent.includes('Firefox') ? 'Firefox' : 'Other' }}</p>
+                      <p class="font-medium">{{ browserInfo.browser }}</p>
                     </div>
                     <div class="space-y-1">
                       <p class="text-sm text-muted-foreground">Platform</p>
-                      <p class="font-medium">{{ navigator.platform }}</p>
+                      <p class="font-medium">{{ browserInfo.platform }}</p>
                     </div>
                   </div>
                   
