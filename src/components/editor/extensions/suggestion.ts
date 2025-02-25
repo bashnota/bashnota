@@ -21,6 +21,10 @@ import {
   ChartScatter,
   VideoIcon,
   ChartPieIcon,
+  Quote,
+  Minus,
+  SquareCheck,
+  PenTool,
 } from 'lucide-vue-next'
 
 type CommandArgs = {
@@ -103,6 +107,48 @@ export default {
                 latex: '\\frac{(a \cdot b)^2}{||a - b||^2}',
               },
             })
+            .run()
+        },
+      },
+      {
+        title: 'Blockquote',
+        category: 'Basic Blocks',
+        icon: Quote,
+        keywords: ['quote', 'blockquote', 'bq'],
+        command: ({ editor, range }: CommandArgs) => {
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .setBlockquote()
+            .run()
+        },
+      },
+      {
+        title: 'Horizontal Rule',
+        category: 'Basic Blocks',
+        icon: Minus,
+        keywords: ['hr', 'rule', 'line', 'divider'],
+        command: ({ editor, range }: CommandArgs) => {
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .setHorizontalRule()
+            .run()
+        },
+      },
+      {
+        title: 'Task List',
+        category: 'Basic Blocks',
+        icon: SquareCheck,
+        keywords: ['task', 'todo', 'list', 'checkbox'],
+        command: ({ editor, range }: CommandArgs) => {
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .toggleTaskList()
             .run()
         },
       },
@@ -255,6 +301,20 @@ export default {
               title: 'Scatter Plot',
               apiUrl: '',
             })
+            .run()
+        },
+      },
+      {
+        title: 'Draw.io Diagram',
+        category: 'Advanced',
+        icon: PenTool,
+        keywords: ['draw.io', 'draw', 'diagram', 'chart', 'graph'],
+        command: ({ editor, range }: CommandArgs) => {
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .insertDrawIo()
             .run()
         },
       },
