@@ -16,6 +16,9 @@ import { useNotaStore } from '@/stores/nota'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { toast } from '@/components/ui/toast'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { PencilIcon } from '@heroicons/vue/24/outline'
 
 // Use shortcuts from the store instead of duplicating them
 const shortcutsStore = useShortcutsStore()
@@ -48,6 +51,11 @@ const editorSettings = ref({
   indentWithTabs: false,
   wordWrap: true,
 })
+
+// Keyboard shortcuts
+const isEditingShortcut = ref(false)
+const currentEditingShortcut = ref(null)
+const newShortcutKey = ref('')
 
 // Computed properties for display
 const animationSpeedLabel = computed(() => {
@@ -82,6 +90,9 @@ onMounted(() => {
       console.error('Failed to parse saved editor settings', e)
     }
   }
+
+  // Load shortcuts on mount
+  shortcutsStore.loadShortcuts()
 })
 
 // Update theme
@@ -171,6 +182,97 @@ const resetAllSettings = () => {
 
 function updateFontSize(newSize) {
   editorSettings.value.fontSize = [newSize]
+}
+
+// Add this function to edit a shortcut
+function editShortcut(shortcut) {
+  currentEditingShortcut.value = shortcut
+  newShortcutKey.value = shortcut.key
+  isEditingShortcut.value = true
+}
+
+// Add this function to save the edited shortcut
+function saveShortcut() {
+  if (currentEditingShortcut.value && newShortcutKey.value) {
+    shortcutsStore.updateShortcut(
+      currentEditingShortcut.value.id, 
+      { ...currentEditingShortcut.value, key: newShortcutKey.value }
+    )
+    
+    toast({
+      title: 'Shortcut Updated',
+      description: `${currentEditingShortcut.value.description} is now ${newShortcutKey.value}`,
+      variant: 'default'
+    })
+  }
+  
+  isEditingShortcut.value = false
+  currentEditingShortcut.value = null
+  newShortcutKey.value = ''
+}
+
+// Update the captureKey function to provide visual feedback
+function captureKey(event) {
+  event.preventDefault()
+  event.stopPropagation()
+  
+  // Get the key combination
+  const ctrl = event.ctrlKey ? 'Ctrl+' : ''
+  const alt = event.altKey ? 'Alt+' : ''
+  const shift = event.shiftKey ? 'Shift+' : ''
+  const meta = event.metaKey ? '⌘+' : ''
+  
+  let key = event.key
+  
+  // Format special keys
+  if (key === ' ') key = 'Space'
+  else if (key === 'Escape') key = 'Esc'
+  else if (key === 'ArrowUp') key = '↑'
+  else if (key === 'ArrowDown') key = '↓'
+  else if (key === 'ArrowLeft') key = '←'
+  else if (key === 'ArrowRight') key = '→'
+  else if (key === 'Enter') key = 'Enter'
+  else if (key === 'Backspace') key = 'Backspace'
+  else if (key === 'Delete') key = 'Delete'
+  else if (key === 'Tab') key = 'Tab'
+  else if (key.length === 1) key = key.toUpperCase()
+  
+  // Don't capture modifier keys alone
+  if (['Control', 'Alt', 'Shift', 'Meta'].includes(key)) {
+    return
+  }
+  
+  // Update the shortcut key with visual feedback
+  newShortcutKey.value = `${meta}${ctrl}${alt}${shift}${key}`
+  
+  // Add visual feedback
+  const inputElement = document.getElementById('shortcut-input')
+  if (inputElement) {
+    // Add a flash effect
+    inputElement.classList.add('shortcut-flash')
+    setTimeout(() => {
+      inputElement.classList.remove('shortcut-flash')
+    }, 200)
+  }
+}
+
+// Add this function to reset shortcuts
+function resetShortcuts() {
+  if (confirm('Are you sure you want to reset all keyboard shortcuts to default?')) {
+    shortcutsStore.resetToDefaults()
+    toast({
+      title: 'Shortcuts Reset',
+      description: 'All keyboard shortcuts have been reset to default values',
+      variant: 'default'
+    })
+  }
+}
+
+// Add this function to format the shortcut key for display
+function formatShortcutKey(key) {
+  return key.split('+').map(part => {
+    return `<kbd class="px-2 py-1 mx-1 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg dark:bg-gray-600 dark:text-gray-100 dark:border-gray-500">${part}</kbd>`
+  }).join('')
 }
 </script>
 
@@ -336,46 +438,44 @@ function updateFontSize(newSize) {
           </div>
           
           <!-- Keyboard Shortcuts Card -->
-          <Card class="overflow-hidden border-2 hover:border-primary/50 transition-all">
-            <CardHeader class="bg-muted/50">
+          <Card class="card">
+            <CardHeader>
               <CardTitle class="flex items-center gap-2">
-                <CommandLineIcon class="h-5 w-5 text-primary" />
+                <Keyboard class="h-5 w-5 text-primary" />
                 Keyboard Shortcuts
               </CardTitle>
-              <CardDescription>Boost your productivity with keyboard shortcuts</CardDescription>
+              <CardDescription>Customize keyboard shortcuts for common actions</CardDescription>
             </CardHeader>
             <CardContent class="pt-6">
-              <div class="space-y-6">
-                <div>
-                  <h3 class="text-lg font-medium mb-3 flex items-center gap-2">
-                    <Badge variant="secondary" class="rounded-md">General</Badge>
-                  </h3>
-                  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    <div v-for="shortcut in shortcutsStore.generalShortcuts" :key="shortcut.key" 
-                      class="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 transition-colors">
-                      <kbd class="px-2 py-1 bg-background border rounded text-sm font-mono min-w-16 text-center shadow-sm">
-                        {{ shortcut.key }}
-                      </kbd>
-                      <span>{{ shortcut.description }}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div>
-                  <h3 class="text-lg font-medium mb-3 flex items-center gap-2">
-                    <Badge variant="secondary" class="rounded-md">Insert Blocks</Badge>
-                  </h3>
-                  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    <div v-for="shortcut in shortcutsStore.blockShortcuts" :key="shortcut.key" 
-                      class="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 transition-colors">
-                      <kbd class="px-2 py-1 bg-background border rounded text-sm font-mono min-w-16 text-center shadow-sm">
-                        {{ shortcut.key }}
-                      </kbd>
-                      <span>{{ shortcut.description }}</span>
-                    </div>
-                  </div>
+              <div class="space-y-4">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Action</TableHead>
+                      <TableHead>Shortcut</TableHead>
+                      <TableHead class="w-[100px]">Edit</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow v-for="shortcut in shortcutsStore.shortcuts" :key="shortcut.id">
+                      <TableCell class="font-medium">{{ shortcut.description }}</TableCell>
+                      <TableCell>
+                        <div v-html="formatShortcutKey(shortcut.key)"></div>
+                      </TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="sm" @click="editShortcut(shortcut)">
+                          <PencilIcon class="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+                
+                <div class="flex justify-end">
+                  <Button variant="outline" @click="resetShortcuts" class="flex items-center gap-2">
+                    <ArrowPathIcon class="h-4 w-4" />
+                    Reset to Defaults
+                  </Button>
                 </div>
               </div>
             </CardContent>
@@ -616,11 +716,55 @@ function updateFontSize(newSize) {
       </Tabs>
     </div>
   </div>
+
+  <!-- Add this dialog component at the end of the template, before the closing </template> tag -->
+  <Dialog v-model:open="isEditingShortcut">
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Edit Keyboard Shortcut</DialogTitle>
+        <DialogDescription v-if="currentEditingShortcut">
+          Change the keyboard shortcut for "{{ currentEditingShortcut.description }}"
+        </DialogDescription>
+      </DialogHeader>
+      
+      <div class="py-4">
+        <Label>Press the new key combination</Label>
+        <Input 
+          id="shortcut-input"
+          v-model="newShortcutKey" 
+          class="mt-2 shortcut-input" 
+          placeholder="Press keys..." 
+          @keydown.stop="captureKey" 
+          @keydown.enter.prevent
+          @keydown.space.prevent
+          @keydown.tab.prevent
+          readonly
+        />
+        
+        <div v-if="newShortcutKey" class="mt-4 text-center">
+          <p class="text-sm text-muted-foreground mb-2">New shortcut:</p>
+          <div class="p-3 bg-muted/30 rounded-md inline-block" v-html="formatShortcutKey(newShortcutKey)"></div>
+        </div>
+        
+        <p class="text-sm text-muted-foreground mt-4">
+          Press the desired key combination (e.g., Ctrl+S, Alt+P)
+        </p>
+      </div>
+      
+      <DialogFooter>
+        <Button variant="outline" @click="isEditingShortcut = false">Cancel</Button>
+        <Button @click="saveShortcut">Save Changes</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
 
 <style scoped>
 kbd {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  display: inline-block;
+  min-width: 2.5em;
+  text-align: center;
 }
 
 .card {
@@ -630,5 +774,56 @@ kbd {
 .card:hover {
   transform: translateY(-2px);
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.shortcut-input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  text-align: center;
+  font-size: 1.1rem;
+  letter-spacing: 0.05em;
+  background-color: var(--background);
+  border: 2px solid var(--border);
+}
+
+.shortcut-flash {
+  background-color: rgba(var(--primary), 0.1);
+  border-color: var(--primary);
+  transition: all 0.2s ease;
+}
+
+/* Add a hint that the input is waiting for keypress */
+.shortcut-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(var(--primary), 0.3);
+}
+
+/* Style for the shortcut preview */
+.shortcut-preview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.5rem 1rem;
+  background-color: var(--muted);
+  border-radius: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+/* Make the kbd elements look nicer */
+kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  display: inline-block;
+  min-width: 1.5em;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--foreground);
+  text-align: center;
+  background-color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+  margin: 0 0.125rem;
 }
 </style> 
