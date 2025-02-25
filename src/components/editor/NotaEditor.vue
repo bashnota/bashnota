@@ -310,7 +310,7 @@ const handleKeyboardShortcuts = (event: KeyboardEvent) => {
       editor.value.chain().focus().toggleTaskList().run()
       break
     case 'g': // Draw.io diagram
-      editor.value.chain().focus().insertDrawio().run()
+      editor.value.chain().focus().insertDrawIo().run()
       break
     case 'b': // Data table
       if (currentNota.value?.id) {
