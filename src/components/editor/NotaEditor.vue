@@ -66,6 +66,8 @@ const content = computed(() => {
 const editorExtensions = [
   StarterKit.configure({
     codeBlock: false,
+    blockquote: false,
+    horizontalRule: false,
   }),
   UniqueId.configure({
     attributeName: 'id',
@@ -121,8 +123,6 @@ const editorExtensions = [
   Youtube,
   SubfigureExtension,
   ImageExtension,
-  Blockquote,
-  HorizontalRule,
   TaskList,
   TaskItem.configure({
     nested: true,
@@ -130,6 +130,8 @@ const editorExtensions = [
   drawIoExtension.configure({
     openDialog: 'dblclick',
   }),
+  Blockquote,
+  HorizontalRule,
 ]
 
 const registerCodeCells = (content: any) => {
