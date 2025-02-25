@@ -12,7 +12,7 @@ import { useNotaStore } from '@/stores/nota'
 import EditorToolbar from './EditorToolbar.vue'
 import SlashCommands from './extensions/Commands'
 import suggestion from './extensions/suggestion'
-import { ref, watch, computed, onUnmounted } from 'vue'
+import { ref, watch, computed, onUnmounted, onMounted } from 'vue'
 import 'highlight.js/styles/github.css'
 import { useRouter } from 'vue-router'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
@@ -251,7 +251,83 @@ const wordCount = computed(() => {
   return text.split(/\s+/).filter((word) => word.length > 0).length
 })
 
+// Handle keyboard shortcuts for inserting blocks
+const handleKeyboardShortcuts = (event: KeyboardEvent) => {
+  // Check if editor is initialized
+  if (!editor.value) return
+  
+  // Skip if target is a CodeMirror editor
+  if (event.target instanceof HTMLElement) {
+    const isCodeMirrorFocused = event.target.closest('.cm-editor') !== null
+    if (isCodeMirrorFocused) return
+  }
+  
+  // Only process Ctrl+Shift+Alt combinations
+  if (!(event.ctrlKey && event.shiftKey && event.altKey)) return
+  
+  // Prevent default browser behavior
+  event.preventDefault()
+  
+  // Process different key combinations
+  switch (event.key.toLowerCase()) {
+    case 'c': // Code block
+      editor.value.chain().focus().insertContent({
+        type: 'executableCodeBlock',
+        attrs: { language: 'python' }
+      }).run()
+      break
+    case 't': // Table
+      editor.value.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
+      break
+    case 'i': // Image
+      editor.value.chain().focus().setImage().run()
+      break
+    case 'm': // Math block
+      editor.value.chain().focus().insertContent({
+        type: 'mathBlock',
+        attrs: { latex: '' }
+      }).run()
+      break
+    case 'd': // Mermaid diagram
+      editor.value.chain().focus().setMermaid('graph TD;\nA-->B;').run()
+      break
+    case 'y': // YouTube
+      editor.value.chain().focus().setYoutube('https://www.youtube.com/watch?v=dQw4w9WgXcQ').run()
+      break
+    case 's': // Scatter plot
+      editor.value.chain().focus().setScatterPlot().run()
+      break
+    case 'f': // Subfigures
+      editor.value.chain().focus().setSubfigures().run()
+      break
+    case 'h': // Horizontal rule
+      editor.value.chain().focus().setHorizontalRule().run()
+      break
+    case 'q': // Blockquote
+      editor.value.chain().focus().toggleBlockquote().run()
+      break
+    case 'k': // Task list
+      editor.value.chain().focus().toggleTaskList().run()
+      break
+    case 'g': // Draw.io diagram
+      editor.value.chain().focus().insertDrawio().run()
+      break
+    case 'b': // Data table
+      if (currentNota.value?.id) {
+        editor.value.chain().focus().insertDataTable(currentNota.value.id).run()
+      }
+      break
+  }
+}
+
+onMounted(() => {
+  // Add keyboard shortcut event listener
+  document.addEventListener('keydown', handleKeyboardShortcuts)
+})
+
 onUnmounted(() => {
+  // Clean up event listeners
+  document.removeEventListener('keydown', handleKeyboardShortcuts)
   codeExecutionStore.cleanup()
 })
 </script>

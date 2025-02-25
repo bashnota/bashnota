@@ -114,7 +114,7 @@ onKeyStroke('n', (e) => {
   }
 })
 
-onKeyStroke('/', (e) => {
+onKeyStroke('k', (e) => {
   if (e.metaKey || e.ctrlKey) {
     e.preventDefault()
     document.querySelector<HTMLInputElement>('.search-input')?.focus()
