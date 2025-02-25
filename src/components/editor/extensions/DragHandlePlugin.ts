@@ -299,6 +299,7 @@ export function DragHandlePlugin(options: GlobalDragHandleOptions & { pluginKey:
           render() {
             return h(BlockCommandMenu, {
               position: { x: e.clientX, y: e.clientY },
+              selection: view.state.selection,
               isVisible: true,
               editorView: view,
               onClose: () => {

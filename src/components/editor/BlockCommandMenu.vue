@@ -10,9 +10,11 @@ import { Trash2Icon, ScissorsIcon, CopyIcon } from 'lucide-vue-next'
 import { onMounted, onUnmounted } from 'vue'
 import type { EditorView } from '@tiptap/pm/view'
 import { serializeForClipboard } from './extensions/DragHandlePlugin'
+import type { Selection } from '@tiptap/pm/state'
 
 const props = defineProps<{
   position: { x: number; y: number } | null
+  selection: Selection | null
   isVisible: boolean
   editorView?: EditorView
 }>()
@@ -23,9 +25,9 @@ const emit = defineEmits<{
 
 const cut = () => {
   emit('close')
-  if (!props.editorView) return
+  if (!props.editorView || !props.selection) return
 
-  const slice = props.editorView.state.selection.content()
+  const slice = props.selection.content()
   const { dom, text } = serializeForClipboard(props.editorView, slice)
 
   // Copy the content to the clipboard
@@ -35,19 +37,20 @@ const cut = () => {
   })
 
   navigator.clipboard.write([clipboardItem]).then(() => {
+    if (!props.editorView || !props.selection) return
+
     // After copying, delete the selected block
-    const { state, dispatch } = props.editorView!
-    const { selection } = state
-    const tr = state.tr.delete(selection.from, selection.to)
+    const { state, dispatch } = props.editorView
+    const tr = state.tr.delete(props.selection.from, props.selection.to)
     dispatch(tr)
   })
 }
 
 const copy = () => {
   emit('close')
-  if (!props.editorView) return
+  if (!props.editorView || !props.selection) return
 
-  const slice = props.editorView.state.selection.content()
+  const slice = props.selection.content()
   const { dom, text } = serializeForClipboard(props.editorView, slice)
 
   // Copy the content to the clipboard
@@ -61,12 +64,10 @@ const copy = () => {
 
 const deleteBlock = () => {
   emit('close')
-  if (!props.editorView) return
+  if (!props.editorView || !props.selection) return
 
   const { state, dispatch } = props.editorView!
-  const { selection } = state
-
-  const tr = state.tr.delete(selection.from, selection.to)
+  const tr = state.tr.delete(props.selection.from, props.selection.to)
   dispatch(tr)
 
   // Focus the editor after deleting
@@ -111,7 +112,7 @@ onUnmounted(() => {
         </CommandItem>
       </CommandGroup>
 
-        <CommandSeparator />
+      <CommandSeparator />
 
       <CommandGroup>
         <CommandItem
