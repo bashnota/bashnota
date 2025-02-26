@@ -36,6 +36,7 @@ const deserializeNota = (nota: any): Nota => ({
   createdAt: nota.createdAt ? new Date(nota.createdAt) : new Date(),
   updatedAt: nota.updatedAt ? new Date(nota.updatedAt) : new Date(),
   config: nota.config ? JSON.parse(JSON.stringify(nota.config)) : undefined,
+  versions: Array.isArray(nota.versions) ? [...nota.versions] : [],
 })
 
 export const useNotaStore = defineStore('nota', {
@@ -47,7 +48,13 @@ export const useNotaStore = defineStore('nota', {
 
   getters: {
     rootItems: (state) => {
-      return state.items.filter((item) => !item.parentId)
+      // Return items that don't have a parentId and are not versions
+      // (i.e., they don't have a notaId property which would indicate they're a version)
+      return state.items.filter((item) => !item.parentId && 
+        // This check ensures we're only returning actual notas, not version entries
+        // that might have been inadvertently added to the items array
+        !('notaId' in item)
+      )
     },
 
     getChildren: (state) => (parentId: string) => {
