@@ -445,6 +445,28 @@ const refreshEditorContent = async () => {
     }
   }
 }
+
+const insertSubNotaLink = (subNotaId: string, subNotaTitle: string) => {
+  if (editor.value) {
+    // Create a link to the sub-nota
+    editor.value.chain().focus().setLink({
+      href: `/nota/${subNotaId}`,
+      target: '_self',
+    }).insertContent(subNotaTitle).setLink({}).run()
+    
+    // Save the content after inserting the link
+    const content = editor.value.getJSON()
+    notaStore.saveNota({
+      id: props.notaId,
+      content: JSON.stringify(content),
+      updatedAt: new Date(),
+    })
+  }
+}
+
+defineExpose({
+  insertSubNotaLink
+})
 </script>
 
 <template>
