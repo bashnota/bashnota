@@ -217,31 +217,7 @@ const editor = useEditor({
     })
     isLoading.value = false
   },
-  onUpdate: ({ editor }) => {
-    try {
-      emit('saving', true)
-      const content = editor.getJSON()
-
-      // Register/update code cells on content change
-      registerCodeCells(content)
-
-      // Save sessions whenever content updates
-      codeExecutionStore.saveSessions(props.notaId)
-
-      notaStore
-        .saveNota({
-          id: props.notaId,
-          content: JSON.stringify(content),
-          updatedAt: new Date(),
-        })
-        .finally(() => {
-          emit('saving', false)
-        })
-    } catch (error) {
-      console.error('Error saving content:', error)
-      emit('saving', false)
-    }
-  },
+  onUpdate: () => saveEditorContent(),
 })
 
 // Watch for ID changes to update editor content
@@ -266,6 +242,70 @@ const wordCount = computed(() => {
   return text.split(/\s+/).filter((word) => word.length > 0).length
 })
 
+// Function to apply settings to the editor
+function applyEditorSettings(settings = editorSettings) {
+  if (!editor.value) return
+  
+  // Apply settings to editor
+  editor.value.setOptions({
+    editorProps: {
+      attributes: {
+        class: `prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none editor-font-size-${settings.fontSize}`,
+        spellcheck: settings.spellCheck.toString()
+      }
+    }
+  })
+  
+  // Update CSS variables for the editor
+  const editorElement = document.querySelector('.ProseMirror') as HTMLElement
+  if (editorElement) {
+    const cssVars = {
+      '--editor-font-size': `${settings.fontSize}px`,
+      '--editor-line-height': settings.lineHeight.toString(),
+      '--editor-tab-size': settings.tabSize.toString(),
+      '--drag-handle-width': `${settings.dragHandleWidth}px`,
+      '--word-wrap': settings.wordWrap ? 'break-word' : 'normal'
+    }
+    
+    Object.entries(cssVars).forEach(([key, value]) => {
+      editorElement.style.setProperty(key, value)
+    })
+  }
+  
+  // Update auto-save behavior
+  autoSaveEnabled.value = settings.autoSave
+}
+
+// Function to save editor content
+const saveEditorContent = () => {
+  if (!editor.value) return
+  
+  try {
+    emit('saving', true)
+    const content = editor.value.getJSON()
+
+    // Register/update code cells on content change
+    registerCodeCells(content)
+
+    // Save sessions whenever content updates
+    codeExecutionStore.saveSessions(props.notaId)
+
+    return notaStore
+      .saveNota({
+        id: props.notaId,
+        content: JSON.stringify(content),
+        updatedAt: new Date(),
+      })
+      .finally(() => {
+        emit('saving', false)
+      })
+  } catch (error) {
+    console.error('Error saving content:', error)
+    emit('saving', false)
+    return Promise.reject(error)
+  }
+}
+
 // Handle keyboard shortcuts for inserting blocks
 const handleKeyboardShortcuts = (event: KeyboardEvent) => {
   // Check if editor is initialized
@@ -283,55 +323,36 @@ const handleKeyboardShortcuts = (event: KeyboardEvent) => {
   // Prevent default browser behavior
   event.preventDefault()
   
-  // Process different key combinations
-  switch (event.key.toLowerCase()) {
-    case 'c': // Code block
-      editor.value.chain().focus().insertContent({
-        type: 'executableCodeBlock',
-        attrs: { language: 'python' }
-      }).run()
-      break
-    case 't': // Table
-      editor.value.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
-      break
-    case 'i': // Image
-      editor.value.chain().focus().setImage().run()
-      break
-    case 'm': // Math block
-      editor.value.chain().focus().insertContent({
-        type: 'mathBlock',
-        attrs: { latex: '' }
-      }).run()
-      break
-    case 'd': // Mermaid diagram
-      editor.value.chain().focus().setMermaid('graph TD;\nA-->B;').run()
-      break
-    case 'y': // YouTube
-      editor.value.chain().focus().setYoutube('https://www.youtube.com/watch?v=dQw4w9WgXcQ').run()
-      break
-    case 's': // Scatter plot
-      editor.value.chain().focus().setScatterPlot().run()
-      break
-    case 'f': // Subfigures
-      editor.value.chain().focus().setSubfigures().run()
-      break
-    case 'h': // Horizontal rule
-      editor.value.chain().focus().setHorizontalRule().run()
-      break
-    case 'q': // Blockquote
-      editor.value.chain().focus().toggleBlockquote().run()
-      break
-    case 'k': // Task list
-      editor.value.chain().focus().toggleTaskList().run()
-      break
-    case 'g': // Draw.io diagram
-      editor.value.chain().focus().insertDrawIo().run()
-      break
-    case 'b': // Data table
+  // Map of key to insertion functions
+  const insertionMap: Record<string, () => void> = {
+    'c': () => editor.value!.chain().focus().insertContent({
+      type: 'executableCodeBlock',
+      attrs: { language: 'python' }
+    }).run(),
+    't': () => editor.value!.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+    'i': () => editor.value!.chain().focus().setImage().run(),
+    'm': () => editor.value!.chain().focus().insertContent({
+      type: 'mathBlock',
+      attrs: { latex: '' }
+    }).run(),
+    'd': () => editor.value!.chain().focus().setMermaid('graph TD;\nA-->B;').run(),
+    'y': () => editor.value!.chain().focus().setYoutube('https://www.youtube.com/watch?v=dQw4w9WgXcQ').run(),
+    's': () => editor.value!.chain().focus().setScatterPlot().run(),
+    'f': () => editor.value!.chain().focus().setSubfigures().run(),
+    'h': () => editor.value!.chain().focus().setHorizontalRule().run(),
+    'q': () => editor.value!.chain().focus().toggleBlockquote().run(),
+    'k': () => editor.value!.chain().focus().toggleTaskList().run(),
+    'g': () => editor.value!.chain().focus().insertDrawIo().run(),
+    'b': () => {
       if (currentNota.value?.id) {
-        editor.value.chain().focus().insertDataTable(currentNota.value.id).run()
+        editor.value!.chain().focus().insertDataTable(currentNota.value.id).run()
       }
-      break
+    }
+  }
+  
+  const key = event.key.toLowerCase()
+  if (insertionMap[key]) {
+    insertionMap[key]()
   }
 }
 
@@ -344,14 +365,23 @@ onMounted(() => {
   if (savedEditorSettings) {
     try {
       const settings = JSON.parse(savedEditorSettings)
-      if (settings.fontSize && settings.fontSize[0]) editorSettings.fontSize = settings.fontSize[0]
-      if (settings.lineHeight && settings.lineHeight[0]) editorSettings.lineHeight = settings.lineHeight[0]
-      if (settings.spellCheck !== undefined) editorSettings.spellCheck = settings.spellCheck
-      if (settings.tabSize && settings.tabSize[0]) editorSettings.tabSize = settings.tabSize[0]
-      if (settings.indentWithTabs !== undefined) editorSettings.indentWithTabs = settings.indentWithTabs
-      if (settings.wordWrap !== undefined) editorSettings.wordWrap = settings.wordWrap
-      if (settings.dragHandleWidth && settings.dragHandleWidth[0]) editorSettings.dragHandleWidth = settings.dragHandleWidth[0]
-      if (settings.autoSave !== undefined) editorSettings.autoSave = settings.autoSave
+      const settingsMap = {
+        'fontSize': (val: any) => val && val[0] ? val[0] : undefined,
+        'lineHeight': (val: any) => val && val[0] ? val[0] : undefined,
+        'spellCheck': (val: any) => val !== undefined ? val : undefined,
+        'tabSize': (val: any) => val && val[0] ? val[0] : undefined,
+        'indentWithTabs': (val: any) => val !== undefined ? val : undefined,
+        'wordWrap': (val: any) => val !== undefined ? val : undefined,
+        'dragHandleWidth': (val: any) => val && val[0] ? val[0] : undefined,
+        'autoSave': (val: any) => val !== undefined ? val : undefined
+      }
+      
+      Object.entries(settingsMap).forEach(([key, transform]) => {
+        const value = transform(settings[key])
+        if (value !== undefined) {
+          (editorSettings as any)[key] = value
+        }
+      })
       
       applyEditorSettings()
     } catch (e) {
@@ -359,19 +389,32 @@ onMounted(() => {
     }
   }
   
-  // Listen for settings changes
+  // Listen for settings changes with the same mapping logic
   window.addEventListener('editor-settings-changed', ((event: CustomEvent) => {
     if (event.detail) {
-      if (event.detail.fontSize && event.detail.fontSize[0]) editorSettings.fontSize = event.detail.fontSize[0]
-      if (event.detail.lineHeight && event.detail.lineHeight[0]) editorSettings.lineHeight = event.detail.lineHeight[0]
-      if (event.detail.spellCheck !== undefined) editorSettings.spellCheck = event.detail.spellCheck
-      if (event.detail.tabSize && event.detail.tabSize[0]) editorSettings.tabSize = event.detail.tabSize[0]
-      if (event.detail.indentWithTabs !== undefined) editorSettings.indentWithTabs = event.detail.indentWithTabs
-      if (event.detail.wordWrap !== undefined) editorSettings.wordWrap = event.detail.wordWrap
-      if (event.detail.dragHandleWidth && event.detail.dragHandleWidth[0]) editorSettings.dragHandleWidth = event.detail.dragHandleWidth[0]
-      if (event.detail.autoSave !== undefined) editorSettings.autoSave = event.detail.autoSave
+      const settingsMap = {
+        'fontSize': (val: any) => val && val[0] ? val[0] : undefined,
+        'lineHeight': (val: any) => val && val[0] ? val[0] : undefined,
+        'spellCheck': (val: any) => val !== undefined ? val : undefined,
+        'tabSize': (val: any) => val && val[0] ? val[0] : undefined,
+        'indentWithTabs': (val: any) => val !== undefined ? val : undefined,
+        'wordWrap': (val: any) => val !== undefined ? val : undefined,
+        'dragHandleWidth': (val: any) => val && val[0] ? val[0] : undefined,
+        'autoSave': (val: any) => val !== undefined ? val : undefined
+      }
       
-      applyEditorSettings()
+      let hasChanges = false
+      Object.entries(settingsMap).forEach(([key, transform]) => {
+        const value = transform(event.detail[key])
+        if (value !== undefined) {
+          (editorSettings as any)[key] = value
+          hasChanges = true
+        }
+      })
+      
+      if (hasChanges) {
+        applyEditorSettings()
+      }
     }
   }) as EventListener)
 })
@@ -381,34 +424,6 @@ onUnmounted(() => {
   document.removeEventListener('keydown', handleKeyboardShortcuts)
   codeExecutionStore.cleanup()
 })
-
-// Function to apply settings to the editor
-function applyEditorSettings() {
-  if (!editor.value) return
-  
-  // Apply settings to editor
-  editor.value.setOptions({
-    editorProps: {
-      attributes: {
-        class: `prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none editor-font-size-${editorSettings.fontSize}`,
-        spellcheck: editorSettings.spellCheck.toString()
-      }
-    }
-  })
-  
-  // Update CSS variables for the editor
-  const editorElement = document.querySelector('.ProseMirror') as HTMLElement
-  if (editorElement) {
-    editorElement.style.setProperty('--editor-font-size', `${editorSettings.fontSize}px`)
-    editorElement.style.setProperty('--editor-line-height', editorSettings.lineHeight.toString())
-    editorElement.style.setProperty('--editor-tab-size', editorSettings.tabSize.toString())
-    editorElement.style.setProperty('--drag-handle-width', `${editorSettings.dragHandleWidth}px`)
-    editorElement.style.setProperty('--word-wrap', editorSettings.wordWrap ? 'break-word' : 'normal')
-  }
-  
-  // Update auto-save behavior
-  autoSaveEnabled.value = editorSettings.autoSave
-}
 
 const isSavingVersion = ref(false)
 
@@ -452,15 +467,10 @@ const insertSubNotaLink = (subNotaId: string, subNotaTitle: string) => {
     editor.value.chain().focus().setLink({
       href: `/nota/${subNotaId}`,
       target: '_self',
-    }).insertContent(subNotaTitle).setLink({}).run()
+    }).insertContent(subNotaTitle).run()
     
     // Save the content after inserting the link
-    const content = editor.value.getJSON()
-    notaStore.saveNota({
-      id: props.notaId,
-      content: JSON.stringify(content),
-      updatedAt: new Date(),
-    })
+    saveEditorContent()
   }
 }
 
