@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import Toaster from '@/components/ui/toast/Toaster.vue'
 
-const isSidebarOpen = ref(true)
+const isSidebarOpen = ref(false)
 const sidebarWidth = ref(300)
 const isResizing = ref(false)
 

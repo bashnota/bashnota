@@ -20,6 +20,7 @@ const props = defineProps<{
   search: string
   viewType: 'grid' | 'list' | 'compact'
   showFavorites: boolean
+  class?: string
 }>()
 
 const emit = defineEmits<{
@@ -92,7 +93,7 @@ const quickActions = [
 </script>
 
 <template>
-  <div class="flex items-center justify-between gap-4">
+  <div :class="['flex items-center justify-between gap-4', props.class]">
     <div class="relative flex-1">
       <MagnifyingGlassIcon
         class="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
