@@ -6,11 +6,12 @@ import {
   CommandList,
   CommandSeparator,
 } from '@/components/ui/command'
-import { Trash2Icon, ScissorsIcon, CopyIcon } from 'lucide-vue-next'
+import { Trash2Icon, ScissorsIcon, CopyIcon, StarIcon } from 'lucide-vue-next'
 import { onMounted, onUnmounted } from 'vue'
 import type { EditorView } from '@tiptap/pm/view'
 import { serializeForClipboard } from './extensions/DragHandlePlugin'
 import type { Selection } from '@tiptap/pm/state'
+import { useFavoriteBlocksStore } from '@/stores/favoriteBlocksStore'
 
 const props = defineProps<{
   position: { x: number; y: number } | null
@@ -22,6 +23,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'close'): void
 }>()
+
+const favoriteBlocksStore = useFavoriteBlocksStore()
 
 const cut = () => {
   emit('close')
@@ -74,6 +77,31 @@ const deleteBlock = () => {
   props.editorView.focus()
 }
 
+const addToFavorites = async () => {
+  emit('close')
+  if (!props.editorView || !props.selection) return
+
+  const name = window.prompt('Enter a name for this block:')
+  if (!name) return
+
+  // Get the full node structure with type information
+  const node = props.editorView.state.doc.nodeAt(props.selection.from)
+  if (!node) return
+
+  const nodeType = node.type.name
+  const content = node.toJSON()
+
+  // Add to favorites
+  await favoriteBlocksStore.addBlock({
+    name,
+    content: JSON.stringify(content),
+    type: nodeType,
+    tags: []
+  })
+
+  props.editorView.focus()
+}
+
 // Handle click outside
 const handleClickOutside = (event: MouseEvent) => {
   const target = event.target as HTMLElement
@@ -109,6 +137,10 @@ onUnmounted(() => {
         <CommandItem value="copy" @select="copy">
           <CopyIcon class="mr-2 h-4 w-4" />
           <span>Copy</span>
+        </CommandItem>
+        <CommandItem value="favorite" @select="addToFavorites">
+          <StarIcon class="mr-2 h-4 w-4" />
+          <span>Add to Favorites</span>
         </CommandItem>
       </CommandGroup>
 

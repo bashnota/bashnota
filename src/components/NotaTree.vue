@@ -195,6 +195,24 @@ onUnmounted(() => {
               icon: StarIcon,
               action: () => store.toggleFavorite(item.id),
             },
+            {
+              label: 'Add to Favorites',
+              icon: StarIcon,
+              action: () => {
+                const dialog = prompt('Enter a name for this block:')
+                if (dialog) {
+                  const selectedContent = editor.value?.getSelectedContent()
+                  // Ensure we're saving a compatible format
+                  const content = selectedContent ? JSON.stringify(selectedContent) : ''
+                  store.addBlock({
+                    name: dialog,
+                    content,
+                    type: 'block',
+                    tags: []
+                  })
+                }
+              }
+            },
           ]"
           :key="action.label"
           class="flex items-center text-start w-full gap-2 px-2 py-1.5 text-sm rounded-sm hover:bg-accent"

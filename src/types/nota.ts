@@ -20,3 +20,11 @@ export interface NotaVersion {
   versionName: string
   createdAt: Date | string
 }
+export interface FavoriteBlock {
+  id: string
+  name: string
+  content: string
+  type: string
+  tags: string[]
+  createdAt: Date | string
+}

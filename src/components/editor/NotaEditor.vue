@@ -41,6 +41,7 @@ import TaskList from '@tiptap/extension-task-list'
 import drawIoExtension from '@rcode-link/tiptap-drawio'
 import { toast } from '@/lib/utils'
 import VersionHistoryDialog from './VersionHistoryDialog.vue'
+import FavoriteBlocksSidebar from './FavoriteBlocksSidebar.vue'
 
 const props = defineProps<{
   notaId: string
@@ -555,6 +556,9 @@ defineExpose({
         </div>
       </div>
     </div>
+
+    <!-- Right Favorites Sidebar -->
+    <FavoriteBlocksSidebar :editor="editor" />
   </div>
 
   <!-- Version History Dialog -->
