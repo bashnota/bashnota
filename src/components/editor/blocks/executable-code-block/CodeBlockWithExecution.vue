@@ -226,7 +226,7 @@ const handleFullScreen = () => {
             placeholder="Search sessions..."
             :searchable="true"
             @select="
-              (value) => {
+              (value: string) => {
                 selectedSession = value
                 handleSessionChange()
                 isSessionOpen = false
@@ -281,7 +281,7 @@ const handleFullScreen = () => {
             placeholder="Search servers..."
             :searchable="true"
             @select="
-              (value) => {
+              (value: string) => {
                 selectedServer = value
                 emit('kernel-select', selectedKernel, selectedServer)
                 isServerOpen = false
@@ -334,7 +334,7 @@ const handleFullScreen = () => {
             placeholder="Search kernels..."
             :searchable="true"
             @select="
-              (value) => {
+              (value: string) => {
                 selectedKernel = value
                 emit('kernel-select', selectedKernel, selectedServer)
                 isKernelOpen = false
