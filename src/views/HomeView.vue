@@ -51,54 +51,77 @@ const createNewNota = async () => {
 </script>
 
 <template>
-  <div class="container py-8 space-y-8">
-    <HomeHeader @create-nota="createNewNota" />
+  <div class="container py-6 h-[calc(100vh-4rem)]">
+    <!-- Main Grid Layout -->
+    <div class="grid grid-cols-1 xl:grid-cols-5 gap-6 h-full">
+      <!-- Left Column: HomeHeader (spans 2 columns on xl) -->
+      <div class="xl:col-span-2">
+        <div class="sticky top-6">
+          <HomeHeader @create-nota="createNewNota" class="h-full" />
+        </div>
+      </div>
 
-    <HomeSearchBar
-      v-model:search="searchQuery"
-      v-model:view-type="viewType"
-      v-model:show-favorites="showFavorites"
-      @create-nota="createNewNota"
-    />
-
-    <HomeTagFilter v-model:selected-tag="selectedTag" :notas="store.rootItems" />
-
-    <Card>
-      <CardHeader>
-        <div class="flex items-center justify-between">
-          <div>
-            <CardTitle class="flex items-center gap-2">
-              <ClockIcon class="h-5 w-5" />
-              {{ showFavorites ? 'Favorite' : 'Recent' }} Notas
-            </CardTitle>
-            <CardDescription>
-              {{ showFavorites ? 'Your starred notas' : 'Your recently updated notas' }}
-            </CardDescription>
+      <!-- Right Column: Interactive Content (spans 3 columns on xl) -->
+      <div class="xl:col-span-3 flex flex-col h-full gap-4">
+        <!-- Search and Controls Bar -->
+        <div class="flex gap-4 items-start shrink-0">
+          <div class="flex-1">
+            <HomeSearchBar
+              v-model:search="searchQuery"
+              v-model:view-type="viewType"
+              v-model:show-favorites="showFavorites"
+              @create-nota="createNewNota"
+              class="w-full"
+            />
           </div>
           <Button
-            v-if="showFavorites || searchQuery"
+            v-if="showFavorites || searchQuery || selectedTag"
             variant="ghost"
             size="sm"
             @click="clearFilters"
-            class="h-8"
+            class="h-10 shrink-0"
           >
             Clear Filters
             <XMarkIcon class="h-4 w-4 ml-2" />
           </Button>
         </div>
-      </CardHeader>
-      <CardContent>
-        <HomeNotaList
-          :is-loading="isLoading"
-          :view-type="viewType"
-          :show-favorites="showFavorites"
-          :search-query="searchQuery"
-          :selected-tag="selectedTag"
+
+        <!-- Tag Filter -->
+        <HomeTagFilter 
+          v-model:selected-tag="selectedTag" 
           :notas="store.rootItems"
-          @create-nota="createNewNota"
-          @update:selected-tag="selectedTag = $event"
+          class="bg-card rounded-lg border p-4 shrink-0" 
         />
-      </CardContent>
-    </Card>
+
+        <!-- Notas List Card -->
+        <Card class="overflow-hidden flex-1 flex flex-col">
+          <CardHeader class="bg-card border-b px-6 shrink-0">
+            <div class="flex items-center justify-between">
+              <div>
+                <CardTitle class="flex items-center gap-2">
+                  <ClockIcon class="h-5 w-5 text-primary" />
+                  {{ showFavorites ? 'Favorite' : 'Recent' }} Notas
+                </CardTitle>
+                <CardDescription>
+                  {{ showFavorites ? 'Your starred notas' : 'Your recently updated notas' }}
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent class="p-4 flex-1 overflow-auto">
+            <HomeNotaList
+              :is-loading="isLoading"
+              :view-type="viewType"
+              :show-favorites="showFavorites"
+              :search-query="searchQuery"
+              :selected-tag="selectedTag"
+              :notas="store.rootItems"
+              @create-nota="createNewNota"
+              @update:selected-tag="selectedTag = $event"
+            />
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   </div>
 </template>

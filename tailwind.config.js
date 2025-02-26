@@ -77,12 +77,28 @@ export const theme = {
         from: { height: 'var(--radix-collapsible-content-height)' },
         to: { height: 0 },
       },
+      'spin-slow': {
+        '0%': { transform: 'rotate(0deg)' },
+        '100%': { transform: 'rotate(360deg)' }
+      },
+      'pulse-subtle': {
+        '0%, 100%': { transform: 'scale(1)' },
+        '50%': { transform: 'scale(1.05)' }
+      },
+      'wiggle': {
+        '0%, 100%': { transform: 'rotate(0deg)' },
+        '25%': { transform: 'rotate(-4deg)' },
+        '75%': { transform: 'rotate(4deg)' }
+      }
     },
     animation: {
       'accordion-down': 'accordion-down 0.2s ease-out',
       'accordion-up': 'accordion-up 0.2s ease-out',
       'collapsible-down': 'collapsible-down 0.2s ease-in-out',
       'collapsible-up': 'collapsible-up 0.2s ease-in-out',
+      'spin-slow': 'spin-slow 20s linear infinite',
+      'pulse-subtle': 'pulse-subtle 3s ease-in-out infinite',
+      'wiggle': 'wiggle 0.5s ease-in-out'
     },
     fontFamily: {
       sans: ['Fira Code', 'sans-serif'],
