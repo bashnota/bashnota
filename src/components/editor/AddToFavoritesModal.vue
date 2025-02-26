@@ -19,12 +19,10 @@ const tags = ref<string[]>([])
 
 const handleNameInput = (e: Event) => {
   const target = e.target as HTMLInputElement
-  console.log('Input value:', target.value)
   name.value = target.value
 }
 
 const handleSubmit = () => {
-  console.log('Submit with name:', name.value)
   if (!name.value.trim()) return
   
   emit('submit', name.value.trim(), tags.value)
@@ -38,7 +36,6 @@ const handleSubmit = () => {
 }
 
 watch(() => props.open, (newValue) => {
-  console.log('Modal open state changed:', newValue)
   if (newValue) {
     name.value = ''
     tags.value = []
@@ -65,7 +62,6 @@ watch(() => props.open, (newValue) => {
             @input="handleNameInput"
             placeholder="Enter a name for this block"
           />
-          <div class="text-xs text-gray-500">Current name: "{{ name }}"</div>
         </div>
         
         <div class="space-y-2">

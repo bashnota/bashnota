@@ -82,9 +82,7 @@ const deleteBlock = () => {
 }
 
 const addToFavorites = () => {
-  console.log('addToFavorites called')
   showAddToFavoritesModal.value = true
-  console.log('Modal should be visible:', showAddToFavoritesModal.value)
 }
 
 const handleAddToFavorites = async (name: string, tags: string[]) => {
