@@ -122,27 +122,27 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div :class="{ 'ml-4': level > 0 }">
+  <div :class="{ 'ml-3': level > 0 }">
     <div v-for="item in items" :key="item.id" class="group" draggable="true">
       <div
-        class="flex items-center gap-1 rounded-md py-1.5 text-sm"
+        class="flex items-center gap-1 rounded-sm py-1 text-sm hover:bg-muted/50 transition-colors"
         @contextmenu="showContextMenu($event, item)"
       >
         <button
           v-if="hasChildren(item.id)"
           @click="toggleItem(item.id)"
-          class="w-5 h-5 flex items-center justify-center text-muted-foreground hover:text-foreground flex-shrink-0"
+          class="w-4 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground flex-shrink-0"
         >
-          <ChevronDownIcon v-if="expandedItems.has(item.id)" class="h-4 w-4" />
-          <ChevronRightIcon v-else class="h-4 w-4" />
+          <ChevronDownIcon v-if="expandedItems.has(item.id)" class="h-3 w-3" />
+          <ChevronRightIcon v-else class="h-3 w-3" />
         </button>
-        <div v-else class="w-5 flex-shrink-0"></div>
+        <div v-else class="w-4 flex-shrink-0"></div>
 
         <Input
           v-if="showRenameInput === item.id"
           :value="renameTitle"
           @input="(e: Event) => (renameTitle = (e.target as HTMLInputElement).value)"
-          class="h-7 text-sm"
+          class="h-6 text-sm"
           @keyup.enter="handleRename(item.id)"
           @keyup.esc="showRenameInput = null"
           @blur="handleRename(item.id)"
@@ -152,21 +152,21 @@ onUnmounted(() => {
         <RouterLink
           v-else
           :to="`/nota/${item.id}`"
-          class="flex items-center gap-2 flex-1 px-2 py-2 rounded-md hover:bg-slate-200 mr-2"
+          class="flex items-center gap-1.5 flex-1 px-1.5 py-0.5 rounded-sm hover:bg-slate-200/50 mr-1"
         >
           <FolderIcon
             v-if="hasChildren(item.id)"
-            class="h-4 w-4 text-muted-foreground flex-shrink-0"
+            class="h-3.5 w-3.5 text-muted-foreground flex-shrink-0"
           />
-          <DocumentTextIcon v-else class="h-4 w-4 text-muted-foreground flex-shrink-0" />
+          <DocumentTextIcon v-else class="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
           <span class="truncate min-w-0 flex-1">{{ item.title }}</span>
         </RouterLink>
 
-        <div class="opacity-0 group-hover:opacity-100 flex items-center gap-1 flex-shrink-0">
+        <div class="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 flex-shrink-0">
           <Button
             variant="ghost"
             size="icon"
-            class="h-7 w-7"
+            class="h-6 w-6"
             @click="emit('show-new-input', item.id)"
             title="Add Sub-Nota"
           >
@@ -175,7 +175,7 @@ onUnmounted(() => {
           <Button
             variant="ghost"
             size="icon"
-            class="h-7 w-7"
+            class="h-6 w-6"
             @click="startRename(item)"
             title="Rename"
           >
@@ -184,7 +184,7 @@ onUnmounted(() => {
           <Button
             variant="ghost"
             size="icon"
-            class="h-7 w-7"
+            class="h-6 w-6"
             @click="handleDelete(item.id)"
             title="Delete"
           >
@@ -234,19 +234,19 @@ onUnmounted(() => {
       </div>
 
       <!-- New Sub-Nota Input -->
-      <div v-if="showNewInput === item.id" class="ml-8 mt-1">
+      <div v-if="showNewInput === item.id" class="ml-7 mt-0.5">
         <Input
           :value="newNotaTitle"
           @input="(e: Event) => emit('update:newNotaTitle', (e.target as HTMLInputElement).value)"
           placeholder="New sub-nota title..."
-          class="text-sm"
+          class="h-6 text-sm"
           @keyup.enter="emit('create', item.id)"
           @keyup.esc="emit('show-new-input', null)"
           autofocus
         />
       </div>
 
-      <div v-if="expandedItems.has(item.id)" class="ml-4">
+      <div v-if="expandedItems.has(item.id)" class="ml-3">
         <NotaTree
           :items="store.getChildren(item.id)"
           :level="level + 1"
