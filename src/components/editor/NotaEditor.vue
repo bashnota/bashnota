@@ -475,8 +475,26 @@ const insertSubNotaLink = (subNotaId: string, subNotaTitle: string) => {
   }
 }
 
+const createAndLinkSubNota = async (title: string) => {
+  if (!editor.value) return
+
+  try {
+    // Create the sub-nota
+    const newNota = await notaStore.createItem(title, props.notaId)
+    
+    // Insert a link to the new nota at current cursor position
+    insertSubNotaLink(newNota.id, newNota.title)
+    
+    return newNota
+  } catch (error) {
+    console.error('Error creating sub-nota:', error)
+    toast('Failed to create sub-nota')
+  }
+}
+
 defineExpose({
-  insertSubNotaLink
+  insertSubNotaLink,
+  createAndLinkSubNota
 })
 </script>
 
