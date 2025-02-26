@@ -16,6 +16,9 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { withDefaults } from 'vue'
 import type { Nota } from '@/types/nota'
+import { useFavoriteBlocksStore } from '@/stores/favoriteBlocksStore'
+import Modal from './Modal.vue'
+import type { Editor } from '@tiptap/vue-3'
 
 interface Props {
   items: Nota[]
@@ -43,10 +46,13 @@ const props = withDefaults(defineProps<Props>(), {
 
 const router = useRouter()
 const store = useNotaStore()
+const favoriteBlocksStore = useFavoriteBlocksStore()
 const showRenameInput = ref<string | null>(null)
 const renameTitle = ref('')
 const itemContextMenu = ref<string | null>(null)
 const contextMenuPosition = ref({ x: 0, y: 0 })
+const editor = ref<Editor | null>(null)
+const isModalOpen = ref(false)
 
 const hasChildren = (id: string) => {
   return store.getChildren(id).length > 0
@@ -89,6 +95,21 @@ const showContextMenu = (event: MouseEvent, item: Nota) => {
 
 const closeContextMenu = () => {
   itemContextMenu.value = null
+}
+
+const handleModalSubmit = (name: string) => {
+  if (!editor.value) {
+    console.error('Editor is not initialized')
+    return
+  }
+  const selectedContent = editor.value.getJSON()
+  const content = selectedContent ? JSON.stringify(selectedContent) : ''
+  favoriteBlocksStore.addBlock({
+    name,
+    content,
+    type: 'block',
+    tags: []
+  })
 }
 
 onMounted(() => {
@@ -199,18 +220,7 @@ onUnmounted(() => {
               label: 'Add to Favorites',
               icon: StarIcon,
               action: () => {
-                const dialog = prompt('Enter a name for this block:')
-                if (dialog) {
-                  const selectedContent = editor.value?.getSelectedContent()
-                  // Ensure we're saving a compatible format
-                  const content = selectedContent ? JSON.stringify(selectedContent) : ''
-                  store.addBlock({
-                    name: dialog,
-                    content,
-                    type: 'block',
-                    tags: []
-                  })
-                }
+                isModalOpen = true
               }
             },
           ]"
@@ -252,6 +262,13 @@ onUnmounted(() => {
       </div>
     </div>
   </div>
+
+  <Modal
+    :isOpen="isModalOpen"
+    title="Enter a name for this block"
+    @close="isModalOpen = false"
+    @submit="handleModalSubmit"
+  />
 </template>
 
 <style scoped>

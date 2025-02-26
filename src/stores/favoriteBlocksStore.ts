@@ -14,7 +14,7 @@ export const useFavoriteBlocksStore = defineStore('favoriteBlocks', {
         ...block,
         id: nanoid(),
         createdAt: new Date(),
-        type: block.type === 'block' ? parsedContent.type : block.type
+        type: block.type,
         
       }
       await db.favoriteBlocks.add(newBlock)

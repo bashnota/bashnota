@@ -4,11 +4,13 @@ import { useFavoriteBlocksStore } from '@/stores/favoriteBlocksStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { StarIcon, MagnifyingGlassIcon, XMarkIcon, PlusIcon, Bars3Icon, ChevronRightIcon } from '@heroicons/vue/24/solid'
+import { StarIcon, MagnifyingGlassIcon, XMarkIcon, PlusIcon, Bars3Icon, ChevronRightIcon, Cog6ToothIcon } from '@heroicons/vue/24/solid'
 import { TagsInput, TagsInputInput, TagsInputItem } from '@/components/ui/tags-input'
 import { toast } from '@/lib/utils'
 import { onKeyStroke } from '@vueuse/core'
 import type { Editor } from '@tiptap/vue-3'
+import { useDebounceFn } from '@vueuse/core'
+import Fuse from 'fuse.js'
 
 const props = defineProps<{
   editor?: Editor | null
@@ -18,8 +20,26 @@ const store = useFavoriteBlocksStore()
 const searchQuery = ref('')
 const selectedTags = ref<string[]>([])
 const isOpen = ref(true)
-const previewContent = ref('')
-const isDragging = ref(false)
+const previewContent = ref<Record<string, string>>({})
+const expandedBlocks = ref<Set<string>>(new Set())
+
+// Configure Fuse.js for fuzzy search
+const fuseOptions = {
+  keys: [
+    { name: 'name', weight: 2 },
+    { name: 'content', weight: 1 },
+    { name: 'tags', weight: 1 }
+  ],
+  threshold: 0.4,
+  includeScore: true
+}
+
+const fuse = computed(() => new Fuse(store.blocks, fuseOptions))
+
+// Debounced search for better performance
+const debouncedSearch = useDebounceFn((query: string) => {
+  searchQuery.value = query
+}, 500)
 
 // Load saved state
 onMounted(() => {
@@ -36,12 +56,22 @@ watch(isOpen, (newState) => {
 })
 
 const filteredBlocks = computed(() => {
-  return store.blocks.filter(block => {
-    const matchesSearch = block.name.toLowerCase().includes(searchQuery.value.toLowerCase())
-    const matchesTags = selectedTags.value.length === 0 || 
+  let results = store.blocks
+
+  // Apply tag filtering
+  if (selectedTags.value.length > 0) {
+    results = results.filter(block => 
       selectedTags.value.every(tag => block.tags.includes(tag))
-    return matchesSearch && matchesTags
-  })
+    )
+  }
+
+  // Apply search if query exists
+  if (searchQuery.value.trim()) {
+    const searchResults = fuse.value.search(searchQuery.value)
+    results = searchResults.map(result => result.item)
+  }
+
+  return results
 })
 
 const availableTags = computed(() => {
@@ -61,17 +91,10 @@ const insertBlock = async (content: string) => {
         content: parsedContent.content,
         attrs: parsedContent.attrs
       })
-      toast({
-        title: 'Block Inserted',
-        description: 'The block was successfully inserted into the document',
-      })
+      toast('The block was successfully inserted into the document')
     } catch (error) {
       console.error('Failed to insert block:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to insert block',
-        variant: 'destructive'
-      })
+      toast('Failed to insert block')
     }
   }
 }
@@ -79,30 +102,28 @@ const insertBlock = async (content: string) => {
 const removeBlock = async (id: string) => {
   if (confirm('Are you sure you want to remove this block from favorites?')) {
     await store.removeBlock(id)
-    toast({
-      title: 'Block Removed',
-      description: 'The block was removed from favorites',
-    })
+    toast('The block was removed from favorites')
   }
 }
 
-const handleDragStart = (event: DragEvent, content: string) => {
-  if (event.dataTransfer) {
-    event.dataTransfer.setData('text/plain', content)
-    isDragging.value = true
+const toggleBlockExpansion = (blockId: string) => {
+  if (expandedBlocks.value.has(blockId)) {
+    expandedBlocks.value.delete(blockId)
+  } else {
+    expandedBlocks.value.add(blockId)
   }
 }
 
-const handleDragEnd = () => {
-  isDragging.value = false
-}
-
-const showPreview = (content: string) => {
+const showPreview = (blockId: string, content: string) => {
   try {
     const parsed = JSON.parse(content)
-    previewContent.value = parsed.content?.[0]?.text || 'No preview available'
+    const previewText = parsed.content?.[0]?.text || 
+      parsed.content?.[0]?.content?.[0]?.text || 
+      'No preview available'
+    previewContent.value[blockId] = previewText.slice(0, 100) + 
+      (previewText.length > 100 ? '...' : '')
   } catch {
-    previewContent.value = 'Invalid content'
+    previewContent.value[blockId] = 'Invalid content'
   }
 }
 
@@ -125,11 +146,34 @@ onKeyStroke('/', (e) => {
     document.querySelector<HTMLInputElement>('.favorite-blocks-search')?.focus()
   }
 })
+
+// Parse and extract searchable content from JSON string
+const getSearchableContent = (content: string) => {
+  try {
+    const parsed = JSON.parse(content)
+    return parsed.content?.[0]?.text || ''
+  } catch {
+    return ''
+  }
+}
+
+// Update store type to include parsed content
+const blocks = computed(() => {
+  return store.blocks.map(block => ({
+    ...block,
+    parsedContent: getSearchableContent(block.content)
+  }))
+})
+
+// Add a button to open settings for customization
+const openCustomizationSettings = () => {
+  // Implementation of opening customization settings
+}
 </script>
 
 <template>
   <div 
-    class="fixed top-14 right-0 bottom-0 z-50 transition-transform duration-200 ease-in-out"
+    class="fixed top-14 right-0 bottom-0 z-50 transition-transform duration-300 ease-in-out"
     :class="[isOpen ? 'translate-x-0' : 'translate-x-full']"
   >
     <!-- Toggle Button -->
@@ -139,6 +183,8 @@ onKeyStroke('/', (e) => {
       size="icon"
       @click="toggleSidebar"
       :title="isOpen ? 'Hide Favorites' : 'Show Favorites'"
+      aria-label="Toggle Favorites Sidebar"
+      tabindex="0"
     >
       <ChevronRightIcon 
         class="w-4 h-4 transition-transform duration-200" 
@@ -148,8 +194,7 @@ onKeyStroke('/', (e) => {
 
     <!-- Sidebar Content -->
     <div 
-      class="w-72 h-full flex flex-col bg-background border-l shadow-lg"
-      :class="[isDragging ? 'pointer-events-none' : '']"
+      class="w-72 h-full flex flex-col bg-background border-l shadow-lg sidebar"
     >
       <div class="p-4 border-b">
         <div class="flex items-center justify-between mb-4">
@@ -166,9 +211,12 @@ onKeyStroke('/', (e) => {
           <div class="relative">
             <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              v-model="searchQuery"
-              placeholder="Search blocks... (/)"
+              :value="searchQuery"
+              @input="(e: Event) => debouncedSearch((e.target as HTMLInputElement).value)"
+              placeholder="Search blocks... (/) - Try 'block name'"
               class="pl-9 favorite-blocks-search"
+              aria-autocomplete="list"
+              aria-controls="search-suggestions"
             />
           </div>
 
@@ -184,39 +232,39 @@ onKeyStroke('/', (e) => {
       <ScrollArea class="flex-1">
         <div class="p-4 space-y-4">
           <div v-for="block in filteredBlocks" :key="block.id" 
-            class="border rounded-lg p-3 hover:bg-muted/50 transition-colors"
-            draggable="true"
-            @dragstart="handleDragStart($event, block.content)"
-            @dragend="handleDragEnd"
-            @mouseenter="showPreview(block.content)"
-            @mouseleave="previewContent = ''"
+            class="block-item border rounded-lg p-2 hover:bg-muted/50 transition-colors"
+            @click="toggleBlockExpansion(block.id)"
+            :class="{ 'expanded': expandedBlocks.has(block.id) }"
           >
-            <div class="flex items-center justify-between mb-2">
-              <h4 class="font-medium">{{ block.name }}</h4>
-              <div class="flex items-center gap-2">
-                <Button variant="ghost" size="icon" @click="insertBlock(block.content)">
-                  <span class="sr-only">Insert</span>
-                  <PlusIcon class="h-4 w-4" />
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2 flex-1">
+                <h4 class="font-medium text-sm truncate">{{ block.name }}</h4>
+              </div>
+              <div class="flex items-center gap-1">
+                <Button variant="ghost" size="icon" @click.stop="insertBlock(block.content)">
+                  <PlusIcon class="h-3 w-3" />
                 </Button>
-                <Button variant="ghost" size="icon" @click="removeBlock(block.id)">
-                  <span class="sr-only">Remove</span>
-                  <XMarkIcon class="h-4 w-4" />
+                <Button variant="ghost" size="icon" @click.stop="removeBlock(block.id)">
+                  <XMarkIcon class="h-3 w-3" />
                 </Button>
-                <div class="cursor-move">
-                  <Bars3Icon class="h-4 w-4 text-muted-foreground" />
-                </div>
               </div>
             </div>
             
-            <div class="flex flex-wrap gap-1 mb-2">
-              <span v-for="tag in block.tags" :key="tag" 
-                class="text-xs bg-muted px-2 py-1 rounded-full">
-                {{ tag }}
-              </span>
-            </div>
-
-            <div v-if="previewContent" class="text-sm text-muted-foreground mt-2 border-t pt-2">
-              {{ previewContent }}
+            <div v-if="expandedBlocks.has(block.id)" 
+              class="mt-2 space-y-2"
+              @mouseenter="showPreview(block.id, block.content)"
+              @mouseleave="previewContent[block.id] = ''"
+            >
+              <div class="flex flex-wrap gap-1">
+                <span v-for="tag in block.tags" :key="tag" 
+                  class="text-xs bg-muted px-1.5 py-0.5 rounded-full">
+                  {{ tag }}
+                </span>
+              </div>
+              <div v-if="previewContent[block.id]" 
+                class="text-xs text-muted-foreground border-t pt-2">
+                {{ previewContent[block.id] }}
+              </div>
             </div>
           </div>
 
@@ -232,12 +280,30 @@ onKeyStroke('/', (e) => {
           </div>
         </div>
       </ScrollArea>
+
+      <!-- Add a button to open settings for customization -->
+      <Button variant="ghost" size="icon" @click="openCustomizationSettings">
+        <Cog6ToothIcon class="w-4 h-4" />
+      </Button>
     </div>
   </div>
 </template>
 
 <style scoped>
-.favorite-blocks-search:focus {
-  @apply ring-2 ring-primary ring-offset-2;
+.block-item {
+  @apply cursor-pointer;
+}
+
+.block-item:hover {
+  @apply shadow-sm;
+}
+
+.block-item.expanded {
+  @apply bg-muted/30;
+}
+
+/* Transition for expansion */
+.block-item > div:last-child {
+  @apply transition-all duration-200;
 }
 </style>
