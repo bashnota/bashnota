@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNotaStore } from '@/stores/nota'
 import { onKeyStroke } from '@vueuse/core'
@@ -12,6 +12,7 @@ import {
   ClockIcon,
   Cog6ToothIcon,
   QuestionMarkCircleIcon,
+  XMarkIcon,
 } from '@heroicons/vue/24/solid'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -25,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import ShortcutsDialog from '../ShortcutsDialog.vue'
+import { Transition } from 'vue'
 
 const router = useRouter()
 const notaStore = useNotaStore()
@@ -34,6 +36,7 @@ const showNewNotaInput = ref<string | null>(null)
 const expandedItems = ref<Set<string>>(new Set())
 const shortcutsDialog = ref<{ isOpen: boolean }>({ isOpen: false })
 const activeView = ref<'all' | 'favorites' | 'recent'>('all')
+const showSearch = ref(false)
 
 // Load last used view from localStorage
 onMounted(async () => {
@@ -117,7 +120,19 @@ onKeyStroke('n', (e) => {
 onKeyStroke('k', (e) => {
   if (e.metaKey || e.ctrlKey) {
     e.preventDefault()
-    document.querySelector<HTMLInputElement>('.search-input')?.focus()
+    showSearch.value = true
+    // Use nextTick to ensure the input is mounted before focusing
+    nextTick(() => {
+      document.querySelector<HTMLInputElement>('.search-input')?.focus()
+    })
+  }
+})
+
+// Add escape handler to close search
+onKeyStroke('Escape', () => {
+  if (showSearch.value) {
+    showSearch.value = false
+    searchQuery.value = ''
   }
 })
 
@@ -131,35 +146,32 @@ const viewOptions = [
 <template>
   <div class="w-full h-full flex flex-col border-e bg-slate-100 dark:bg-slate-900">
     <!-- Header -->
-    <div class="p-6 border-b space-y-4">
+    <div class="p-2 border-b space-y-2">
+      <!-- Logo and Controls -->
       <div class="flex items-center justify-between">
         <RouterLink
           to="/"
-          class="flex items-center gap-2 px-4 py-2 hover:bg-muted/50 rounded-lg transition-colors"
+          class="flex items-center gap-2 px-2 py-1 hover:bg-muted/50 rounded-md transition-colors"
         >
-          <div class="flex items-center gap-2">
-            <img src="@/assets/logo.svg" alt="BashNota Logo" class="h-8 w-auto text-primary" />
-            <span class="font-bold text-xl">BashNota</span>
-          </div>
+          <img src="@/assets/logo.svg" alt="BashNota Logo" class="h-5 w-auto text-primary" />
+          <span class="font-semibold">BashNota</span>
         </RouterLink>
 
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-1">
           <DarkModeToggle />
-
-          <!-- Settings Dropdown -->
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Cog6ToothIcon class="h-4 w-4" />
+              <Button variant="ghost" size="sm" class="h-6 w-6">
+                <Cog6ToothIcon class="h-3.5 w-3.5" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent>
+            <DropdownMenuContent align="end">
               <DropdownMenuItem @click="shortcutsDialog.isOpen = true">
-                <QuestionMarkCircleIcon class="h-4 w-4" />
-                <span>Keyboard Shortcuts</span>
+                <QuestionMarkCircleIcon class="h-4 w-4 mr-2" />
+                <span>Shortcuts</span>
               </DropdownMenuItem>
               <DropdownMenuItem @click="router.push('/settings')">
-                <Cog6ToothIcon class="h-4 w-4" />
+                <Cog6ToothIcon class="h-4 w-4 mr-2" />
                 <span>Settings</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -167,96 +179,115 @@ const viewOptions = [
         </div>
       </div>
 
-      <!-- Search -->
-      <div class="relative">
-        <MagnifyingGlassIcon
-          class="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground"
-        />
-        <Input
-          v-model="searchQuery"
-          placeholder="Search notas..."
-          class-name="pl-8 text-sm search-input"
-        />
-      </div>
+      <!-- Search and View Controls -->
+      <div class="space-y-1.5">
+        <div class="flex items-center gap-1">
+          <!-- Search Button/Bar -->
+          <Transition
+            enter-active-class="transition-all duration-200 ease-out"
+            enter-from-class="opacity-0 scale-95"
+            enter-to-class="opacity-100 scale-100"
+            leave-active-class="transition-all duration-200 ease-in"
+            leave-from-class="opacity-100 scale-100"
+            leave-to-class="opacity-0 scale-95"
+          >
+            <div v-if="showSearch" class="relative w-full">
+              <div class="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none">
+                <MagnifyingGlassIcon class="h-3 w-3 text-muted-foreground" />
+              </div>
+              <Input
+                v-model="searchQuery"
+                placeholder="Search..."
+                class="pl-7 pr-7 h-6 text-xs w-full bg-background search-input"
+                @blur="showSearch = false"
+                autofocus
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                class="absolute right-1 top-1/2 -translate-y-1/2 h-4 w-4"
+                @click="() => {
+                  showSearch = false
+                  searchQuery = ''
+                }"
+              >
+                <XMarkIcon class="h-3 w-3" />
+              </Button>
+            </div>
+            <div v-else class="flex items-center gap-1 w-full">
+              <Button
+                variant="ghost"
+                size="sm"
+                class="h-6 w-6 flex-shrink-0"
+                @click="showSearch = true"
+                title="Search (⌘K)"
+              >
+                <MagnifyingGlassIcon class="h-3.5 w-3.5" />
+              </Button>
 
-      <!-- View Selector -->
-      <div class="flex gap-2">
-        <Button
-          v-for="option in viewOptions"
-          :key="option.id"
-          variant="ghost"
-          size="icon"
-          :class="[
-            'h-8 w-8',
-            activeView === option.id && 'bg-primary/10 text-primary hover:bg-primary/20',
-          ]"
-          @click="activeView = option.id as 'all' | 'favorites' | 'recent'"
-          :title="option.label"
-        >
-          <component :is="option.icon" class="h-4 w-4" />
-        </Button>
-      </div>
+              <!-- View Controls -->
+              <div class="flex gap-1">
+                <Button
+                  v-for="option in viewOptions"
+                  :key="option.id"
+                  variant="ghost"
+                  size="sm"
+                  :class="[
+                    'h-6 w-6',
+                    activeView === option.id && 'bg-primary/10 text-primary hover:bg-primary/20',
+                  ]"
+                  @click="activeView = option.id as 'all' | 'favorites' | 'recent'"
+                  :title="option.label"
+                >
+                  <component :is="option.icon" class="h-3.5 w-3.5" />
+                </Button>
+              </div>
 
-      <!-- New Nota Button/Input -->
-      <div>
-        <Input
-          v-if="showNewNotaInput === null"
-          :value="newNotaTitle"
-          @input="(e: Event) => (newNotaTitle = (e.target as HTMLInputElement).value)"
-          placeholder="New nota title..."
-          class="text-sm"
-          @keyup.enter="createNewNota()"
-          @keydown="handleKeydown"
-          ref="newNotaInput"
-          autofocus
-        />
-        <Button
-          v-else
-          @click="showNewNotaInput = null"
-          class="h-8 w-8"
-          variant="default"
-          title="New Nota"
-        >
-          <PlusIcon class="h-4 w-4" />
-        </Button>
+              <Button
+                @click="createNewNota()"
+                class="h-6 text-xs px-2 gap-1 ml-auto"
+                variant="default"
+                size="sm"
+              >
+                <PlusIcon class="h-3.5 w-3.5" />
+                <span>New Nota</span>
+              </Button>
+            </div>
+          </Transition>
+        </div>
       </div>
     </div>
 
     <!-- Tree View -->
     <ScrollArea class="flex-1">
-      <div class="p-4">
+      <div class="py-1">
         <NotaTree
           :items="filteredNotas"
           :expanded-items="expandedItems"
           :show-new-input="showNewNotaInput"
           :new-nota-title="newNotaTitle"
-          @toggle="
-            (id) => (expandedItems.has(id) ? expandedItems.delete(id) : expandedItems.add(id))
-          "
+          @toggle="(id) => (expandedItems.has(id) ? expandedItems.delete(id) : expandedItems.add(id))"
           @create="createNewNota"
-          @show-new-input="
-            (id) => {
-              showNewNotaInput = id
-              newNotaTitle = ''
-            }
-          "
+          @show-new-input="(id) => {
+            showNewNotaInput = id
+            newNotaTitle = ''
+          }"
           @update:new-nota-title="(value) => (newNotaTitle = value)"
         />
 
         <!-- Empty State -->
         <div
           v-if="filteredNotas.length === 0"
-          class="flex flex-col items-center justify-center h-32 text-sm text-muted-foreground gap-3"
+          class="flex flex-col items-center justify-center h-16 text-sm text-muted-foreground gap-1.5"
         >
-          <div class="rounded-full bg-muted/50 p-3">
-            <component :is="searchQuery ? MagnifyingGlassIcon : FolderIcon" class="w-5 h-5" />
+          <div class="rounded-full bg-muted/50 p-1.5">
+            <component :is="searchQuery ? MagnifyingGlassIcon : FolderIcon" class="w-3 h-3" />
           </div>
           {{ searchQuery ? 'No items found' : 'Create your first nota' }}
         </div>
       </div>
     </ScrollArea>
 
-    <!-- Shortcuts Dialog -->
     <ShortcutsDialog ref="shortcutsDialog" />
   </div>
 </template>
