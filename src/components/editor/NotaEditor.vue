@@ -39,6 +39,8 @@ import HorizontalRule from '@tiptap/extension-horizontal-rule'
 import TaskItem from '@tiptap/extension-task-item'
 import TaskList from '@tiptap/extension-task-list'
 import drawIoExtension from '@rcode-link/tiptap-drawio'
+import { toast } from '@/lib/utils'
+import VersionHistoryDialog from './VersionHistoryDialog.vue'
 
 const props = defineProps<{
   notaId: string
@@ -54,6 +56,7 @@ const codeExecutionStore = useCodeExecutionStore()
 const router = useRouter()
 const isSidebarOpen = ref(true)
 const autoSaveEnabled = ref(true)
+const showVersionHistory = ref(false)
 
 const currentNota = computed(() => {
   return notaStore.getCurrentNota(props.notaId)
@@ -406,6 +409,42 @@ function applyEditorSettings() {
   // Update auto-save behavior
   autoSaveEnabled.value = editorSettings.autoSave
 }
+
+const isSavingVersion = ref(false)
+
+const saveVersion = async () => {
+  if (!editor.value || !currentNota.value) return
+  
+  try {
+    isSavingVersion.value = true
+    const content = editor.value.getJSON()
+    
+    await notaStore.saveNotaVersion({
+      id: props.notaId,
+      content: JSON.stringify(content),
+      versionName: `Version ${new Date().toLocaleString()}`,
+      createdAt: new Date()
+    })
+    
+    toast('Version saved successfully')
+  } catch (error) {
+    console.error('Error saving version:', error)
+    toast('Failed to save version')
+  } finally {
+    isSavingVersion.value = false
+  }
+}
+
+const refreshEditorContent = async () => {
+  if (editor.value) {
+    // Reload the nota content
+    const nota = await notaStore.loadNota(props.notaId)
+    if (nota?.content) {
+      // Set the editor content from the restored version
+      editor.value.commands.setContent(JSON.parse(nota.content))
+    }
+  }
+}
 </script>
 
 <template>
@@ -444,7 +483,27 @@ function applyEditorSettings() {
             <ListIcon class="h-4 w-4" />
             <span class="text-xs">Contents</span>
           </Button>
-          <span>{{ wordCount }} words</span>
+          <div class="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              @click="saveVersion"
+              :disabled="isSavingVersion"
+              class="flex items-center gap-1"
+            >
+              <span v-if="isSavingVersion" class="inline-block h-3 w-3 animate-spin rounded-full border-2 border-solid border-current border-r-transparent"></span>
+              <span>Save Version</span>
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              @click="showVersionHistory = true"
+              class="flex items-center gap-1"
+            >
+              <span>History</span>
+            </Button>
+            <span>{{ wordCount }} words</span>
+          </div>
         </div>
       </div>
 
@@ -465,6 +524,13 @@ function applyEditorSettings() {
       </div>
     </div>
   </div>
+
+  <!-- Version History Dialog -->
+  <VersionHistoryDialog 
+    :nota-id="props.notaId" 
+    v-model:open="showVersionHistory"
+    @version-restored="refreshEditorContent"
+  />
 </template>
 
 <style>
