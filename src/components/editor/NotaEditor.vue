@@ -557,7 +557,7 @@ defineExpose({
       </div>
     </div>
 
-    <!-- Right Favorites Sidebar -->
+    <!-- Favorites Sidebar is now rendered outside the editor layout -->
     <FavoriteBlocksSidebar :editor="editor" />
   </div>
 
