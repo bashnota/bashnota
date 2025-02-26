@@ -6,8 +6,15 @@ export class NotaDB extends Dexie {
 
   constructor() {
     super('notaDB')
-    this.version(2).stores({
-      notas: '++id, title, parentId, tags, favorite, updatedAt',
+    this.version(3).stores({
+      notas: '++id, title, parentId, tags, favorite, updatedAt'
+    }).upgrade(tx => {
+      // Add versions array to existing records
+      return tx.table('notas').toCollection().modify(nota => {
+        if (!nota.versions) {
+          nota.versions = []
+        }
+      })
     })
   }
 }

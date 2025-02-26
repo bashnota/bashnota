@@ -10,4 +10,13 @@ export interface Nota {
   createdAt: Date | string
   updatedAt: Date | string
   tags: string[]
+  versions?: NotaVersion[]
+}
+
+export interface NotaVersion {
+  id: string
+  notaId: string
+  content: string
+  versionName: string
+  createdAt: Date | string
 }

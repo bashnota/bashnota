@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { db } from '@/db'
-import { type Nota } from '@/types/nota'
+import { type Nota, type NotaVersion} from '@/types/nota'
 import type { NotaConfig } from '@/types/jupyter'
 import { nanoid } from 'nanoid'
 import { toast } from '@/lib/utils'
@@ -17,6 +17,14 @@ const serializeNota = (nota: Partial<Nota> & { id: string }): any => {
   // If there's a config, deep clone it to ensure it's serializable
   if (nota.config) {
     serialized.config = JSON.parse(JSON.stringify(nota.config))
+  }
+  
+  // Properly serialize versions array if it exists
+  if (nota.versions && Array.isArray(nota.versions)) {
+    serialized.versions = nota.versions.map(version => ({
+      ...version,
+      createdAt: version.createdAt && version.createdAt instanceof Date ? version.createdAt.toISOString() : version.createdAt
+    }))
   }
 
   return serialized
@@ -320,5 +328,84 @@ export const useNotaStore = defineStore('nota', {
         return []
       }
     },
+
+    async saveNotaVersion(version: { id: string; content: string; versionName: string; createdAt: Date }) {
+      try {
+        const nota = this.getCurrentNota(version.id)
+        if (!nota) throw new Error('Nota not found')
+        
+        const notaVersion: NotaVersion = {
+          id: nanoid(),
+          notaId: version.id,
+          content: version.content,
+          versionName: version.versionName,
+          createdAt: version.createdAt instanceof Date ? version.createdAt.toISOString() : version.createdAt
+        }
+        
+        // If versions array doesn't exist, create it
+        if (!nota.versions) {
+          nota.versions = []
+        }
+        
+        // Add the version to the versions array
+        nota.versions.push(notaVersion)
+        
+        // Save the updated nota with versions to the database
+        // Use serializeNota to ensure everything is properly serialized
+        const serialized = serializeNota(nota)
+        await db.notas.update(version.id, serialized)
+        
+        return notaVersion
+      } catch (error) {
+        console.error('Failed to save nota version:', error)
+        throw error
+      }
+    },
+
+    getNotaVersions(notaId: string) {
+      const nota = this.getCurrentNota(notaId)
+      return nota?.versions || []
+    },
+
+    async restoreVersion(notaId: string, versionId: string) {
+      try {
+        const nota = this.getCurrentNota(notaId)
+        if (!nota || !nota.versions) throw new Error('Nota or versions not found')
+        
+        const version = nota.versions.find(v => v.id === versionId)
+        if (!version) throw new Error('Version not found')
+        
+        // Update nota content with version content
+        await this.saveNota({
+          id: notaId,
+          content: version.content,
+          updatedAt: new Date()
+        })
+        
+        return true
+      } catch (error) {
+        console.error('Failed to restore version:', error)
+        throw error
+      }
+    },
+
+    async deleteVersion(notaId: string, versionId: string) {
+      try {
+        const nota = this.getCurrentNota(notaId)
+        if (!nota || !nota.versions) throw new Error('Nota or versions not found')
+        
+        // Filter out the version to delete
+        nota.versions = nota.versions.filter(v => v.id !== versionId)
+        
+        // Save the updated nota with the version removed
+        const serialized = serializeNota(nota)
+        await db.notas.update(notaId, serialized)
+        
+        return true
+      } catch (error) {
+        console.error('Failed to delete version:', error)
+        throw error
+      }
+    }
   },
 })
