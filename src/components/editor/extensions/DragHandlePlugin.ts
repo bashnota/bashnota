@@ -292,6 +292,7 @@ export function DragHandlePlugin(options: GlobalDragHandleOptions & { pluginKey:
 
         // Create container for menu
         menuContainer = document.createElement('div')
+        menuContainer.classList.add('block-command-menu-container')
         document.body.appendChild(menuContainer)
 
         // Create and mount menu component
@@ -303,10 +304,13 @@ export function DragHandlePlugin(options: GlobalDragHandleOptions & { pluginKey:
               isVisible: true,
               editorView: view,
               onClose: () => {
-                menuApp.unmount()
-                menuContainer?.remove()
-                menuApp = null
-                menuContainer = null
+                // Only unmount if we're not showing the add to favorites modal
+                if (!menuApp?._instance?.exposed?.showAddToFavoritesModal?.value) {
+                  menuApp?.unmount()
+                  menuContainer?.remove()
+                  menuApp = null
+                  menuContainer = null
+                }
               },
             })
           },
