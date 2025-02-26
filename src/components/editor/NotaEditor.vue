@@ -551,9 +551,11 @@ defineExpose({
         </div>
 
         <!-- Editor Content Area -->
-        <div class="h-full overflow-auto px-4 md:px-8 lg:px-12">
-          <editor-content :editor="editor" class="max-w-4xl mx-auto py-8" />
-        </div>
+<div class="h-full overflow-hidden px-4 md:px-8 lg:px-12">
+  <ScrollArea class="h-full">
+    <editor-content :editor="editor" class="max-w-4xl mx-auto py-8" />
+  </ScrollArea>
+</div>
       </div>
     </div>
 

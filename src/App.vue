@@ -125,3 +125,42 @@ const handleMouseMove = (event: MouseEvent) => {
   </div>
   <Toaster />
 </template>
+
+<style>
+/* Custom Scrollbar Styles */
+* {
+  /* For Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground)/0.2) transparent;
+}
+
+/* For Webkit browsers (Chrome, Safari, etc) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--muted-foreground)/0.2);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--muted-foreground)/0.3);
+}
+
+/* Hide scrollbars for components using ScrollArea */
+.scrollarea-content::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollarea-content {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+</style>
