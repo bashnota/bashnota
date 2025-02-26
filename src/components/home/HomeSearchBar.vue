@@ -74,16 +74,17 @@ const handleFileSelect = async (event: Event) => {
 }
 
 const quickActions = [
-  {
-    title: 'New Nota',
-    icon: PlusIcon,
-    action: () => emit('create-nota'),
-  },
-  {
-    title: 'Import',
-    icon: FolderPlusIcon,
-    action: handleImport,
-  },
+  // TODO: remove this later
+  // {
+  //   title: 'New Nota',
+  //   icon: PlusIcon,
+  //   action: () => emit('create-nota'),
+  // },
+  // {
+  //   title: 'Import',
+  //   icon: FolderPlusIcon,
+  //   action: handleImport,
+  // },
   {
     title: 'Favorites',
     icon: StarIcon,

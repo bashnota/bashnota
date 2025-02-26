@@ -3,12 +3,13 @@ import { ref, watch, onMounted } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ClockIcon, XMarkIcon } from '@heroicons/vue/24/solid'
+import { ClockIcon, XMarkIcon, PlusIcon, FolderPlusIcon } from '@heroicons/vue/24/solid'
 import { useRouter } from 'vue-router'
 import HomeHeader from '@/components/home/HomeHeader.vue'
 import HomeSearchBar from '@/components/home/HomeSearchBar.vue'
 import HomeTagFilter from '@/components/home/HomeTagFilter.vue'
 import HomeNotaList from '@/components/home/HomeNotaList.vue'
+import { toast } from '@/lib/utils'
 
 const router = useRouter()
 const store = useNotaStore()
@@ -47,6 +48,22 @@ const clearFilters = () => {
 const createNewNota = async () => {
   const nota = await store.createItem('Untitled Nota')
   router.push(`/nota/${nota.id}`)
+}
+
+const handleImport = () => {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.json'
+  input.onchange = async (event) => {
+    const file = (event.target as HTMLInputElement).files?.[0]
+    if (file) {
+      const success = await store.importNotas(file)
+      if (success) {
+        await store.loadNotas()
+      }
+    }
+  }
+  input.click()
 }
 </script>
 
@@ -105,6 +122,16 @@ const createNewNota = async () => {
                 <CardDescription>
                   {{ showFavorites ? 'Your starred notas' : 'Your recently updated notas' }}
                 </CardDescription>
+              </div>
+              <div class="flex items-center gap-2">
+                <Button variant="outline" size="sm" @click="createNewNota">
+                  <PlusIcon class="h-4 w-4 mr-2" />
+                  New Nota
+                </Button>
+                <Button variant="outline" size="sm" @click="handleImport">
+                  <FolderPlusIcon class="h-4 w-4 mr-2" />
+                  Import
+                </Button>
               </div>
             </div>
           </CardHeader>
