@@ -162,28 +162,25 @@ const removeServer = async (serverToRemove: JupyterServer) => {
 <template>
   <div class="p-6 max-w-4xl mx-auto">
     <div class="space-y-6">
-      <div class="flex items-center justify-between">
-        <h2 class="text-2xl font-semibold tracking-tight">Nota Configuration</h2>
+      <div class="space-y-2">
+        <h2 class="text-2xl font-semibold tracking-tight">Jupyter Configuration</h2>
+        <p class="text-sm text-muted-foreground">
+          Configure Jupyter servers and kernels for code execution in your notebooks
+        </p>
       </div>
 
       <Tabs default-value="servers" class="w-full">
-        <TabsList class="grid w-full grid-cols-3">
+        <TabsList class="grid w-full grid-cols-2">
           <TabsTrigger value="servers">
             <div class="flex items-center justify-center gap-2 p-1">
               <ServerIcon class="w-4 h-4 shrink-0" />
-              <span class="text-sm">Servers</span>
+              <span class="text-sm">Jupyter Servers</span>
             </div>
           </TabsTrigger>
           <TabsTrigger value="kernels">
             <div class="flex items-center justify-center gap-2 p-1">
               <CpuChipIcon class="w-4 h-4 shrink-0" />
-              <span class="text-sm">Kernels</span>
-            </div>
-          </TabsTrigger>
-          <TabsTrigger value="settings">
-            <div class="flex items-center justify-center gap-2 p-1">
-              <Cog6ToothIcon class="w-4 h-4 shrink-0" />
-              <span class="text-sm">General Settings</span>
+              <span class="text-sm">Available Kernels</span>
             </div>
           </TabsTrigger>
         </TabsList>
@@ -273,9 +270,13 @@ const removeServer = async (serverToRemove: JupyterServer) => {
               <!-- Server List -->
               <div
                 v-if="config.jupyterServers.length === 0"
-                class="rounded-lg border border-dashed p-8 text-center text-muted-foreground"
+                class="rounded-lg border border-dashed p-8 text-center"
               >
-                No servers configured yet
+                <ServerIcon class="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
+                <p class="text-sm font-medium mb-2">No Jupyter Servers Configured</p>
+                <p class="text-sm text-muted-foreground max-w-md mx-auto">
+                  Add a Jupyter server to enable code execution in your notebooks. You can connect to a local or remote Jupyter server.
+                </p>
               </div>
 
               <div v-else class="space-y-4">

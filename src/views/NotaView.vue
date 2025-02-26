@@ -10,6 +10,7 @@ import {
   ArrowPathIcon,
   StarIcon,
   ArrowDownTrayIcon,
+  CpuChipIcon,
 } from '@heroicons/vue/24/outline'
 import { Button } from '@/components/ui/button'
 import { formatDate } from '@/lib/utils'
@@ -20,6 +21,7 @@ import TagsInputItemDelete from '@/components/ui/tags-input/TagsInputItemDelete.
 import TagsInputInput from '@/components/ui/tags-input/TagsInputInput.vue'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
 import { Loader2, PlayCircle } from 'lucide-vue-next'
+import { toast } from '@/components/ui/toast'
 
 const props = defineProps<{
   id: string
@@ -56,6 +58,23 @@ onMounted(async () => {
     await store.saveItem(loadedNota)
   }
   isReady.value = true
+  
+  // Check if this is a root nota and has no Jupyter servers configured
+  if (nota.value && !nota.value.parentId) {
+    const config = nota.value.config
+    if (!config?.jupyterServers || config.jupyterServers.length === 0) {
+      toast({
+        title: "Configure Jupyter",
+        description: "Set up your Jupyter server to enable code execution in this notebook.",
+        action: {
+          label: "Configure",
+          onClick: () => {
+            showConfigPage.value = true
+          }
+        }
+      })
+    }
+  }
 })
 
 const executeAllCells = async () => {
@@ -221,8 +240,15 @@ const exportNota = async () => {
           />
         </Button>
 
-        <Button variant="ghost" size="icon" title="Settings" @click="toggleConfigPage" v-if="nota">
-          <Cog6ToothIcon class="w-5 h-5" />
+        <Button 
+          variant="outline" 
+          title="Jupyter Settings" 
+          @click="toggleConfigPage" 
+          v-if="nota"
+          class="flex items-center gap-2"
+        >
+          <CpuChipIcon class="w-5 h-5" />
+          <span class="hidden sm:inline">Jupyter Settings</span>
         </Button>
 
         <Button variant="ghost" size="icon" title="Export" @click="exportNota" v-if="nota">
