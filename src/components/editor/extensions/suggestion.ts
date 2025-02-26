@@ -104,7 +104,7 @@ export default {
             .insertContent({
               type: 'mathBlock',
               attrs: {
-                latex: '\\frac{(a \cdot b)^2}{||a - b||^2}',
+                latex: 'ⵟ(a,b) = \\frac{(a \\cdot b)^2}{||a - b||^2}, \\forall a,b \\in \\mathbb{R}^n, a \\neq b',
               },
             })
             .run()

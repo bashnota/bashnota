@@ -77,12 +77,8 @@ const editorExtensions = [
     tightListClass: 'tight',
     bulletListMarker: '-',
     linkify: true,
-    html: false,
-    transformPasted: (content) => {
-      console.log('Transforming pasted content:', content)
-      return content
-    }
-  }),
+    html: false
+    }),
   StarterKit.configure({
     codeBlock: false,
     blockquote: false,
