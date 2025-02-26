@@ -40,6 +40,10 @@ export const MarkdownExtension = Extension.create({
               }
               return false
             },
+            paste: (view, event) => {
+              // Don't interfere with paste events - let the Markdown extension handle it
+              return false
+            }
           },
           decorations(state) {
             const decos: Decoration[] = []

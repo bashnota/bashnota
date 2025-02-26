@@ -69,6 +69,20 @@ const content = computed(() => {
 
 // Create a base extensions array
 const editorExtensions = [
+  Markdown.configure({
+    transformPastedText: true,
+    transformCopiedText: false,
+    breaks: true,
+    tightLists: true,
+    tightListClass: 'tight',
+    bulletListMarker: '-',
+    linkify: true,
+    html: false,
+    transformPasted: (content) => {
+      console.log('Transforming pasted content:', content)
+      return content
+    }
+  }),
   StarterKit.configure({
     codeBlock: false,
     blockquote: false,
@@ -116,9 +130,6 @@ const editorExtensions = [
     shouldShow: () => true,
   }),
   MarkdownExtension,
-  Markdown.configure({
-    transformPastedText: true,
-  }),
   Mermaid.configure({
     HTMLAttributes: {
       class: 'mermaid-block',
@@ -196,6 +207,53 @@ const editor = useEditor({
     attributes: {
       class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none',
     },
+    handlePaste: (view, event) => {
+      // Get the plain text content
+      const text = event.clipboardData?.getData('text/plain')
+      
+      // If there's no text, let the default handler work
+      if (!text) return false
+      
+      // Check if it looks like markdown
+      const isMarkdown = /(\#{1,6}\s.+)|(\*\*.+\*\*)|(\*.+\*)|(\[.+\]\(.+\))|(\`\`\`.+\`\`\`)|(\>\s.+)|(\-\s.+)|(\d+\.\s.+)/m.test(text)
+      
+      if (isMarkdown) {
+        // Get the editor instance to use its markdown parsing capability
+        const editorInstance = editor.value
+        
+        if (editorInstance) {
+          // Prevent the default paste behavior
+          event.preventDefault()
+          
+          // Insert a paragraph at the current position
+          const { from } = view.state.selection
+          
+          // Use the Markdown extension's parsing capability directly
+          // This delays the processing to let the editor handle it properly
+          setTimeout(() => {
+            // First delete the selection if there is one
+            if (view.state.selection.from !== view.state.selection.to) {
+              editorInstance.commands.deleteSelection()
+            }
+            
+            // Now insert the markdown as HTML content to trigger proper parsing
+            editorInstance.commands.insertContent(
+              text,
+              {
+                parseOptions: {
+                  preserveWhitespace: 'full',
+                }
+              }
+            )
+          }, 0)
+          
+          return true
+        }
+      }
+      
+      // Let the default handler work for non-markdown content
+      return false
+    }
   },
   onCreate({ editor }) {
     // Load saved sessions first
