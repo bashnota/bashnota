@@ -68,8 +68,8 @@ export const InlineAIGenerationExtension = Node.create({
         })
       },
       
-      generateInlineAI: (nodePos, prompt) => ({ editor }) => {
-        console.log('generateInlineAI called with:', nodePos, prompt)
+      generateInlineAI: (nodePos, prompt, isContinuation = false) => ({ editor }) => {
+        console.log('generateInlineAI called with:', nodePos, prompt, isContinuation)
         
         const aiSettings = useAISettingsStore()
         const providerId = aiSettings.settings.preferredProviderId
@@ -81,15 +81,17 @@ export const InlineAIGenerationExtension = Node.create({
           console.error('API key required for', provider.name)
           
           // Find the node and update it directly
-          const node = editor.state.doc.nodeAt(nodePos)
-          if (node && node.type.name === 'inlineAIGeneration') {
-            editor.view.dispatch(
-              editor.state.tr.setNodeMarkup(nodePos, undefined, {
-                ...node.attrs,
-                error: `API key required for ${provider.name}`,
-                isLoading: false
-              })
-            )
+          if (nodePos !== undefined && nodePos >= 0 && nodePos < editor.state.doc.content.size) {
+            const node = editor.state.doc.nodeAt(nodePos)
+            if (node && node.type.name === 'inlineAIGeneration') {
+              editor.view.dispatch(
+                editor.state.tr.setNodeMarkup(nodePos, undefined, {
+                  ...node.attrs,
+                  error: `API key required for ${provider.name}`,
+                  isLoading: false
+                })
+              )
+            }
           }
           
           toast({
@@ -103,15 +105,17 @@ export const InlineAIGenerationExtension = Node.create({
         
         // Set loading state
         console.log('Setting loading state at position:', nodePos)
-        const node = editor.state.doc.nodeAt(nodePos)
+        
+        // Get the node at the position
+        const { state } = editor.view
+        const node = state.doc.nodeAt(nodePos)
         if (node && node.type.name === 'inlineAIGeneration') {
-          editor.view.dispatch(
-            editor.state.tr.setNodeMarkup(nodePos, undefined, {
-              ...node.attrs,
-              isLoading: true,
-              error: ''
-            })
-          )
+          const transaction = state.tr.setNodeMarkup(nodePos, undefined, {
+            ...node.attrs,
+            isLoading: true,
+            error: ''
+          })
+          editor.view.dispatch(transaction)
         }
         
         // Show loading toast
@@ -133,15 +137,21 @@ export const InlineAIGenerationExtension = Node.create({
           console.log('Generation successful:', result)
           
           // Update node with result
-          const updatedNode = editor.state.doc.nodeAt(nodePos)
-          if (updatedNode && updatedNode.type.name === 'inlineAIGeneration') {
-            editor.view.dispatch(
-              editor.state.tr.setNodeMarkup(nodePos, undefined, {
-                ...updatedNode.attrs,
-                result: result.text.trim(),
-                isLoading: false
-              })
-            )
+          if (nodePos !== undefined && nodePos >= 0 && nodePos < editor.state.doc.content.size) {
+            const updatedNode = editor.state.doc.nodeAt(nodePos)
+            if (updatedNode && updatedNode.type.name === 'inlineAIGeneration') {
+              const newResult = isContinuation 
+                ? updatedNode.attrs.result + '\n\n' + result.text.trim()
+                : result.text.trim()
+              
+              editor.view.dispatch(
+                editor.state.tr.setNodeMarkup(nodePos, undefined, {
+                  ...updatedNode.attrs,
+                  result: newResult,
+                  isLoading: false
+                })
+              )
+            }
           }
           
           // Show success toast
@@ -153,15 +163,17 @@ export const InlineAIGenerationExtension = Node.create({
           console.error('Generation failed:', error)
           
           // Update node with error
-          const updatedNode = editor.state.doc.nodeAt(nodePos)
-          if (updatedNode && updatedNode.type.name === 'inlineAIGeneration') {
-            editor.view.dispatch(
-              editor.state.tr.setNodeMarkup(nodePos, undefined, {
-                ...updatedNode.attrs,
-                error: error instanceof Error ? error.message : 'Unknown error occurred',
-                isLoading: false
-              })
-            )
+          if (nodePos !== undefined && nodePos >= 0 && nodePos < editor.state.doc.content.size) {
+            const updatedNode = editor.state.doc.nodeAt(nodePos)
+            if (updatedNode && updatedNode.type.name === 'inlineAIGeneration') {
+              editor.view.dispatch(
+                editor.state.tr.setNodeMarkup(nodePos, undefined, {
+                  ...updatedNode.attrs,
+                  error: error instanceof Error ? error.message : 'Unknown error occurred',
+                  isLoading: false
+                })
+              )
+            }
           }
           
           // Show error toast
