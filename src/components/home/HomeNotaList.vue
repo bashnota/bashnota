@@ -26,7 +26,7 @@ const props = defineProps<{
   currentPage?: number
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'create-nota'): void
   (e: 'update:selectedTag', value: string): void
   (e: 'update:page', value: number): void
