@@ -373,14 +373,60 @@ export default {
       onUpdate(props: any) {
         component.updateProps(props)
 
-        popup.setProps({
-          getReferenceClientRect: props.clientRect,
-        })
+        // Check if popup exists and has setProps method
+        if (popup) {
+          try {
+            if (typeof popup.setProps === 'function') {
+              popup.setProps({
+                getReferenceClientRect: props.clientRect,
+              })
+            } else if (Array.isArray(popup) && popup[0] && typeof popup[0].setProps === 'function') {
+              // Handle case where tippy returns an array
+              popup[0].setProps({
+                getReferenceClientRect: props.clientRect,
+              })
+            } else if (popup._tippy && typeof popup._tippy.setProps === 'function') {
+              // Try accessing through _tippy property
+              popup._tippy.setProps({
+                getReferenceClientRect: props.clientRect,
+              })
+            } else {
+              // If setProps is not available, recreate the popup
+              if (typeof popup.destroy === 'function') {
+                popup.destroy()
+              } else if (popup.hideWithInteractivity) {
+                popup.unmount && popup.unmount()
+              }
+              
+              // @ts-ignore
+              popup = tippy('body', {
+                getReferenceClientRect: props.clientRect,
+                appendTo: () => document.body,
+                content: component.element,
+                showOnCreate: true,
+                interactive: true,
+                trigger: 'manual',
+                placement: 'bottom-start',
+                theme: 'command-palette',
+              })
+            }
+          } catch (e) {
+            console.warn('Error updating tippy instance:', e)
+          }
+        }
       },
 
       onKeyDown(props: any) {
         if (props.event.key === 'Escape') {
-          popup.hide()
+          // Check if popup exists and has hide method
+          if (popup) {
+            if (typeof popup.hide === 'function') {
+              popup.hide()
+            } else if (popup.popper) {
+              // Alternative approach if hide is not available
+              popup.popper.style.display = 'none'
+            }
+          }
           return true
         }
 
@@ -388,8 +434,38 @@ export default {
       },
 
       onExit() {
-        popup.destroy()
-        component.destroy()
+        if (popup) {
+          // Try different methods to hide/destroy the popup
+          try {
+            // First try to hide it if the method exists
+            if (typeof popup.hide === 'function') {
+              popup.hide()
+            }
+            
+            // Then try to destroy it using various possible methods
+            if (typeof popup.destroy === 'function') {
+              popup.destroy()
+            } else if (popup.hideWithInteractivity && typeof popup.unmount === 'function') {
+              popup.unmount()
+            } else if (popup._tippy && typeof popup._tippy.destroy === 'function') {
+              popup._tippy.destroy()
+            } else if (popup.popper) {
+              // Manual DOM removal as last resort
+              if (popup.popper.parentNode) {
+                popup.popper.parentNode.removeChild(popup.popper)
+              }
+            } else if (Array.isArray(popup) && popup[0] && typeof popup[0].destroy === 'function') {
+              // Sometimes tippy returns an array of instances
+              popup[0].destroy()
+            }
+          } catch (e) {
+            console.warn('Error cleaning up tippy instance:', e)
+          }
+        }
+        
+        if (component) {
+          component.destroy()
+        }
       },
     }
   },
