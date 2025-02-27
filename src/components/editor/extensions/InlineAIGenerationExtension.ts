@@ -1,9 +1,9 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import { VueNodeViewRenderer } from '@tiptap/vue-3'
-import InlineAIGenerationComponent from '../blocks/InlineAIGeneration.vue'
+import InlineAIGenerationComponent from '@/components/editor/blocks/InlineAIGeneration.vue'
 import { aiService } from '@/services/aiService'
 import { useAISettingsStore } from '@/stores/aiSettingsStore'
-import { toast } from '@/lib/utils'
+import { toast } from '@/components/ui/toast'
 
 export interface InlineAIGenerationAttributes {
   prompt: string
@@ -56,7 +56,7 @@ export const InlineAIGenerationExtension = Node.create({
   
   addCommands() {
     return {
-      insertInlineAIGeneration: () => ({ commands }) => {
+      insertInlineAIGeneration: () => ({ commands }: { commands: any }) => {
         return commands.insertContent({
           type: this.name,
           attrs: {

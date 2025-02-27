@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
 import { Textarea } from '@/components/ui/textarea'
-import { toast } from '@/lib/utils'
+import { toast } from '@/components/ui/toast'
 import { SparklesIcon, KeyIcon, Save, Trash2Icon } from 'lucide-vue-next'
 
 const aiSettings = useAISettingsStore()
@@ -175,7 +175,7 @@ const handlePaste = (providerId: string, event: ClipboardEvent) => {
                   placeholder="Enter API key"
                   class="flex-1"
                   @blur="handleApiKeyChange(provider.id, apiKeys[provider.id])"
-                  @paste="(event) => handlePaste(provider.id, event)"
+                  @paste="(event: ClipboardEvent) => handlePaste(provider.id, event)"
                 />
                 <Button 
                   variant="destructive" 

@@ -27,19 +27,12 @@ import {
   PenTool,
   SparklesIcon,
 } from 'lucide-vue-next'
-import { ref } from 'vue'
-import AIGenerationDialog from '../blocks/AIGenerationDialog.vue'
-import { createApp, h } from 'vue'
 
 type CommandArgs = {
   editor: Editor
   range: Range
   props: any
 }
-
-// Create a ref to track the AI dialog state
-let aiGenerationDialog: any = null
-let aiPrompt = ref('')
 
 export default {
   items: ({ query }: { query: string }) => {
@@ -333,7 +326,13 @@ export default {
         description: 'Insert an inline AI generation block',
         icon: SparklesIcon,
         command: ({ editor, range }: CommandArgs) => {
-          editor.chain().focus().deleteRange(range).insertInlineAIGeneration().run()
+          if (editor.can().insertInlineAIGeneration?.()) {
+            editor.chain().focus().deleteRange(range).insertInlineAIGeneration().run()
+          } else {
+            editor.chain().focus().deleteRange(range).insertContent({
+              type: 'aiGeneration',
+            }).run()
+          }
         },
       },
     ]
@@ -358,6 +357,7 @@ export default {
           editor: props.editor,
         })
 
+        // @ts-ignore
         popup = tippy('body', {
           getReferenceClientRect: props.clientRect,
           appendTo: () => document.body,
@@ -366,20 +366,21 @@ export default {
           interactive: true,
           trigger: 'manual',
           placement: 'bottom-start',
+          theme: 'command-palette',
         })
       },
 
       onUpdate(props: any) {
         component.updateProps(props)
 
-        popup[0].setProps({
+        popup.setProps({
           getReferenceClientRect: props.clientRect,
         })
       },
 
       onKeyDown(props: any) {
         if (props.event.key === 'Escape') {
-          popup[0].hide()
+          popup.hide()
           return true
         }
 
@@ -387,7 +388,7 @@ export default {
       },
 
       onExit() {
-        popup[0].destroy()
+        popup.destroy()
         component.destroy()
       },
     }

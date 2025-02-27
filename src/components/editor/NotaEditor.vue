@@ -42,8 +42,6 @@ import drawIoExtension from '@rcode-link/tiptap-drawio'
 import { toast } from '@/lib/utils'
 import VersionHistoryDialog from './VersionHistoryDialog.vue'
 import FavoriteBlocksSidebar from './FavoriteBlocksSidebar.vue'
-import { AIGenerationExtension } from './extensions/AIGenerationExtension'
-import AIGenerationDialog from './blocks/AIGenerationDialog.vue'
 import { InlineAIGenerationExtension } from './extensions/InlineAIGenerationExtension'
 
 const props = defineProps<{
@@ -61,7 +59,6 @@ const router = useRouter()
 const isSidebarOpen = ref(true)
 const autoSaveEnabled = ref(true)
 const showVersionHistory = ref(false)
-const showAIDialog = ref(false)
 
 const currentNota = computed(() => {
   return notaStore.getCurrentNota(props.notaId)
@@ -148,7 +145,6 @@ const editorExtensions = [
   }),
   Blockquote,
   HorizontalRule,
-  AIGenerationExtension,
   InlineAIGenerationExtension,
 ]
 
@@ -553,28 +549,6 @@ const createAndLinkSubNota = async (title: string) => {
   }
 }
 
-const handleAIGenerate = (prompt: string) => {
-  if (editor.value) {
-    editor.value.commands.generateText(prompt)
-  }
-}
-
-const handleAIShortcut = (event: KeyboardEvent) => {
-  if ((event.metaKey || event.ctrlKey) && event.key === 'g') {
-    event.preventDefault()
-    showAIDialog.value = true
-  }
-}
-
-onMounted(() => {
-  // Add keyboard shortcut listener
-  document.addEventListener('keydown', handleAIShortcut)
-})
-
-onUnmounted(() => {
-  // Remove the listener
-  document.removeEventListener('keydown', handleAIShortcut)
-})
 
 defineExpose({
   insertSubNotaLink,
@@ -672,11 +646,6 @@ defineExpose({
     @version-restored="refreshEditorContent"
   />
 
-  <AIGenerationDialog 
-    :open="showAIDialog" 
-    @update:open="showAIDialog = $event"
-    @generate="handleAIGenerate"
-  />
 </template>
 
 <style>

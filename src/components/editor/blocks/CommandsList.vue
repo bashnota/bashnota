@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ArrowTurnDownLeftIcon } from '@heroicons/vue/24/outline'
-import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 interface CommandItem {
   title: string
@@ -52,21 +52,21 @@ watch(
   },
 )
 
-const selectItem = (index) => {
+const selectItem = (index: number) => {
   selectedIndex.value = index
 }
 
-const onMousedown = (e) => {
+const onMousedown = (e: MouseEvent) => {
   e.preventDefault()
 }
 
-const onMouseup = (e, { command, index }) => {
+const onMouseup = (e: MouseEvent, { command, index }: { command: () => void, index: number }) => {
   e.preventDefault()
   selectItem(index)
   command()
 }
 
-const onKeyDown = (event) => {
+const onKeyDown = (event: KeyboardEvent) => {
   if (!event) return false
 
   if (event.key === 'ArrowUp') {
@@ -115,9 +115,9 @@ defineExpose({
                 ? 'bg-accent text-accent-foreground'
                 : 'text-popover-foreground hover:bg-accent hover:text-accent-foreground',
             ]"
-            @mouseenter="selectItem(itemToGlobalIndex.get(item))"
+            @mouseenter="selectItem(itemToGlobalIndex.get(item) ?? 0)"
             @mousedown="onMousedown"
-            @mouseup="(e) => onMouseup(e, { command: () => command(item), index: itemToGlobalIndex.get(item) })"
+            @mouseup="(e) => onMouseup(e, { command: () => command(item), index: itemToGlobalIndex.get(item) ?? 0 })"
           >
             <div class="flex items-center gap-2">
               <component
