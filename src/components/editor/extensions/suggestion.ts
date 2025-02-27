@@ -25,7 +25,11 @@ import {
   Minus,
   SquareCheck,
   PenTool,
+  SparklesIcon,
 } from 'lucide-vue-next'
+import { ref } from 'vue'
+import AIGenerationDialog from '../blocks/AIGenerationDialog.vue'
+import { createApp, h } from 'vue'
 
 type CommandArgs = {
   editor: Editor
@@ -33,8 +37,14 @@ type CommandArgs = {
   props: any
 }
 
+// Create a ref to track the AI dialog state
+let aiGenerationDialog: any = null
+let aiPrompt = ref('')
+
 export default {
   items: ({ query }: { query: string }) => {
+    const store = useNotaStore()
+    
     const items = [
       // Basic Blocks
       {
@@ -318,19 +328,23 @@ export default {
             .run()
         },
       },
+      {
+        title: 'AI Generation',
+        description: 'Insert an inline AI generation block',
+        icon: SparklesIcon,
+        command: ({ editor, range }: CommandArgs) => {
+          editor.chain().focus().deleteRange(range).insertInlineAIGeneration().run()
+        },
+      },
     ]
 
-    return !query
-      ? items
-      : items
-          .filter((item) => {
-            const searchQuery = query.toLowerCase()
-            return (
-              item.title.toLowerCase().includes(searchQuery) ||
-              item.keywords.some((keyword) => keyword.toLowerCase().includes(searchQuery))
-            )
-          })
-          .slice(0, 10)
+    if (!query) {
+      return items
+    }
+
+    return items.filter(item => {
+      return item.title.toLowerCase().includes(query.toLowerCase())
+    })
   },
 
   render: () => {
@@ -344,7 +358,6 @@ export default {
           editor: props.editor,
         })
 
-        // @ts-ignore
         popup = tippy('body', {
           getReferenceClientRect: props.clientRect,
           appendTo: () => document.body,
@@ -353,12 +366,12 @@ export default {
           interactive: true,
           trigger: 'manual',
           placement: 'bottom-start',
-          theme: 'command-palette',
         })
       },
 
       onUpdate(props: any) {
         component.updateProps(props)
+
         popup[0].setProps({
           getReferenceClientRect: props.clientRect,
         })
@@ -369,7 +382,8 @@ export default {
           popup[0].hide()
           return true
         }
-        return component?.ref?.onKeyDown(props)
+
+        return component.ref?.onKeyDown(props.event)
       },
 
       onExit() {

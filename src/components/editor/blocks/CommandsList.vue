@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ArrowTurnDownLeftIcon } from '@heroicons/vue/24/outline'
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 
 interface CommandItem {
   title: string
@@ -52,18 +52,23 @@ watch(
   },
 )
 
-const selectItem = (index?: number) => {
-  if (index === undefined) {
-    return
-  }
-
-  const item = props.items[index]
-  if (item) {
-    props.command(item)
-  }
+const selectItem = (index) => {
+  selectedIndex.value = index
 }
 
-const onKeyDown = ({ event }: { event: KeyboardEvent }) => {
+const onMousedown = (e) => {
+  e.preventDefault()
+}
+
+const onMouseup = (e, { command, index }) => {
+  e.preventDefault()
+  selectItem(index)
+  command()
+}
+
+const onKeyDown = (event) => {
+  if (!event) return false
+
   if (event.key === 'ArrowUp') {
     selectedIndex.value = (selectedIndex.value + props.items.length - 1) % props.items.length
     return true
@@ -75,14 +80,19 @@ const onKeyDown = ({ event }: { event: KeyboardEvent }) => {
   }
 
   if (event.key === 'Enter') {
-    selectItem(selectedIndex.value)
-    return true
+    if (props.items[selectedIndex.value]) {
+      // Make sure we're using the proper command execution pattern
+      props.command(props.items[selectedIndex.value])
+      return true
+    }
   }
 
   return false
 }
 
-defineExpose({ onKeyDown })
+defineExpose({
+  onKeyDown,
+})
 </script>
 
 <template>
@@ -105,7 +115,9 @@ defineExpose({ onKeyDown })
                 ? 'bg-accent text-accent-foreground'
                 : 'text-popover-foreground hover:bg-accent hover:text-accent-foreground',
             ]"
-            @click="selectItem(itemToGlobalIndex.get(item))"
+            @mouseenter="selectItem(itemToGlobalIndex.get(item))"
+            @mousedown="onMousedown"
+            @mouseup="(e) => onMouseup(e, { command: () => command(item), index: itemToGlobalIndex.get(item) })"
           >
             <div class="flex items-center gap-2">
               <component
