@@ -9,7 +9,7 @@ import type { JupyterServer } from '@/types/jupyter'
 export class CodeExecutionService {
   private getBaseUrl(server: JupyterServer): string {
     const protocol = server.ip.startsWith('http') ? '' : 'http://'
-    return `${protocol}${server.ip}:${server.port}/api`
+    return `${protocol}${server.ip}:${server.port}`
   }
 
   private getUrlWithToken(serverConfig: JupyterServer, endpoint: string): string {
