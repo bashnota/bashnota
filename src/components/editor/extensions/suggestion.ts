@@ -36,8 +36,6 @@ type CommandArgs = {
 
 export default {
   items: ({ query }: { query: string }) => {
-    const store = useNotaStore()
-    
     const items = [
       // Basic Blocks
       {
