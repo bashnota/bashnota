@@ -18,6 +18,7 @@ const viewType = ref<'grid' | 'list' | 'compact'>('grid')
 const showFavorites = ref(false)
 const searchQuery = ref('')
 const selectedTag = ref('')
+const currentPage = ref(1)
 
 onMounted(async () => {
   await store.loadNotas()
@@ -65,6 +66,10 @@ const handleImport = () => {
   }
   input.click()
 }
+
+const handlePageChange = (page: number) => {
+  currentPage.value = page
+}
 </script>
 
 <template>
@@ -81,8 +86,8 @@ const handleImport = () => {
       <!-- Right Column: Interactive Content (spans 3 columns on xl) -->
       <div class="xl:col-span-3 flex flex-col h-full gap-4">
         <!-- Search and Controls Bar -->
-        <div class="flex gap-4 items-start shrink-0">
-          <div class="flex-1">
+        <div class="flex flex-col sm:flex-row gap-4 items-start shrink-0">
+          <div class="flex-1 w-full sm:w-auto">
             <HomeSearchBar
               v-model:search="searchQuery"
               v-model:view-type="viewType"
@@ -91,6 +96,16 @@ const handleImport = () => {
               class="w-full"
             />
           </div>
+          
+          <!-- Tag Filter - moved next to search bar -->
+          <div class="w-full sm:w-64 shrink-0">
+            <HomeTagFilter 
+              v-model:selected-tag="selectedTag" 
+              :notas="store.rootItems"
+              class="bg-card rounded-lg border p-2 h-10" 
+            />
+          </div>
+          
           <Button
             v-if="showFavorites || searchQuery || selectedTag"
             variant="ghost"
@@ -103,15 +118,8 @@ const handleImport = () => {
           </Button>
         </div>
 
-        <!-- Tag Filter -->
-        <HomeTagFilter 
-          v-model:selected-tag="selectedTag" 
-          :notas="store.rootItems"
-          class="bg-card rounded-lg border p-4 shrink-0" 
-        />
-
         <!-- Notas List Card -->
-        <Card class="overflow-hidden flex-1 flex flex-col">
+        <Card class="overflow-hidden flex-1 flex flex-col h-full">
           <CardHeader class="bg-card border-b px-6 shrink-0">
             <div class="flex items-center justify-between">
               <div>
@@ -135,7 +143,7 @@ const handleImport = () => {
               </div>
             </div>
           </CardHeader>
-          <CardContent class="p-4 flex-1 overflow-auto">
+          <CardContent class="p-4 overflow-y-auto flex-1">
             <HomeNotaList
               :is-loading="isLoading"
               :view-type="viewType"
@@ -143,8 +151,10 @@ const handleImport = () => {
               :search-query="searchQuery"
               :selected-tag="selectedTag"
               :notas="store.rootItems"
+              :current-page="currentPage"
               @create-nota="createNewNota"
-              @update:selected-tag="selectedTag = $event"
+              @update:selectedTag="selectedTag = $event"
+              @update:page="handlePageChange"
             />
           </CardContent>
         </Card>
