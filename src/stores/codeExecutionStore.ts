@@ -4,6 +4,7 @@ import { CodeExecutionService } from '../services/codeExecutionService'
 import type { CodeCell, KernelSession } from '@/types/codeExecution'
 import type { JupyterServer } from '@/types/jupyter'
 import { useNotaStore } from './nota'
+import { getURLWithoutProtocol } from '@/lib/utils'
 
 export const useCodeExecutionStore = defineStore('codeExecution', () => {
   const cells = ref<Map<string, CodeCell>>(new Map())
@@ -89,9 +90,9 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
       const { attrs, content } = block
       const code = content ? content.map((c: any) => c.text).join('\n') : ''
 
-      const serverID = attrs.serverID ? attrs.serverID.split(':') : null
+      const serverID = attrs.serverID ? getURLWithoutProtocol(attrs.serverID).split(':') : null
       const server = serverID
-        ? servers.find((s: any) => s.ip === serverID[0] && s.port === serverID[1])
+        ? servers.find((s: any) => getURLWithoutProtocol(s.ip) === serverID[0] && s.port === serverID[1])
         : undefined
 
       // If block has a session, ensure session has server config and kernel info

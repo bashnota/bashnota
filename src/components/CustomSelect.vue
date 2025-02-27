@@ -64,10 +64,12 @@ const filteredOptions = computed(() => {
           @click="emit('select', option.value)"
         >
           <CircleDot
-            class="h-4 w-4 mr-2"
+            class="h-4 w-4 mr-2 shrink-0"
             :class="selectedValue === option.value ? 'opacity-100' : 'opacity-0'"
           />
-          {{ option.label }}
+          <span class="overflow-ellipsis overflow-hidden whitespace-nowrap">
+            {{ option.label }}
+          </span>
         </div>
       </div>
     </div>

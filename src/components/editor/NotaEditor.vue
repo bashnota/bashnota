@@ -39,7 +39,7 @@ import HorizontalRule from '@tiptap/extension-horizontal-rule'
 import TaskItem from '@tiptap/extension-task-item'
 import TaskList from '@tiptap/extension-task-list'
 import drawIoExtension from '@rcode-link/tiptap-drawio'
-import { toast } from '@/lib/utils'
+import { getURLWithoutProtocol, toast } from '@/lib/utils'
 import VersionHistoryDialog from './VersionHistoryDialog.vue'
 import FavoriteBlocksSidebar from './FavoriteBlocksSidebar.vue'
 import { InlineAIGenerationExtension } from './extensions/InlineAIGenerationExtension'
@@ -171,9 +171,9 @@ const registerCodeCells = (content: any) => {
     const { attrs, content } = block
     const code = content ? content.map((c: any) => c.text).join('\n') : ''
 
-    const serverID = attrs.serverID ? attrs.serverID.split(':') : null
+    const serverID = attrs.serverID ? getURLWithoutProtocol(attrs.serverID).split(':') : null
     const server = serverID
-      ? servers.find((s: any) => s.ip === serverID[0] && s.port === serverID[1])
+      ? servers.find((s: any) => getURLWithoutProtocol(s.ip) === serverID[0] && s.port === serverID[1])
       : undefined
 
     codeExecutionStore.addCell({
