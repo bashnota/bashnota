@@ -25,6 +25,7 @@ import {
   Minus,
   SquareCheck,
   PenTool,
+  SparklesIcon,
 } from 'lucide-vue-next'
 
 type CommandArgs = {
@@ -35,6 +36,8 @@ type CommandArgs = {
 
 export default {
   items: ({ query }: { query: string }) => {
+    const store = useNotaStore()
+    
     const items = [
       // Basic Blocks
       {
@@ -318,19 +321,29 @@ export default {
             .run()
         },
       },
+      {
+        title: 'AI Generation',
+        description: 'Insert an inline AI generation block',
+        icon: SparklesIcon,
+        command: ({ editor, range }: CommandArgs) => {
+          if (editor.can().insertInlineAIGeneration?.()) {
+            editor.chain().focus().deleteRange(range).insertInlineAIGeneration().run()
+          } else {
+            editor.chain().focus().deleteRange(range).insertContent({
+              type: 'aiGeneration',
+            }).run()
+          }
+        },
+      },
     ]
 
-    return !query
-      ? items
-      : items
-          .filter((item) => {
-            const searchQuery = query.toLowerCase()
-            return (
-              item.title.toLowerCase().includes(searchQuery) ||
-              item.keywords.some((keyword) => keyword.toLowerCase().includes(searchQuery))
-            )
-          })
-          .slice(0, 10)
+    if (!query) {
+      return items
+    }
+
+    return items.filter(item => {
+      return item.title.toLowerCase().includes(query.toLowerCase())
+    })
   },
 
   render: () => {
@@ -359,21 +372,23 @@ export default {
 
       onUpdate(props: any) {
         component.updateProps(props)
-        popup[0].setProps({
+
+        popup.setProps({
           getReferenceClientRect: props.clientRect,
         })
       },
 
       onKeyDown(props: any) {
         if (props.event.key === 'Escape') {
-          popup[0].hide()
+          popup.hide()
           return true
         }
-        return component?.ref?.onKeyDown(props)
+
+        return component.ref?.onKeyDown(props.event)
       },
 
       onExit() {
-        popup[0].destroy()
+        popup.destroy()
         component.destroy()
       },
     }

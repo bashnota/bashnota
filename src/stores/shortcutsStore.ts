@@ -17,6 +17,7 @@ const defaultGeneralShortcuts: Shortcut[] = [
   { id: 'bold-text', key: '⌘ B', description: 'Bold text (in editor)' },
   { id: 'italic-text', key: '⌘ I', description: 'Italic text (in editor)' },
   { id: 'escape', key: 'Esc', description: 'Close dialogs / Cancel editing' },
+  { id: 'ai-generation', key: '⌘ G', description: 'AI text generation' },
 ]
 
 const defaultBlockShortcuts: Shortcut[] = [
@@ -33,6 +34,7 @@ const defaultBlockShortcuts: Shortcut[] = [
   { id: 'insert-tasklist', key: 'Ctrl+Shift+Alt+K', description: 'Insert task list' },
   { id: 'insert-drawio', key: 'Ctrl+Shift+Alt+G', description: 'Insert Draw.io diagram' },
   { id: 'insert-datatable', key: 'Ctrl+Shift+Alt+B', description: 'Insert data table' },
+  { id: 'insert-ai-block', key: 'Ctrl+Shift+Alt+A', description: 'Insert inline AI generation block' },
 ]
 
 export const useShortcutsStore = defineStore('shortcuts', {

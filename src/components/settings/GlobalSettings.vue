@@ -4,7 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ServerIcon, CpuChipIcon, Cog6ToothIcon, ArrowPathIcon, TrashIcon, DocumentDuplicateIcon } from '@heroicons/vue/24/solid'
 import { CommandLineIcon, PaintBrushIcon, AdjustmentsHorizontalIcon } from '@heroicons/vue/24/outline'
-import { Keyboard, Code2, Database, Palette, Monitor, Cpu } from 'lucide-vue-next'
+import { Keyboard, Code2, Database, Palette, Monitor, Cpu, SparklesIcon } from 'lucide-vue-next'
 import { useShortcutsStore } from '@/stores/shortcutsStore'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
@@ -19,6 +19,7 @@ import { toast } from '@/components/ui/toast'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { PencilIcon } from '@heroicons/vue/24/outline'
+import AISettings from '@/components/settings/AISettings.vue'
 
 // Use shortcuts from the store instead of duplicating them
 const shortcutsStore = useShortcutsStore()
@@ -326,6 +327,12 @@ function formatShortcutKey(key: string) {
             <div class="flex items-center justify-center gap-2 p-2">
               <Cpu class="w-4 h-4 shrink-0" />
               <span class="text-sm font-medium">Advanced</span>
+            </div>
+          </TabsTrigger>
+          <TabsTrigger value="ai" class="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <div class="flex items-center justify-center gap-2 p-2">
+              <SparklesIcon class="h-4 w-4 shrink-0" />
+              <span class="text-sm font-medium">AI Generation</span>
             </div>
           </TabsTrigger>
         </TabsList>
@@ -730,6 +737,11 @@ function formatShortcutKey(key: string) {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <!-- AI Generation Tab -->
+        <TabsContent value="ai">
+          <AISettings />
         </TabsContent>
       </Tabs>
     </div>

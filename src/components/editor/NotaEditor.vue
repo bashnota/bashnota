@@ -42,6 +42,7 @@ import drawIoExtension from '@rcode-link/tiptap-drawio'
 import { toast } from '@/lib/utils'
 import VersionHistoryDialog from './VersionHistoryDialog.vue'
 import FavoriteBlocksSidebar from './FavoriteBlocksSidebar.vue'
+import { InlineAIGenerationExtension } from './extensions/InlineAIGenerationExtension'
 
 const props = defineProps<{
   notaId: string
@@ -144,6 +145,7 @@ const editorExtensions = [
   }),
   Blockquote,
   HorizontalRule,
+  InlineAIGenerationExtension,
 ]
 
 const registerCodeCells = (content: any) => {
@@ -402,7 +404,8 @@ const handleKeyboardShortcuts = (event: KeyboardEvent) => {
       if (currentNota.value?.id) {
         editor.value!.chain().focus().insertDataTable(currentNota.value.id).run()
       }
-    }
+    },
+    'a': () => editor.value!.chain().focus().insertInlineAIGeneration().run(),
   }
   
   const key = event.key.toLowerCase()
@@ -546,6 +549,7 @@ const createAndLinkSubNota = async (title: string) => {
   }
 }
 
+
 defineExpose({
   insertSubNotaLink,
   createAndLinkSubNota
@@ -641,6 +645,7 @@ defineExpose({
     v-model:open="showVersionHistory"
     @version-restored="refreshEditorContent"
   />
+
 </template>
 
 <style>
