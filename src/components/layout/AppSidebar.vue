@@ -85,15 +85,18 @@ const filteredNotas = computed(() => {
 })
 
 const createNewNota = async (parentId: string | null = null) => {
-  if (!newNotaTitle.value.trim()) return
+  // If title is empty, use a default title
+  const title = newNotaTitle.value.trim() || 'Untitled Nota'
 
   try {
-    const nota = await notaStore.createItem(newNotaTitle.value, parentId)
+    // For root-level notas, parentId should be null
+    const actualParentId = parentId === '' ? null : parentId
+    const nota = await notaStore.createItem(title, actualParentId)
     newNotaTitle.value = ''
     showNewNotaInput.value = null
 
-    if (parentId) {
-      expandedItems.value.add(parentId)
+    if (actualParentId) {
+      expandedItems.value.add(actualParentId)
     }
 
     await router.push(`/nota/${nota.id}`)
@@ -244,7 +247,7 @@ const viewOptions = [
               </div>
 
               <Button
-                @click="createNewNota()"
+                @click="showNewNotaInput = ''"
                 class="h-6 text-xs px-2 gap-1 ml-auto"
                 variant="default"
                 size="sm"
@@ -255,6 +258,37 @@ const viewOptions = [
             </div>
           </Transition>
         </div>
+
+        <!-- New Nota Input -->
+        <Transition
+          enter-active-class="transition-all duration-200 ease-out"
+          enter-from-class="opacity-0 -translate-y-2"
+          enter-to-class="opacity-100 translate-y-0"
+          leave-active-class="transition-all duration-200 ease-in"
+          leave-from-class="opacity-100 translate-y-0"
+          leave-to-class="opacity-0 -translate-y-2"
+        >
+          <div v-if="showNewNotaInput !== null" class="relative">
+            <div class="flex gap-1">
+              <Input
+                v-model="newNotaTitle"
+                placeholder="Enter nota title..."
+                class="h-6 text-xs flex-1"
+                @keydown="handleKeydown"
+                @keydown.enter="createNewNota(showNewNotaInput)"
+                autofocus
+              />
+              <Button 
+                @click="createNewNota(showNewNotaInput)" 
+                variant="default" 
+                size="sm" 
+                class="h-6 text-xs"
+              >
+                Create
+              </Button>
+            </div>
+          </div>
+        </Transition>
       </div>
     </div>
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import NotaEditor from '@/components/editor/NotaEditor.vue'
 import NotaConfigPage from '@/components/NotaConfigPage.vue'
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { ref, onMounted, watch, nextTick, markRaw } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { computed } from 'vue'
 import {
@@ -65,13 +65,7 @@ onMounted(async () => {
     if (!config?.jupyterServers || config.jupyterServers.length === 0) {
       toast({
         title: "Configure Jupyter",
-        description: "Set up your Jupyter server to enable code execution in this notebook.",
-        action: {
-          label: "Configure",
-          onClick: () => {
-            showConfigPage.value = true
-          }
-        }
+        description: "Set up your Jupyter server to enable code execution in this notebook."
       })
     }
   }
