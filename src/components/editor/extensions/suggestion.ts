@@ -340,7 +340,11 @@ export default {
     }
 
     return items.filter(item => {
-      return item.title.toLowerCase().includes(query.toLowerCase())
+      const matchesTitle = item.title.toLowerCase().includes(query.toLowerCase())
+      const matchesKeywords = item.keywords?.some(keyword => 
+        keyword.toLowerCase().includes(query.toLowerCase())
+      )
+      return matchesTitle || matchesKeywords
     })
   },
 
