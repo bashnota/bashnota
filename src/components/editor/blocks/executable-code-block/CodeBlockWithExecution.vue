@@ -48,6 +48,7 @@ const codeValue = ref(props.code)
 const output = ref(props.result)
 const isCodeCopied = ref(false)
 const isCodeVisible = ref(true)
+const isOutputVisible = ref(true)
 const isFullScreen = ref(false)
 
 const { cell, execute, copyOutput, isCopied } = useCodeExecution(props.id)
@@ -385,6 +386,7 @@ const handleFullScreen = () => {
         :language="language"
         :disabled="cell?.isExecuting"
         @update:modelValue="updateCode"
+        maxHeight="300px"
       />
     </div>
 
@@ -394,13 +396,20 @@ const handleFullScreen = () => {
         <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           Output
         </span>
-        <Button variant="ghost" size="sm" @click="copyOutput" class="h-6 w-6 p-0">
-          <Copy v-if="!isCopied" class="h-3 w-3" />
-          <Check v-else class="h-3 w-3" />
-        </Button>
+        <div class="flex items-center gap-1">
+          <Button variant="ghost" size="sm" @click="isOutputVisible = !isOutputVisible" class="h-6 w-6 p-0" :title="isOutputVisible ? 'Hide Output' : 'Show Output'">
+            <Eye v-if="!isOutputVisible" class="h-3 w-3" />
+            <EyeOff v-else class="h-3 w-3" />
+          </Button>
+          <Button variant="ghost" size="sm" @click="copyOutput" class="h-6 w-6 p-0">
+            <Copy v-if="!isCopied" class="h-3 w-3" />
+            <Check v-else class="h-3 w-3" />
+          </Button>
+        </div>
       </div>
       <div
-        class="text-sm whitespace-pre-wrap break-words p-4"
+        v-show="isOutputVisible"
+        class="text-sm whitespace-pre-wrap break-words p-4 max-h-[300px] overflow-auto"
         :class="{ 'bg-red-50 dark:bg-red-950 text-destructive dark:text-red-200': cell?.hasError }"
         v-html="cell?.output"
       ></div>
@@ -432,5 +441,25 @@ const handleFullScreen = () => {
 
 .cmd-empty {
   @apply py-6 text-center text-sm text-muted-foreground;
+}
+
+/* Add styles for scrollable output */
+div[v-html] {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(155, 155, 155, 0.5) transparent;
+}
+
+div[v-html]::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+div[v-html]::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+div[v-html]::-webkit-scrollbar-thumb {
+  background-color: rgba(155, 155, 155, 0.5);
+  border-radius: 4px;
 }
 </style>
