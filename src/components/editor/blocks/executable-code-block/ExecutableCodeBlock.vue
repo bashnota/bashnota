@@ -98,10 +98,32 @@ const onSessionSelect = (sessionId: string) => {
 
     <Card v-else class="overflow-hidden">
       <CardContent class="p-0">
-        <pre class="bg-muted p-4 overflow-x-auto font-mono text-sm leading-relaxed">
+        <pre class="bg-muted p-4 overflow-x-auto max-h-[400px] font-mono text-sm leading-relaxed">
           <code :class="language">{{ code }}</code>
         </pre>
       </CardContent>
     </Card>
   </node-view-wrapper>
 </template>
+
+<style scoped>
+/* Add styles for scrollable code blocks */
+pre {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(155, 155, 155, 0.5) transparent;
+}
+
+pre::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+pre::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+pre::-webkit-scrollbar-thumb {
+  background-color: rgba(155, 155, 155, 0.5);
+  border-radius: 4px;
+}
+</style>
