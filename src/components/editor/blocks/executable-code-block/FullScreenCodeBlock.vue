@@ -29,7 +29,7 @@ const updateCode = (newCode: string) => {
 </script>
 
 <template>
-    <div v-if="isOpen" class="fixed inset-0 z-50 bg-background">
+    <div v-if="isOpen" class="fixed inset-0 z-50 bg-background flex flex-col">
         <!-- Header -->
         <div class="flex items-center justify-between p-4 border-b">
             <h2 class="text-lg font-semibold">Code Editor</h2>
@@ -46,14 +46,14 @@ const updateCode = (newCode: string) => {
         </div>
 
         <!-- Content -->
-        <div class="flex h-[calc(100vh-4rem)]">
+        <div class="flex flex-1 overflow-hidden">
             <!-- Code Editor -->
-            <div class="flex-1 overflow-auto border-r">
-                <CodeMirror v-model="localCode" :language="language" @update:modelValue="updateCode" />
+            <div class="flex-1 h-full border-r overflow-hidden">
+                <CodeMirror v-model="localCode" :language="language" @update:modelValue="updateCode" :fullScreen="true" />
             </div>
 
             <!-- Output -->
-            <div class="w-1/2 flex flex-col">
+            <div class="w-1/2 flex flex-col h-full">
                 <div class="p-2 border-b">
                     <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Output
@@ -68,3 +68,19 @@ const updateCode = (newCode: string) => {
         </div>
     </div>
 </template>
+
+<style scoped>
+/* Ensure the CodeMirror component takes full height */
+:deep(.cm-editor) {
+  height: 100%;
+}
+
+:deep(.cm-scroller) {
+  height: 100% !important;
+}
+
+:deep(.cm-gutters) {
+  height: auto !important;
+  min-height: 100% !important;
+}
+</style>
