@@ -97,11 +97,11 @@ defineExpose({
 
 <template>
   <div class="w-72 rounded-lg border bg-popover shadow-md">
-    <div class="flex flex-col p-1">
+    <div class="flex flex-col p-1 max-h-80 overflow-y-auto scrollbar-thin">
       <template v-if="items.length">
         <div v-for="(items, groupName) in groupedItems" :key="groupName">
           <!-- Group Header -->
-          <div v-if="items.length" class="px-2 py-1.5">
+          <div v-if="items.length" class="px-2 py-1.5 sticky top-0 bg-popover z-10">
             <p class="text-xs font-medium text-muted-foreground/70">{{ groupName }}</p>
           </div>
 
@@ -169,5 +169,29 @@ defineExpose({
 
 .tippy-box[data-theme~='command-palette'] .tippy-content {
   @apply p-0;
+}
+
+/* Custom scrollbar styles */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.3);
+  border-radius: 9999px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(156, 163, 175, 0.5);
+}
+
+/* For Firefox */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
 }
 </style>
