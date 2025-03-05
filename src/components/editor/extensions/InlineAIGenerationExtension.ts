@@ -4,6 +4,9 @@ import InlineAIGenerationComponent from '@/components/editor/blocks/InlineAIGene
 import { aiService } from '@/services/aiService'
 import { useAISettingsStore } from '@/stores/aiSettingsStore'
 import { toast } from '@/components/ui/toast'
+import { EditorState } from '@tiptap/pm/state'
+import { Editor } from '@tiptap/core'
+import type { CommandProps } from '@tiptap/core'
 
 export interface InlineAIGenerationAttributes {
   prompt: string
@@ -140,14 +143,11 @@ export const InlineAIGenerationExtension = Node.create({
           if (nodePos !== undefined && nodePos >= 0 && nodePos < editor.state.doc.content.size) {
             const updatedNode = editor.state.doc.nodeAt(nodePos)
             if (updatedNode && updatedNode.type.name === 'inlineAIGeneration') {
-              const newResult = isContinuation 
-                ? updatedNode.attrs.result + '\n\n' + result.text.trim()
-                : result.text.trim()
-              
+              // Always set the latest response as the result
               editor.view.dispatch(
                 editor.state.tr.setNodeMarkup(nodePos, undefined, {
                   ...updatedNode.attrs,
-                  result: newResult,
+                  result: result.text.trim(),
                   isLoading: false
                 })
               )
@@ -185,6 +185,14 @@ export const InlineAIGenerationExtension = Node.create({
         })
         
         return true
+      },
+
+      deleteInlineAIGeneration: (pos: number) => ({ commands, state }: CommandProps) => {
+        const node = state.doc.nodeAt(pos)
+        if (node && node.type.name === 'inlineAIGeneration') {
+          return commands.deleteNode('inlineAIGeneration')
+        }
+        return false
       }
     }
   }
