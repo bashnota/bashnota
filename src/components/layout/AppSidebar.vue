@@ -2,6 +2,7 @@
 import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNotaStore } from '@/stores/nota'
+import { useAuthStore } from '@/stores/auth'
 import { onKeyStroke } from '@vueuse/core'
 import DarkModeToggle from './DarkModeToggle.vue'
 import {
@@ -13,6 +14,7 @@ import {
   Cog6ToothIcon,
   QuestionMarkCircleIcon,
   XMarkIcon,
+  UserIcon,
 } from '@heroicons/vue/24/solid'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -26,10 +28,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import ShortcutsDialog from '../ShortcutsDialog.vue'
-import { Transition } from 'vue'
 
 const router = useRouter()
 const notaStore = useNotaStore()
+const authStore = useAuthStore()
 const newNotaTitle = ref('')
 const searchQuery = ref('')
 const showNewNotaInput = ref<string | null>(null)
@@ -37,6 +39,10 @@ const expandedItems = ref<Set<string>>(new Set())
 const shortcutsDialog = ref<{ isOpen: boolean }>({ isOpen: false })
 const activeView = ref<'all' | 'favorites' | 'recent'>('all')
 const showSearch = ref(false)
+
+// Auth related computed
+const isAuthenticated = computed(() => authStore.isAuthenticated)
+const currentUser = computed(() => authStore.currentUser)
 
 // Load last used view from localStorage
 onMounted(async () => {
@@ -144,6 +150,15 @@ const viewOptions = [
   { id: 'favorites', label: 'Favorites', icon: StarIcon },
   { id: 'recent', label: 'Recent', icon: ClockIcon },
 ]
+
+// Handle login/profile navigation
+const handleAuthNavigation = () => {
+  if (isAuthenticated.value) {
+    router.push('/profile')
+  } else {
+    router.push('/login')
+  }
+}
 </script>
 
 <template>
@@ -177,6 +192,10 @@ const viewOptions = [
                 <Cog6ToothIcon class="h-4 w-4 mr-2" />
                 <span>Settings</span>
               </DropdownMenuItem>
+              <DropdownMenuItem @click="handleAuthNavigation">
+                <UserIcon class="h-4 w-4 mr-2" />
+                <span>{{ isAuthenticated ? 'Your Profile' : 'Login' }}</span>
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -209,10 +228,12 @@ const viewOptions = [
                 variant="ghost"
                 size="sm"
                 class="absolute right-1 top-1/2 -translate-y-1/2 h-4 w-4"
-                @click="() => {
-                  showSearch = false
-                  searchQuery = ''
-                }"
+                @click="
+                  () => {
+                    showSearch = false
+                    searchQuery = ''
+                  }
+                "
               >
                 <XMarkIcon class="h-3 w-3" />
               </Button>
@@ -278,10 +299,10 @@ const viewOptions = [
                 @keydown.enter="createNewNota(showNewNotaInput)"
                 autofocus
               />
-              <Button 
-                @click="createNewNota(showNewNotaInput)" 
-                variant="default" 
-                size="sm" 
+              <Button
+                @click="createNewNota(showNewNotaInput)"
+                variant="default"
+                size="sm"
                 class="h-6 text-xs"
               >
                 Create
@@ -300,12 +321,16 @@ const viewOptions = [
           :expanded-items="expandedItems"
           :show-new-input="showNewNotaInput"
           :new-nota-title="newNotaTitle"
-          @toggle="(id) => (expandedItems.has(id) ? expandedItems.delete(id) : expandedItems.add(id))"
+          @toggle="
+            (id) => (expandedItems.has(id) ? expandedItems.delete(id) : expandedItems.add(id))
+          "
           @create="createNewNota"
-          @show-new-input="(id) => {
-            showNewNotaInput = id
-            newNotaTitle = ''
-          }"
+          @show-new-input="
+            (id) => {
+              showNewNotaInput = id
+              newNotaTitle = ''
+            }
+          "
           @update:new-nota-title="(value) => (newNotaTitle = value)"
         />
 
@@ -321,6 +346,25 @@ const viewOptions = [
         </div>
       </div>
     </ScrollArea>
+
+    <!-- Auth Status Indicator -->
+    <div class="px-4 py-2 border-t text-sm">
+      <div v-if="isAuthenticated" class="flex items-center gap-2">
+        <div class="w-2 h-2 rounded-full bg-green-500"></div>
+        <RouterLink
+          to="/profile"
+          class="text-sm text-muted-foreground hover:text-foreground truncate"
+        >
+          Signed in as {{ currentUser?.displayName || currentUser?.email }}
+        </RouterLink>
+      </div>
+      <div v-else class="flex items-center gap-2">
+        <div class="w-2 h-2 rounded-full bg-amber-500"></div>
+        <RouterLink to="/login" class="text-sm text-muted-foreground hover:text-foreground">
+          Sign in to sync your data
+        </RouterLink>
+      </div>
+    </div>
 
     <ShortcutsDialog ref="shortcutsDialog" />
   </div>

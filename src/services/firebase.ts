@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app'
 import { getAnalytics, logEvent } from 'firebase/analytics'
+import { getAuth, connectAuthEmulator } from 'firebase/auth'
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -10,7 +11,7 @@ const firebaseConfig = {
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 }
 
 // Initialize Firebase
@@ -28,4 +29,12 @@ export const logAnalyticsEvent = (eventName: string, eventParams?: Record<string
   }
 }
 
-export { analytics } 
+// Initialize Auth
+const auth = getAuth(app)
+
+// Connect to the Auth emulator if running in development
+if (import.meta.env.VITE_NODE_ENV === 'development') {
+  connectAuthEmulator(auth, 'http://localhost:9099')
+}
+
+export { analytics, auth }

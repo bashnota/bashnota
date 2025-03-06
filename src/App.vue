@@ -2,17 +2,23 @@
 import { RouterView } from 'vue-router'
 import AppSidebar from './components/layout/AppSidebar.vue'
 import BreadcrumbNav from './components/layout/BreadcrumbNav.vue'
+import AuthHeader from './components/auth/AuthHeader.vue'
 import { Bars3Icon as MenuIcon } from '@heroicons/vue/24/solid'
 import { ref, onMounted, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import Toaster from '@/components/ui/toast/Toaster.vue'
+import { useAuthStore } from '@/stores/auth'
 
 const isSidebarOpen = ref(false)
 const sidebarWidth = ref(300)
 const isResizing = ref(false)
+const authStore = useAuthStore()
 
-onMounted(() => {
+onMounted(async () => {
+  // Initialize auth state
+  await authStore.init()
+  
   const savedState = localStorage.getItem('sidebar-state')
   if (savedState) {
     isSidebarOpen.value = JSON.parse(savedState)
@@ -114,6 +120,9 @@ const handleMouseMove = (event: MouseEvent) => {
             </Button>
             <BreadcrumbNav />
           </div>
+          
+          <!-- Auth Header Component -->
+          <AuthHeader />
         </div>
       </div>
 

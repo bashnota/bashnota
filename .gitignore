@@ -135,3 +135,5 @@ firebase.json
 .firebase/
 
 .vscode/
+
+emulator-data/
