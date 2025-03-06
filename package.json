@@ -11,7 +11,8 @@
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
     "lint": "eslint . --fix",
-    "format": "prettier --write src/"
+    "format": "prettier --write src/",
+    "emulator": "firebase emulators:start --import=./emulator-data --export-on-exit emulator-data"
   },
   "dependencies": {
     "@codemirror/gutter": "^0.19.9",
