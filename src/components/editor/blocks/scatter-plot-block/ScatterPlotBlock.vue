@@ -162,7 +162,16 @@
         :disabled="isLocked"
       />
     </div>
-    <div ref="plotContainer" class="plot-container" @dblclick="handleDoubleClick"></div>
+    <div class="plot-container-wrapper">
+      <div ref="plotContainer" class="plot-container" @dblclick="handleDoubleClick"></div>
+      <div v-if="isZoomed" class="zoom-indicator">
+        <span>Zoomed In</span>
+        <Button variant="ghost" size="sm" @click="resetZoom" class="reset-zoom-btn">
+          <RefreshCwIcon class="h-3 w-3 mr-1" />
+          Reset
+        </Button>
+      </div>
+    </div>
     <div v-if="uniqueLabels.length > 0" class="legend">
       <div v-for="label in uniqueLabels" :key="label" class="legend-item">
         <span class="legend-color" :style="{ backgroundColor: getColorForLabel(label) }"></span>
@@ -179,7 +188,7 @@ import type { NodeViewProps } from '@tiptap/vue-3'
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import { Button } from '@/components/ui/button'
 import { Tooltip } from '@/components/ui/tooltip'
-import { LockIcon, UnlockIcon, PlusIcon, DownloadIcon } from 'lucide-vue-next'
+import { LockIcon, UnlockIcon, PlusIcon, DownloadIcon, ZoomInIcon, ZoomOutIcon, RefreshCwIcon } from 'lucide-vue-next'
 import { useEditor } from '@tiptap/vue-3'
 import type { ScaleOrdinal } from 'd3'
 
@@ -221,6 +230,8 @@ interface PlotState {
   selectedYColumn?: string
   selectedLabelColumn?: string
   colorMapping?: Record<string, string>
+  isZoomed?: boolean
+  zoomTransform?: any
 }
 
 const currentData = ref<DataPoint[]>([])
@@ -253,16 +264,10 @@ const initializeColorScale = (labels: string[]) => {
   // If we have no labels, exit early
   if (!labels.length) return;
   
-  console.log('Initializing colors for labels:', labels);
-  console.log('Current color mapping:', colorMapping.value);
-  
   // For any new labels, assign colors
   labels.forEach(label => {
     if (!colorMapping.value[label]) {
       colorMapping.value[label] = colorScale(label);
-      console.log(`Assigned new color for ${label}: ${colorMapping.value[label]}`);
-    } else {
-      console.log(`Using saved color for ${label}: ${colorMapping.value[label]}`);
     }
   });
   
@@ -281,6 +286,11 @@ const generateRandomData = (n: number = 50): DataPoint[] => {
   }))
 }
 
+const isZoomed = ref(false)
+const zoomTransform = ref<d3.ZoomTransform | null>(null)
+const initialXDomain = ref<[number, number] | null>(null)
+const initialYDomain = ref<[number, number] | null>(null)
+
 const createScatterPlot = (data: DataPoint[]) => {
   if (!plotContainer.value) return
 
@@ -288,19 +298,9 @@ const createScatterPlot = (data: DataPoint[]) => {
   
   // Get unique labels from data in a consistent order
   const labels = Array.from(new Set(data.map((d) => d.label || 'default')))
-  console.log('Creating scatter plot with labels:', labels);
-  console.log('Current label column:', selectedLabelColumn.value);
   
   // Initialize or restore color scale for these labels
   initializeColorScale(labels)
-  
-  // Debug log to verify colors
-  if (labels.length > 0) {
-    console.log('Color assignments:')
-    labels.forEach(label => {
-      console.log(`  - ${label}: ${getColorForLabel(label)}`)
-    })
-  }
 
   // Clear previous plot
   d3.select(plotContainer.value).selectAll('*').remove()
@@ -309,16 +309,27 @@ const createScatterPlot = (data: DataPoint[]) => {
   const width = 700 - margin.left - margin.right
   const height = 450 - margin.top - margin.bottom
 
+  // Create the main SVG element
   const svg = d3
     .select(plotContainer.value)
     .append('svg')
     .attr('width', width + margin.left + margin.right)
     .attr('height', height + margin.top + margin.bottom)
-    .append('g')
+    
+  // Create a group for the entire plot that will be transformed during zoom
+  const plotGroup = svg.append('g')
     .attr('transform', `translate(${margin.left},${margin.top})`)
-
+    
+  // Add clip path to prevent elements from rendering outside the plot area
+  svg.append('defs').append('clipPath')
+    .attr('id', 'clip')
+    .append('rect')
+    .attr('width', width)
+    .attr('height', height)
+    .attr('rx', 8)
+    
   // Add background
-  svg
+  plotGroup
     .append('rect')
     .attr('width', width)
     .attr('height', height)
@@ -334,37 +345,47 @@ const createScatterPlot = (data: DataPoint[]) => {
   // Add 5% padding to each side
   const xPadding = (xMax - xMin) * 0.05
   const yPadding = (yMax - yMin) * 0.05
+  
+  // Store initial domains for reset functionality
+  initialXDomain.value = [xMin - xPadding, xMax + xPadding]
+  initialYDomain.value = [yMin - yPadding, yMax + yPadding]
 
   const x = d3
     .scaleLinear()
-    .domain([xMin - xPadding, xMax + xPadding])
+    .domain(initialXDomain.value)
     .range([0, width])
     .nice()
 
   const y = d3
     .scaleLinear()
-    .domain([yMin - yPadding, yMax + yPadding])
+    .domain(initialYDomain.value)
     .range([height, 0])
     .nice()
+    
+  // Create a group for the content that will be zoomed
+  const zoomableGroup = plotGroup.append('g')
+    .attr('clip-path', 'url(#clip)')
+    
+  // Create a group for the dots
+  const dotsGroup = zoomableGroup.append('g')
 
   // Add grid lines
-  const xAxis = d3.axisBottom(x)
+  const xGrid = d3.axisBottom(x)
     .tickSize(-height)
     .tickFormat(() => '')
   
-  svg
-    .append('g')
+  const xGridGroup = zoomableGroup.append('g')
     .attr('class', 'grid')
     .attr('transform', `translate(0,${height})`)
-    .call(xAxis)
+    .call(xGrid)
 
-  const yAxis = d3.axisLeft(y)
+  const yGrid = d3.axisLeft(y)
     .tickSize(-width)
     .tickFormat(() => '')
     
-  svg.append('g')
+  const yGridGroup = zoomableGroup.append('g')
     .attr('class', 'grid')
-    .call(yAxis)
+    .call(yGrid)
     
   // Add special lines for x=0 and y=0 axes if they are within the domain
   const xDomain = x.domain();
@@ -372,7 +393,7 @@ const createScatterPlot = (data: DataPoint[]) => {
   
   // Add x=0 line if it's within the y-axis domain
   if (yDomain[0] <= 0 && yDomain[1] >= 0) {
-    svg.append('line')
+    zoomableGroup.append('line')
       .attr('class', 'zero-axis')
       .attr('x1', 0)
       .attr('y1', y(0))
@@ -385,7 +406,7 @@ const createScatterPlot = (data: DataPoint[]) => {
   
   // Add y=0 line if it's within the x-axis domain
   if (xDomain[0] <= 0 && xDomain[1] >= 0) {
-    svg.append('line')
+    zoomableGroup.append('line')
       .attr('class', 'zero-axis')
       .attr('x1', x(0))
       .attr('y1', 0)
@@ -397,38 +418,35 @@ const createScatterPlot = (data: DataPoint[]) => {
   }
 
   // Add X axis
-  svg
+  const xAxisGroup = plotGroup
     .append('g')
+    .attr('class', 'x-axis')
     .attr('transform', `translate(0,${height})`)
     .call(d3.axisBottom(x))
-    .call((g) =>
-      g
-        .append('text')
-        .attr('x', width / 2)
-        .attr('y', 40)
-        .attr('fill', 'currentColor')
-        .attr('text-anchor', 'middle')
-        .text(xAxisLabel.value),
-    )
+    
+  xAxisGroup.append('text')
+    .attr('x', width / 2)
+    .attr('y', 40)
+    .attr('fill', 'currentColor')
+    .attr('text-anchor', 'middle')
+    .text(xAxisLabel.value)
 
   // Add Y axis
-  svg
+  const yAxisGroup = plotGroup
     .append('g')
+    .attr('class', 'y-axis')
     .call(d3.axisLeft(y))
-    .call((g) =>
-      g
-        .append('text')
-        .attr('x', -height / 2)
-        .attr('y', -40)
-        .attr('fill', 'currentColor')
-        .attr('text-anchor', 'middle')
-        .attr('transform', 'rotate(-90)')
-        .text(yAxisLabel.value),
-    )
+    
+  yAxisGroup.append('text')
+    .attr('x', -height / 2)
+    .attr('y', -40)
+    .attr('fill', 'currentColor')
+    .attr('text-anchor', 'middle')
+    .attr('transform', 'rotate(-90)')
+    .text(yAxisLabel.value)
 
   // Add dots with transition
-  const dots = svg
-    .append('g')
+  const dots = dotsGroup
     .selectAll('circle')
     .data(data)
     .enter()
@@ -462,7 +480,7 @@ const createScatterPlot = (data: DataPoint[]) => {
         .style('opacity', 1)
         .style('stroke-width', 2)
 
-      const tooltip = svg
+      const tooltip = plotGroup
         .append('g')
         .attr('class', 'tooltip')
         .attr('transform', `translate(${x(d.x) + 10},${y(d.y) - 10})`)
@@ -506,7 +524,122 @@ const createScatterPlot = (data: DataPoint[]) => {
         .style('opacity', opacity.value)
         .style('stroke-width', 1)
 
-      svg.selectAll('.tooltip').remove()
+      plotGroup.selectAll('.tooltip').remove()
+    })
+    
+  // Define zoom behavior
+  const zoom = d3.zoom()
+    .scaleExtent([1, 20])  // Set min zoom to 1 (current view) and max zoom to 20x
+    .extent([[0, 0], [width, height]])
+    .on('zoom', (event) => {
+      // Store the current zoom transform
+      zoomTransform.value = event.transform
+      isZoomed.value = event.transform.k > 1
+      
+      // Apply the transform to the zoomable group
+      zoomableGroup.attr('transform', event.transform)
+      
+      // Update the axes with the new scales
+      xAxisGroup.call(d3.axisBottom(event.transform.rescaleX(x)))
+      yAxisGroup.call(d3.axisLeft(event.transform.rescaleY(y)))
+      
+      // Update the grid lines
+      xGridGroup.call(
+        d3.axisBottom(event.transform.rescaleX(x))
+          .tickSize(-height)
+          .tickFormat(() => '')
+      )
+      
+      yGridGroup.call(
+        d3.axisLeft(event.transform.rescaleY(y))
+          .tickSize(-width)
+          .tickFormat(() => '')
+      )
+      
+      // Update dot size based on zoom level
+      dotsGroup.selectAll('circle')
+        .attr('r', pointSize.value / Math.sqrt(event.transform.k))
+    })
+    
+  // Apply zoom behavior to the SVG
+  svg.call(zoom as any)
+  
+  // Restore previous zoom state if available
+  if (zoomTransform.value) {
+    svg.call(zoom.transform as any, zoomTransform.value)
+  }
+  
+  // Add zoom controls
+  const zoomControls = svg.append('g')
+    .attr('class', 'zoom-controls')
+    .attr('transform', `translate(${width + margin.left - 30}, ${margin.top + 10})`)
+  
+  // Zoom in button
+  zoomControls.append('circle')
+    .attr('r', 12)
+    .attr('fill', 'hsl(var(--background))')
+    .attr('stroke', 'hsl(var(--border))')
+    .attr('stroke-width', 1)
+    .attr('cx', 0)
+    .attr('cy', 0)
+    .style('cursor', 'pointer')
+    
+  zoomControls.append('text')
+    .attr('x', 0)
+    .attr('y', 4)
+    .attr('text-anchor', 'middle')
+    .attr('fill', 'hsl(var(--foreground))')
+    .style('font-size', '16px')
+    .style('cursor', 'pointer')
+    .text('+')
+    .on('click', () => {
+      svg.transition().duration(300).call(zoom.scaleBy as any, 1.5)
+    })
+  
+  // Zoom out button
+  zoomControls.append('circle')
+    .attr('r', 12)
+    .attr('fill', 'hsl(var(--background))')
+    .attr('stroke', 'hsl(var(--border))')
+    .attr('stroke-width', 1)
+    .attr('cx', 0)
+    .attr('cy', 30)
+    .style('cursor', 'pointer')
+    
+  zoomControls.append('text')
+    .attr('x', 0)
+    .attr('y', 34)
+    .attr('text-anchor', 'middle')
+    .attr('fill', 'hsl(var(--foreground))')
+    .style('font-size', '16px')
+    .style('cursor', 'pointer')
+    .text('−')
+    .on('click', () => {
+      svg.transition().duration(300).call(zoom.scaleBy as any, 0.75)
+    })
+  
+  // Reset zoom button
+  zoomControls.append('circle')
+    .attr('r', 12)
+    .attr('fill', 'hsl(var(--background))')
+    .attr('stroke', 'hsl(var(--border))')
+    .attr('stroke-width', 1)
+    .attr('cx', 0)
+    .attr('cy', 60)
+    .style('cursor', 'pointer')
+    
+  zoomControls.append('text')
+    .attr('x', 0)
+    .attr('y', 64)
+    .attr('text-anchor', 'middle')
+    .attr('fill', 'hsl(var(--foreground))')
+    .style('font-size', '14px')
+    .style('cursor', 'pointer')
+    .text('↺')
+    .on('click', () => {
+      svg.transition().duration(500).call(zoom.transform as any, d3.zoomIdentity)
+      zoomTransform.value = null
+      isZoomed.value = false
     })
 }
 
@@ -533,11 +666,9 @@ const handleColumnSelectionChange = () => {
   if (rawCsvData.value.length > 0) {
     // Check if we have valid selections
     if (selectedXColumn.value && selectedYColumn.value) {
-      console.log('Column selection changed. Label column:', selectedLabelColumn.value);
       
       // Clear color mapping if label column changed
       if (props.node.attrs.selectedLabelColumn !== selectedLabelColumn.value) {
-        console.log('Label column changed, clearing color mapping');
         colorMapping.value = {};
       }
       
@@ -565,7 +696,6 @@ const handleColumnSelectionChange = () => {
         colorMapping: { ...colorMapping.value } // Save color mapping with selections
       };
       
-      console.log('Saving column selections to attributes:', attrs);
       updateAttributes(attrs);
     }
   }
@@ -578,11 +708,8 @@ const processCsvWithColumns = (
   yColumn: string,
   labelColumn?: string
 ): DataPoint[] => {
-  console.log(`Processing CSV with label column: "${labelColumn}"`);
-  
   // First check if we should use a label column
   const useLabels = labelColumn && labelColumn !== '';
-  console.log('Using labels:', useLabels);
   
   const processedData = data
     .map(row => {
@@ -604,18 +731,11 @@ const processCsvWithColumns = (
     })
     .filter(point => !isNaN(point.x) && !isNaN(point.y) && point.x !== null && point.y !== null);
   
-  // Log the unique labels found
-  const labels = new Set(processedData.map(d => d.label || 'default'));
-  console.log('Found labels in processed data:', Array.from(labels));
-  
   return processedData;
 }
 
 // Store the complete plot state
 const savePlotState = (): PlotState => {
-  console.log('Saving plot state with label column:', selectedLabelColumn.value);
-  console.log('Saving plot state with color mapping:', colorMapping.value);
-  
   return {
     data: [...currentData.value],
     xAxisLabel: xAxisLabel.value,
@@ -627,7 +747,13 @@ const savePlotState = (): PlotState => {
     selectedXColumn: selectedXColumn.value,
     selectedYColumn: selectedYColumn.value,
     selectedLabelColumn: selectedLabelColumn.value,
-    colorMapping: { ...colorMapping.value }
+    colorMapping: { ...colorMapping.value },
+    isZoomed: isZoomed.value,
+    zoomTransform: zoomTransform.value ? {
+      x: zoomTransform.value.x,
+      y: zoomTransform.value.y,
+      k: zoomTransform.value.k
+    } : null
   }
 }
 
@@ -652,12 +778,17 @@ const restorePlotState = (state: PlotState) => {
   // Handle label column explicitly - important to preserve emptiness
   if (state.selectedLabelColumn !== undefined) {
     selectedLabelColumn.value = state.selectedLabelColumn
-    console.log('Restored label column from state:', selectedLabelColumn.value)
   }
   
   // Restore color mapping BEFORE drawing the plot
   if (state.colorMapping) {
     colorMapping.value = { ...state.colorMapping }
+  }
+  
+  // Restore zoom state if available
+  if (state.zoomTransform) {
+    zoomTransform.value = state.zoomTransform
+    isZoomed.value = state.isZoomed || false
   }
   
   // Make sure we have the data and redraw the plot
@@ -695,9 +826,6 @@ const toggleLock = () => {
       selectedYColumn: selectedYColumn.value,
       selectedLabelColumn: selectedLabelColumn.value // Explicitly save label column even if empty
     };
-    
-    console.log('Locking with label column:', selectedLabelColumn.value);
-    console.log('Locking with color mapping:', colorMapping.value);
     
     // Don't include API URL in locked state
     if (apiUrl.value) {
@@ -806,18 +934,14 @@ const fetchData = async () => {
 }
 
 const initializePlot = () => {
-  console.log('Initializing plot with label column:', selectedLabelColumn.value);
-  
   // If we have a saved plot state from the locked state, use that
   if (isLocked.value && props.node.attrs.plotState) {
-    console.log('Restoring from plot state');
     restorePlotState(props.node.attrs.plotState)
     return
   }
   
   // If we have API data saved in attributes, use that
   if (props.node.attrs.apiData && Array.isArray(props.node.attrs.apiData)) {
-    console.log('Using saved API data');
     currentData.value = props.node.attrs.apiData
     createScatterPlot(props.node.attrs.apiData)
     return
@@ -825,8 +949,6 @@ const initializePlot = () => {
   
   // If we have saved csv content, parse and use it
   if (props.node.attrs.csvContent) {
-    console.log('Parsing saved CSV content with label column:', selectedLabelColumn.value);
-    
     parseCsvData(props.node.attrs.csvContent)
       .then(data => {
         currentData.value = data
@@ -834,7 +956,6 @@ const initializePlot = () => {
         
         // CRITICAL: After creating the plot, make sure all settings are saved
         // This ensures column selections are saved even if they weren't in the attributes
-        console.log('Saving column selections after CSV parsing');
         saveAllSettings();
       })
       .catch(console.error)
@@ -842,7 +963,6 @@ const initializePlot = () => {
   }
   
   // Otherwise generate random data
-  console.log('Generating random data');
   const data = generateRandomData()
   currentData.value = data
   createScatterPlot(data)
@@ -860,8 +980,6 @@ const triggerFileInput = () => {
 
 const analyzeCsvColumns = (rows: Array<Record<string, any>>) => {
   if (!rows.length) return
-  
-  console.log('Analyzing CSV columns with current label column:', selectedLabelColumn.value);
   
   // Extract column names
   const columns = Object.keys(rows[0] || {})
@@ -888,28 +1006,21 @@ const analyzeCsvColumns = (rows: Array<Record<string, any>>) => {
   // CRITICAL: For label column, ONLY set it if it hasn't already been set from props
   // This prevents overriding the value that was explicitly set from props.node.attrs
   if (!selectedLabelColumn.value && selectedLabelColumn.value !== '') {
-    console.log('Label column not set, determining default');
     // If not already set, prioritize previous selection from attributes
     if (props.node.attrs.selectedLabelColumn !== undefined) {
       selectedLabelColumn.value = props.node.attrs.selectedLabelColumn
-      console.log('Using saved label column from attrs:', selectedLabelColumn.value);
     } 
     // Check specifically for a column named 'label'
     else if (columns.includes('label')) {
       selectedLabelColumn.value = 'label';
-      console.log('Found and using "label" column');
     }
     else if (nonNumericColumns.length > 0) {
       // Otherwise, default to first non-numeric column
       selectedLabelColumn.value = nonNumericColumns[0]
-      console.log('Using default label column (first non-numeric):', selectedLabelColumn.value);
     } else {
       // If no non-numeric columns available, use empty string (no coloring)
       selectedLabelColumn.value = ''
-      console.log('No suitable label column found, using empty string');
     }
-  } else {
-    console.log('Keeping existing label column:', selectedLabelColumn.value);
   }
 }
 
@@ -985,16 +1096,11 @@ const parseCsvData = async (csvContent: string): Promise<DataPoint[]> => {
       // Store raw data for later use
       rawCsvData.value = rows
       
-      console.log('Parsing CSV data with label column before analysis:', selectedLabelColumn.value);
-      
       // Analyze columns (which will restore column selections)
       analyzeCsvColumns(rows)
       
-      console.log('After analysis, label column is:', selectedLabelColumn.value);
-      
       // If we have stored column selections, use them
       if (props.node.attrs.selectedXColumn && props.node.attrs.selectedYColumn) {
-        console.log('Using stored column selections from attributes');
         // Process with stored column selections
         const data = processCsvWithColumns(
           rows, 
@@ -1005,7 +1111,6 @@ const parseCsvData = async (csvContent: string): Promise<DataPoint[]> => {
         
         resolve(data)
       } else {
-        console.log('No stored column selections, determining automatically');
         // Otherwise determine automatically
         // Get column names
         const columns = Object.keys(rows[0] || {})
@@ -1033,12 +1138,10 @@ const parseCsvData = async (csvContent: string): Promise<DataPoint[]> => {
         if (numericColumns.length >= 2) {
           selectedXColumn.value = numericColumns[0];
           selectedYColumn.value = numericColumns[1];
-          console.log(`Auto-selected X column: ${selectedXColumn.value}, Y column: ${selectedYColumn.value}`);
         }
         
         if (labelColumn) {
           selectedLabelColumn.value = labelColumn;
-          console.log(`Auto-selected label column: ${selectedLabelColumn.value}`);
         }
 
         const data: DataPoint[] = rows
@@ -1067,7 +1170,6 @@ const extractColumnsFromCsv = (csvContent: string) => {
     if (!firstRow) return null;
     
     const columns = firstRow.split(',');
-    console.log('Extracted columns from CSV header:', columns);
     
     // Try to determine which columns are numeric and which might be labels
     const rows = d3.csvParse(csvContent);
@@ -1094,17 +1196,9 @@ const extractColumnsFromCsv = (csvContent: string) => {
 
 // Initialize component with proper defaults
 onMounted(() => {
-  console.log('Component mounted with attrs:', props.node.attrs);
-  console.log('Selected columns in attrs:', {
-    x: props.node.attrs.selectedXColumn,
-    y: props.node.attrs.selectedYColumn,
-    label: props.node.attrs.selectedLabelColumn
-  });
-  
   // CRITICAL: Set the label column from attributes FIRST, before any other initialization
   if (props.node.attrs.selectedLabelColumn !== undefined) {
     selectedLabelColumn.value = props.node.attrs.selectedLabelColumn;
-    console.log('Setting initial label column from attrs:', selectedLabelColumn.value);
   }
   
   // If we have CSV content but no column selections, try to extract them
@@ -1112,30 +1206,25 @@ onMounted(() => {
       (!props.node.attrs.selectedXColumn || 
        !props.node.attrs.selectedYColumn || 
        selectedLabelColumn.value === '')) {
-    console.log('CSV content exists but column selections are missing, extracting from CSV');
     const columns = extractColumnsFromCsv(props.node.attrs.csvContent);
     
     if (columns) {
       // Set default columns based on CSV content
       if (columns.numeric.length >= 2 && !props.node.attrs.selectedXColumn) {
         selectedXColumn.value = columns.numeric[0];
-        console.log('Setting X column from CSV:', selectedXColumn.value);
       }
       
       if (columns.numeric.length >= 2 && !props.node.attrs.selectedYColumn) {
         selectedYColumn.value = columns.numeric[1];
-        console.log('Setting Y column from CSV:', selectedYColumn.value);
       }
       
       // Check specifically for a column named 'label' first
       if (columns.all.includes('label') && (selectedLabelColumn.value === '' || selectedLabelColumn.value === undefined)) {
         selectedLabelColumn.value = 'label';
-        console.log('Found and setting label column to "label"');
       }
       // Otherwise use the first non-numeric column if available and label isn't set
       else if (columns.nonNumeric.length > 0 && (selectedLabelColumn.value === '' || selectedLabelColumn.value === undefined)) {
         selectedLabelColumn.value = columns.nonNumeric[0];
-        console.log('Setting label column from CSV:', selectedLabelColumn.value);
       }
     }
   }
@@ -1143,18 +1232,15 @@ onMounted(() => {
   // Also set X and Y columns if available
   if (props.node.attrs.selectedXColumn) {
     selectedXColumn.value = props.node.attrs.selectedXColumn;
-    console.log('Setting initial X column from attrs:', selectedXColumn.value);
   }
   
   if (props.node.attrs.selectedYColumn) {
     selectedYColumn.value = props.node.attrs.selectedYColumn;
-    console.log('Setting initial Y column from attrs:', selectedYColumn.value);
   }
   
   // Then restore the color mapping if available
   if (props.node.attrs.colorMapping && typeof props.node.attrs.colorMapping === 'object') {
     colorMapping.value = { ...props.node.attrs.colorMapping }
-    console.log('Restored color mapping on mount:', colorMapping.value)
   }
   
   // Then initialize the plot (which will use the color mapping)
@@ -1164,7 +1250,6 @@ onMounted(() => {
   // This ensures column selections are saved even if they weren't in the attributes
   nextTick(() => {
     if (selectedXColumn.value && selectedYColumn.value) {
-      console.log('Saving all settings after component initialization');
       saveAllSettings();
     }
   });
@@ -1206,7 +1291,6 @@ watch(
   () => selectedLabelColumn.value,
   (newValue, oldValue) => {
     if (newValue !== oldValue && rawCsvData.value.length > 0) {
-      console.log('Label column changed from', oldValue, 'to', newValue);
       // Clear the existing color mapping when changing label column
       colorMapping.value = {}
       handleColumnSelectionChange()
@@ -1230,11 +1314,40 @@ const saveAllSettings = () => {
     selectedLabelColumn: selectedLabelColumn.value,
     
     // Color settings
-    colorMapping: { ...colorMapping.value }
+    colorMapping: { ...colorMapping.value },
+    
+    // Zoom settings
+    isZoomed: isZoomed.value,
+    zoomTransform: zoomTransform.value ? {
+      x: zoomTransform.value.x,
+      y: zoomTransform.value.y,
+      k: zoomTransform.value.k
+    } : null
   };
   
-  console.log('Saving all settings to Tiptap:', settings);
   updateAttributes(settings);
+}
+
+// Reset zoom function
+const resetZoom = () => {
+  if (!plotContainer.value) return;
+  
+  // Find the SVG element
+  const svg = d3.select(plotContainer.value).select('svg');
+  if (!svg.empty()) {
+    // Get the zoom behavior
+    const zoom = d3.zoom();
+    
+    // Reset to identity transform (no zoom, no pan)
+    svg.transition().duration(500).call(zoom.transform as any, d3.zoomIdentity);
+    
+    // Reset our state
+    zoomTransform.value = null;
+    isZoomed.value = false;
+    
+    // Save the updated state
+    saveAllSettings();
+  }
 }
 
 const showExportMenu = ref(false)
@@ -1519,6 +1632,10 @@ input[type='range'] {
   color: hsl(var(--foreground));
 }
 
+.plot-container-wrapper {
+  position: relative;
+}
+
 .plot-container {
   display: flex;
   justify-content: center;
@@ -1533,6 +1650,30 @@ input[type='range'] {
 
 .plot-container:hover {
   cursor: pointer;
+}
+
+.zoom-indicator {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+}
+
+.reset-zoom-btn {
+  padding: 2px 6px;
+  height: auto;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
 }
 
 .axis-labels {
@@ -1591,6 +1732,14 @@ input[type='range'] {
 
 :deep(text) {
   fill: hsl(var(--foreground));
+}
+
+:deep(.zoom-controls text) {
+  user-select: none;
+}
+
+:deep(.zoom-controls circle:hover) {
+  fill: hsl(var(--muted));
 }
 
 input:disabled,
