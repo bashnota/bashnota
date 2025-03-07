@@ -26,6 +26,7 @@ import {
   SquareCheck,
   PenTool,
   SparklesIcon,
+  Flame,
 } from 'lucide-vue-next'
 import { toast } from '@/lib/utils'
 
@@ -209,6 +210,21 @@ export default {
           if (!url) return
 
           editor.chain().focus().deleteRange(range).setYoutube(url).run()
+        },
+      },
+
+      {
+        title: 'Bonfire',
+        category: 'Special',
+        icon: Flame,
+        keywords: ['chill', 'bonfire', 'fire', 'rest', 'warriors'],
+        command: ({ editor, range }: CommandArgs) => {
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .setBonfire()
+            .run()
         },
       },
 

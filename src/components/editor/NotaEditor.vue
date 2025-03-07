@@ -27,6 +27,7 @@ import { MarkdownExtension } from './extensions/MarkdownExtension'
 import { Mermaid } from './extensions/mermaid'
 import { ScatterPlot } from './extensions/scatter-plot'
 import { Youtube } from './extensions/youtube'
+import { Bonfire } from './extensions/bonfire'
 import { SubfigureExtension } from './extensions/SubfigureExtension'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
 import { Markdown } from 'tiptap-markdown'
@@ -134,6 +135,7 @@ const editorExtensions = [
   }),
   ScatterPlot,
   Youtube,
+  Bonfire,
   SubfigureExtension,
   ImageExtension,
   TaskList,
