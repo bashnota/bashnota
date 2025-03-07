@@ -27,6 +27,7 @@ import {
   PenTool,
   SparklesIcon,
 } from 'lucide-vue-next'
+import { toast } from '@/lib/utils'
 
 type CommandArgs = {
   editor: Editor
@@ -250,7 +251,13 @@ export default {
                 })
                 .run()
 
-              router.push(`/nota/${newPage.id}`)
+              toast('Sub nota created successfully! Click the link to navigate to it.')
+              
+              // Trigger content save by dispatching an update event
+              const transaction = editor.state.tr
+              editor.view.dispatch(transaction)
+              
+              // router.push(`/nota/${newPage.id}`)
             } catch (error) {
               console.error('Failed to create nota:', error)
             }
