@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import NotaEditor from '@/components/editor/NotaEditor.vue'
 import NotaConfigPage from '@/components/NotaConfigPage.vue'
-import { ref, onMounted, watch, nextTick, markRaw } from 'vue'
+import { ref, onMounted, watch, nextTick } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { computed } from 'vue'
 import {
-  Cog6ToothIcon,
   CheckCircleIcon,
   ArrowPathIcon,
   StarIcon,
   ArrowDownTrayIcon,
   CpuChipIcon,
 } from '@heroicons/vue/24/outline'
+import { Share2 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { formatDate } from '@/lib/utils'
 import { TagsInput } from '@/components/ui/tags-input'
@@ -22,6 +22,7 @@ import TagsInputInput from '@/components/ui/tags-input/TagsInputInput.vue'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
 import { Loader2, PlayCircle } from 'lucide-vue-next'
 import { toast } from '@/components/ui/toast'
+import PublishNotaModal from '@/components/editor/PublishNotaModal.vue'
 
 const props = defineProps<{
   id: string
@@ -34,6 +35,7 @@ const isReady = ref(false)
 
 const nota = computed(() => store.getCurrentNota(props.id))
 const showConfigPage = ref(false)
+const showShareDialog = ref(false)
 const isSaving = ref(false)
 const showSaved = ref(false)
 const isEditingTitle = ref(false)
@@ -58,14 +60,14 @@ onMounted(async () => {
     await store.saveItem(loadedNota)
   }
   isReady.value = true
-  
+
   // Check if this is a root nota and has no Jupyter servers configured
   if (nota.value && !nota.value.parentId) {
     const config = nota.value.config
     if (!config?.jupyterServers || config.jupyterServers.length === 0) {
       toast({
-        title: "Configure Jupyter",
-        description: "Set up your Jupyter server to enable code execution in this notebook."
+        title: 'Configure Jupyter',
+        description: 'Set up your Jupyter server to enable code execution in this notebook.',
       })
     }
   }
@@ -84,6 +86,11 @@ const executeAllCells = async () => {
 
 const toggleConfigPage = () => {
   showConfigPage.value = !showConfigPage.value
+}
+
+// New function to toggle share dialog
+const toggleShareDialog = () => {
+  showShareDialog.value = !showShareDialog.value
 }
 
 // Save status handlers
@@ -234,10 +241,21 @@ const exportNota = async () => {
           />
         </Button>
 
-        <Button 
-          variant="outline" 
-          title="Jupyter Settings" 
-          @click="toggleConfigPage" 
+        <Button
+          variant="outline"
+          title="Share"
+          @click="toggleShareDialog"
+          v-if="nota"
+          class="flex items-center gap-2"
+        >
+          <Share2 class="w-5 h-5" />
+          <span class="hidden sm:inline">Share</span>
+        </Button>
+
+        <Button
+          variant="outline"
+          title="Jupyter Settings"
+          @click="toggleConfigPage"
           v-if="nota"
           class="flex items-center gap-2"
         >
@@ -260,5 +278,8 @@ const exportNota = async () => {
         <p class="text-muted-foreground">Loading...</p>
       </div>
     </main>
+
+    <!-- Share Dialog -->
+    <PublishNotaModal v-if="nota" :nota-id="id" v-model:open="showShareDialog" />
   </div>
 </template>

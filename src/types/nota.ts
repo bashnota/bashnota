@@ -11,6 +11,8 @@ export interface Nota {
   updatedAt: Date | string
   tags: string[]
   versions?: NotaVersion[]
+  isPublished?: boolean
+  publishedAt?: string | null
 }
 
 export interface NotaVersion {
@@ -27,4 +29,15 @@ export interface FavoriteBlock {
   type: string
   tags: string[]
   createdAt: Date | string
+}
+
+export interface PublishedNota {
+  id: string
+  title: string
+  content: string | null
+  updatedAt: string
+  publishedAt: string
+  authorId: string
+  authorName: string
+  isPublic: boolean
 }

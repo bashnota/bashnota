@@ -1,9 +1,21 @@
 import { defineStore } from 'pinia'
 import { db } from '@/db'
-import { type Nota, type NotaVersion} from '@/types/nota'
+import { type Nota, type NotaVersion, type PublishedNota } from '@/types/nota'
 import type { NotaConfig } from '@/types/jupyter'
 import { nanoid } from 'nanoid'
 import { toast } from '@/lib/utils'
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  setDoc,
+  where,
+} from 'firebase/firestore'
+import { firestore } from '@/services/firebase'
+import { useAuthStore } from './auth'
 
 // Helper functions to convert dates and ensure data is serializable
 const serializeNota = (nota: Partial<Nota> & { id: string }): any => {
@@ -18,12 +30,15 @@ const serializeNota = (nota: Partial<Nota> & { id: string }): any => {
   if (nota.config) {
     serialized.config = JSON.parse(JSON.stringify(nota.config))
   }
-  
+
   // Properly serialize versions array if it exists
   if (nota.versions && Array.isArray(nota.versions)) {
-    serialized.versions = nota.versions.map(version => ({
+    serialized.versions = nota.versions.map((version) => ({
       ...version,
-      createdAt: version.createdAt && version.createdAt instanceof Date ? version.createdAt.toISOString() : version.createdAt
+      createdAt:
+        version.createdAt && version.createdAt instanceof Date
+          ? version.createdAt.toISOString()
+          : version.createdAt,
     }))
   }
 
@@ -44,16 +59,19 @@ export const useNotaStore = defineStore('nota', {
     items: [] as Nota[],
     loading: false,
     error: null as string | null,
+    publishedNotas: [] as string[],
   }),
 
   getters: {
     rootItems: (state) => {
       // Return items that don't have a parentId and are not versions
       // (i.e., they don't have a notaId property which would indicate they're a version)
-      return state.items.filter((item) => !item.parentId && 
-        // This check ensures we're only returning actual notas, not version entries
-        // that might have been inadvertently added to the items array
-        !('notaId' in item)
+      return state.items.filter(
+        (item) =>
+          !item.parentId &&
+          // This check ensures we're only returning actual notas, not version entries
+          // that might have been inadvertently added to the items array
+          !('notaId' in item),
       )
     },
 
@@ -94,6 +112,16 @@ export const useNotaStore = defineStore('nota', {
         return findRoot(item.parentId)
       }
       return findRoot(id)
+    },
+
+    isPublished: (state) => (id: string) => {
+      return state.publishedNotas.includes(id)
+    },
+
+    getPublicLink: () => (id: string) => {
+      const baseURL = import.meta.env.VITE_APP_BASE_URL
+      // Format your public URL as needed
+      return `${baseURL}/p/${id}`
     },
   },
 
@@ -309,25 +337,25 @@ export const useNotaStore = defineStore('nota', {
       try {
         // Get all notas
         const allNotas = [...this.items]
-        
+
         // Create a JSON file
         const data = JSON.stringify(allNotas, null, 2)
         const blob = new Blob([data], { type: 'application/json' })
         const url = URL.createObjectURL(blob)
-        
+
         // Create a download link and trigger it
         const a = document.createElement('a')
         a.href = url
         a.download = `notas-export-${new Date().toISOString().split('T')[0]}.json`
         document.body.appendChild(a)
         a.click()
-        
+
         // Clean up
         URL.revokeObjectURL(url)
         document.body.removeChild(a)
-        
+
         toast('All notas exported successfully')
-        
+
         return allNotas
       } catch (error) {
         console.error('Failed to export notas:', error)
@@ -336,32 +364,38 @@ export const useNotaStore = defineStore('nota', {
       }
     },
 
-    async saveNotaVersion(version: { id: string; content: string; versionName: string; createdAt: Date }) {
+    async saveNotaVersion(version: {
+      id: string
+      content: string
+      versionName: string
+      createdAt: Date
+    }) {
       try {
         const nota = this.getCurrentNota(version.id)
         if (!nota) throw new Error('Nota not found')
-        
+
         const notaVersion: NotaVersion = {
           id: nanoid(),
           notaId: version.id,
           content: version.content,
           versionName: version.versionName,
-          createdAt: version.createdAt instanceof Date ? version.createdAt.toISOString() : version.createdAt
+          createdAt:
+            version.createdAt instanceof Date ? version.createdAt.toISOString() : version.createdAt,
         }
-        
+
         // If versions array doesn't exist, create it
         if (!nota.versions) {
           nota.versions = []
         }
-        
+
         // Add the version to the versions array
         nota.versions.push(notaVersion)
-        
+
         // Save the updated nota with versions to the database
         // Use serializeNota to ensure everything is properly serialized
         const serialized = serializeNota(nota)
         await db.notas.update(version.id, serialized)
-        
+
         return notaVersion
       } catch (error) {
         console.error('Failed to save nota version:', error)
@@ -378,17 +412,17 @@ export const useNotaStore = defineStore('nota', {
       try {
         const nota = this.getCurrentNota(notaId)
         if (!nota || !nota.versions) throw new Error('Nota or versions not found')
-        
-        const version = nota.versions.find(v => v.id === versionId)
+
+        const version = nota.versions.find((v) => v.id === versionId)
         if (!version) throw new Error('Version not found')
-        
+
         // Update nota content with version content
         await this.saveNota({
           id: notaId,
           content: version.content,
-          updatedAt: new Date()
+          updatedAt: new Date(),
         })
-        
+
         return true
       } catch (error) {
         console.error('Failed to restore version:', error)
@@ -400,19 +434,173 @@ export const useNotaStore = defineStore('nota', {
       try {
         const nota = this.getCurrentNota(notaId)
         if (!nota || !nota.versions) throw new Error('Nota or versions not found')
-        
+
         // Filter out the version to delete
-        nota.versions = nota.versions.filter(v => v.id !== versionId)
-        
+        nota.versions = nota.versions.filter((v) => v.id !== versionId)
+
         // Save the updated nota with the version removed
         const serialized = serializeNota(nota)
         await db.notas.update(notaId, serialized)
-        
+
         return true
       } catch (error) {
         console.error('Failed to delete version:', error)
         throw error
       }
-    }
+    },
+
+    async publishNota(id: string) {
+      try {
+        const nota = this.getCurrentNota(id)
+        if (!nota) throw new Error('Nota not found')
+
+        // Get the current user from auth store
+        const authStore = useAuthStore()
+        if (!authStore.currentUser?.uid) {
+          throw new Error('You must be logged in to publish a nota')
+        }
+
+        // Create a publishable version of the nota
+        const publishedNota: PublishedNota = {
+          id: nota.id,
+          title: nota.title,
+          content: nota.content,
+          updatedAt: nota.updatedAt instanceof Date ? nota.updatedAt.toISOString() : nota.updatedAt,
+          publishedAt: new Date().toISOString(),
+          authorId: authStore.currentUser.uid,
+          authorName: authStore.currentUser.displayName || 'Anonymous',
+          isPublic: true,
+        }
+
+        // Save to Firestore
+        const docRef = doc(collection(firestore, 'publishedNotas'), nota.id)
+        await setDoc(docRef, publishedNota)
+
+        // Update local state
+        if (!this.publishedNotas.includes(id)) {
+          this.publishedNotas.push(id)
+        }
+
+        // Update nota with publish status
+        nota.isPublished = true
+        nota.publishedAt = publishedNota.publishedAt
+        await this.saveItem(nota)
+
+        toast(`Nota "${nota.title}" published successfully`)
+
+        return publishedNota
+      } catch (error) {
+        console.error('Failed to publish nota:', error)
+        throw error
+      }
+    },
+
+    async unpublishNota(id: string) {
+      try {
+        const nota = this.getCurrentNota(id)
+        if (!nota) throw new Error('Nota not found')
+
+        // Delete from Firestore
+        const docRef = doc(collection(firestore, 'publishedNotas'), nota.id)
+        await deleteDoc(docRef)
+
+        // Update local state
+        this.publishedNotas = this.publishedNotas.filter((notaId) => notaId !== id)
+
+        // Update nota status
+        nota.isPublished = false
+        nota.publishedAt = null
+        await this.saveItem(nota)
+
+        toast(`Nota "${nota.title}" unpublished successfully`)
+
+        return true
+      } catch (error) {
+        console.error('Failed to unpublish nota:', error)
+        throw error
+      }
+    },
+
+    async getPublishedNota(id: string) {
+      try {
+        const docRef = doc(collection(firestore, 'publishedNotas'), id)
+        const docSnap = await getDoc(docRef)
+
+        if (docSnap.exists()) {
+          return docSnap.data() as PublishedNota
+        } else {
+          return null
+        }
+      } catch (error) {
+        console.error('Failed to fetch published nota:', error)
+        throw error
+      }
+    },
+
+    async getPublishedNotasByUser(userId: string) {
+      try {
+        const q = query(
+          collection(firestore, 'publishedNotas'),
+          where('authorId', '==', userId),
+          where('isPublic', '==', true),
+        )
+
+        const querySnapshot = await getDocs(q)
+        const notas: PublishedNota[] = []
+
+        querySnapshot.forEach((doc) => {
+          notas.push(doc.data() as PublishedNota)
+        })
+
+        return notas
+      } catch (error) {
+        console.error('Failed to fetch published notas by user:', error)
+        return []
+      }
+    },
+
+    // Load all published notas for the current user
+    async loadPublishedNotas() {
+      try {
+        const authStore = useAuthStore()
+        const userId = authStore.currentUser?.uid
+
+        if (!userId) return []
+
+        // Query Firestore for published notas by this user
+        const q = query(
+          collection(firestore, 'publishedNotas'),
+          where('authorId', '==', userId),
+          where('isPublic', '==', true),
+        )
+
+        const querySnapshot = await getDocs(q)
+        const publishedIds: string[] = []
+
+        querySnapshot.forEach((doc) => {
+          publishedIds.push(doc.id)
+        })
+
+        // Update local state
+        this.publishedNotas = publishedIds
+
+        // Sync the isPublished status with our local notas
+        for (const nota of this.items) {
+          if (publishedIds.includes(nota.id) && !nota.isPublished) {
+            nota.isPublished = true
+            await this.saveItem(nota)
+          } else if (!publishedIds.includes(nota.id) && nota.isPublished) {
+            nota.isPublished = false
+            nota.publishedAt = null
+            await this.saveItem(nota)
+          }
+        }
+
+        return publishedIds
+      } catch (error) {
+        console.error('Failed to load published notas:', error)
+        return []
+      }
+    },
   },
 })

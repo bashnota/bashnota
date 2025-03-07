@@ -44,6 +44,18 @@ const router = createRouter({
       component: () => import('@/views/auth/ProfileView.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/p/:id',
+      name: 'public-nota',
+      component: () => import('@/views/PublicNotaView.vue'),
+      props: true,
+    },
+    {
+      path: '/u/:userId',
+      name: 'user-published',
+      component: () => import('@/views/UserPublishedView.vue'),
+      props: true,
+    },
     // 404 route should be the last route
     {
       path: '/:pathMatch(.*)*',

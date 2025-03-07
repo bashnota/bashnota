@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app'
 import { getAnalytics, logEvent } from 'firebase/analytics'
 import { getAuth, connectAuthEmulator } from 'firebase/auth'
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore'
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -37,4 +38,12 @@ if (import.meta.env.VITE_NODE_ENV === 'development') {
   connectAuthEmulator(auth, 'http://localhost:9099')
 }
 
-export { analytics, auth }
+// Initialize Firestore
+const firestore = getFirestore(app)
+
+// Connect to the Firestore emulator if running in development
+if (import.meta.env.VITE_NODE_ENV === 'development') {
+  connectFirestoreEmulator(firestore, 'localhost', 8080)
+}
+
+export { analytics, auth, firestore }
