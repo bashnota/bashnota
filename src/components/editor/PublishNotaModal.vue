@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/lib/utils'
-import { Copy, Share2, Globe, EyeOff, Loader2 } from 'lucide-vue-next'
+import { Copy, Share2, Globe, EyeOff, Loader2, RefreshCw } from 'lucide-vue-next'
 import { Switch } from '@/components/ui/switch'
 
 const props = defineProps<{
@@ -48,6 +48,7 @@ const publishNota = async () => {
   try {
     isPublishing.value = true
     await notaStore.publishNota(props.notaId)
+    toast('Nota published successfully')
   } catch (error) {
     console.error('Error publishing nota:', error)
     toast('Failed to publish nota')
@@ -60,12 +61,17 @@ const unpublishNota = async () => {
   try {
     isUnpublishing.value = true
     await notaStore.unpublishNota(props.notaId)
+    toast('Nota unpublished')
   } catch (error) {
     console.error('Error unpublishing nota:', error)
     toast('Failed to unpublish nota')
   } finally {
     isUnpublishing.value = false
   }
+}
+
+const updatePublishedVersion = async () => {
+  await publishNota()
 }
 
 const copyLink = () => {
@@ -156,6 +162,19 @@ watch(
             />
             <Loader2 v-if="isPublishing || isUnpublishing" class="h-4 w-4 animate-spin" />
           </div>
+        </div>
+
+        <!-- Simple update button when already published -->
+        <div v-if="isAuthenticated && isPublished" class="flex justify-end">
+          <Button
+            size="sm"
+            variant="outline"
+            @click="updatePublishedVersion"
+            :disabled="isPublishing"
+          >
+            <RefreshCw class="h-4 w-4 mr-1" :class="{ 'animate-spin': isPublishing }" />
+            Update Published Version
+          </Button>
         </div>
 
         <!-- Public link section (only visible when published) -->
