@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useNotaStore } from '@/stores/nota'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDate } from '@/lib/utils'
-import { ExternalLink, User } from 'lucide-vue-next'
+import { ExternalLink } from 'lucide-vue-next'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar' // Import Avatar components
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import { type PublishedNota } from '@/types/nota'
 
@@ -15,6 +16,27 @@ const notaStore = useNotaStore()
 const publishedNotas = ref<PublishedNota[]>([])
 const isLoading = ref(true)
 const error = ref<string | null>(null)
+
+// Computed property to get author name from the first published nota
+const authorName = computed(() => {
+  if (publishedNotas.value.length > 0) {
+    return publishedNotas.value[0].authorName
+  }
+  return 'Author'
+})
+
+// Computed property to generate initials from author name
+const authorInitials = computed(() => {
+  if (!authorName.value) return ''
+
+  const nameParts = authorName.value.split(' ').filter((part) => part.length > 0)
+  if (nameParts.length >= 2) {
+    return `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase()
+  } else if (nameParts.length === 1) {
+    return nameParts[0][0].toUpperCase()
+  }
+  return ''
+})
 
 onMounted(async () => {
   try {
@@ -50,11 +72,20 @@ const viewNota = (id: string) => {
 <template>
   <div class="container mx-auto max-w-6xl py-8 px-4">
     <header class="mb-8">
-      <h1 class="text-3xl font-bold flex items-center gap-2">
-        <User class="h-8 w-8" />
-        Published Notas
-      </h1>
-      <p class="text-muted-foreground mt-2">All public notas published by this user</p>
+      <div class="flex items-center gap-4 mb-4">
+        <!-- User Avatar (using initials from author name) -->
+        <Avatar class="h-16 w-16">
+          <AvatarFallback class="text-lg">
+            {{ authorInitials || 'A' }}
+          </AvatarFallback>
+        </Avatar>
+
+        <!-- User info from publishedNotas -->
+        <div>
+          <h1 class="text-3xl font-bold">{{ authorName }}'s Notas</h1>
+          <p class="text-muted-foreground mt-1">Published documents and notes</p>
+        </div>
+      </div>
     </header>
 
     <!-- Loading state -->
