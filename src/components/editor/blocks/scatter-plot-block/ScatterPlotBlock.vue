@@ -188,8 +188,7 @@ import type { NodeViewProps } from '@tiptap/vue-3'
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import { Button } from '@/components/ui/button'
 import { Tooltip } from '@/components/ui/tooltip'
-import { LockIcon, UnlockIcon, PlusIcon, DownloadIcon, ZoomInIcon, ZoomOutIcon, RefreshCwIcon } from 'lucide-vue-next'
-import { useEditor } from '@tiptap/vue-3'
+import { LockIcon, UnlockIcon, PlusIcon, DownloadIcon, RefreshCwIcon } from 'lucide-vue-next'
 import type { ScaleOrdinal } from 'd3'
 
 const props = defineProps<NodeViewProps>()

@@ -1,9 +1,9 @@
 <template>
-  <node-view-wrapper class="math-block">
+  <node-view-wrapper class="math-block" :class="{ readonly: isReadOnly }">
     <div class="math-display" v-show="!isEditing" @dblclick="startEditing">
       <div ref="mathOutput"></div>
     </div>
-    <div v-show="isEditing" class="math-input">
+    <div v-show="isEditing && !isReadOnly" class="math-input">
       <textarea
         ref="textarea"
         v-model="latex"
@@ -18,7 +18,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import 'mathjax/es5/tex-svg'
 
@@ -37,12 +37,17 @@ const props = defineProps({
     type: Function,
     required: true,
   },
+  editor: {
+    type: Object,
+    required: true,
+  },
 })
 
 const isEditing = ref(false)
 const latex = ref(props.node.attrs.latex || '')
 const mathOutput = ref<HTMLElement | null>(null)
 const textarea = ref<HTMLTextAreaElement | null>(null)
+const isReadOnly = computed(() => !props.editor.isEditable)
 
 const renderMath = () => {
   if (mathOutput.value && latex.value) {
@@ -56,10 +61,17 @@ const renderMath = () => {
       console.error('Error rendering LaTeX:', error)
       mathOutput.value.innerHTML = '<span style="color: red;">Invalid LaTeX</span>'
     }
+  } else if (mathOutput.value && !latex.value) {
+    // Hide empty math blocks in read-only mode
+    if (isReadOnly.value) {
+      mathOutput.value.parentElement?.parentElement?.classList.add('hidden')
+    }
   }
 }
 
 const startEditing = () => {
+  if (isReadOnly.value) return
+
   isEditing.value = true
   setTimeout(() => {
     textarea.value?.focus()
@@ -80,6 +92,15 @@ watch(
     renderMath()
   },
 )
+
+// Watch for changes in read-only status
+watch(isReadOnly, () => {
+  // Force stop editing when switched to read-only
+  if (isReadOnly.value && isEditing.value) {
+    stopEditing()
+  }
+  renderMath()
+})
 
 onMounted(() => {
   // Wait for MathJax to be loaded
@@ -102,11 +123,19 @@ onMounted(() => {
   border-radius: 4px;
 }
 
+.math-block.readonly {
+  border: none;
+  padding: 0;
+}
+
 .math-display {
   min-height: 2em;
   display: flex;
   justify-content: center;
   align-items: center;
+}
+
+.math-display:not(.readonly) {
   cursor: pointer;
 }
 
@@ -120,5 +149,9 @@ onMounted(() => {
   border: 1px solid #ccc;
   border-radius: 4px;
   font-family: monospace;
+}
+
+.hidden {
+  display: none;
 }
 </style>

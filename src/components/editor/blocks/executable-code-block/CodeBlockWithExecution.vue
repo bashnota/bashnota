@@ -38,12 +38,7 @@ interface Props {
   sessionId: string | null
   notaId: string
   kernelPreference?: KernelConfig | null
-}
-
-interface KeyboardShortcut {
-  keys: string
-  action: string
-  handler: () => void
+  isReadOnly?: boolean
 }
 
 // Define props
@@ -58,7 +53,11 @@ const emit = defineEmits<{
 }>()
 
 // Utils
-const showConsoleMessage = (title: string, message: string, type: 'success' | 'error' | 'warning') => {
+const showConsoleMessage = (
+  title: string,
+  message: string,
+  type: 'success' | 'error' | 'warning',
+) => {
   const logPrefix = `[${type.toUpperCase()}] ${title}: `
   if (type === 'error') {
     console.error(logPrefix, message)
@@ -97,7 +96,6 @@ const codeBlockRef = ref<HTMLElement | null>(null)
 const codeValue = ref(props.code)
 const lastSavedCode = ref(props.code)
 const isCodeCopied = ref(false)
-const isOutputCopied = ref(false)
 
 // Code execution
 const { cell, execute, copyOutput, isCopied } = useCodeExecution(props.id)
@@ -106,13 +104,6 @@ const originalCodeBeforeExecution = ref('')
 
 // Computed properties
 const hasUnsavedChanges = computed(() => codeValue.value !== lastSavedCode.value)
-
-const keyboardShortcuts = computed<KeyboardShortcut[]>(() => [
-  { keys: 'Ctrl+Shift+Alt+Enter', action: 'Run code', handler: handleExecution },
-  { keys: 'Ctrl+S', action: 'Save changes', handler: saveChanges },
-  { keys: 'Ctrl+M', action: 'Toggle fullscreen', handler: () => (isFullScreen.value = !isFullScreen.value) },
-])
-
 const availableSessions = computed(() => codeExecutionStore.getAllSessions)
 
 const rootNotaId = computed(() => {
@@ -145,12 +136,13 @@ const availableKernels = computed(() => {
   return notaConfig.value.kernels[selectedServer.value] || []
 })
 
-const isReadyToExecute = computed(() => 
-  selectedKernel.value && 
-  selectedKernel.value !== 'none' && 
-  selectedServer.value && 
-  selectedServer.value !== 'none' && 
-  !cell.value?.isExecuting
+const isReadyToExecute = computed(
+  () =>
+    selectedKernel.value &&
+    selectedKernel.value !== 'none' &&
+    selectedServer.value &&
+    selectedServer.value !== 'none' &&
+    !cell.value?.isExecuting,
 )
 
 // Methods
@@ -172,7 +164,11 @@ const createNewSession = async () => {
     showConsoleMessage('New session created', `Created session: ${sessionName}`, 'success')
   } catch (error) {
     console.error('Failed to create session:', error)
-    showConsoleMessage('Error creating session', 'Failed to create new session. Please try again.', 'error')
+    showConsoleMessage(
+      'Error creating session',
+      'Failed to create new session. Please try again.',
+      'error',
+    )
   } finally {
     isSettingUp.value = false
   }
@@ -187,7 +183,11 @@ const handleSessionChange = async () => {
       await codeExecutionStore.saveSessions(props.notaId)
     } catch (error) {
       console.error('Failed to change session:', error)
-      showConsoleMessage('Error changing session', 'Failed to update session. Please try again.', 'error')
+      showConsoleMessage(
+        'Error changing session',
+        'Failed to update session. Please try again.',
+        'error',
+      )
     } finally {
       isSettingUp.value = false
     }
@@ -197,23 +197,31 @@ const handleSessionChange = async () => {
 const handleExecution = async () => {
   if (!isReadyToExecute.value) {
     if (!selectedServer.value || selectedServer.value === 'none') {
-      showConsoleMessage('Server not selected', 'Please select a server before executing code.', 'warning')
+      showConsoleMessage(
+        'Server not selected',
+        'Please select a server before executing code.',
+        'warning',
+      )
       return
     }
-    
+
     if (!selectedKernel.value || selectedKernel.value === 'none') {
-      showConsoleMessage('Kernel not selected', 'Please select a kernel before executing code.', 'warning')
+      showConsoleMessage(
+        'Kernel not selected',
+        'Please select a kernel before executing code.',
+        'warning',
+      )
       return
     }
-    
+
     return
   }
-  
+
   try {
     // Save the original code to restore after execution if needed
     originalCodeBeforeExecution.value = codeValue.value
     executionInProgress.value = true
-    
+
     await execute()
     emit('update:output', cell.value?.output || '')
     // Save after successful execution
@@ -221,7 +229,7 @@ const handleExecution = async () => {
   } catch (error) {
     console.error('Error executing code:', error)
     showConsoleMessage('Execution error', 'An error occurred during code execution.', 'error')
-    
+
     // Restore original code if it was changed during execution
     if (codeValue.value !== originalCodeBeforeExecution.value) {
       codeValue.value = originalCodeBeforeExecution.value
@@ -268,14 +276,14 @@ const handleKeyDown = (e: KeyboardEvent) => {
     handleExecution()
     return
   }
-  
+
   // Save changes: Ctrl+S
   if (e.ctrlKey && e.key === 's') {
     e.preventDefault()
     saveChanges()
     return
   }
-  
+
   // Toggle fullscreen: Ctrl+M
   if (e.ctrlKey && e.key === 'm') {
     e.preventDefault()
@@ -294,19 +302,19 @@ onMounted(async () => {
     if (props.sessionId) {
       selectedSession.value = props.sessionId
     }
-    
+
     window.addEventListener('keydown', handleKeyDown)
-    
+
     lastSavedCode.value = props.code
   } catch (error) {
     console.error('Error initializing code block:', error)
   }
-  
+
   await nextTick()
-  if (codeBlockRef.value) {
+  if (codeBlockRef.value && !props.isReadOnly) {
     const editor = codeBlockRef.value.querySelector('.cm-editor')
     if (editor) {
-      (editor as HTMLElement).focus()
+      ;(editor as HTMLElement).focus()
     }
   }
 })
@@ -345,7 +353,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div 
+  <div
     ref="codeBlockRef"
     class="flex flex-col bg-slate-100 dark:bg-slate-900 rounded-lg overflow-hidden border shadow-sm transition-all duration-200"
     :class="{ 'ring-2 ring-primary': hasUnsavedChanges }"
@@ -356,58 +364,66 @@ onBeforeUnmount(() => {
     >
       <!-- Left toolbar group -->
       <div class="flex items-center gap-2 flex-wrap">
-        <!-- Session Selector -->
-        <Popover v-model:open="isSessionOpen">
-          <PopoverTrigger as-child>
-            <Button
-              variant="outline"
-              size="sm"
-              class="gap-2 h-8 relative"
-              :class="{ 'bg-amber-500/20 hover:bg-amber-500/30': !selectedSession }"
-              :title="selectedSession ? 'Current Session' : 'Select Session'"
-              aria-label="Session management"
-            >
-              <Layers class="h-4 w-4" />
-              <span
-                v-if="selectedSession"
-                class="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full"
-                aria-hidden="true"
-              ></span>
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent 
-            class="w-[230px] p-0" 
-            align="start"
-            :side="'bottom'"
-            description="Select or create a new session for code execution"
-          >
-            <div class="p-2 text-xs font-medium text-muted-foreground">
-              Sessions group code execution contexts
-            </div>
-            <div class="p-1 border-t">
-              <Button size="sm" variant="outline" class="w-full gap-2 h-8" @click="createNewSession" :disabled="isSettingUp">
-                <Loader2 v-if="isSettingUp" class="h-3 w-3 animate-spin" />
-                <Plus v-else class="h-4 w-4" />
-                New Session
+        <!-- Session Selector - Hide when readonly -->
+        <template v-if="!isReadOnly">
+          <Popover v-model:open="isSessionOpen">
+            <PopoverTrigger as-child>
+              <Button
+                variant="outline"
+                size="sm"
+                class="gap-2 h-8 relative"
+                :class="{ 'bg-amber-500/20 hover:bg-amber-500/30': !selectedSession }"
+                :title="selectedSession ? 'Current Session' : 'Select Session'"
+                aria-label="Session management"
+              >
+                <Layers class="h-4 w-4" />
+                <span
+                  v-if="selectedSession"
+                  class="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full"
+                  aria-hidden="true"
+                ></span>
               </Button>
-            </div>
-            <CustomSelect
-              :options="
-                availableSessions.map((session) => ({ value: session.id, label: session.name }))
-              "
-              :model-value="selectedSession"
-              placeholder="Search sessions..."
-              :searchable="true"
-              @select="
-                (value: string) => {
-                  selectedSession = value
-                  handleSessionChange()
-                  isSessionOpen = false
-                }
-              "
-            />
-          </PopoverContent>
-        </Popover>
+            </PopoverTrigger>
+            <PopoverContent
+              class="w-[230px] p-0"
+              align="start"
+              :side="'bottom'"
+              description="Select or create a new session for code execution"
+            >
+              <div class="p-2 text-xs font-medium text-muted-foreground">
+                Sessions group code execution contexts
+              </div>
+              <div class="p-1 border-t">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  class="w-full gap-2 h-8"
+                  @click="createNewSession"
+                  :disabled="isSettingUp"
+                >
+                  <Loader2 v-if="isSettingUp" class="h-3 w-3 animate-spin" />
+                  <Plus v-else class="h-4 w-4" />
+                  New Session
+                </Button>
+              </div>
+              <CustomSelect
+                :options="
+                  availableSessions.map((session) => ({ value: session.id, label: session.name }))
+                "
+                :model-value="selectedSession"
+                placeholder="Search sessions..."
+                :searchable="true"
+                @select="
+                  (value: string) => {
+                    selectedSession = value
+                    handleSessionChange()
+                    isSessionOpen = false
+                  }
+                "
+              />
+            </PopoverContent>
+          </Popover>
+        </template>
 
         <!-- Code Visibility Toggle -->
         <Button
@@ -422,65 +438,71 @@ onBeforeUnmount(() => {
           <EyeOff v-else class="h-4 w-4" />
         </Button>
 
-        <!-- Server Selector -->
-        <Popover v-model:open="isServerOpen">
-          <PopoverTrigger as-child>
-            <Button
-              variant="outline"
-              size="sm"
-              class="gap-2 h-8 relative"
-              :class="{
-                'bg-amber-500/20 hover:bg-amber-500/30': !selectedServer || selectedServer === 'none',
-              }"
-              :title="
-                selectedServer && selectedServer !== 'none'
-                  ? `Server: ${selectedServer}`
-                  : 'Select Server'
-              "
-              aria-label="Select server"
+        <!-- Server Selector - Hide when readonly -->
+        <template v-if="!isReadOnly">
+          <Popover v-model:open="isServerOpen">
+            <PopoverTrigger as-child>
+              <Button
+                variant="outline"
+                size="sm"
+                class="gap-2 h-8 relative"
+                :class="{
+                  'bg-amber-500/20 hover:bg-amber-500/30':
+                    !selectedServer || selectedServer === 'none',
+                }"
+                :title="
+                  selectedServer && selectedServer !== 'none'
+                    ? `Server: ${selectedServer}`
+                    : 'Select Server'
+                "
+                aria-label="Select server"
+              >
+                <Server class="h-4 w-4" />
+                <span
+                  v-if="selectedServer && selectedServer !== 'none'"
+                  class="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full"
+                  aria-hidden="true"
+                ></span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              class="w-[230px] p-0"
+              align="start"
+              :side="'bottom'"
+              description="Select a Jupyter server for code execution"
             >
-              <Server class="h-4 w-4" />
-              <span
-                v-if="selectedServer && selectedServer !== 'none'"
-                class="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full"
-                aria-hidden="true"
-              ></span>
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent 
-            class="w-[230px] p-0" 
-            align="start"
-            :side="'bottom'"
-            description="Select a Jupyter server for code execution"
-          >
-            <div class="p-2 text-xs font-medium text-muted-foreground">
-              Select a Jupyter server for code execution
-            </div>
-            <CustomSelect
-              :options="
-                availableServers.map((server) => ({
-                  value: server.displayName,
-                  label: server.displayName,
-                }))
-              "
-              :model-value="selectedServer"
-              placeholder="Search servers..."
-              :searchable="true"
-              @select="
-                (value: string) => {
-                  selectedServer = value
-                  emit('kernel-select', selectedKernel, selectedServer)
-                  isServerOpen = false
-                }
-              "
-            />
-            <div v-if="availableServers.length === 0" class="p-3 text-sm text-center text-muted-foreground">
-              No servers available. Configure servers in the settings.
-            </div>
-          </PopoverContent>
-        </Popover>
+              <div class="p-2 text-xs font-medium text-muted-foreground">
+                Select a Jupyter server for code execution
+              </div>
+              <CustomSelect
+                :options="
+                  availableServers.map((server) => ({
+                    value: server.displayName,
+                    label: server.displayName,
+                  }))
+                "
+                :model-value="selectedServer"
+                placeholder="Search servers..."
+                :searchable="true"
+                @select="
+                  (value: string) => {
+                    selectedServer = value
+                    emit('kernel-select', selectedKernel, selectedServer)
+                    isServerOpen = false
+                  }
+                "
+              />
+              <div
+                v-if="availableServers.length === 0"
+                class="p-3 text-sm text-center text-muted-foreground"
+              >
+                No servers available. Configure servers in the settings.
+              </div>
+            </PopoverContent>
+          </Popover>
+        </template>
 
-        <!-- Kernel Selector -->
+        <!-- Kernel Selector - Keep button but hide popover content when readonly -->
         <Popover v-model:open="isKernelOpen">
           <PopoverTrigger as-child>
             <Button
@@ -488,7 +510,8 @@ onBeforeUnmount(() => {
               size="sm"
               class="gap-2 h-8 relative min-w-[32px]"
               :class="{
-                'bg-amber-500/20 hover:bg-amber-500/30': !selectedKernel || selectedKernel === 'none',
+                'bg-amber-500/20 hover:bg-amber-500/30':
+                  !selectedKernel || selectedKernel === 'none',
                 'pl-2 pr-3': selectedKernel && selectedKernel !== 'none',
               }"
               :disabled="!selectedServer || selectedServer === 'none'"
@@ -513,11 +536,12 @@ onBeforeUnmount(() => {
               ></span>
             </Button>
           </PopoverTrigger>
-          <PopoverContent 
-            class="w-[230px] p-0" 
+          <PopoverContent
+            class="w-[230px] p-0"
             align="start"
             :side="'bottom'"
             :description="`Select a kernel for ${language} code execution`"
+            v-if="!isReadOnly"
           >
             <div class="p-2 text-xs font-medium text-muted-foreground">
               Select a kernel for this language ({{ language }})
@@ -540,7 +564,10 @@ onBeforeUnmount(() => {
                 }
               "
             />
-            <div v-if="availableKernels.length === 0" class="p-3 text-sm text-center text-muted-foreground">
+            <div
+              v-if="availableKernels.length === 0"
+              class="p-3 text-sm text-center text-muted-foreground"
+            >
               No kernels available. Select a server first.
             </div>
           </PopoverContent>
@@ -551,7 +578,11 @@ onBeforeUnmount(() => {
 
       <!-- Right toolbar group -->
       <div class="flex items-center gap-2">
-        <div class="hidden md:flex items-center text-xs text-muted-foreground mr-1 gap-2">
+        <!-- Keyboard shortcuts (hidden in readonly) -->
+        <div
+          v-if="!isReadOnly"
+          class="hidden md:flex items-center text-xs text-muted-foreground mr-1 gap-2"
+        >
           <div class="flex items-center">
             <kbd class="px-1.5 py-0.5 border rounded text-[10px]">Ctrl+Shift+Alt+Enter</kbd>
             <span class="ml-1">run</span>
@@ -562,9 +593,9 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <!-- Save Changes Button -->
+        <!-- Save Changes Button (hidden in readonly) -->
         <Button
-          v-if="hasUnsavedChanges"
+          v-if="!isReadOnly && hasUnsavedChanges"
           variant="outline"
           size="sm"
           @click="saveChanges"
@@ -575,8 +606,22 @@ onBeforeUnmount(() => {
           <Save class="w-4 h-4" />
         </Button>
 
-        <!-- Run Code Button -->
+        <!-- Copy button (always available) -->
         <Button
+          variant="outline"
+          size="sm"
+          @click="copyCode"
+          class="h-8"
+          title="Copy code"
+          aria-label="Copy code"
+        >
+          <Copy v-if="!isCodeCopied" class="w-4 h-4" />
+          <Check v-else class="w-4 h-4" />
+        </Button>
+
+        <!-- Run Code Button (hidden in readonly) -->
+        <Button
+          v-if="!isReadOnly"
           variant="default"
           size="sm"
           :disabled="!isReadyToExecute"
@@ -590,7 +635,7 @@ onBeforeUnmount(() => {
           Run
         </Button>
 
-        <!-- Fullscreen Button -->
+        <!-- Fullscreen Button (always available, even in readonly) -->
         <Button
           variant="ghost"
           size="sm"
@@ -604,9 +649,15 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <!-- Warning Banner -->
-    <div 
-      v-if="!selectedServer || selectedServer === 'none' || !selectedKernel || selectedKernel === 'none'"
+    <!-- Warning Banner (hidden in readonly) -->
+    <div
+      v-if="
+        !isReadOnly &&
+        (!selectedServer ||
+          selectedServer === 'none' ||
+          !selectedKernel ||
+          selectedKernel === 'none')
+      "
       class="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800 border-b p-2 flex items-center text-xs text-amber-600 dark:text-amber-400"
     >
       <AlertTriangle class="h-3 w-3 mr-2" />
@@ -614,18 +665,18 @@ onBeforeUnmount(() => {
         Select a server to run this code block
       </span>
       <span v-else-if="!selectedKernel || selectedKernel === 'none'">
-        Select a kernel to run this code block  
+        Select a kernel to run this code block
       </span>
     </div>
 
     <!-- Code Editor -->
     <div v-show="isCodeVisible" class="relative group">
       <div class="absolute right-2 top-2 z-10 opacity-0 transition-opacity group-hover:opacity-100">
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          @click="copyCode" 
-          class="h-8 w-8 p-0" 
+        <Button
+          variant="ghost"
+          size="sm"
+          @click="copyCode"
+          class="h-8 w-8 p-0"
           title="Copy code to clipboard"
           aria-label="Copy code"
         >
@@ -637,7 +688,8 @@ onBeforeUnmount(() => {
       <CodeMirror
         v-model="codeValue"
         :language="language"
-        :disabled="cell?.isExecuting"
+        :disabled="cell?.isExecuting || isReadOnly"
+        :readonly="isReadOnly"
         @update:modelValue="updateCode"
         maxHeight="300px"
         aria-label="Code editor"
@@ -657,21 +709,21 @@ onBeforeUnmount(() => {
           <span v-if="cell?.hasError" class="ml-2 text-destructive">(Error)</span>
         </span>
         <div class="flex items-center gap-1">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            @click="isOutputVisible = !isOutputVisible" 
-            class="h-6 w-6 p-0" 
+          <Button
+            variant="ghost"
+            size="sm"
+            @click="isOutputVisible = !isOutputVisible"
+            class="h-6 w-6 p-0"
             :title="isOutputVisible ? 'Hide Output' : 'Show Output'"
             aria-label="Toggle output visibility"
           >
             <Eye v-if="!isOutputVisible" class="h-3 w-3" />
             <EyeOff v-else class="h-3 w-3" />
           </Button>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            @click="copyOutput" 
+          <Button
+            variant="ghost"
+            size="sm"
+            @click="copyOutput"
             class="h-6 w-6 p-0"
             title="Copy output to clipboard"
             aria-label="Copy output"
@@ -700,6 +752,7 @@ onBeforeUnmount(() => {
       :language="language"
       :is-open="isFullScreen"
       :is-executing="cell?.isExecuting"
+      :is-read-only="isReadOnly"
       @update:is-open="isFullScreen = $event"
       :on-close="() => (isFullScreen = false)"
       :on-update="updateCode"
@@ -745,35 +798,5 @@ div[v-html]::-webkit-scrollbar-thumb {
   .flex-wrap {
     flex-wrap: wrap;
   }
-}
-
-:deep(button:focus-visible),
-:deep(div[tabindex]:focus-visible) {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-}
-
-.ring-primary {
-  box-shadow: 0 0 0 2px var(--primary-300, rgba(59, 130, 246, 0.3));
-}
-
-:deep(.radix-popover-content:focus-visible) {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-}
-
-/* Ensure the CodeMirror instance preserves indentation, especially for Python */
-:deep(.cm-editor) {
-  height: 100%;
-  tab-size: 4 !important;
-}
-
-:deep(.cm-line) {
-  white-space: pre !important;
-}
-
-/* Preserve Python indentation */
-:deep(.cm-content[data-language="python"]) {
-  tab-size: 4 !important;
 }
 </style>

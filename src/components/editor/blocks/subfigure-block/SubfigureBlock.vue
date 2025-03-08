@@ -1,7 +1,8 @@
 <template>
   <node-view-wrapper class="my-4 w-full">
     <div class="flex flex-col gap-4 w-full">
-      <div class="flex items-center justify-between w-full p-2 border-b">
+      <!-- Controls - only visible in edit mode -->
+      <div v-if="!isReadOnly" class="flex items-center justify-between w-full p-2 border-b">
         <div class="flex items-center gap-4">
           <div class="flex items-center gap-1 bg-muted p-1 rounded-md">
             <Button
@@ -38,7 +39,9 @@
         </div>
       </div>
 
+      <!-- Subfigures grid - always visible if has content -->
       <div
+        v-if="hasVisibleSubfigures || !isReadOnly"
         class="grid gap-6"
         :class="{
           'grid-cols-1': attrs.layout === 'vertical',
@@ -46,27 +49,33 @@
           'grid-cols-1 md:grid-cols-2': attrs.layout === 'horizontal',
         }"
       >
-        <div v-for="(subfig, index) in attrs.subfigures" :key="index" class="relative group">
+        <div
+          v-for="(subfig, index) in attrs.subfigures"
+          :key="index"
+          class="relative group"
+          v-show="subfig.src || !isReadOnly"
+        >
           <div class="relative bg-muted p-2 rounded-lg overflow-hidden">
             <img
               v-if="subfig.src"
               :src="subfig.src"
               :style="{ objectFit: attrs.objectFit || 'contain' }"
               :class="[
-                'w-full rounded-md transition-transform hover:scale-102 cursor-zoom-in',
+                'w-full rounded-md',
+                isReadOnly ? '' : 'transition-transform hover:scale-102 cursor-zoom-in',
                 { 'h-48': attrs.unifiedSize },
               ]"
               @dblclick="handleDoubleClick"
             />
             <UploadZone
-              v-else
+              v-else-if="!isReadOnly"
               @file-selected="(e) => handleSubfigureUpload(e, index)"
               @file-dropped="(e) => handleSubfigureDrop(e, index)"
               class="rounded-md"
             />
 
             <Button
-              v-if="!isLocked && subfig.src"
+              v-if="!isLocked && subfig.src && !isReadOnly"
               @click="removeSubfigure(index)"
               variant="destructive"
               size="icon"
@@ -76,8 +85,14 @@
             </Button>
 
             <div v-if="subfig.src" class="mt-2">
+              <!-- Read-only subfigure caption -->
+              <div v-if="isReadOnly" class="text-sm px-2 py-1">
+                {{ subfig.caption || getSubfigureLabel(index) }}
+              </div>
+
+              <!-- Editable subfigure caption -->
               <div
-                v-if="!isEditingSubfigureCaption[index]"
+                v-else-if="!isEditingSubfigureCaption[index]"
                 class="text-sm hover:bg-muted/50 rounded px-2 py-1 cursor-text"
                 @click="startEditingSubfigureCaption(index)"
               >
@@ -105,16 +120,23 @@
         </div>
       </div>
 
-      <div class="flex flex-col gap-2 w-full mt-4">
+      <!-- Main caption and label - modified for read-only mode -->
+      <div v-if="hasVisibleSubfigures || !isReadOnly" class="flex flex-col gap-2 w-full mt-4">
+        <!-- Read-only label -->
+        <div v-if="isReadOnly && localLabel" class="font-medium text-base px-2 py-1">
+          {{ localLabel }}
+        </div>
+
+        <!-- Editable label -->
         <div
-          v-if="!isEditingLabel"
+          v-else-if="!isReadOnly && !isEditingLabel"
           class="font-medium text-base hover:bg-muted/50 rounded px-2 py-1 cursor-text"
           @click="isEditingLabel = true"
         >
           {{ localLabel || 'Click to add figure label' }}
         </div>
         <Input
-          v-else
+          v-else-if="!isReadOnly"
           :value="localLabel"
           @input="localLabel = $event.target.value"
           @blur="handleLabelBlur"
@@ -124,15 +146,21 @@
           :disabled="isLocked"
         />
 
+        <!-- Read-only caption -->
+        <div v-if="isReadOnly && localCaption" class="text-sm text-muted-foreground px-2 py-1">
+          {{ localCaption }}
+        </div>
+
+        <!-- Editable caption -->
         <div
-          v-if="!isEditingCaption"
+          v-else-if="!isReadOnly && !isEditingCaption"
           class="text-sm text-muted-foreground hover:bg-muted/50 rounded px-2 py-1 cursor-text"
           @click="isEditingCaption = true"
         >
           {{ localCaption || 'Click to add main caption' }}
         </div>
         <Input
-          v-else
+          v-else-if="!isReadOnly"
           :value="localCaption"
           @input="localCaption = $event.target.value"
           @blur="handleCaptionBlur"
@@ -166,6 +194,7 @@ import UploadZone from '@/components/UploadZone.vue'
 const props = defineProps<{
   node: any
   updateAttributes: (attrs: Record<string, any>) => void
+  editor: any
 }>()
 
 // Reactive state
@@ -178,6 +207,15 @@ const isLocked = ref(props.node.attrs.isLocked || false)
 const isEditingLabel = ref(false)
 const isEditingCaption = ref(false)
 const isEditingSubfigureCaption = ref<Record<number, boolean>>({})
+const isReadOnly = computed(() => !props.editor.isEditable)
+
+// Check if there are any visible subfigures in read-only mode
+const hasVisibleSubfigures = computed(() => {
+  if (!attrs.value.subfigures || attrs.value.subfigures.length === 0) {
+    return false
+  }
+  return attrs.value.subfigures.some((subfig: any) => subfig.src)
+})
 
 // Caption handling methods
 const handleLabelBlur = () => {
@@ -238,6 +276,8 @@ const removeSubfigure = (index: number) => {
 }
 
 const handleSubfigureDrop = async (event: DragEvent, index: number) => {
+  if (isReadOnly.value) return
+
   const file = event.dataTransfer?.files[0]
   if (file) {
     await handleSubfigureFileUpload(file, index)
@@ -262,6 +302,8 @@ const handleSubfigureFileUpload = async (file: File, index: number) => {
 }
 
 const handleSubfigureUpload = async (event: Event, index: number) => {
+  if (isReadOnly.value) return
+
   const file = (event.target as HTMLInputElement).files?.[0]
   if (file) {
     await handleSubfigureFileUpload(file, index)
@@ -270,6 +312,7 @@ const handleSubfigureUpload = async (event: Event, index: number) => {
 
 // Subfigure caption methods
 const startEditingSubfigureCaption = (index: number) => {
+  if (isReadOnly.value) return
   isEditingSubfigureCaption.value[index] = true
 }
 
@@ -304,6 +347,16 @@ watch(
   { deep: true },
 )
 
+// Watch for read-only status changes
+watch(isReadOnly, (newValue) => {
+  if (newValue) {
+    // Force close all editing states in read-only mode
+    isEditingLabel.value = false
+    isEditingCaption.value = false
+    isEditingSubfigureCaption.value = {}
+  }
+})
+
 // Lifecycle hooks
 onMounted(() => {
   if (!props.node.attrs.subfigures) {
@@ -330,6 +383,8 @@ const handleKeydown = (e: KeyboardEvent) => {
 }
 
 const handleDoubleClick = (event: MouseEvent) => {
+  if (isReadOnly.value) return
+
   event.preventDefault()
   event.stopPropagation()
 

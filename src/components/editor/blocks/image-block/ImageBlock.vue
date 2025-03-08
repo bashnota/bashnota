@@ -9,9 +9,9 @@
           'items-end': attrs.alignment === 'right',
         }"
       >
-        <!-- Controls -->
+        <!-- Controls - only show in edit mode -->
         <div
-          v-if="attrs.src && !isLocked"
+          v-if="attrs.src && !isLocked && !isReadOnly"
           class="flex items-center gap-1 mb-2 p-0.5 bg-muted/50 rounded-md w-fit"
         >
           <!-- Width controls -->
@@ -54,8 +54,8 @@
           </Button>
         </div>
 
-        <!-- Image container -->
-        <div class="relative" :style="{ width: attrs.width }">
+        <!-- Image container - only show if there's an image or not in read-only mode -->
+        <div v-if="attrs.src || !isReadOnly" class="relative" :style="{ width: attrs.width }">
           <img
             v-if="attrs.src"
             :src="attrs.src"
@@ -63,20 +63,31 @@
             class="w-full h-auto rounded-md"
             @dblclick="handleDoubleClick"
           />
-          <UploadZone v-else @file-selected="handleImageUpload" @file-dropped="handleDrop" />
+          <UploadZone
+            v-else-if="!isReadOnly"
+            @file-selected="handleImageUpload"
+            @file-dropped="handleDrop"
+          />
         </div>
 
-        <!-- Caption and label -->
+        <!-- Caption and label - different display for read-only mode -->
         <div v-if="attrs.src" class="flex flex-col gap-1 w-full mt-2">
+          <!-- Read-only label display -->
+          <div v-if="isReadOnly && localLabel" class="font-medium text-base px-2 py-1">
+            {{ localLabel }}
+          </div>
+
+          <!-- Editable label -->
           <div
-            v-if="!isEditingLabel"
+            v-else-if="!isReadOnly && !isEditingLabel"
             class="font-medium text-base hover:bg-muted/50 rounded px-2 py-1 cursor-text"
             @click="isEditingLabel = true"
           >
             {{ localLabel || 'Click to add figure label' }}
           </div>
+
           <Input
-            v-else
+            v-else-if="!isReadOnly"
             v-model="localLabel"
             @blur="handleLabelBlur"
             @keyup.enter="handleLabelBlur"
@@ -86,15 +97,22 @@
             autofocus
           />
 
+          <!-- Read-only caption display -->
+          <div v-if="isReadOnly && localCaption" class="text-sm text-muted-foreground px-2 py-1">
+            {{ localCaption }}
+          </div>
+
+          <!-- Editable caption -->
           <div
-            v-if="!isEditingCaption"
+            v-else-if="!isReadOnly && !isEditingCaption"
             class="text-sm text-muted-foreground hover:bg-muted/50 rounded px-2 py-1 cursor-text"
             @click="isEditingCaption = true"
           >
             {{ localCaption || 'Click to add caption' }}
           </div>
+
           <Input
-            v-else
+            v-else-if="!isReadOnly"
             v-model="localCaption"
             @blur="handleCaptionBlur"
             @keyup.enter="handleCaptionBlur"
@@ -127,6 +145,7 @@ import UploadZone from '@/components/UploadZone.vue'
 
 const props = defineProps<{
   node: any
+  editor: any
   updateAttributes: (attrs: Record<string, any>) => void
 }>()
 
@@ -139,6 +158,7 @@ const localAlignment = ref(props.node.attrs.alignment || 'center')
 const isLocked = ref(props.node.attrs.isLocked || false)
 const isEditingLabel = ref(false)
 const isEditingCaption = ref(false)
+const isReadOnly = computed(() => !props.editor.isEditable)
 
 // UI helpers
 const alignmentIcons: Record<string, FunctionalComponent> = {
@@ -215,6 +235,8 @@ const toggleLock = () => {
 
 // Event handlers
 const handleDoubleClick = (event: MouseEvent) => {
+  if (isReadOnly.value) return
+
   event.preventDefault()
   event.stopPropagation()
 

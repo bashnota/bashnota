@@ -7,6 +7,7 @@ import { getViewerExtensions } from './extensions'
 
 // Import shared CSS
 import '@/assets/editor-styles.css'
+import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
 
 // Define props
 const props = defineProps<{
@@ -14,11 +15,48 @@ const props = defineProps<{
   readonly?: boolean
 }>()
 
+const codeExecutionStore = useCodeExecutionStore()
+
+const registerCodeCells = (content: any) => {
+  // Find all executable code blocks in the content
+  const findCodeBlocks = (node: any): any[] => {
+    const blocks = []
+    if (node.type === 'executableCodeBlock') {
+      blocks.push(node)
+    }
+    if (node.content) {
+      node.content.forEach((child: any) => {
+        blocks.push(...findCodeBlocks(child))
+      })
+    }
+    return blocks
+  }
+
+  const codeBlocks = findCodeBlocks(content)
+
+  // Register each code block with the store
+  codeBlocks.forEach((block) => {
+    const { attrs, content } = block
+    const code = content ? content.map((c: any) => c.text).join('\n') : ''
+
+    codeExecutionStore.addCell({
+      id: attrs.id,
+      code,
+      kernelName: attrs.kernelName,
+      output: attrs.output,
+      sessionId: attrs.sessionId,
+    })
+  })
+}
+
 // Create a read-only editor instance with our shared extensions
 const editor = useEditor({
   content: props.content ? JSON.parse(props.content) : null,
   extensions: getViewerExtensions(),
   editable: false, // Read-only mode
+  onCreate({ editor }) {
+    registerCodeCells(editor.getJSON())
+  },
 })
 
 // Update content when props change

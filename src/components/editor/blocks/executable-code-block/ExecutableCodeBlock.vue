@@ -88,6 +88,7 @@ const onSessionSelect = (sessionId: string) => {
           :session-id="sessionId"
           :nota-id="notaId"
           :kernel-preference="kernelPreference"
+          :is-read-only="editor.options.editable === false"
           @update:code="updateCode"
           @kernel-select="onKernelSelect"
           @update:output="updateOutput"
