@@ -61,7 +61,7 @@ const shareNota = () => {
 </script>
 
 <template>
-  <div class="container mx-auto max-w-4xl py-8 px-4">
+  <div class="container mx-auto py-8 px-4">
     <!-- Loading state -->
     <div v-if="isLoading" class="flex justify-center items-center h-64">
       <LoadingSpinner class="w-10 h-10" />
