@@ -9,6 +9,7 @@ import cors from 'cors'
 admin.initializeApp({
   projectId: process.env.GCLOUD_PROJECT,
   credential: admin.credential.applicationDefault(),
+  storageBucket: `${process.env.GCLOUD_PROJECT}.appspot.com`,
 })
 
 import notaRouter from './routes/nota'

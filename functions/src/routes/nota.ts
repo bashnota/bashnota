@@ -4,6 +4,7 @@ import admin from 'firebase-admin'
 import Validator from 'validatorjs'
 import { PublishedNota } from '../types/nota'
 import { authorizeRequest } from '../helpers'
+import { NotaContentProcessor } from '../utils/NotaContentProcessor'
 
 const router = express.Router()
 const db = admin.firestore()
@@ -97,6 +98,10 @@ router.post('/publish/:id', authorizeRequest, async (req: Request, res: Response
       return res.status(400).json({ errors: validation.errors })
     }
 
+    // Process the content through our pipeline
+    const contentProcessor = new NotaContentProcessor(user.uid)
+    const processedContent = await contentProcessor.process(notaData.content)
+
     // Check if the nota already exists
     const docRef = db.collection(publishedNotasCollection).doc(notaId)
     const docSnap = await docRef.get()
@@ -111,10 +116,10 @@ router.post('/publish/:id', authorizeRequest, async (req: Request, res: Response
         })
       }
 
-      // Update existing nota
+      // Update existing nota with processed content
       const updatedNota: Partial<PublishedNota> = {
         title: notaData.title,
-        content: notaData.content || null,
+        content: JSON.stringify(processedContent),
         updatedAt: new Date().toISOString(),
       }
 
@@ -127,11 +132,11 @@ router.post('/publish/:id', authorizeRequest, async (req: Request, res: Response
         id: notaId,
       })
     } else {
-      // Create new published nota
+      // Create new published nota with processed content
       const publishedNota: PublishedNota = {
         id: notaId,
         title: notaData.title,
-        content: notaData.content || null,
+        content: JSON.stringify(processedContent),
         updatedAt: notaData.updatedAt || new Date().toISOString(),
         publishedAt: new Date().toISOString(),
         authorId: user.uid,

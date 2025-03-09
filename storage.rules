@@ -1,0 +1,24 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Deny all access by default
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+    
+    // Allow reading individual published files
+    match /published/{userId}/{fileName} {
+      // Anyone can read published files
+      allow read: if true;
+      
+      // No write access for anyone through client-side rules
+      allow write: if false;
+    }
+    
+    // Prevent listing all files
+    match /published/{userId} {
+      allow list: if false;
+    }
+  }
+}
