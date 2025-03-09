@@ -27,6 +27,14 @@ export const useAuthStore = defineStore('auth', {
       return new Promise<void>((resolve) => {
         // Set up auth state listener
         authService.onAuthStateChange((user) => {
+          // Save token to local storage
+          if (user) {
+            // @ts-ignore
+            localStorage.setItem('token', user.accessToken)
+          } else {
+            localStorage.removeItem('token')
+          }
+
           this.user = authService.mapUserToProfile(user)
           this.initialized = true
           resolve()

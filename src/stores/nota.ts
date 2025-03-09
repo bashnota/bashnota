@@ -4,18 +4,8 @@ import { type Nota, type NotaVersion, type PublishedNota } from '@/types/nota'
 import type { NotaConfig } from '@/types/jupyter'
 import { nanoid } from 'nanoid'
 import { toast } from '@/lib/utils'
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  setDoc,
-  where,
-} from 'firebase/firestore'
-import { firestore } from '@/services/firebase'
 import { useAuthStore } from './auth'
+import { fetchAPI } from '@/services/axios'
 
 // Helper functions to convert dates and ensure data is serializable
 const serializeNota = (nota: Partial<Nota> & { id: string }): any => {
@@ -186,7 +176,7 @@ export const useNotaStore = defineStore('nota', {
       const item = this.items.find((i) => i.id === id)
       if (item) {
         item.title = newTitle
-        item.updatedAt = new Date().toISOString()
+        item.updatedAt = new Date()
         await db.notas.update(id, {
           title: newTitle,
           updatedAt: new Date().toISOString(),
@@ -449,32 +439,23 @@ export const useNotaStore = defineStore('nota', {
       }
     },
 
+    // UPDATED PUBLISH METHODS USING API
+
     async publishNota(id: string) {
       try {
         const nota = this.getCurrentNota(id)
         if (!nota) throw new Error('Nota not found')
 
-        // Get the current user from auth store
-        const authStore = useAuthStore()
-        if (!authStore.currentUser?.uid) {
-          throw new Error('You must be logged in to publish a nota')
-        }
-
-        // Create a publishable version of the nota
-        const publishedNota: PublishedNota = {
-          id: nota.id,
+        // Prepare nota data for publishing
+        const publishData = {
           title: nota.title,
           content: nota.content,
           updatedAt: nota.updatedAt instanceof Date ? nota.updatedAt.toISOString() : nota.updatedAt,
-          publishedAt: new Date().toISOString(),
-          authorId: authStore.currentUser.uid,
-          authorName: authStore.currentUser.displayName || 'Anonymous',
-          isPublic: true,
         }
 
-        // Save to Firestore
-        const docRef = doc(collection(firestore, 'publishedNotas'), nota.id)
-        await setDoc(docRef, publishedNota)
+        // Call the API to publish the nota
+        const response = await fetchAPI.post(`/nota/publish/${id}`, publishData)
+        const publishedNota = response.data
 
         // Update local state
         if (!this.publishedNotas.includes(id)) {
@@ -491,6 +472,7 @@ export const useNotaStore = defineStore('nota', {
         return publishedNota
       } catch (error) {
         console.error('Failed to publish nota:', error)
+        toast('Failed to publish nota')
         throw error
       }
     },
@@ -500,9 +482,8 @@ export const useNotaStore = defineStore('nota', {
         const nota = this.getCurrentNota(id)
         if (!nota) throw new Error('Nota not found')
 
-        // Delete from Firestore
-        const docRef = doc(collection(firestore, 'publishedNotas'), nota.id)
-        await deleteDoc(docRef)
+        // Call the API to unpublish the nota
+        await fetchAPI.delete(`/nota/publish/${id}`)
 
         // Update local state
         this.publishedNotas = this.publishedNotas.filter((notaId) => notaId !== id)
@@ -517,20 +498,16 @@ export const useNotaStore = defineStore('nota', {
         return true
       } catch (error) {
         console.error('Failed to unpublish nota:', error)
+        toast('Failed to unpublish nota')
         throw error
       }
     },
 
     async getPublishedNota(id: string) {
       try {
-        const docRef = doc(collection(firestore, 'publishedNotas'), id)
-        const docSnap = await getDoc(docRef)
-
-        if (docSnap.exists()) {
-          return docSnap.data() as PublishedNota
-        } else {
-          return null
-        }
+        // Call the API to get the published nota
+        const response = await fetchAPI.get(`/nota/published/${id}`)
+        return response.data as PublishedNota
       } catch (error) {
         console.error('Failed to fetch published nota:', error)
         throw error
@@ -539,27 +516,15 @@ export const useNotaStore = defineStore('nota', {
 
     async getPublishedNotasByUser(userId: string) {
       try {
-        const q = query(
-          collection(firestore, 'publishedNotas'),
-          where('authorId', '==', userId),
-          where('isPublic', '==', true),
-        )
-
-        const querySnapshot = await getDocs(q)
-        const notas: PublishedNota[] = []
-
-        querySnapshot.forEach((doc) => {
-          notas.push(doc.data() as PublishedNota)
-        })
-
-        return notas
+        // Call the API to get published notas by user
+        const response = await fetchAPI.get(`/nota/user/${userId}`)
+        return response.data as PublishedNota[]
       } catch (error) {
         console.error('Failed to fetch published notas by user:', error)
         return []
       }
     },
 
-    // Load all published notas for the current user
     async loadPublishedNotas() {
       try {
         const authStore = useAuthStore()
@@ -567,19 +532,12 @@ export const useNotaStore = defineStore('nota', {
 
         if (!userId) return []
 
-        // Query Firestore for published notas by this user
-        const q = query(
-          collection(firestore, 'publishedNotas'),
-          where('authorId', '==', userId),
-          where('isPublic', '==', true),
-        )
+        // Call the API to get all published notas for the current user
+        const response = await fetchAPI.get('/nota/published')
+        const publishedNotas = response.data as PublishedNota[]
 
-        const querySnapshot = await getDocs(q)
-        const publishedIds: string[] = []
-
-        querySnapshot.forEach((doc) => {
-          publishedIds.push(doc.id)
-        })
+        // Extract IDs
+        const publishedIds = publishedNotas.map((nota) => nota.id)
 
         // Update local state
         this.publishedNotas = publishedIds
