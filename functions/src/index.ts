@@ -9,7 +9,7 @@ import cors from 'cors'
 admin.initializeApp({
   projectId: process.env.GCLOUD_PROJECT,
   credential: admin.credential.applicationDefault(),
-  storageBucket: `${process.env.GCLOUD_PROJECT}.appspot.com`,
+  storageBucket: `${process.env.GCLOUD_PROJECT}.firebasestorage.app`,
 })
 
 import notaRouter from './routes/nota'
