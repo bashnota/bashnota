@@ -1,4 +1,11 @@
 import axios from 'axios'
+import * as webllm from "@mlc-ai/web-llm";
+
+// Add the InitProgressReport interface to match WebLLM's API
+interface InitProgressReport {
+  text: string;
+  progress: number;
+}
 
 export interface LLMProvider {
   id: string
@@ -22,6 +29,14 @@ export interface GenerationResult {
   text: string
   provider: string
   tokens: number
+}
+
+export interface WebLLMModelInfo {
+  id: string
+  name: string
+  size: string
+  description: string
+  downloadSize: string
 }
 
 export const supportedProviders: LLMProvider[] = [
@@ -57,9 +72,75 @@ export const supportedProviders: LLMProvider[] = [
     maxTokens: 4096,
     defaultPrompt: 'You are a helpful AI assistant.',
   },
+  {
+    id: 'webllm',
+    name: 'WebLLM (Browser)',
+    apiEndpoint: '', // Not needed for WebLLM as it runs locally
+    requiresApiKey: false,
+    maxTokens: 4096, // This can vary based on the model
+    defaultPrompt: 'You are a helpful AI assistant running locally in the browser.',
+  },
 ]
 
 export class AIService {
+  private webllmEngine: webllm.MLCEngine | null = null;
+  private webllmModel: string = '';
+  private modelLoadingProgress: number = 0;
+  private isModelLoading: boolean = false;
+  private modelLoadingError: string | null = null;
+
+  async isWebGPUSupported(): Promise<boolean> {
+    if (typeof navigator === 'undefined') return false;
+    
+    try {
+      return 'gpu' in navigator;
+    } catch (error) {
+      console.error('Error checking WebGPU support:', error);
+      return false;
+    }
+  }
+
+  async initializeWebLLM(modelName: string): Promise<void> {
+    if (this.isModelLoading) {
+      throw new Error('A model is already being loaded');
+    }
+    
+    try {
+      this.isModelLoading = true;
+      this.modelLoadingProgress = 0;
+      this.modelLoadingError = null;
+      
+      // Progress callback function with correct type
+      const initProgressCallback = (report: InitProgressReport) => {
+        this.modelLoadingProgress = report.progress;
+        console.log(`Loading model: ${Math.round(report.progress * 100)}% - ${report.text}`);
+      };
+      
+      // If we already have an engine, reload it with the new model
+      if (this.webllmEngine) {
+        this.webllmModel = modelName;
+        await this.webllmEngine.reload(modelName);
+      } else {
+        // Create a new engine with the selected model
+        this.webllmEngine = await webllm.CreateMLCEngine(
+          modelName,
+          { 
+            initProgressCallback,
+            // Optional: Add custom configuration here
+            // appConfig: { ... }
+          }
+        );
+        this.webllmModel = modelName;
+      }
+    } catch (error) {
+      this.modelLoadingError = error instanceof Error ? error.message : 'Unknown error loading model';
+      console.error('Error initializing WebLLM:', error);
+      throw error;
+    } finally {
+      this.isModelLoading = false;
+    }
+  }
+
   async generateText(
     providerId: string, 
     apiKey: string, 
@@ -81,6 +162,8 @@ export class AIService {
           return await this.generateWithGemini(apiKey, options)
         case 'ollama':
           return await this.generateWithOllama(options)
+        case 'webllm':
+          return await this.generateWithWebLLM(options)
         default:
           throw new Error(`Provider ${providerId} not implemented`)
       }
@@ -250,6 +333,180 @@ export class AIService {
       text: response.data.response,
       provider: 'ollama',
       tokens: 0 // Ollama doesn't return token count in the same way
+    }
+  }
+
+  private async generateWithWebLLM(
+    options: GenerationOptions
+  ): Promise<GenerationResult> {
+    if (!this.webllmEngine) {
+      throw new Error('WebLLM engine not initialized. Please select and load a model first.');
+    }
+
+    try {
+      // Create a chat completion using the OpenAI-compatible API
+      const response = await this.webllmEngine.chat.completions.create({
+        messages: [
+          { role: "system", content: "You are a helpful assistant." },
+          { role: "user", content: options.prompt }
+        ],
+        temperature: options.temperature || 0.7,
+        max_tokens: options.maxTokens || 1024,
+        top_p: options.topP || 0.95,
+        stream: false
+      });
+
+      // Extract the response text
+      const generatedText = response.choices[0].message.content;
+      
+      return {
+        text: generatedText,
+        provider: 'webllm',
+        tokens: response.usage?.completion_tokens || 0
+      };
+    } catch (error) {
+      console.error('WebLLM generation failed:', error);
+      throw new Error(error instanceof Error ? error.message : 'WebLLM generation failed');
+    }
+  }
+
+  async generateWithWebLLMStreaming(
+    options: GenerationOptions,
+    onChunk: (text: string) => void,
+    onComplete: (result: GenerationResult) => void
+  ): Promise<void> {
+    if (!this.webllmEngine) {
+      throw new Error('WebLLM engine not initialized. Please select and load a model first.');
+    }
+
+    try {
+      let fullText = '';
+      
+      // Create a streaming chat completion
+      const stream = await this.webllmEngine.chat.completions.create({
+        messages: [
+          { role: "system", content: "You are a helpful assistant." },
+          { role: "user", content: options.prompt }
+        ],
+        temperature: options.temperature || 0.7,
+        max_tokens: options.maxTokens || 1024,
+        top_p: options.topP || 0.95,
+        stream: true,
+        stream_options: { include_usage: true }
+      });
+
+      // Process each chunk as it arrives
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || '';
+        if (content) {
+          fullText += content;
+          onChunk(content);
+        }
+        
+        // If this is the last chunk with usage information
+        if (chunk.usage) {
+          onComplete({
+            text: fullText,
+            provider: 'webllm',
+            tokens: chunk.usage.completion_tokens || 0
+          });
+        }
+      }
+    } catch (error) {
+      console.error('WebLLM streaming generation failed:', error);
+      throw new Error(error instanceof Error ? error.message : 'WebLLM streaming generation failed');
+    }
+  }
+
+  async setWebLLMModel(modelName: string): Promise<void> {
+    if (this.isModelLoading) {
+      throw new Error('A model is already being loaded');
+    }
+    
+    if (this.webllmModel === modelName && this.webllmEngine) {
+      // Model is already loaded
+      return;
+    }
+    
+    await this.initializeWebLLM(modelName);
+  }
+
+  async getAvailableWebLLMModels(): Promise<WebLLMModelInfo[]> {
+    // Get the list of models from WebLLM
+    const modelRecords = webllm.prebuiltAppConfig.model_list;
+    
+    // Transform the model records into a more user-friendly format
+    return modelRecords.map(model => {
+      // Extract model size from the ID (e.g., "Llama-3.1-8B-Instruct" -> "8B")
+      const sizeMatch = model.model_id.match(/(\d+\.?\d*[BM])/);
+      const size = sizeMatch ? sizeMatch[0] : 'Unknown';
+      
+      // Format the model name for display
+      const name = model.model_id
+        .replace(/-/g, ' ')
+        .replace(/q4f32_\d+/, '')
+        .replace(/MLC$/, '')
+        .trim();
+      
+      return {
+        id: model.model_id,
+        name: name,
+        size: size,
+        description: `${name} (${size})`,
+        // Estimate download size based on model size
+        downloadSize: this.estimateDownloadSize(size)
+      };
+    });
+  }
+  
+  // Helper method to estimate download size
+  private estimateDownloadSize(modelSize: string): string {
+    if (modelSize.includes('0.5B')) return '~250MB';
+    if (modelSize.includes('1B') || modelSize.includes('1.5B')) return '~500MB';
+    if (modelSize.includes('2B')) return '~1GB';
+    if (modelSize.includes('3B')) return '~1.5GB';
+    if (modelSize.includes('7B') || modelSize.includes('8B')) return '~4GB';
+    if (modelSize.includes('13B')) return '~7GB';
+    return 'Unknown';
+  }
+  
+  // Add methods to get the current model loading state
+  getModelLoadingState(): { 
+    isLoading: boolean; 
+    progress: number; 
+    error: string | null;
+    currentModel: string | null;
+  } {
+    return {
+      isLoading: this.isModelLoading,
+      progress: this.modelLoadingProgress,
+      error: this.modelLoadingError,
+      currentModel: this.webllmModel || null
+    };
+  }
+  
+  // Add a method to check if a model is loaded
+  isModelLoaded(): boolean {
+    return !!this.webllmEngine && !!this.webllmModel;
+  }
+  
+  // Add a method to get the current model
+  getCurrentModel(): string {
+    return this.webllmModel;
+  }
+  
+  // Add a method to abort generation
+  abortGeneration(): void {
+    if (this.webllmEngine) {
+      try {
+        // Since there's no direct cancel method, we can try to create a new completion
+        // which should effectively cancel the previous one
+        console.log('Attempting to abort WebLLM generation');
+        // We could potentially reload the model to force a reset
+        // or just let the current generation complete
+      } catch (error) {
+        console.error('Error aborting generation:', error);
+      }
     }
   }
 }

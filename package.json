@@ -27,6 +27,7 @@
     "@codemirror/view": "^6.36.3",
     "@headlessui/vue": "^1.7.23",
     "@heroicons/vue": "^2.2.0",
+    "@mlc-ai/web-llm": "^0.2.78",
     "@rcode-link/tiptap-drawio": "^1.0.21",
     "@tiptap/extension-blockquote": "^2.11.5",
     "@tiptap/extension-code-block": "^2.11.5",
