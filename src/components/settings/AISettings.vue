@@ -9,7 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/components/ui/slider'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from '@/components/ui/toast'
-import { SparklesIcon, KeyIcon, Save, Trash2Icon } from 'lucide-vue-next'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { SparklesIcon, KeyIcon, Save, Trash2Icon, CpuIcon } from 'lucide-vue-next'
+import WebLLMSettings from '@/components/settings/WebLLMSettings.vue'
 
 const aiSettings = useAISettingsStore()
 const apiKeys = ref<Record<string, string>>({...aiSettings.settings.apiKeys})
@@ -17,6 +19,7 @@ const customPrompt = ref(aiSettings.settings.customPrompt)
 const maxTokens = ref([aiSettings.settings.maxTokens])
 const temperature = ref([aiSettings.settings.temperature])
 const preferredProviderId = ref(aiSettings.settings.preferredProviderId)
+const activeTab = ref('api-keys')
 
 const saveSettings = () => {
   // Update API keys
@@ -126,131 +129,154 @@ const handlePaste = (providerId: string, event: ClipboardEvent) => {
 
 <template>
   <div class="space-y-6">
-    <Card>
-      <CardHeader>
-        <CardTitle class="flex items-center text-xl font-semibold">
-          <SparklesIcon class="mr-2 h-5 w-5" /> AI Generation Settings
-        </CardTitle>
-        <CardDescription>
-          Configure your AI text generation settings and API keys
-        </CardDescription>
-      </CardHeader>
-      
-      <CardContent>
-        <div class="space-y-6">
-          <!-- Provider Selection -->
-          <div class="space-y-2">
-            <Label for="preferred-provider">Preferred AI Provider</Label>
-            <Select v-model="preferredProviderId">
-              <SelectTrigger id="preferred-provider">
-                <SelectValue placeholder="Select AI provider" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem 
-                  v-for="provider in aiSettings.providers" 
-                  :key="provider.id" 
-                  :value="provider.id"
-                >
-                  {{ provider.name }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
+    <Tabs v-model="activeTab" class="w-full">
+      <TabsList class="grid w-full grid-cols-2 mb-6">
+        <TabsTrigger value="api-keys" class="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <div class="flex items-center justify-center gap-2 p-2">
+            <KeyIcon class="w-4 h-4 shrink-0" />
+            <span class="text-sm font-medium">API Keys & Settings</span>
           </div>
+        </TabsTrigger>
+        <TabsTrigger value="webllm" class="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <div class="flex items-center justify-center gap-2 p-2">
+            <CpuIcon class="w-4 h-4 shrink-0" />
+            <span class="text-sm font-medium">WebLLM (Local Models)</span>
+          </div>
+        </TabsTrigger>
+      </TabsList>
 
-          <!-- API Keys -->
-          <div class="space-y-4">
-            <h3 class="text-lg font-medium">API Keys</h3>
-            
-            <div 
-              v-for="provider in aiSettings.providers.filter(p => p.requiresApiKey)" 
-              :key="provider.id"
-              class="space-y-2"
-            >
-              <Label :for="`api-key-${provider.id}`">{{ provider.name }} API Key</Label>
-              <div class="flex space-x-2">
-                <Input
-                  :id="`api-key-${provider.id}`"
-                  v-model="apiKeys[provider.id]"
-                  type="password"
-                  placeholder="Enter API key"
-                  class="flex-1"
-                  @blur="handleApiKeyChange(provider.id, apiKeys[provider.id])"
-                  @paste="(event: ClipboardEvent) => handlePaste(provider.id, event)"
-                />
-                <Button 
-                  variant="destructive" 
-                  size="icon"
-                  @click="clearApiKey(provider.id)"
-                  v-if="apiKeys[provider.id]"
-                >
-                  <Trash2Icon class="h-4 w-4" />
-                </Button>
+      <TabsContent value="api-keys">
+        <Card>
+          <CardHeader>
+            <CardTitle class="flex items-center text-xl font-semibold">
+              <SparklesIcon class="mr-2 h-5 w-5" /> AI Generation Settings
+            </CardTitle>
+            <CardDescription>
+              Configure your AI text generation settings and API keys
+            </CardDescription>
+          </CardHeader>
+          
+          <CardContent>
+            <div class="space-y-6">
+              <!-- Provider Selection -->
+              <div class="space-y-2">
+                <Label for="preferred-provider">Preferred AI Provider</Label>
+                <Select v-model="preferredProviderId">
+                  <SelectTrigger id="preferred-provider">
+                    <SelectValue placeholder="Select AI provider" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem 
+                      v-for="provider in aiSettings.providers" 
+                      :key="provider.id" 
+                      :value="provider.id"
+                    >
+                      {{ provider.name }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <p class="text-xs text-gray-500">
-                {{ getApiKeyInstructions(provider.id) }}
-              </p>
-            </div>
-          </div>
 
-          <!-- Advanced Settings -->
-          <div class="space-y-4">
-            <h3 class="text-lg font-medium">Advanced Settings</h3>
-
-            <!-- Custom System Prompt -->
-            <div class="space-y-2">
-              <Label for="custom-prompt">Custom System Prompt</Label>
-              <Textarea
-                id="custom-prompt"
-                v-model="customPrompt"
-                placeholder="Optional: Add a custom system prompt that will be used for all generations"
-                rows="3"
-              />
-              <p class="text-xs text-gray-500">
-                A system prompt helps guide the AI's behavior. Leave empty to use default.
-              </p>
-            </div>
-
-            <!-- Temperature -->
-            <div class="space-y-2">
-              <div class="flex justify-between">
-                <Label for="temperature">Temperature: {{ temperature[0].toFixed(1) }}</Label>
-                <span class="text-xs text-gray-500">{{ formatTemperature(temperature[0]) }}</span>
+              <!-- API Keys -->
+              <div class="space-y-4">
+                <h3 class="text-lg font-medium">API Keys</h3>
+                
+                <div 
+                  v-for="provider in aiSettings.providers.filter(p => p.requiresApiKey)" 
+                  :key="provider.id"
+                  class="space-y-2"
+                >
+                  <Label :for="`api-key-${provider.id}`">{{ provider.name }} API Key</Label>
+                  <div class="flex space-x-2">
+                    <Input
+                      :id="`api-key-${provider.id}`"
+                      v-model="apiKeys[provider.id]"
+                      type="password"
+                      placeholder="Enter API key"
+                      class="flex-1"
+                      @blur="handleApiKeyChange(provider.id, apiKeys[provider.id])"
+                      @paste="(event: ClipboardEvent) => handlePaste(provider.id, event)"
+                    />
+                    <Button 
+                      variant="destructive" 
+                      size="icon"
+                      @click="clearApiKey(provider.id)"
+                      v-if="apiKeys[provider.id]"
+                    >
+                      <Trash2Icon class="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p class="text-xs text-gray-500">
+                    {{ getApiKeyInstructions(provider.id) }}
+                  </p>
+                </div>
               </div>
-              <Slider
-                id="temperature"
-                v-model="temperature"
-                :min="0"
-                :max="1"
-                :step="0.1"
-              />
-              <p class="text-xs text-gray-500">
-                Controls randomness: lower values are more deterministic, higher values are more creative
-              </p>
-            </div>
 
-            <!-- Max Tokens -->
-            <div class="space-y-2">
-              <Label for="max-tokens">Max Tokens: {{ maxTokens[0] }}</Label>
-              <Slider
-                id="max-tokens"
-                v-model="maxTokens"
-                :min="100"
-                :max="8192"
-                :step="100"
-              />
-              <p class="text-xs text-gray-500">
-                Maximum number of tokens to generate
-              </p>
-            </div>
-          </div>
+              <!-- Advanced Settings -->
+              <div class="space-y-4">
+                <h3 class="text-lg font-medium">Advanced Settings</h3>
 
-          <!-- Save Button -->
-          <Button @click="saveSettings" class="w-full">
-            <Save class="mr-2 h-4 w-4" />
-            Save Settings
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+                <!-- Custom System Prompt -->
+                <div class="space-y-2">
+                  <Label for="custom-prompt">Custom System Prompt</Label>
+                  <Textarea
+                    id="custom-prompt"
+                    v-model="customPrompt"
+                    placeholder="Optional: Add a custom system prompt that will be used for all generations"
+                    rows="3"
+                  />
+                  <p class="text-xs text-gray-500">
+                    A system prompt helps guide the AI's behavior. Leave empty to use default.
+                  </p>
+                </div>
+
+                <!-- Temperature -->
+                <div class="space-y-2">
+                  <div class="flex justify-between">
+                    <Label for="temperature">Temperature: {{ temperature[0].toFixed(1) }}</Label>
+                    <span class="text-xs text-gray-500">{{ formatTemperature(temperature[0]) }}</span>
+                  </div>
+                  <Slider
+                    id="temperature"
+                    v-model="temperature"
+                    :min="0"
+                    :max="1"
+                    :step="0.1"
+                  />
+                  <p class="text-xs text-gray-500">
+                    Controls randomness: lower values are more deterministic, higher values are more creative
+                  </p>
+                </div>
+
+                <!-- Max Tokens -->
+                <div class="space-y-2">
+                  <Label for="max-tokens">Max Tokens: {{ maxTokens[0] }}</Label>
+                  <Slider
+                    id="max-tokens"
+                    v-model="maxTokens"
+                    :min="100"
+                    :max="8192"
+                    :step="100"
+                  />
+                  <p class="text-xs text-gray-500">
+                    Maximum number of tokens to generate
+                  </p>
+                </div>
+              </div>
+
+              <!-- Save Button -->
+              <Button @click="saveSettings" class="w-full">
+                <Save class="mr-2 h-4 w-4" />
+                Save Settings
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      <TabsContent value="webllm">
+        <WebLLMSettings />
+      </TabsContent>
+    </Tabs>
   </div>
 </template> 
