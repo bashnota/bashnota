@@ -360,7 +360,7 @@ export class AIService {
       const generatedText = response.choices[0].message.content;
       
       return {
-        text: generatedText,
+        text: generatedText || '',
         provider: 'webllm',
         tokens: response.usage?.completion_tokens || 0
       };
