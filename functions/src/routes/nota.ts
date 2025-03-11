@@ -98,9 +98,9 @@ router.post('/publish/:id', authorizeRequest, async (req: Request, res: Response
       return res.status(400).json({ errors: validation.errors })
     }
 
-    // Process the content through our pipeline
-    const contentProcessor = new NotaContentProcessor(user.uid)
-    const processedContent = await contentProcessor.process(notaData.content)
+    // Use the simplified content processor to sanitize content
+    const contentProcessor = new NotaContentProcessor()
+    const processedContent = contentProcessor.process(notaData.content)
 
     // Check if the nota already exists
     const docRef = db.collection(publishedNotasCollection).doc(notaId)

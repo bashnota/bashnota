@@ -13,6 +13,7 @@ admin.initializeApp({
 })
 
 import notaRouter from './routes/nota'
+import imageRouter from './routes/image'
 
 // Create an Express app
 const app = express()
@@ -24,6 +25,7 @@ app.use(
         : '*',
   }),
 )
+app.use(express.json({ limit: '5mb' }))
 
 app.get('/', (req: Request, res: Response) => {
   res.json({
@@ -35,5 +37,6 @@ app.get('/', (req: Request, res: Response) => {
 })
 
 app.use('/nota', notaRouter)
+app.use('/image', imageRouter)
 
 export const api = onRequest(app)
