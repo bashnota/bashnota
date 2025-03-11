@@ -6,6 +6,7 @@ import { nanoid } from 'nanoid'
 import { toast } from '@/lib/utils'
 import { useAuthStore } from './auth'
 import { fetchAPI } from '@/services/axios'
+import { processNotaContent } from '@/services/publishNotaUtilities'
 
 // Helper functions to convert dates and ensure data is serializable
 const serializeNota = (nota: Partial<Nota> & { id: string }): any => {
@@ -439,17 +440,20 @@ export const useNotaStore = defineStore('nota', {
       }
     },
 
-    // UPDATED PUBLISH METHODS USING API
-
     async publishNota(id: string) {
       try {
         const nota = this.getCurrentNota(id)
-        if (!nota) throw new Error('Nota not found')
+        if (!nota || !nota.content) throw new Error('Nota not found')
 
-        // Prepare nota data for publishing
+        toast(`Processing images for "${nota.title}"...`)
+
+        // Process all images in the content object recursively
+        const processedContent = await processNotaContent(nota.content)
+
+        // Prepare nota data for publishing with processed content
         const publishData = {
           title: nota.title,
-          content: nota.content,
+          content: JSON.stringify(processedContent),
           updatedAt: nota.updatedAt instanceof Date ? nota.updatedAt.toISOString() : nota.updatedAt,
         }
 
@@ -465,7 +469,11 @@ export const useNotaStore = defineStore('nota', {
         // Update nota with publish status
         nota.isPublished = true
         nota.publishedAt = publishedNota.publishedAt
-        await this.saveItem(nota)
+
+        // Save the processed content back to the nota
+        // This prevents having to re-upload the same images on future updates
+        nota.content = JSON.stringify(processedContent)
+        await this.saveItem({ ...nota })
 
         toast(`Nota "${nota.title}" published successfully`)
 
