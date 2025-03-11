@@ -26,6 +26,7 @@ import PopoverTrigger from '@/components/ui/popover/PopoverTrigger.vue'
 import PopoverContent from '@/components/ui/popover/PopoverContent.vue'
 import FullScreenCodeBlock from './FullScreenCodeBlock.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
+import OutputRenderer from './OutputRenderer.vue'
 
 // Types
 interface Props {
@@ -703,45 +704,14 @@ onBeforeUnmount(() => {
 
     <!-- Output Section -->
     <div v-if="cell?.output" class="border-t">
-      <div class="flex items-center justify-between p-2 border-b">
-        <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          Output
-          <span v-if="cell?.hasError" class="ml-2 text-destructive">(Error)</span>
-        </span>
-        <div class="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            @click="isOutputVisible = !isOutputVisible"
-            class="h-6 w-6 p-0"
-            :title="isOutputVisible ? 'Hide Output' : 'Show Output'"
-            aria-label="Toggle output visibility"
-          >
-            <Eye v-if="!isOutputVisible" class="h-3 w-3" />
-            <EyeOff v-else class="h-3 w-3" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            @click="copyOutput"
-            class="h-6 w-6 p-0"
-            title="Copy output to clipboard"
-            aria-label="Copy output"
-          >
-            <Copy v-if="!isCopied" class="h-3 w-3" />
-            <Check v-else class="h-3 w-3" />
-          </Button>
-        </div>
-      </div>
-      <div
-        v-show="isOutputVisible"
-        class="text-sm whitespace-pre-wrap break-words p-4 max-h-[300px] overflow-auto"
-        :class="{ 'bg-red-50 dark:bg-red-950 text-destructive dark:text-red-200': cell?.hasError }"
-        v-html="cell?.output"
-        role="region"
-        aria-label="Code execution output"
-        aria-live="polite"
-      ></div>
+      <OutputRenderer
+        :content="cell.output"
+        :type="cell?.hasError ? 'error' : undefined"
+        :showControls="true"
+        :isCollapsible="true"
+        :maxHeight="'300px'"
+        @copy="copyOutput"
+      />
     </div>
 
     <!-- Fullscreen Modal -->
@@ -749,6 +719,7 @@ onBeforeUnmount(() => {
       v-if="isFullScreen"
       :code="codeValue"
       :output="cell?.output"
+      :outputType="cell?.hasError ? 'error' : undefined"
       :language="language"
       :is-open="isFullScreen"
       :is-executing="cell?.isExecuting"
