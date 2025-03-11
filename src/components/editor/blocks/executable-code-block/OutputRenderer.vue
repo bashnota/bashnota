@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, computed } from 'vue'
-import { Copy, Check, Download, Maximize, Minimize, Eye, EyeOff } from 'lucide-vue-next'
+import { Copy, Check, Download, Maximize, Minimize, Eye, EyeOff, Wand2, Code2 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 
 const props = defineProps<{
@@ -10,10 +10,12 @@ const props = defineProps<{
   maxHeight?: string
   isCollapsible?: boolean
   isFullscreenable?: boolean
+  originalCode?: string // Original code that produced this output
 }>()
 
 const emit = defineEmits<{
   'copy': []
+  'fix-with-ai': [originalCode: string, errorOutput: string]
 }>()
 
 const formattedContent = ref('')
@@ -21,6 +23,9 @@ const jsonTree = ref<any>(null)
 const isOutputCopied = ref(false)
 const isOutputVisible = ref(true)
 const isFullscreen = ref(false)
+
+// Add loading state for AI fix
+const isAiFixLoading = ref(false)
 
 // Determine output type based on content if not explicitly provided
 const effectiveOutputType = computed(() => {
@@ -180,6 +185,88 @@ const highlightJson = (json: string) => {
     .replace(/\b(true|false|null)\b/g, '<span class="json-literal">$1</span>')
     .replace(/\b(\d+)\b/g, '<span class="json-number">$1</span>')
 }
+
+// Error detection
+const hasError = computed(() => {
+  return effectiveOutputType.value === 'error' || 
+    (props.content && (
+      props.content.toLowerCase().includes('error') ||
+      props.content.toLowerCase().includes('exception') ||
+      props.content.toLowerCase().includes('traceback') ||
+      props.content.toLowerCase().includes('failed')
+    ))
+})
+
+// Function to handle AI fix request with loading state
+const requestAiFix = () => {
+  if (props.originalCode) {
+    isAiFixLoading.value = true
+    emit('fix-with-ai', props.originalCode, props.content)
+    
+    // We'll reset this when the parent component tells us it's done
+    // But add a timeout just in case
+    setTimeout(() => {
+      isAiFixLoading.value = false
+    }, 30000) // 30 seconds max
+  }
+}
+
+// New method to reset loading state (to be called by parent)
+const resetAiFixLoading = () => {
+  isAiFixLoading.value = false
+}
+
+// Expose methods to parent components
+defineExpose({
+  resetAiFixLoading
+})
+
+// Add language detection for better syntax highlighting
+const detectedLanguage = computed(() => {
+  if (!props.content) return null
+  
+  // Check for common language patterns in the output
+  if (props.content.includes('Traceback (most recent call last):')) return 'python'
+  if (props.content.includes('SyntaxError:') && props.content.includes('at ')) return 'javascript'
+  if (props.content.includes('Exception in thread')) return 'java'
+  if (props.content.includes('Fatal error:') && props.content.includes('PHP')) return 'php'
+  if (props.content.includes('Uncaught exception')) return 'php'
+  
+  return null
+})
+
+// Improved code formatting for better readability
+const formatCodeOutput = (content: string) => {
+  if (!content) return ''
+  
+  // Add line numbers
+  const lines = content.split('\n')
+  let result = ''
+  
+  lines.forEach((line, index) => {
+    const lineNumber = index + 1
+    const paddedNumber = lineNumber.toString().padStart(3, ' ')
+    
+    // Highlight error lines
+    const isErrorLine = line.toLowerCase().includes('error') || 
+                        line.toLowerCase().includes('exception') ||
+                        line.toLowerCase().includes('warning')
+    
+    result += `<div class="code-line ${isErrorLine ? 'error-line' : ''}">
+                <span class="line-number">${paddedNumber}</span>
+                <span class="line-content">${line}</span>
+              </div>`
+  })
+  
+  return result
+}
+
+// Format error output with better highlighting
+const formattedErrorOutput = computed(() => {
+  if (!hasError.value || !props.content) return ''
+  
+  return formatCodeOutput(props.content)
+})
 </script>
 
 <template>
@@ -191,9 +278,29 @@ const highlightJson = (json: string) => {
         <span v-if="effectiveOutputType !== 'text'" class="output-type-label">
           ({{ effectiveOutputType }})
         </span>
+        <span v-if="hasError" class="error-badge">Error Detected</span>
       </span>
       
       <div class="output-controls">
+        <!-- Fix with AI button (only shown when error is detected and originalCode is provided) -->
+        <Button
+          v-if="hasError && props.originalCode"
+          variant="outline"
+          size="sm"
+          @click="requestAiFix"
+          class="fix-ai-button"
+          :disabled="isAiFixLoading"
+          title="Fix this error with AI"
+        >
+          <div v-if="isAiFixLoading" class="ai-loading-indicator">
+            <div class="ai-loading-dot"></div>
+            <div class="ai-loading-dot"></div>
+            <div class="ai-loading-dot"></div>
+          </div>
+          <Wand2 v-else class="control-icon mr-1" />
+          {{ isAiFixLoading ? 'Fixing...' : 'Fix with AI' }}
+        </Button>
+        
         <!-- Toggle visibility button -->
         <Button
           v-if="props.isCollapsible"
@@ -249,11 +356,23 @@ const highlightJson = (json: string) => {
       </div>
     </div>
     
+    <!-- AI Fix Loading Overlay (shown when AI is fixing) -->
+    <div v-if="isAiFixLoading" class="ai-fix-overlay">
+      <div class="ai-fix-message">
+        <div class="ai-fix-loading-spinner"></div>
+        <div class="ai-fix-text">AI is analyzing and fixing your code...</div>
+      </div>
+    </div>
+    
     <!-- Output content -->
     <div 
       v-if="isOutputVisible" 
       class="output-content"
-      :class="[`output-${effectiveOutputType}`, { 'error': effectiveOutputType === 'error' }]"
+      :class="[
+        `output-${effectiveOutputType}`, 
+        { 'error': effectiveOutputType === 'error' || hasError },
+        { 'with-line-numbers': hasError && detectedLanguage }
+      ]"
       :style="{ maxHeight: !isFullscreen && props.maxHeight ? props.maxHeight : 'none' }"
     >
       <!-- Text output -->
@@ -271,8 +390,12 @@ const highlightJson = (json: string) => {
       <!-- Image output -->
       <div v-else-if="effectiveOutputType === 'image'" class="image-viewer" v-html="content"></div>
       
-      <!-- Error output -->
-      <pre v-else-if="effectiveOutputType === 'error'" class="error-output">{{ content }}</pre>
+      <!-- Enhanced error output with line numbers and highlighting -->
+      <div 
+        v-if="effectiveOutputType === 'error' || hasError" 
+        class="error-output-container"
+        v-html="formattedErrorOutput"
+      ></div>
       
       <!-- HTML output (default) -->
       <div v-else class="html-viewer" v-html="content"></div>
@@ -449,5 +572,172 @@ const highlightJson = (json: string) => {
 .output-content::-webkit-scrollbar-thumb {
   background-color: rgba(155, 155, 155, 0.5);
   border-radius: 4px;
+}
+
+.error-badge {
+  display: inline-block;
+  background-color: rgb(220, 38, 38);
+  color: white;
+  font-size: 0.65rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 9999px;
+  margin-left: 0.5rem;
+  font-weight: 500;
+  text-transform: none;
+}
+
+.fix-ai-button {
+  display: flex;
+  align-items: center;
+  height: 1.75rem;
+  padding: 0 0.5rem;
+  margin-right: 0.5rem;
+  background-color: rgba(79, 70, 229, 0.1);
+  border-color: rgba(79, 70, 229, 0.2);
+  color: rgb(79, 70, 229);
+}
+
+.fix-ai-button:hover {
+  background-color: rgba(79, 70, 229, 0.15);
+  border-color: rgba(79, 70, 229, 0.3);
+}
+
+:global(.dark) .fix-ai-button {
+  background-color: rgba(139, 92, 246, 0.1);
+  border-color: rgba(139, 92, 246, 0.2);
+  color: rgb(139, 92, 246);
+}
+
+:global(.dark) .fix-ai-button:hover {
+  background-color: rgba(139, 92, 246, 0.15);
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+/* Enhanced code output styling */
+.with-line-numbers {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.code-line {
+  display: flex;
+  white-space: pre;
+}
+
+.line-number {
+  user-select: none;
+  text-align: right;
+  color: var(--muted-foreground);
+  padding-right: 1rem;
+  min-width: 3rem;
+  border-right: 1px solid var(--border);
+  margin-right: 0.75rem;
+}
+
+.line-content {
+  flex: 1;
+  white-space: pre-wrap;
+}
+
+.error-line {
+  background-color: rgba(220, 38, 38, 0.1);
+  font-weight: 500;
+}
+
+.error-line .line-content {
+  color: rgb(220, 38, 38);
+}
+
+:global(.dark) .error-line {
+  background-color: rgba(248, 113, 113, 0.1);
+}
+
+:global(.dark) .error-line .line-content {
+  color: rgb(248, 113, 113);
+}
+
+.error-output-container {
+  overflow-x: auto;
+}
+
+/* AI Fix Loading Animation */
+.ai-loading-indicator {
+  display: flex;
+  align-items: center;
+  margin-right: 0.5rem;
+}
+
+.ai-loading-dot {
+  width: 4px;
+  height: 4px;
+  margin: 0 1px;
+  background-color: currentColor;
+  border-radius: 50%;
+  animation: ai-loading-dot 1.4s infinite ease-in-out both;
+}
+
+.ai-loading-dot:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.ai-loading-dot:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes ai-loading-dot {
+  0%, 80%, 100% {
+    transform: scale(0);
+  }
+  40% {
+    transform: scale(1);
+  }
+}
+
+.ai-fix-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  backdrop-filter: blur(2px);
+}
+
+.ai-fix-message {
+  background-color: var(--background);
+  border-radius: 8px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+  max-width: 80%;
+}
+
+.ai-fix-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(79, 70, 229, 0.2);
+  border-radius: 50%;
+  border-top-color: rgb(79, 70, 229);
+  animation: ai-fix-spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+.ai-fix-text {
+  font-size: 0.875rem;
+  color: var(--foreground);
+  text-align: center;
+}
+
+@keyframes ai-fix-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style> 

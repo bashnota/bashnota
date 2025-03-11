@@ -210,7 +210,9 @@ onBeforeUnmount(() => {
           :showControls="true"
           :isFullscreenable="true"
           :isCollapsible="true"
+          :originalCode="localCode"
           class="h-full flex-1"
+          @fix-with-ai="onExecute"
         />
         <div v-else class="flex-1 flex items-center justify-center text-sm text-muted-foreground">
           No output to display

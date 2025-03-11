@@ -8,6 +8,7 @@ declare module './OutputRenderer.vue' {
     maxHeight?: string
     isCollapsible?: boolean
     isFullscreenable?: boolean
+    originalCode?: string
   }, {}, any>
   
   export default OutputRenderer

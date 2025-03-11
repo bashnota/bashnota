@@ -1,0 +1,440 @@
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+import { Button } from '@/components/ui/button'
+import { Check, X, Copy, ArrowRight, AlertTriangle, Settings } from 'lucide-vue-next'
+import CodeMirror from './CodeMirror.vue'
+import { CodeFixService } from '@/services/codeFixService'
+import { toast } from '@/components/ui/toast'
+import { useRouter } from 'vue-router'
+
+const props = defineProps<{
+  originalCode: string
+  errorOutput: string
+  isOpen: boolean
+  language: string
+}>()
+
+const emit = defineEmits<{
+  'close': []
+  'apply-fix': [fixedCode: string]
+}>()
+
+// State
+const isLoading = ref(true)
+const fixedCode = ref('')
+const explanation = ref('')
+const isCopied = ref(false)
+const hasError = ref(false)
+const errorMessage = ref('')
+const provider = ref('')
+const router = useRouter()
+
+// Create code fix service
+const codeFixService = new CodeFixService()
+
+// Generate AI fix using the CodeFixService
+const generateAiFix = async () => {
+  isLoading.value = true
+  hasError.value = false
+  errorMessage.value = ''
+  
+  try {
+    // Generate the fix using the code fix service
+    const result = await codeFixService.generateFix(
+      props.originalCode,
+      props.errorOutput,
+      props.language
+    )
+    
+    // Update state with the result
+    fixedCode.value = result.fixedCode
+    explanation.value = result.explanation
+    provider.value = result.provider
+    isLoading.value = false
+  } catch (error) {
+    console.error('Failed to generate AI fix:', error)
+    hasError.value = true
+    
+    // Check if the error is related to WebLLM not being loaded
+    const errorStr = error instanceof Error ? error.message : 'Unknown error occurred'
+    errorMessage.value = errorStr
+    isLoading.value = false
+    
+    toast({
+      title: 'AI Fix Failed',
+      description: errorMessage.value,
+      variant: 'destructive'
+    })
+  }
+}
+
+// Copy fixed code to clipboard
+const copyFixedCode = async () => {
+  try {
+    await navigator.clipboard.writeText(fixedCode.value)
+    isCopied.value = true
+    setTimeout(() => {
+      isCopied.value = false
+    }, 2000)
+  } catch (error) {
+    console.error('Failed to copy code:', error)
+  }
+}
+
+// Apply the fix
+const applyFix = () => {
+  emit('apply-fix', fixedCode.value)
+  emit('close')
+}
+
+// Close the dialog
+const closeDialog = () => {
+  emit('close')
+}
+
+// Differences between original and fixed code
+const diffSummary = computed(() => {
+  if (!fixedCode.value) return ''
+  
+  const originalLines = props.originalCode.split('\n').length
+  const fixedLines = fixedCode.value.split('\n').length
+  const lineChange = fixedLines - originalLines
+  
+  let lineChangeText = ''
+  if (lineChange > 0) {
+    lineChangeText = `+${lineChange} lines`
+  } else if (lineChange < 0) {
+    lineChangeText = `${lineChange} lines`
+  } else {
+    lineChangeText = 'Same number of lines'
+  }
+  
+  return lineChangeText
+})
+
+// Retry generation
+const retryGeneration = () => {
+  generateAiFix()
+}
+
+// Navigate to AI settings
+const goToAISettings = () => {
+  emit('close')
+  router.push('/settings?tab=ai')
+}
+
+// Initialize
+onMounted(() => {
+  generateAiFix()
+})
+</script>
+
+<template>
+  <div v-if="isOpen" class="ai-fixer-overlay">
+    <div class="ai-fixer-container">
+      <!-- Header -->
+      <div class="ai-fixer-header">
+        <h3 class="ai-fixer-title">AI Code Fix</h3>
+        <Button variant="ghost" size="icon" @click="closeDialog" class="ai-fixer-close">
+          <X class="h-4 w-4" />
+        </Button>
+      </div>
+      
+      <!-- Loading state -->
+      <div v-if="isLoading" class="ai-fixer-loading">
+        <div class="ai-fixer-spinner"></div>
+        <p class="ai-fixer-loading-text">AI is analyzing your code and generating a fix...</p>
+      </div>
+      
+      <!-- Error state -->
+      <div v-else-if="hasError" class="ai-fixer-error">
+        <AlertTriangle class="h-12 w-12 text-destructive mb-4" />
+        <h4 class="ai-fixer-error-title">Failed to Generate Fix</h4>
+        <p class="ai-fixer-error-message">{{ errorMessage }}</p>
+        <div class="ai-fixer-error-actions">
+          <Button variant="outline" @click="closeDialog">Cancel</Button>
+          <Button variant="default" @click="retryGeneration">Retry</Button>
+          <Button 
+            v-if="errorMessage.includes('WebLLM is not loaded')" 
+            variant="default" 
+            @click="goToAISettings"
+            class="ai-fixer-settings-btn"
+          >
+            <Settings class="h-3.5 w-3.5 mr-1" />
+            AI Settings
+          </Button>
+        </div>
+      </div>
+      
+      <!-- Results -->
+      <div v-else class="ai-fixer-content">
+        <!-- Explanation -->
+        <div class="ai-fixer-explanation">
+          <h4 class="ai-fixer-section-title">AI Analysis</h4>
+          <p>{{ explanation }}</p>
+          <div v-if="provider" class="ai-fixer-provider">
+            Generated by {{ provider }}
+          </div>
+        </div>
+        
+        <!-- Code comparison -->
+        <div class="ai-fixer-code-comparison">
+          <div class="ai-fixer-code-section">
+            <div class="ai-fixer-code-header">
+              <h4 class="ai-fixer-section-title">Original Code</h4>
+            </div>
+            <div class="ai-fixer-code-editor">
+              <CodeMirror
+                :modelValue="props.originalCode"
+                :language="language"
+                :readonly="true"
+                maxHeight="200px"
+              />
+            </div>
+          </div>
+          
+          <div class="ai-fixer-arrow">
+            <ArrowRight class="h-6 w-6" />
+            <div class="ai-fixer-diff-summary">{{ diffSummary }}</div>
+          </div>
+          
+          <div class="ai-fixer-code-section">
+            <div class="ai-fixer-code-header">
+              <h4 class="ai-fixer-section-title">Fixed Code</h4>
+              <Button
+                variant="ghost"
+                size="sm"
+                @click="copyFixedCode"
+                class="ai-fixer-copy-btn"
+              >
+                <Copy v-if="!isCopied" class="h-3.5 w-3.5 mr-1" />
+                <Check v-else class="h-3.5 w-3.5 mr-1" />
+                {{ isCopied ? 'Copied' : 'Copy' }}
+              </Button>
+            </div>
+            <div class="ai-fixer-code-editor">
+              <CodeMirror
+                :modelValue="fixedCode"
+                :language="language"
+                :readonly="true"
+                maxHeight="200px"
+              />
+            </div>
+          </div>
+        </div>
+        
+        <!-- Actions -->
+        <div class="ai-fixer-actions">
+          <Button variant="outline" @click="closeDialog">Cancel</Button>
+          <Button variant="default" @click="applyFix">Apply Fix</Button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.ai-fixer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  backdrop-filter: blur(2px);
+}
+
+.ai-fixer-container {
+  background-color: var(--background);
+  border-radius: 8px;
+  width: 90%;
+  max-width: 1000px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+}
+
+.ai-fixer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.ai-fixer-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.ai-fixer-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+}
+
+.ai-fixer-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(79, 70, 229, 0.2);
+  border-radius: 50%;
+  border-top-color: rgb(79, 70, 229);
+  animation: ai-fixer-spin 1s linear infinite;
+  margin-bottom: 1.5rem;
+}
+
+.ai-fixer-loading-text {
+  font-size: 1rem;
+  color: var(--muted-foreground);
+}
+
+.ai-fixer-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  text-align: center;
+}
+
+.ai-fixer-error-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem 0;
+  color: var(--destructive);
+}
+
+.ai-fixer-error-message {
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+  margin-bottom: 1.5rem;
+  max-width: 80%;
+}
+
+.ai-fixer-error-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.ai-fixer-content {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.ai-fixer-explanation {
+  background-color: var(--muted);
+  padding: 1rem;
+  border-radius: 6px;
+  border-left: 4px solid rgb(79, 70, 229);
+}
+
+.ai-fixer-section-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem 0;
+  color: var(--foreground);
+}
+
+.ai-fixer-code-comparison {
+  display: flex;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.ai-fixer-code-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.ai-fixer-code-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background-color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.ai-fixer-code-editor {
+  flex: 1;
+  overflow: hidden;
+}
+
+.ai-fixer-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-foreground);
+}
+
+.ai-fixer-diff-summary {
+  font-size: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.ai-fixer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.ai-fixer-copy-btn {
+  display: flex;
+  align-items: center;
+  height: 1.75rem;
+  padding: 0 0.5rem;
+  font-size: 0.75rem;
+}
+
+@keyframes ai-fixer-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 768px) {
+  .ai-fixer-code-comparison {
+    flex-direction: column;
+  }
+  
+  .ai-fixer-arrow {
+    flex-direction: row;
+    padding: 0.5rem 0;
+  }
+  
+  .ai-fixer-diff-summary {
+    margin-top: 0;
+    margin-left: 0.5rem;
+  }
+}
+
+.ai-fixer-provider {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  margin-top: 0.5rem;
+  text-align: right;
+  font-style: italic;
+}
+
+.ai-fixer-settings-btn {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+}
+</style> 

@@ -27,6 +27,7 @@ import PopoverContent from '@/components/ui/popover/PopoverContent.vue'
 import FullScreenCodeBlock from './FullScreenCodeBlock.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
 import OutputRenderer from './OutputRenderer.vue'
+import AiCodeFixer from './AiCodeFixer.vue'
 
 // Types
 interface Props {
@@ -145,6 +146,10 @@ const isReadyToExecute = computed(
     selectedServer.value !== 'none' &&
     !cell.value?.isExecuting,
 )
+
+// Add AI code fixer state
+const isAiFixerOpen = ref(false)
+const outputRendererRef = ref<InstanceType<typeof OutputRenderer> | null>(null)
 
 // Methods
 const createNewSession = async () => {
@@ -267,6 +272,39 @@ const copyCode = async () => {
 
 const handleFullScreen = () => {
   isFullScreen.value = true
+}
+
+// Handle AI fix request
+const handleAiFixRequest = (originalCode: string, errorOutput: string) => {
+  isAiFixerOpen.value = true
+}
+
+// Apply AI fix
+const applyAiFix = (fixedCode: string) => {
+  // Update the code
+  codeValue.value = fixedCode
+  emit('update:code', fixedCode)
+  
+  // Reset the output renderer loading state
+  if (outputRendererRef.value) {
+    outputRendererRef.value.resetAiFixLoading()
+  }
+  
+  // Close the AI fixer
+  isAiFixerOpen.value = false
+  
+  // Execute the fixed code
+  handleExecution()
+}
+
+// Close AI fixer
+const closeAiFixer = () => {
+  isAiFixerOpen.value = false
+  
+  // Reset the output renderer loading state
+  if (outputRendererRef.value) {
+    outputRendererRef.value.resetAiFixLoading()
+  }
 }
 
 // Event handlers
@@ -705,12 +743,15 @@ onBeforeUnmount(() => {
     <!-- Output Section -->
     <div v-if="cell?.output" class="border-t">
       <OutputRenderer
+        ref="outputRendererRef"
         :content="cell.output"
         :type="cell?.hasError ? 'error' : undefined"
         :showControls="true"
         :isCollapsible="true"
         :maxHeight="'300px'"
+        :originalCode="codeValue"
         @copy="copyOutput"
+        @fix-with-ai="handleAiFixRequest"
       />
     </div>
 
@@ -728,6 +769,17 @@ onBeforeUnmount(() => {
       :on-close="() => (isFullScreen = false)"
       :on-update="updateCode"
       :on-execute="handleExecution"
+    />
+    
+    <!-- AI Code Fixer -->
+    <AiCodeFixer
+      v-if="isAiFixerOpen"
+      :original-code="codeValue"
+      :error-output="cell?.output || ''"
+      :is-open="isAiFixerOpen"
+      :language="language"
+      @close="closeAiFixer"
+      @apply-fix="applyAiFix"
     />
   </div>
 </template>
