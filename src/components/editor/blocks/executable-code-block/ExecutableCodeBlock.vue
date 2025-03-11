@@ -6,6 +6,7 @@ import { useRoute } from 'vue-router'
 import { useNotaStore } from '@/stores/nota'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
 import { Card, CardContent } from '@/components/ui/card'
+import OutputRenderer from './OutputRenderer.vue'
 
 const props = defineProps<{
   node: any
@@ -99,9 +100,12 @@ const onSessionSelect = (sessionId: string) => {
 
     <Card v-else class="overflow-hidden">
       <CardContent class="p-0">
-        <pre class="bg-muted p-4 overflow-x-auto max-h-[400px] font-mono text-sm leading-relaxed">
-          <code :class="language">{{ code }}</code>
-        </pre>
+        <OutputRenderer
+          :content="code"
+          type="text"
+          :showControls="false"
+          :maxHeight="'400px'"
+        />
       </CardContent>
     </Card>
   </node-view-wrapper>

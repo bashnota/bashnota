@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue'
 import { Button } from '@/components/ui/button'
-import { X, Play, Loader2, Copy, Check } from 'lucide-vue-next'
+import { X, Play, Loader2 } from 'lucide-vue-next'
 import CodeMirror from './CodeMirror.vue'
+import OutputRenderer from './OutputRenderer.vue'
 
 const props = defineProps<{
   code: string
   output: string | null | undefined
+  outputType?: 'text' | 'html' | 'json' | 'table' | 'image' | 'error'
   isOpen: boolean
   language: string
   onClose: () => void
@@ -21,7 +23,7 @@ const localCode = ref(props.code)
 const resizing = ref(false)
 const splitPosition = ref(50) // Default split at 50%
 const startX = ref(0)
-const isOutputCopied = ref(false)
+const isOutputFullscreen = ref(false)
 
 // Watch for external code changes
 watch(
@@ -48,6 +50,11 @@ const handleKeyDown = (e: KeyboardEvent) => {
 
   // Escape key to close
   if (e.key === 'Escape' && !props.isExecuting) {
+    if (isOutputFullscreen.value) {
+      isOutputFullscreen.value = false
+      e.preventDefault()
+      return
+    }
     props.onClose()
   }
 
@@ -94,23 +101,13 @@ const endResize = () => {
   document.body.style.userSelect = ''
 }
 
-// Copy output to clipboard
-const copyOutput = async () => {
-  if (!props.output) return
-
-  try {
-    // Convert HTML to plain text for copying
-    const tempDiv = document.createElement('div')
-    tempDiv.innerHTML = props.output
-    const textContent = tempDiv.textContent || tempDiv.innerText || ''
-
-    await navigator.clipboard.writeText(textContent)
-    isOutputCopied.value = true
-    setTimeout(() => {
-      isOutputCopied.value = false
-    }, 2000)
-  } catch (error) {
-    console.error('Failed to copy output:', error)
+// Toggle output fullscreen mode
+const toggleOutputFullscreen = () => {
+  isOutputFullscreen.value = !isOutputFullscreen.value
+  if (isOutputFullscreen.value) {
+    splitPosition.value = 0 // Hide editor when output is fullscreen
+  } else {
+    splitPosition.value = 50 // Reset to default split
   }
 }
 
@@ -166,20 +163,6 @@ onBeforeUnmount(() => {
           Run
         </Button>
 
-        <!-- Copy button (always shown) -->
-        <Button
-          variant="outline"
-          size="sm"
-          @click="copyOutput"
-          class="h-8"
-          title="Copy output to clipboard"
-          v-if="output"
-        >
-          <Copy v-if="!isOutputCopied" class="w-4 h-4 mr-2" />
-          <Check v-else class="w-4 h-4 mr-2" />
-          Copy Output
-        </Button>
-
         <!-- Close button -->
         <Button variant="ghost" size="icon" @click="onClose" aria-label="Close editor">
           <X class="h-4 w-4" />
@@ -190,8 +173,12 @@ onBeforeUnmount(() => {
 
     <!-- Content -->
     <div class="flex flex-1 overflow-hidden editor-container">
-      <!-- Code Editor -->
-      <div class="h-full overflow-hidden" :style="{ width: `${splitPosition}%` }">
+      <!-- Code Editor (hidden when output is fullscreen) -->
+      <div 
+        class="h-full overflow-hidden transition-all" 
+        :style="{ width: isOutputFullscreen ? '0%' : `${splitPosition}%` }"
+        :class="{ 'hidden': isOutputFullscreen }"
+      >
         <CodeMirror
           v-model="localCode"
           :language="language"
@@ -202,26 +189,30 @@ onBeforeUnmount(() => {
         />
       </div>
 
-      <!-- Resize handle -->
+      <!-- Resize handle (hidden when output is fullscreen) -->
       <div
+        v-if="!isOutputFullscreen"
         class="w-1 cursor-col-resize hover:bg-primary/20 active:bg-primary/40 transition-colors"
         @mousedown="startResize"
         aria-hidden="true"
       ></div>
 
       <!-- Output -->
-      <div class="flex flex-col h-full" :style="{ width: `${100 - splitPosition}%` }">
-        <div class="p-2 border-b bg-muted/30">
-          <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            Output
-          </span>
-        </div>
-        <div
+      <div 
+        class="flex flex-col h-full transition-all" 
+        :style="{ width: isOutputFullscreen ? '100%' : `${100 - splitPosition}%` }"
+      >
+        <!-- Use the enhanced OutputRenderer component -->
+        <OutputRenderer 
           v-if="output"
-          class="flex-1 overflow-auto p-4 text-sm whitespace-pre-wrap break-words"
-          v-html="output"
-          aria-live="polite"
-          role="status"
+          :content="output" 
+          :type="outputType"
+          :showControls="true"
+          :isFullscreenable="true"
+          :isCollapsible="true"
+          :originalCode="localCode"
+          class="h-full flex-1"
+          @fix-with-ai="onExecute"
         />
         <div v-else class="flex-1 flex items-center justify-center text-sm text-muted-foreground">
           No output to display
@@ -248,7 +239,7 @@ onBeforeUnmount(() => {
 
 /* Add transition for smooth resizing */
 .editor-container > div {
-  transition: width 0.05s ease;
+  transition: width 0.2s ease;
 }
 
 /* When actively resizing, disable transitions for better performance */
