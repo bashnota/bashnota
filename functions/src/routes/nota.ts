@@ -4,7 +4,6 @@ import admin from 'firebase-admin'
 import Validator from 'validatorjs'
 import { PublishedNota } from '../types/nota'
 import { authorizeRequest } from '../helpers'
-import { NotaContentProcessor } from '../utils/NotaContentProcessor'
 
 const router = express.Router()
 const db = admin.firestore()
@@ -99,8 +98,11 @@ router.post('/publish/:id', authorizeRequest, async (req: Request, res: Response
     }
 
     // Use the simplified content processor to sanitize content
-    const contentProcessor = new NotaContentProcessor()
-    const processedContent = contentProcessor.process(notaData.content)
+    // const contentProcessor = new NotaContentProcessor()
+    // const processedContent = contentProcessor.process(notaData.content)
+
+    // TODO: Activate content processor
+    const processedContent = JSON.parse(notaData.content)
 
     // Check if the nota already exists
     const docRef = db.collection(publishedNotasCollection).doc(notaId)
