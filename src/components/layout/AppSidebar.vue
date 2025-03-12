@@ -9,14 +9,10 @@ import {
   PlusIcon,
   MagnifyingGlassIcon,
   FolderIcon,
-  StarIcon,
-  ClockIcon,
   Cog6ToothIcon,
   QuestionMarkCircleIcon,
-  XMarkIcon,
   UserIcon,
 } from '@heroicons/vue/24/solid'
-import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import NotaTree from '../NotaTree.vue'
 import { RouterLink } from 'vue-router'
@@ -29,20 +25,27 @@ import {
 } from '@/components/ui/dropdown-menu'
 import ShortcutsDialog from '../ShortcutsDialog.vue'
 
+// Import our new modular components
+import SidebarSearch from './SidebarSearch.vue'
+import SidebarViewSelector from './SidebarViewSelector.vue'
+import SidebarNewNotaButton from './SidebarNewNotaButton.vue'
+import SidebarPagination from './SidebarPagination.vue'
+import SidebarAuthStatus from './SidebarAuthStatus.vue'
+
 const router = useRouter()
 const notaStore = useNotaStore()
 const authStore = useAuthStore()
 const newNotaTitle = ref('')
 const searchQuery = ref('')
-const showNewNotaInput = ref<string | null>(null)
+const showNewNotaInput = ref<boolean>(false)
 const expandedItems = ref<Set<string>>(new Set())
 const shortcutsDialog = ref<{ isOpen: boolean }>({ isOpen: false })
 const activeView = ref<'all' | 'favorites' | 'recent'>('all')
 const showSearch = ref(false)
 
-// Auth related computed
-const isAuthenticated = computed(() => authStore.isAuthenticated)
-const currentUser = computed(() => authStore.currentUser)
+// Pagination state
+const currentPage = ref(1)
+const itemsPerPage = ref(15)
 
 // Load last used view from localStorage
 onMounted(async () => {
@@ -53,9 +56,9 @@ onMounted(async () => {
   }
 })
 
-// Save view preference
-watch(activeView, (newView) => {
-  localStorage.setItem('sidebar-view', newView)
+// Reset pagination when view or search changes
+watch([activeView, searchQuery], () => {
+  currentPage.value = 1
 })
 
 const filteredNotas = computed(() => {
@@ -75,7 +78,6 @@ const filteredNotas = computed(() => {
           const dateB = new Date(b.updatedAt)
           return dateB.getTime() - dateA.getTime()
         })
-        .slice(0, 10) // Show only 10 most recent
       break
   }
 
@@ -90,6 +92,18 @@ const filteredNotas = computed(() => {
   return items
 })
 
+// Paginated items
+const paginatedNotas = computed(() => {
+  const startIndex = (currentPage.value - 1) * itemsPerPage.value
+  const endIndex = startIndex + itemsPerPage.value
+  return filteredNotas.value.slice(startIndex, endIndex)
+})
+
+// Total pages for pagination
+const totalPages = computed(() => {
+  return Math.ceil(filteredNotas.value.length / itemsPerPage.value) || 1
+})
+
 const createNewNota = async (parentId: string | null = null) => {
   // If title is empty, use a default title
   const title = newNotaTitle.value.trim() || 'Untitled Nota'
@@ -99,7 +113,7 @@ const createNewNota = async (parentId: string | null = null) => {
     const actualParentId = parentId === '' ? null : parentId
     const nota = await notaStore.createItem(title, actualParentId)
     newNotaTitle.value = ''
-    showNewNotaInput.value = null
+    showNewNotaInput.value = false
 
     if (actualParentId) {
       expandedItems.value.add(actualParentId)
@@ -111,49 +125,17 @@ const createNewNota = async (parentId: string | null = null) => {
   }
 }
 
-const handleKeydown = (event: KeyboardEvent) => {
-  if (event.key === 'Escape') {
-    showNewNotaInput.value = null
-    newNotaTitle.value = ''
-  }
-}
-
 // Keyboard shortcuts
-onKeyStroke('n', (e) => {
+onKeyStroke('n', (e: KeyboardEvent) => {
   if (e.metaKey || e.ctrlKey) {
     e.preventDefault()
-    showNewNotaInput.value = null
+    showNewNotaInput.value = false
   }
 })
-
-onKeyStroke('k', (e) => {
-  if (e.metaKey || e.ctrlKey) {
-    e.preventDefault()
-    showSearch.value = true
-    // Use nextTick to ensure the input is mounted before focusing
-    nextTick(() => {
-      document.querySelector<HTMLInputElement>('.search-input')?.focus()
-    })
-  }
-})
-
-// Add escape handler to close search
-onKeyStroke('Escape', () => {
-  if (showSearch.value) {
-    showSearch.value = false
-    searchQuery.value = ''
-  }
-})
-
-const viewOptions = [
-  { id: 'all', label: 'All Notes', icon: FolderIcon },
-  { id: 'favorites', label: 'Favorites', icon: StarIcon },
-  { id: 'recent', label: 'Recent', icon: ClockIcon },
-]
 
 // Handle login/profile navigation
 const handleAuthNavigation = () => {
-  if (isAuthenticated.value) {
+  if (authStore.isAuthenticated) {
     router.push('/profile')
   } else {
     router.push('/login')
@@ -162,7 +144,7 @@ const handleAuthNavigation = () => {
 </script>
 
 <template>
-  <div class="w-full h-full flex flex-col border-e bg-slate-100 dark:bg-slate-900">
+  <div class="w-full h-full flex flex-col border-e bg-slate-50 dark:bg-slate-900">
     <!-- Header -->
     <div class="p-2 border-b space-y-2">
       <!-- Logo and Controls -->
@@ -179,7 +161,7 @@ const handleAuthNavigation = () => {
           <DarkModeToggle />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" class="h-6 w-6">
+              <Button variant="ghost" size="sm" class="h-7 w-7">
                 <Cog6ToothIcon class="h-3.5 w-3.5" />
               </Button>
             </DropdownMenuTrigger>
@@ -194,7 +176,7 @@ const handleAuthNavigation = () => {
               </DropdownMenuItem>
               <DropdownMenuItem @click="handleAuthNavigation">
                 <UserIcon class="h-4 w-4 mr-2" />
-                <span>{{ isAuthenticated ? 'Your Profile' : 'Login' }}</span>
+                <span>{{ authStore.isAuthenticated ? 'Your Profile' : 'Login' }}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -202,169 +184,87 @@ const handleAuthNavigation = () => {
       </div>
 
       <!-- Search and View Controls -->
-      <div class="space-y-1.5">
-        <div class="flex items-center gap-1">
-          <!-- Search Button/Bar -->
-          <Transition
-            enter-active-class="transition-all duration-200 ease-out"
-            enter-from-class="opacity-0 scale-95"
-            enter-to-class="opacity-100 scale-100"
-            leave-active-class="transition-all duration-200 ease-in"
-            leave-from-class="opacity-100 scale-100"
-            leave-to-class="opacity-0 scale-95"
-          >
-            <div v-if="showSearch" class="relative w-full">
-              <div class="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none">
-                <MagnifyingGlassIcon class="h-3 w-3 text-muted-foreground" />
-              </div>
-              <Input
-                v-model="searchQuery"
-                placeholder="Search..."
-                class="pl-7 pr-7 h-6 text-xs w-full bg-background search-input"
-                @blur="showSearch = false"
-                autofocus
-              />
-              <Button
-                variant="ghost"
-                size="sm"
-                class="absolute right-1 top-1/2 -translate-y-1/2 h-4 w-4"
-                @click="
-                  () => {
-                    showSearch = false
-                    searchQuery = ''
-                  }
-                "
-              >
-                <XMarkIcon class="h-3 w-3" />
-              </Button>
-            </div>
-            <div v-else class="flex items-center gap-1 w-full">
-              <Button
-                variant="ghost"
-                size="sm"
-                class="h-6 w-6 flex-shrink-0"
-                @click="showSearch = true"
-                title="Search (⌘K)"
-              >
-                <MagnifyingGlassIcon class="h-3.5 w-3.5" />
-              </Button>
+      <div class="space-y-2">
+        <div class="flex items-center gap-1.5">
+          <!-- Search Component -->
+          <SidebarSearch
+            v-model="searchQuery"
+            v-model:showSearch="showSearch"
+          />
 
-              <!-- View Controls -->
-              <div class="flex gap-1">
-                <Button
-                  v-for="option in viewOptions"
-                  :key="option.id"
-                  variant="ghost"
-                  size="sm"
-                  :class="[
-                    'h-6 w-6',
-                    activeView === option.id && 'bg-primary/10 text-primary hover:bg-primary/20',
-                  ]"
-                  @click="activeView = option.id as 'all' | 'favorites' | 'recent'"
-                  :title="option.label"
-                >
-                  <component :is="option.icon" class="h-3.5 w-3.5" />
-                </Button>
-              </div>
+          <!-- View Selector Component -->
+          <SidebarViewSelector
+            v-model="activeView"
+            v-if="!showSearch"
+          />
 
-              <Button
-                @click="showNewNotaInput = ''"
-                class="h-6 text-xs px-2 gap-1 ml-auto"
-                variant="default"
-                size="sm"
-              >
-                <PlusIcon class="h-3.5 w-3.5" />
-                <span>New Nota</span>
-              </Button>
-            </div>
-          </Transition>
+          <!-- New Nota Button Component -->
+          <SidebarNewNotaButton
+            v-if="!showSearch"
+            :show-input="showNewNotaInput"
+            :title="newNotaTitle"
+            :parent-id="null"
+            @update:show-input="showNewNotaInput = $event"
+            @update:title="newNotaTitle = $event"
+            @create="createNewNota"
+            class="ml-auto"
+          />
         </div>
-
-        <!-- New Nota Input -->
-        <Transition
-          enter-active-class="transition-all duration-200 ease-out"
-          enter-from-class="opacity-0 -translate-y-2"
-          enter-to-class="opacity-100 translate-y-0"
-          leave-active-class="transition-all duration-200 ease-in"
-          leave-from-class="opacity-100 translate-y-0"
-          leave-to-class="opacity-0 -translate-y-2"
-        >
-          <div v-if="showNewNotaInput !== null" class="relative">
-            <div class="flex gap-1">
-              <Input
-                v-model="newNotaTitle"
-                placeholder="Enter nota title..."
-                class="h-6 text-xs flex-1"
-                @keydown="handleKeydown"
-                @keydown.enter="createNewNota(showNewNotaInput)"
-                autofocus
-              />
-              <Button
-                @click="createNewNota(showNewNotaInput)"
-                variant="default"
-                size="sm"
-                class="h-6 text-xs"
-              >
-                Create
-              </Button>
-            </div>
-          </div>
-        </Transition>
       </div>
     </div>
 
-    <!-- Tree View -->
+    <!-- Tree View with Pagination -->
     <ScrollArea class="flex-1">
       <div class="py-1">
         <NotaTree
-          :items="filteredNotas"
+          :items="paginatedNotas"
           :expanded-items="expandedItems"
-          :show-new-input="showNewNotaInput"
+          :show-new-input="null"
           :new-nota-title="newNotaTitle"
-          @toggle="
-            (id) => (expandedItems.has(id) ? expandedItems.delete(id) : expandedItems.add(id))
-          "
+          @toggle="(id) => (expandedItems.has(id) ? expandedItems.delete(id) : expandedItems.add(id))"
           @create="createNewNota"
-          @show-new-input="
-            (id) => {
-              showNewNotaInput = id
-              newNotaTitle = ''
-            }
-          "
+          @show-new-input="(id) => {
+            showNewNotaInput = true
+            newNotaTitle = ''
+          }"
           @update:new-nota-title="(value) => (newNotaTitle = value)"
         />
 
         <!-- Empty State -->
         <div
           v-if="filteredNotas.length === 0"
-          class="flex flex-col items-center justify-center h-16 text-sm text-muted-foreground gap-1.5"
+          class="flex flex-col items-center justify-center h-24 text-sm text-muted-foreground gap-1.5 my-4"
         >
-          <div class="rounded-full bg-muted/50 p-1.5">
-            <component :is="searchQuery ? MagnifyingGlassIcon : FolderIcon" class="w-3 h-3" />
+          <div class="rounded-full bg-muted/50 p-2">
+            <component :is="searchQuery ? MagnifyingGlassIcon : FolderIcon" class="w-4 h-4" />
           </div>
-          {{ searchQuery ? 'No items found' : 'Create your first nota' }}
+          <p>{{ searchQuery ? 'No items found' : 'Create your first nota' }}</p>
+          <Button 
+            v-if="!searchQuery" 
+            @click="showNewNotaInput = true" 
+            variant="outline" 
+            size="sm" 
+            class="mt-1"
+          >
+            <PlusIcon class="h-3.5 w-3.5 mr-1" />
+            New Nota
+          </Button>
         </div>
+
+        <!-- Pagination Component -->
+        <SidebarPagination
+          v-if="filteredNotas.length > 0"
+          :current-page="currentPage"
+          @update:page="currentPage = $event"
+          :total-pages="totalPages"
+          :items-per-page="itemsPerPage"
+          :total-items="filteredNotas.length"
+        />
       </div>
     </ScrollArea>
 
-    <!-- Auth Status Indicator -->
-    <div class="px-4 py-2 border-t text-sm">
-      <div v-if="isAuthenticated" class="flex items-center gap-2">
-        <div class="w-2 h-2 rounded-full bg-green-500"></div>
-        <RouterLink
-          to="/profile"
-          class="text-sm text-muted-foreground hover:text-foreground truncate"
-        >
-          Signed in as {{ currentUser?.displayName || currentUser?.email }}
-        </RouterLink>
-      </div>
-      <div v-else class="flex items-center gap-2">
-        <div class="w-2 h-2 rounded-full bg-amber-500"></div>
-        <RouterLink to="/login" class="text-sm text-muted-foreground hover:text-foreground">
-          Sign in to sync your data
-        </RouterLink>
-      </div>
-    </div>
+    <!-- Auth Status Component -->
+    <SidebarAuthStatus />
 
     <ShortcutsDialog ref="shortcutsDialog" />
   </div>
