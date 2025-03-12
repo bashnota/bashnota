@@ -29,6 +29,33 @@ export interface KernelConfig {
   lastUsed: string
 }
 
+export interface CloudProvider {
+  id: string
+  name: string
+  logo: string
+  description: string
+}
+
+export interface VMConfiguration {
+  name: string
+  provider: string
+  region: string
+  instanceType: string
+  diskSize: number
+  sshKey?: string
+  username?: string
+  password?: string
+}
+
+export interface CloudVM extends VMConfiguration {
+  id: string
+  status: 'creating' | 'running' | 'stopped' | 'error'
+  ipAddress?: string
+  createdAt: string
+  jupyterUrl?: string
+  jupyterToken?: string
+}
+
 export interface NotaConfig {
   jupyterServers: Array<{
     ip: string
@@ -41,6 +68,7 @@ export interface NotaConfig {
     id: string
     name: string
   }>
+  cloudVMs?: CloudVM[]
 }
 
 export interface KernelSpec {

@@ -1,22 +1,31 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { JupyterService } from '@/services/jupyterService'
-import type { JupyterServer, KernelSpec } from '@/types/jupyter'
+import { CloudProviderService, type VMTemplate } from '@/services/cloudProviderService'
+import type { JupyterServer, KernelSpec, CloudProvider, VMConfiguration, CloudVM } from '@/types/jupyter'
 import {
   ServerIcon,
   CpuChipIcon,
   ArrowPathIcon,
   Cog6ToothIcon,
   PlusIcon,
+  CloudIcon,
 } from '@heroicons/vue/24/outline'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 import ServerListItem from './ServerListItem.vue'
+import CloudProviderSelector from './CloudProviderSelector.vue'
+import CloudVMConfigModal from './CloudVMConfigModal.vue'
+import CloudVMListItem from './CloudVMListItem.vue'
+import CloudVMCreationProgress from './CloudVMCreationProgress.vue'
+import CloudVMTemplateSelector from './CloudVMTemplateSelector.vue'
 import { toast } from '@/lib/utils'
+import { Badge } from '@/components/ui/badge'
 
 const props = defineProps<{
   notaId: string
@@ -24,6 +33,7 @@ const props = defineProps<{
 
 const store = useNotaStore()
 const jupyterService = new JupyterService()
+const cloudProviderService = new CloudProviderService()
 
 // Form states
 const serverForm = ref<{
@@ -41,6 +51,20 @@ const isRefreshingKernels = ref(false)
 const testResults = ref<Record<string, { success: boolean; message: string }>>({})
 const showServerForm = ref(false)
 
+// Cloud provider states
+const showCloudProviderSelector = ref(false)
+const selectedProvider = ref<CloudProvider | null>(null)
+const showVMConfigModal = ref(false)
+const showTemplateSelector = ref(false)
+const isCreatingVM = ref(false)
+const showCreationProgress = ref(false)
+const creatingVM = ref<CloudVM | null>(null)
+const creationStep = ref(0)
+const totalSteps = 6 // Total steps in VM creation process
+const creationLogs = ref<string[]>([])
+const selectedTemplate = ref<VMTemplate | null>(null)
+const cloudTabActiveView = ref<'all' | 'recent'>('all')
+
 // Load config from store
 const currentNota = computed(() => store.getCurrentNota(props.notaId))
 const config = computed(() => {
@@ -48,9 +72,23 @@ const config = computed(() => {
     currentNota.value?.config || {
       jupyterServers: [],
       notebooks: [],
-      kernels: {} as Record<string, KernelSpec[]>,
+      kernels: {},
+      cloudVMs: [],
     }
   )
+})
+
+// Computed property for recently created VMs (last 7 days)
+const recentCloudVMs = computed(() => {
+  if (!config.value.cloudVMs) return []
+  
+  const sevenDaysAgo = new Date()
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+  
+  return config.value.cloudVMs.filter(vm => {
+    const createdAt = new Date(vm.createdAt)
+    return createdAt >= sevenDaysAgo
+  }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 })
 
 // Test server connection
@@ -157,6 +195,212 @@ const removeServer = async (serverToRemove: JupyterServer) => {
     })
   }
 }
+
+// Cloud provider functions
+const openCloudProviderSelector = () => {
+  showCloudProviderSelector.value = true
+}
+
+const handleProviderSelect = (provider: CloudProvider) => {
+  selectedProvider.value = provider
+  showCloudProviderSelector.value = false
+  showTemplateSelector.value = true
+}
+
+const handleTemplateSelect = (template: VMTemplate) => {
+  selectedTemplate.value = template
+  showTemplateSelector.value = false
+  
+  // Create VM from template
+  createVMFromTemplate(template)
+}
+
+const handleCustomVM = () => {
+  showTemplateSelector.value = false
+  showVMConfigModal.value = true
+}
+
+const closeVMConfigModal = () => {
+  showVMConfigModal.value = false
+  selectedProvider.value = null
+}
+
+const closeTemplateSelector = () => {
+  showTemplateSelector.value = false
+  selectedProvider.value = null
+}
+
+const createVMFromTemplate = async (template: VMTemplate) => {
+  // Generate a random password for the VM
+  const randomPassword = Math.random().toString(36).substring(2, 10) + 
+                         Math.random().toString(36).substring(2, 10)
+  
+  // Create a copy of the configuration with the password
+  const vmConfig: VMConfiguration = {
+    ...template.configuration,
+    password: randomPassword,
+  }
+  
+  // Start VM creation process
+  await createVM(vmConfig, template.packages)
+}
+
+const createVM = async (vmConfig: VMConfiguration, packages: string[] = []) => {
+  isCreatingVM.value = true
+  showVMConfigModal.value = false
+  showCreationProgress.value = true
+  
+  try {
+    // Add timestamp to logs
+    const addLog = (message: string) => {
+      const timestamp = new Date().toLocaleTimeString()
+      creationLogs.value.push(`${timestamp}|${message}`)
+    }
+    
+    // Step 1: Create VM
+    creationStep.value = 0
+    addLog(`Creating VM instance on ${vmConfig.provider}...`)
+    const vm = await cloudProviderService.createVM(vmConfig)
+    creatingVM.value = vm
+    
+    // Save VM to config
+    await store.updateNotaConfig(props.notaId, (config) => {
+      if (!config.cloudVMs) config.cloudVMs = []
+      config.cloudVMs.push(vm)
+    })
+    
+    // Step 2: Wait for VM to start
+    creationStep.value = 1
+    addLog('Waiting for VM to start...')
+    await new Promise((resolve) => setTimeout(resolve, 3000))
+    
+    // Step 3: Install dependencies
+    creationStep.value = 2
+    addLog('Installing Python and dependencies...')
+    addLog('apt-get update')
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+    addLog('apt-get install -y python3-pip python3-dev')
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+    
+    // Step 4: Configure Jupyter
+    creationStep.value = 3
+    addLog('Installing Jupyter...')
+    addLog('pip3 install jupyter jupyterlab')
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+    
+    // Install additional packages if provided
+    if (packages && packages.length > 0) {
+      addLog(`Installing additional packages: ${packages.join(', ')}...`)
+      const packageCommands = cloudProviderService.getPackageInstallCommands(packages)
+      for (const cmd of packageCommands) {
+        addLog(cmd)
+        await new Promise((resolve) => setTimeout(resolve, 1500))
+      }
+    }
+    
+    addLog('Configuring Jupyter...')
+    addLog('jupyter notebook --generate-config')
+    addLog('Setting up security and remote access...')
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    
+    // Step 5: Start Jupyter server
+    creationStep.value = 4
+    addLog('Starting Jupyter server...')
+    addLog('nohup jupyter lab --port=8888 &')
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+    
+    // Step 6: Get connection details
+    creationStep.value = 5
+    addLog('Retrieving connection details...')
+    const updatedVM = await cloudProviderService.provisionVM(vm, packages)
+    
+    // Update VM in config
+    await store.updateNotaConfig(props.notaId, (config) => {
+      if (!config.cloudVMs) return
+      const index = config.cloudVMs.findIndex((v) => v.id === updatedVM.id)
+      if (index !== -1) {
+        config.cloudVMs[index] = updatedVM
+      }
+    })
+    
+    creatingVM.value = updatedVM
+    addLog(`Jupyter server is running at ${updatedVM.jupyterUrl}`)
+    addLog(`Token: ${updatedVM.jupyterToken}`)
+    addLog('Setup completed successfully!')
+    
+    toast(`Jupyter server on ${updatedVM.name} is now running`)
+  } catch (error) {
+    creationLogs.value.push(`Error: ${error instanceof Error ? error.message : String(error)}`)
+    
+    // Update VM status to error
+    if (creatingVM.value) {
+      await store.updateNotaConfig(props.notaId, (config) => {
+        if (!config.cloudVMs) return
+        const index = config.cloudVMs.findIndex((v) => v.id === creatingVM.value?.id)
+        if (index !== -1) {
+          config.cloudVMs[index] = {
+            ...config.cloudVMs[index],
+            status: 'error',
+          }
+        }
+      })
+    }
+  } finally {
+    isCreatingVM.value = false
+    selectedTemplate.value = null
+  }
+}
+
+const closeCreationProgress = () => {
+  showCreationProgress.value = false
+  creatingVM.value = null
+  creationStep.value = 0
+  creationLogs.value = []
+}
+
+const addVMServer = async (server: JupyterServer) => {
+  // Check if server already exists
+  const serverExists = config.value.jupyterServers.some(
+    (s) => s.ip === server.ip && s.port === server.port,
+  )
+  
+  if (serverExists) {
+    toast('This server is already added to your configuration')
+    return
+  }
+  
+  // Test connection before adding
+  await testConnection(server)
+  
+  const serverKey = `${server.ip}:${server.port}`
+  if (testResults.value[serverKey]?.success) {
+    await store.updateNotaConfig(props.notaId, (config) => {
+      if (!config.jupyterServers) config.jupyterServers = []
+      config.jupyterServers.push(server)
+    })
+    
+    toast(`Server ${server.ip}:${server.port} added successfully`)
+  }
+}
+
+const removeVM = async (vmToRemove: CloudVM) => {
+  if (confirm(`Are you sure you want to remove ${vmToRemove.name}?`)) {
+    await store.updateNotaConfig(props.notaId, (config) => {
+      if (!config.cloudVMs) return
+      config.cloudVMs = config.cloudVMs.filter((vm) => vm.id !== vmToRemove.id)
+    })
+    
+    toast(`VM ${vmToRemove.name} removed`)
+  }
+}
+
+// Helper function to safely get kernels for a server
+const getKernelsForServer = (server: JupyterServer): KernelSpec[] => {
+  const serverKey = `${server.ip}:${server.port}`
+  const kernels = config.value.kernels as Record<string, KernelSpec[]> | undefined
+  if (!kernels) return []
+  return kernels[serverKey] || []
+}
 </script>
 
 <template>
@@ -170,11 +414,17 @@ const removeServer = async (serverToRemove: JupyterServer) => {
       </div>
 
       <Tabs default-value="servers" class="w-full">
-        <TabsList class="grid w-full grid-cols-2">
+        <TabsList class="grid w-full grid-cols-3">
           <TabsTrigger value="servers">
             <div class="flex items-center justify-center gap-2 p-1">
               <ServerIcon class="w-4 h-4 shrink-0" />
               <span class="text-sm">Jupyter Servers</span>
+            </div>
+          </TabsTrigger>
+          <TabsTrigger value="cloud">
+            <div class="flex items-center justify-center gap-2 p-1">
+              <CloudIcon class="w-4 h-4 shrink-0" />
+              <span class="text-sm">Cloud Servers</span>
             </div>
           </TabsTrigger>
           <TabsTrigger value="kernels">
@@ -292,6 +542,89 @@ const removeServer = async (serverToRemove: JupyterServer) => {
           </Card>
         </TabsContent>
 
+        <!-- Cloud Servers Tab -->
+        <TabsContent value="cloud" class="space-y-6">
+          <Card>
+            <CardHeader>
+              <div class="flex items-center justify-between">
+                <div>
+                  <CardTitle>Cloud Jupyter Servers</CardTitle>
+                  <CardDescription>Create and manage Jupyter servers on cloud providers</CardDescription>
+                </div>
+                <Button
+                  @click="openCloudProviderSelector"
+                  variant="outline"
+                  class="flex items-center gap-2"
+                >
+                  <CloudIcon class="w-4 h-4" />
+                  Create Cloud Server
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <!-- View Selector -->
+              <div v-if="config.cloudVMs?.length" class="mb-4 flex items-center space-x-2 border-b pb-4">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  :class="{ 'bg-muted': cloudTabActiveView === 'all' }"
+                  @click="cloudTabActiveView = 'all'"
+                >
+                  All Servers
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  :class="{ 'bg-muted': cloudTabActiveView === 'recent' }"
+                  @click="cloudTabActiveView = 'recent'"
+                >
+                  Recently Created
+                  <Badge v-if="recentCloudVMs.length" class="ml-2">{{ recentCloudVMs.length }}</Badge>
+                </Button>
+              </div>
+
+              <!-- Cloud VM List -->
+              <div
+                v-if="!config.cloudVMs?.length"
+                class="rounded-lg border border-dashed p-8 text-center"
+              >
+                <CloudIcon class="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
+                <p class="text-sm font-medium mb-2">No Cloud Servers Created</p>
+                <p class="text-sm text-muted-foreground max-w-md mx-auto">
+                  Create a Jupyter server on a cloud provider with a single click. We'll handle the setup and configuration for you.
+                </p>
+                <Button @click="openCloudProviderSelector" class="mt-4">
+                  <CloudIcon class="w-4 h-4 mr-2" />
+                  Create Your First Cloud Server
+                </Button>
+              </div>
+
+              <div v-else-if="cloudTabActiveView === 'all'" class="space-y-4">
+                <CloudVMListItem
+                  v-for="vm in config.cloudVMs"
+                  :key="vm.id"
+                  :vm="vm"
+                  @add-server="addVMServer"
+                  @remove="removeVM"
+                />
+              </div>
+
+              <div v-else-if="cloudTabActiveView === 'recent'" class="space-y-4">
+                <div v-if="recentCloudVMs.length === 0" class="text-center p-8">
+                  <p class="text-sm text-muted-foreground">No servers created in the last 7 days</p>
+                </div>
+                <CloudVMListItem
+                  v-for="vm in recentCloudVMs"
+                  :key="vm.id"
+                  :vm="vm"
+                  @add-server="addVMServer"
+                  @remove="removeVM"
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <!-- Kernels Tab -->
         <TabsContent value="kernels" class="space-y-6">
           <div v-if="config.jupyterServers.length === 0">
@@ -327,7 +660,7 @@ const removeServer = async (serverToRemove: JupyterServer) => {
               </CardHeader>
               <CardContent class="border-t pt-6">
                 <div
-                  v-if="!config.kernels[`${server.ip}:${server.port}`]?.length"
+                  v-if="getKernelsForServer(server).length === 0"
                   class="rounded-lg border border-dashed p-8 text-center"
                 >
                   <CpuChipIcon class="w-10 h-10 mx-auto mb-4 text-muted-foreground/50" />
@@ -339,7 +672,7 @@ const removeServer = async (serverToRemove: JupyterServer) => {
 
                 <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div
-                    v-for="kernel in config.kernels[`${server.ip}:${server.port}`]"
+                    v-for="kernel in getKernelsForServer(server)"
                     :key="kernel.name"
                     class="group rounded-lg border bg-slate-50 dark:bg-slate-900 hover:shadow-sm transition-all duration-200 p-4"
                   >
@@ -368,19 +701,57 @@ const removeServer = async (serverToRemove: JupyterServer) => {
             </Card>
           </div>
         </TabsContent>
-
-        <!-- Settings Tab -->
-        <TabsContent value="settings">
-          <Card>
-            <CardHeader>
-              <CardTitle>General Settings</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <!-- Add general settings here -->
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
     </div>
   </div>
+
+  <!-- Cloud Provider Selection Dialog -->
+  <Dialog :open="showCloudProviderSelector" @update:open="(open) => (showCloudProviderSelector = open)">
+    <DialogContent class="sm:max-w-[800px]">
+      <div class="space-y-6">
+        <div class="space-y-2">
+          <h3 class="text-lg font-medium">Select Cloud Provider</h3>
+          <p class="text-sm text-muted-foreground">
+            Choose a cloud provider to create your Jupyter server
+          </p>
+        </div>
+        <CloudProviderSelector @select="handleProviderSelect" />
+      </div>
+    </DialogContent>
+  </Dialog>
+
+  <!-- Template Selection Dialog -->
+  <Dialog :open="showTemplateSelector" @update:open="(open) => !open && closeTemplateSelector()">
+    <DialogContent class="sm:max-w-[800px]">
+      <CloudVMTemplateSelector
+        v-if="selectedProvider"
+        :provider="selectedProvider"
+        @select-template="handleTemplateSelect"
+        @custom-vm="handleCustomVM"
+      />
+    </DialogContent>
+  </Dialog>
+
+  <!-- VM Configuration Modal -->
+  <CloudVMConfigModal
+    v-if="selectedProvider"
+    :show="showVMConfigModal"
+    :provider="selectedProvider"
+    @close="closeVMConfigModal"
+    @create="createVM"
+  />
+
+  <!-- VM Creation Progress Dialog -->
+  <Dialog :open="showCreationProgress" @update:open="(open) => !open && closeCreationProgress()">
+    <DialogContent class="sm:max-w-[700px]">
+      <CloudVMCreationProgress
+        v-if="creatingVM"
+        :vm="creatingVM"
+        :current-step="creationStep"
+        :total-steps="totalSteps"
+        :logs="creationLogs"
+        @close="closeCreationProgress"
+      />
+    </DialogContent>
+  </Dialog>
 </template>
