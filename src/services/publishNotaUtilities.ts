@@ -1,4 +1,4 @@
-import type { SubFigure } from '@/components/editor/extensions/SubfigureExtension'
+import type { SubFigure } from '@/components/editor/blocks/subfigure-block/subfigure-extension'
 import { fetchAPI } from '@/services/axios'
 
 // Regular expression to identify data URLs
@@ -135,7 +135,7 @@ async function processContentObject(obj: any) : Promise<any> {
     }
 
     // Handle subfigures based on the SubfigureExtension
-    if (obj.type === 'subfigures' && obj.attrs?.subfigures && Array.isArray(obj.attrs.subfigures)) {
+    if (obj.type === 'subfigure' && obj.attrs?.subfigures && Array.isArray(obj.attrs.subfigures)) {
       const processedSubfigures = await Promise.all(
         obj.attrs.subfigures.map(async (subfigure: SubFigure) => {
           // Check if this subfigure has a data URL as src

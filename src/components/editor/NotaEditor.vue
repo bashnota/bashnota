@@ -304,7 +304,7 @@ const handleKeyboardShortcuts = (event: KeyboardEvent) => {
     y: () =>
       editor.value!.chain().focus().setYoutube('https://www.youtube.com/watch?v=dQw4w9WgXcQ').run(),
     s: () => editor.value!.chain().focus().setScatterPlot().run(),
-    f: () => editor.value!.chain().focus().setSubfigures().run(),
+    f: () => editor.value!.chain().focus().setSubfigure().run(),
     h: () => editor.value!.chain().focus().setHorizontalRule().run(),
     q: () => editor.value!.chain().focus().toggleBlockquote().run(),
     k: () => editor.value!.chain().focus().toggleTaskList().run(),
