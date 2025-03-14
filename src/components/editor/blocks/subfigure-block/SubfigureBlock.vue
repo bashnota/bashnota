@@ -27,6 +27,7 @@
         v-if="hasVisibleSubfigures || !isReadOnly"
         v-model="captionData"
         :is-read-only="isReadOnly"
+        @unlock="unlockSubfigure"
       />
     </div>
   </node-view-wrapper>

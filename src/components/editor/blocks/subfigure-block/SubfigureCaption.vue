@@ -71,6 +71,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [value: CaptionData]
+  'unlock': []
 }>()
 
 // Local state
@@ -95,7 +96,10 @@ watch(
 
 // Label methods
 const startEditingLabel = () => {
-  if (props.modelValue.isLocked) return
+  if (props.modelValue.isLocked) {
+    emit('unlock')
+    return
+  }
   isEditingLabel.value = true
 }
 
@@ -116,7 +120,10 @@ const handleLabelInput = (event: Event) => {
 
 // Caption methods
 const startEditingCaption = () => {
-  if (props.modelValue.isLocked) return
+  if (props.modelValue.isLocked) {
+    emit('unlock')
+    return
+  }
   isEditingCaption.value = true
 }
 

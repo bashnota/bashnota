@@ -11,12 +11,14 @@
           { 'h-48': unifiedSize },
         ]"
         @dblclick="handleDoubleClick"
+        @click="handleImageClick"
       />
       <UploadZone
         v-else-if="!isReadOnly"
         @file-selected="handleFileSelected"
         @file-dropped="handleFileDrop"
         class="rounded-md"
+        :disabled="isLocked"
       />
 
       <Button
@@ -57,6 +59,15 @@
         />
       </div>
     </div>
+
+    <!-- Image Preview Modal -->
+    <ImagePreviewModal
+      :is-open="isPreviewOpen"
+      @update:is-open="isPreviewOpen = $event"
+      :image-src="subfigure.src"
+      :image-alt="defaultLabel"
+      :image-caption="subfigure.caption || defaultLabel"
+    />
   </div>
 </template>
 
@@ -66,6 +77,7 @@ import { TrashIcon } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import UploadZone from '@/components/UploadZone.vue'
+import ImagePreviewModal from '@/components/ImagePreviewModal.vue'
 
 type ObjectFitType = 'contain' | 'cover' | 'fill' | 'none' | 'scale-down'
 
@@ -93,6 +105,7 @@ const emit = defineEmits<{
 // Local state
 const localCaption = ref(props.subfigure.caption || '')
 const isEditingCaption = ref(false)
+const isPreviewOpen = ref(false)
 
 // Computed properties
 const imageStyle = computed(() => ({
@@ -110,9 +123,23 @@ watch(
   { deep: true, immediate: true }
 )
 
+// Image preview methods
+const handleImageClick = (event: MouseEvent) => {
+  // Always allow preview, even when locked
+  event.preventDefault()
+  event.stopPropagation()
+  
+  // If in edit mode and locked, a single click should open the preview
+  // Double click will still trigger the unlock event separately
+  isPreviewOpen.value = true
+}
+
 // Caption methods
 const startEditingCaption = () => {
-  if (props.isLocked) return
+  if (props.isLocked) {
+    emit('unlock')
+    return
+  }
   isEditingCaption.value = true
 }
 
@@ -141,6 +168,11 @@ const updateSubfigure = (data: Partial<SubfigureData>) => {
 
 // File handling methods
 const handleFileDrop = async (event: DragEvent) => {
+  if (props.isLocked) {
+    emit('unlock')
+    return
+  }
+  
   const file = event.dataTransfer?.files[0]
   if (file) {
     await handleFileUpload(file)
@@ -148,6 +180,11 @@ const handleFileDrop = async (event: DragEvent) => {
 }
 
 const handleFileSelected = async (event: Event) => {
+  if (props.isLocked) {
+    emit('unlock')
+    return
+  }
+  
   const file = (event.target as HTMLInputElement).files?.[0]
   if (file) {
     await handleFileUpload(file)
@@ -175,6 +212,12 @@ const handleDoubleClick = (event: MouseEvent) => {
   event.preventDefault()
   event.stopPropagation()
 
+  // Close the preview if it's open
+  if (isPreviewOpen.value) {
+    isPreviewOpen.value = false
+  }
+
+  // Unlock if locked
   if (props.isLocked) {
     emit('unlock')
   }
