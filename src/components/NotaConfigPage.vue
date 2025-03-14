@@ -9,6 +9,7 @@ import {
   ArrowPathIcon,
   Cog6ToothIcon,
   PlusIcon,
+  LinkIcon,
 } from '@heroicons/vue/24/outline'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
@@ -30,10 +31,12 @@ const serverForm = ref<{
   ip: string
   port: string
   token: string
+  url: string
 }>({
   ip: '',
   port: '',
   token: '',
+  url: '',
 })
 
 const isTestingConnection = ref(false)
@@ -136,6 +139,7 @@ const addServer = async () => {
       ip: '',
       port: '',
       token: '',
+      url: '',
     }
     showServerForm.value = false
 
@@ -155,6 +159,24 @@ const removeServer = async (serverToRemove: JupyterServer) => {
         delete config.kernels[serverKey]
       }
     })
+  }
+}
+
+// Parse Jupyter URL
+const parseJupyterUrl = () => {
+  if (!serverForm.value.url) {
+    toast('Please enter a Jupyter URL')
+    return
+  }
+
+  const parsedServer = jupyterService.parseJupyterUrl(serverForm.value.url)
+  if (parsedServer) {
+    serverForm.value.ip = parsedServer.ip
+    serverForm.value.port = parsedServer.port
+    serverForm.value.token = parsedServer.token
+    toast('URL parsed successfully')
+  } else {
+    toast('Failed to parse Jupyter URL')
   }
 }
 </script>
@@ -208,6 +230,34 @@ const removeServer = async (serverToRemove: JupyterServer) => {
               <!-- New Server Form -->
               <div v-if="showServerForm" class="mb-6 border rounded-lg p-4 bg-muted/50">
                 <form @submit.prevent="addServer" class="space-y-4">
+                  <!-- URL Input -->
+                  <div class="space-y-2">
+                    <label class="text-sm font-medium">Jupyter URL (Optional)</label>
+                    <div class="flex gap-2">
+                      <Input
+                        :value="serverForm.url"
+                        @input="
+                          (e: Event) => (serverForm.url = (e.target as HTMLInputElement).value)
+                        "
+                        type="text"
+                        placeholder="https://jupyter-server.example.com:8888/?token=abc123"
+                        class="flex-1"
+                      />
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        @click="parseJupyterUrl"
+                        class="flex items-center gap-2"
+                      >
+                        <LinkIcon class="w-4 h-4" />
+                        Parse URL
+                      </Button>
+                    </div>
+                    <p class="text-xs text-muted-foreground">
+                      Paste a Jupyter URL (including Kaggle URLs) to automatically fill the fields below
+                    </p>
+                  </div>
+
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="space-y-2">
                       <label class="text-sm font-medium">Server IP</label>
@@ -257,6 +307,7 @@ const removeServer = async (serverToRemove: JupyterServer) => {
                           serverForm.ip = ''
                           serverForm.port = ''
                           serverForm.token = ''
+                          serverForm.url = ''
                         }
                       "
                     >
