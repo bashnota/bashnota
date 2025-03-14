@@ -315,6 +315,29 @@ const handleKeyboardShortcuts = (event: KeyboardEvent) => {
       }
     },
     a: () => editor.value!.chain().focus().insertInlineAIGeneration().run(),
+    x: () => {
+      if (editor.value) {
+        // Instead of trying to set text selection at the end,
+        // we'll append a new paragraph directly
+        editor.value.chain()
+          .focus()
+          // First ensure we're at the end by appending the content
+          .command(({ tr, dispatch }) => {
+            if (dispatch) {
+              // Create a new paragraph node
+              const node = editor.value!.schema.nodes.paragraph.create(
+                null,
+                editor.value!.schema.text('New text block')
+              )
+              
+              // Append it to the end of the document
+              tr.insert(tr.doc.content.size, node)
+            }
+            return true
+          })
+          .run()
+      }
+    },
   }
 
   const key = event.key.toLowerCase()
