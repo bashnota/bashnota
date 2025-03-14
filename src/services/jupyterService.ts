@@ -3,6 +3,61 @@ import type { JupyterServer, ExecutionResult, KernelSpec, WSMessage } from '@/ty
 import { v4 as uuidv4 } from 'uuid'
 
 export class JupyterService {
+  /**
+   * Parse a Jupyter URL into a JupyterServer object
+   * Handles both standard Jupyter URLs and Kaggle Jupyter URLs
+   * @param url The Jupyter URL to parse
+   * @returns A JupyterServer object or null if parsing fails
+   */
+  parseJupyterUrl(url: string): JupyterServer | null {
+    try {
+      const urlObj = new URL(url)
+      
+      // Handle Kaggle Jupyter URLs
+      if (urlObj.hostname.includes('kaggle')) {
+        // Extract token from query parameters
+        const token = urlObj.searchParams.get('token')
+        if (!token) {
+          console.error('No token found in Kaggle URL')
+          return null
+        }
+        
+        // For Kaggle, we use the full hostname as the IP
+        // and extract the protocol (http/https)
+        const protocol = urlObj.protocol
+        const ip = `${protocol}//${urlObj.hostname}`
+        
+        // Kaggle typically uses port 80 for HTTP and 443 for HTTPS
+        // but we'll use the port from the URL if it exists
+        const port = urlObj.port || (protocol === 'https:' ? '443' : '80')
+        
+        return {
+          ip,
+          port,
+          token
+        }
+      }
+      
+      // Handle standard Jupyter URLs
+      const protocol = urlObj.protocol
+      const hostname = urlObj.hostname
+      const ip = `${protocol}//${hostname}`
+      const port = urlObj.port || (protocol === 'https:' ? '443' : '80')
+      
+      // Extract token from query parameters
+      const token = urlObj.searchParams.get('token') || ''
+      
+      return {
+        ip,
+        port,
+        token
+      }
+    } catch (error) {
+      console.error('Error parsing Jupyter URL:', error)
+      return null
+    }
+  }
+
   private getBaseUrl(server: JupyterServer): string {
     const protocol = server.ip.startsWith('http') ? '' : 'http://'
     return `${protocol}${server.ip}:${server.port}/api`
