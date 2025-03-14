@@ -10,118 +10,29 @@
         }"
       >
         <!-- Controls - only show in edit mode -->
-        <div
+        <ImageControls
           v-if="attrs.src && !isLocked && !isReadOnly"
-          class="flex items-center gap-1 mb-2 p-0.5 bg-muted/50 rounded-md w-fit"
-        >
-          <!-- Width controls -->
-          <Button
-            v-for="size in ['25%', '50%', '75%', '100%']"
-            :key="size"
-            variant="ghost"
-            size="sm"
-            class="px-2 h-8"
-            :class="{ 'bg-background': localWidth === size }"
-            @click="updateWidth(size)"
-          >
-            <ImageIcon v-if="size === '25%'" class="w-3 h-3" />
-            <ImageIcon v-if="size === '50%'" class="w-4 h-4" />
-            <ImageIcon v-if="size === '75%'" class="w-5 h-5" />
-            <ImageIcon v-if="size === '100%'" class="w-6 h-6" />
-          </Button>
+          v-model="imageAttributes"
+        />
 
-          <Separator orientation="vertical" class="mx-0.5 h-6" />
+        <!-- Image container -->
+        <ImageDisplay
+          v-if="attrs.src || !isReadOnly"
+          :src="attrs.src"
+          :width="attrs.width"
+          :object-fit="attrs.objectFit"
+          :is-locked="isLocked"
+          :is-read-only="isReadOnly"
+          @update:src="updateSrc"
+          @unlock="unlockImage"
+        />
 
-          <!-- Alignment controls -->
-          <Button
-            v-for="align in ['left', 'center', 'right']"
-            :key="align"
-            variant="ghost"
-            size="sm"
-            class="px-2 h-8"
-            :class="{ 'bg-background': localAlignment === align }"
-            @click="updateAlignment(align)"
-          >
-            <component :is="alignmentIcons[align]" class="w-4 h-4" />
-          </Button>
-
-          <Separator orientation="vertical" class="mx-0.5 h-6" />
-
-          <!-- Lock control -->
-          <Button variant="ghost" size="sm" class="px-2 h-8" @click="toggleLock">
-            <LockIcon v-if="isLocked" class="h-4 w-4" />
-            <UnlockIcon v-else class="h-4 w-4" />
-          </Button>
-        </div>
-
-        <!-- Image container - only show if there's an image or not in read-only mode -->
-        <div v-if="attrs.src || !isReadOnly" class="relative" :style="{ width: attrs.width }">
-          <img
-            v-if="attrs.src"
-            :src="attrs.src"
-            :style="{ objectFit: attrs.objectFit || 'contain' }"
-            class="w-full h-auto rounded-md"
-            @dblclick="handleDoubleClick"
-          />
-          <UploadZone
-            v-else-if="!isReadOnly"
-            @file-selected="handleImageUpload"
-            @file-dropped="handleDrop"
-          />
-        </div>
-
-        <!-- Caption and label - different display for read-only mode -->
-        <div v-if="attrs.src" class="flex flex-col gap-1 w-full mt-2">
-          <!-- Read-only label display -->
-          <div v-if="isReadOnly && localLabel" class="font-medium text-base px-2 py-1">
-            {{ localLabel }}
-          </div>
-
-          <!-- Editable label -->
-          <div
-            v-else-if="!isReadOnly && !isEditingLabel"
-            class="font-medium text-base hover:bg-muted/50 rounded px-2 py-1 cursor-text"
-            @click="isEditingLabel = true"
-          >
-            {{ localLabel || 'Click to add figure label' }}
-          </div>
-
-          <Input
-            v-else-if="!isReadOnly"
-            v-model="localLabel"
-            @blur="handleLabelBlur"
-            @keyup.enter="handleLabelBlur"
-            placeholder="Figure label (e.g., Figure 1)"
-            class="font-medium"
-            :disabled="isLocked"
-            autofocus
-          />
-
-          <!-- Read-only caption display -->
-          <div v-if="isReadOnly && localCaption" class="text-sm text-muted-foreground px-2 py-1">
-            {{ localCaption }}
-          </div>
-
-          <!-- Editable caption -->
-          <div
-            v-else-if="!isReadOnly && !isEditingCaption"
-            class="text-sm text-muted-foreground hover:bg-muted/50 rounded px-2 py-1 cursor-text"
-            @click="isEditingCaption = true"
-          >
-            {{ localCaption || 'Click to add caption' }}
-          </div>
-
-          <Input
-            v-else-if="!isReadOnly"
-            v-model="localCaption"
-            @blur="handleCaptionBlur"
-            @keyup.enter="handleCaptionBlur"
-            placeholder="Add caption..."
-            class="text-sm"
-            :disabled="isLocked"
-            autofocus
-          />
-        </div>
+        <!-- Caption and label -->
+        <ImageCaption
+          v-if="attrs.src"
+          v-model="captionData"
+          :is-read-only="isReadOnly"
+        />
       </div>
     </div>
   </node-view-wrapper>
@@ -129,155 +40,110 @@
 
 <script setup lang="ts">
 import { NodeViewWrapper } from '@tiptap/vue-3'
-import { ref, computed, onMounted, watch, onUnmounted, type FunctionalComponent } from 'vue'
-import {
-  AlignLeftIcon,
-  AlignCenterIcon,
-  AlignRightIcon,
-  LockIcon,
-  UnlockIcon,
-  ImageIcon,
-} from 'lucide-vue-next'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Separator } from '@/components/ui/separator'
-import UploadZone from '@/components/UploadZone.vue'
+import { computed, watch, onMounted, onUnmounted } from 'vue'
+import type { NodeViewProps } from '@tiptap/vue-3'
+import ImageControls from './ImageControls.vue'
+import ImageDisplay from './ImageDisplay.vue'
+import ImageCaption from './ImageCaption.vue'
 
-const props = defineProps<{
-  node: any
-  editor: any
-  updateAttributes: (attrs: Record<string, any>) => void
-}>()
+// Define types
+type ObjectFitType = 'contain' | 'cover' | 'fill' | 'none' | 'scale-down'
+type AlignmentType = 'left' | 'center' | 'right'
 
-// Reactive state
+interface ImageAttributes {
+  src?: string
+  width: string
+  alignment: AlignmentType
+  objectFit: ObjectFitType
+  isLocked: boolean
+  caption?: string
+  label?: string
+}
+
+// Props - extend NodeViewProps
+const props = defineProps<NodeViewProps>()
+
+// Computed properties
 const attrs = computed(() => props.node.attrs)
-const localCaption = ref(props.node.attrs.caption || '')
-const localLabel = ref(props.node.attrs.label || '')
-const localWidth = ref(props.node.attrs.width || '100%')
-const localAlignment = ref(props.node.attrs.alignment || 'center')
-const isLocked = ref(props.node.attrs.isLocked || false)
-const isEditingLabel = ref(false)
-const isEditingCaption = ref(false)
 const isReadOnly = computed(() => !props.editor.isEditable)
+const isLocked = computed(() => props.node.attrs.isLocked || false)
 
-// UI helpers
-const alignmentIcons: Record<string, FunctionalComponent> = {
-  left: AlignLeftIcon,
-  center: AlignCenterIcon,
-  right: AlignRightIcon,
-}
-
-// File handling methods
-const handleDrop = async (event: DragEvent) => {
-  const file = event.dataTransfer?.files[0]
-  if (file) {
-    await handleFileUpload(file)
+// Reactive state for v-model bindings
+const imageAttributes = computed({
+  get: () => ({
+    width: attrs.value.width || '100%',
+    alignment: attrs.value.alignment || 'center',
+    isLocked: attrs.value.isLocked || false,
+  }),
+  set: (newAttrs: Partial<ImageAttributes>) => {
+    updateNodeAttributes(newAttrs)
   }
-}
+})
 
-const handleFileUpload = async (file: File) => {
-  try {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      props.updateAttributes({
-        src: e.target?.result,
-      })
-    }
-    reader.readAsDataURL(file)
-  } catch (error) {
-    console.error('Error uploading image:', error)
+const captionData = computed({
+  get: () => ({
+    caption: attrs.value.caption || '',
+    label: attrs.value.label || '',
+    isLocked: attrs.value.isLocked || false,
+  }),
+  set: (data: { caption: string; label: string; isLocked: boolean }) => {
+    updateCaptionData(data)
   }
-}
-
-const handleImageUpload = async (event: Event) => {
-  const file = (event.target as HTMLInputElement).files?.[0]
-  if (file) {
-    await handleFileUpload(file)
-  }
-}
-
-// Caption and label methods
-const handleLabelBlur = () => {
-  isEditingLabel.value = false
-  props.updateAttributes({
-    label: localLabel.value,
-  })
-}
-
-const handleCaptionBlur = () => {
-  isEditingCaption.value = false
-  props.updateAttributes({
-    caption: localCaption.value,
-  })
-}
+})
 
 // Update methods
-const updateWidth = (width: string) => {
-  localWidth.value = width
-  props.updateAttributes({
-    width,
-  })
+const updateNodeAttributes = (newAttrs: Partial<ImageAttributes>) => {
+  props.updateAttributes(newAttrs)
 }
 
-const updateAlignment = (alignment: string) => {
-  localAlignment.value = alignment
-  props.updateAttributes({
-    alignment,
-  })
+const updateSrc = (src: string) => {
+  props.updateAttributes({ src })
 }
 
-const toggleLock = () => {
-  isLocked.value = !isLocked.value
-  props.updateAttributes({
-    isLocked: isLocked.value,
-  })
-}
-
-// Event handlers
-const handleDoubleClick = (event: MouseEvent) => {
-  if (isReadOnly.value) return
-
-  event.preventDefault()
-  event.stopPropagation()
-
-  if (isLocked.value) {
-    isLocked.value = false
-    props.updateAttributes({
-      isLocked: false,
-    })
+const updateCaptionData = (data: { caption: string; label: string; isLocked: boolean }) => {
+  // Ensure we're not losing data by using a more explicit update
+  const updates: Record<string, any> = {}
+  
+  if (data.caption !== undefined) {
+    updates.caption = data.caption
   }
+  
+  if (data.label !== undefined) {
+    updates.label = data.label
+  }
+  
+  if (data.isLocked !== undefined) {
+    updates.isLocked = data.isLocked
+  }
+  
+  props.updateAttributes(updates)
+  
+  // Force a refresh of the computed properties
+  imageAttributes.value
+  captionData.value
 }
 
-// Watch for external changes
-watch(
-  () => props.node.attrs,
-  (newAttrs) => {
-    if (newAttrs.caption !== localCaption.value) {
-      localCaption.value = newAttrs.caption || ''
-    }
-    if (newAttrs.label !== localLabel.value) {
-      localLabel.value = newAttrs.label || ''
-    }
-    if (newAttrs.width !== localWidth.value) {
-      localWidth.value = newAttrs.width || '100%'
-    }
-    if (newAttrs.alignment !== localAlignment.value) {
-      localAlignment.value = newAttrs.alignment || 'center'
-    }
-    if (newAttrs.isLocked !== isLocked.value) {
-      isLocked.value = newAttrs.isLocked || false
-    }
-  },
-  { deep: true },
-)
+const unlockImage = () => {
+  props.updateAttributes({
+    isLocked: false,
+  })
+}
 
 // Keyboard handling
 const handleKeydown = (e: KeyboardEvent) => {
   if (e.key === 'Escape') {
-    isEditingLabel.value = false
-    isEditingCaption.value = false
+    // Any global escape handling can go here
   }
 }
+
+// Lifecycle hooks
+watch(
+  () => props.node.attrs,
+  () => {
+    // Any additional watching logic can go here
+  },
+  { deep: true }
+)
 
 onMounted(() => {
   window.addEventListener('keydown', handleKeydown)
