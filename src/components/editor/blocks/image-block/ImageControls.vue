@@ -71,7 +71,8 @@ const emit = defineEmits<{
 }>()
 
 // Constants
-const sizes = ['25%', '50%', '75%', '100%']
+const sizes = ['25%', '50%', '75%', '100%'] as const
+type SizeType = typeof sizes[number]
 const alignments = ['left', 'center', 'right']
 
 // UI helpers
@@ -81,7 +82,7 @@ const alignmentIcons: Record<string, FunctionalComponent> = {
   right: AlignRightIcon,
 }
 
-const sizeIconClasses = {
+const sizeIconClasses: Record<SizeType, string> = {
   '25%': 'w-3 h-3',
   '50%': 'w-4 h-4',
   '75%': 'w-5 h-5',
@@ -89,7 +90,7 @@ const sizeIconClasses = {
 }
 
 // Update methods
-const updateWidth = (width: string) => {
+const updateWidth = (width: SizeType) => {
   emit('update:modelValue', { ...props.modelValue, width })
 }
 

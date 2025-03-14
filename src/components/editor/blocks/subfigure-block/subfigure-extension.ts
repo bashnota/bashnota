@@ -2,16 +2,19 @@ import { Node, mergeAttributes } from '@tiptap/core'
 import { VueNodeViewRenderer } from '@tiptap/vue-3'
 import { NodeSelection } from '@tiptap/pm/state'
 import SubfigureBlock from './SubfigureBlock.vue'
+import type { ImageFit } from '../../extensions/types'
+
+export interface SubFigure {
+  src: string
+  caption?: string
+}
 
 export interface SubfigureOptions {
   HTMLAttributes: Record<string, any>
 }
 
 export interface SubfigureAttributes {
-  subfigures: Array<{
-    src: string
-    caption: string
-  }>
+  subfigures: SubFigure[]
   layout: 'horizontal' | 'vertical' | 'grid'
   unifiedSize: boolean
   objectFit: 'contain' | 'cover' | 'fill' | 'none' | 'scale-down'
@@ -56,6 +59,16 @@ export const SubfigureExtension = Node.create<SubfigureOptions>({
     return {
       subfigures: {
         default: [],
+        parseHTML: (element) => {
+          const subfiguresData = element.getAttribute('data-subfigures')
+          return subfiguresData ? JSON.parse(subfiguresData) : []
+        },
+        renderHTML: (attributes) => {
+          if (attributes.subfigures?.length) {
+            return { 'data-subfigures': JSON.stringify(attributes.subfigures) }
+          }
+          return {}
+        },
       },
       layout: {
         default: 'horizontal',
@@ -80,6 +93,23 @@ export const SubfigureExtension = Node.create<SubfigureOptions>({
 
   parseHTML() {
     return [
+      {
+        tag: 'figure[data-subfigures]',
+        getAttrs: (element) => {
+          if (typeof element === 'string') return {}
+          
+          const el = element as HTMLElement
+          return {
+            subfigures: JSON.parse(el.getAttribute('data-subfigures') || '[]'),
+            layout: el.getAttribute('data-layout') || 'horizontal',
+            unifiedSize: el.getAttribute('data-unified-size') === 'true',
+            objectFit: el.getAttribute('data-object-fit') || 'contain',
+            isLocked: el.getAttribute('data-locked') === 'true',
+            caption: el.querySelector('.subfigure-main-caption')?.textContent || '',
+            label: el.querySelector('.subfigure-main-label')?.textContent || '',
+          }
+        },
+      },
       {
         tag: 'div[data-type="subfigure"]',
         getAttrs: (node) => {
@@ -116,9 +146,20 @@ export const SubfigureExtension = Node.create<SubfigureOptions>({
   },
 
   renderHTML({ HTMLAttributes }) {
-    const { subfigures, layout, unifiedSize, objectFit, isLocked, caption, label } = HTMLAttributes
+    const { subfigures, layout, unifiedSize, objectFit, isLocked, caption, label, ...rest } = HTMLAttributes
     
-    const subfigureItems = (subfigures || []).map((subfig: any) => {
+    const attrs = {
+      ...rest,
+      'data-type': 'subfigure',
+      'data-layout': layout || 'horizontal',
+      'data-unified-size': unifiedSize ? 'true' : 'false',
+      'data-object-fit': objectFit || 'contain',
+      'data-locked': isLocked ? 'true' : 'false',
+      'data-subfigures': JSON.stringify(subfigures || []),
+      class: 'subfigure-container',
+    }
+    
+    const subfigureItems = (subfigures || []).map((subfig: SubFigure) => {
       return [
         'div', 
         { class: 'subfigure-item' }, 
@@ -128,18 +169,8 @@ export const SubfigureExtension = Node.create<SubfigureOptions>({
     })
     
     return [
-      'div',
-      mergeAttributes(
-        this.options.HTMLAttributes,
-        {
-          'data-type': 'subfigure',
-          'data-layout': layout || 'horizontal',
-          'data-unified-size': unifiedSize ? 'true' : 'false',
-          'data-object-fit': objectFit || 'contain',
-          'data-locked': isLocked ? 'true' : 'false',
-          class: 'subfigure-container',
-        }
-      ),
+      'figure',
+      mergeAttributes(this.options.HTMLAttributes, attrs),
       [
         'div',
         { class: `subfigure-grid subfigure-layout-${layout || 'horizontal'}` },
@@ -155,7 +186,11 @@ export const SubfigureExtension = Node.create<SubfigureOptions>({
       setSubfigure: (options = {}) => ({ commands }) => {
         return commands.insertContent({
           type: this.name,
-          attrs: options,
+          attrs: {
+            subfigures: [],
+            layout: 'horizontal',
+            ...options,
+          },
         })
       },
       updateSubfigure: (options) => ({ commands, editor }) => {

@@ -26,11 +26,18 @@ declare module '@tiptap/core' {
       /**
        * Add an image
        */
-      setImage: (options: Partial<ImageAttributes>) => ReturnType
+      setImage: (options?: Partial<ImageAttributes>) => ReturnType
       /**
        * Update an image
        */
       updateImage: (options: Partial<ImageAttributes>) => ReturnType
+    }
+    // Legacy command for backward compatibility
+    imageBlock: {
+      /**
+       * Add an image (legacy)
+       */
+      setImage: (options?: Partial<ImageAttributes>) => ReturnType
     }
   }
 }
@@ -128,6 +135,32 @@ export const ImageExtension = Node.create<ImageOptions>({
           }
         },
       },
+      // Support the legacy node type
+      {
+        tag: 'figure[data-image-block]',
+        getAttrs: (node) => {
+          if (typeof node === 'string') return false
+          
+          const element = node as HTMLElement
+          const img = element.querySelector('img')
+          const figcaption = element.querySelector('figcaption')
+          
+          if (!img) return false
+          
+          return {
+            src: img?.getAttribute('src') || element.getAttribute('src') || '',
+            alt: img?.getAttribute('alt') || '',
+            title: img?.getAttribute('title') || '',
+            width: img?.getAttribute('width') || element.getAttribute('width') || '100%',
+            height: img?.getAttribute('height') || element.getAttribute('height') || 'auto',
+            alignment: element.getAttribute('data-alignment') || 'center',
+            objectFit: element.getAttribute('data-object-fit') || 'contain',
+            isLocked: element.getAttribute('data-locked') === 'true',
+            caption: figcaption?.textContent || element.getAttribute('data-caption') || '',
+            label: element.getAttribute('data-label') || '',
+          }
+        },
+      },
     ]
   },
 
@@ -139,6 +172,8 @@ export const ImageExtension = Node.create<ImageOptions>({
         'figure',
         {
           class: `image-figure alignment-${alignment || 'center'}`,
+          'data-alignment': alignment || 'center',
+          'data-locked': isLocked ? 'true' : 'false',
         },
         ['img', mergeAttributes(this.options.HTMLAttributes, attrs)],
         [
@@ -155,10 +190,15 @@ export const ImageExtension = Node.create<ImageOptions>({
 
   addCommands() {
     return {
-      setImage: (options) => ({ commands }) => {
+      setImage: (options = {}) => ({ commands }) => {
         return commands.insertContent({
           type: this.name,
-          attrs: options,
+          attrs: {
+            src: '',
+            width: '100%',
+            alignment: 'center',
+            ...options,
+          },
         })
       },
       updateImage: (options) => ({ commands, editor }) => {
@@ -171,6 +211,20 @@ export const ImageExtension = Node.create<ImageOptions>({
         }
 
         return false
+      },
+      // Legacy command implementation
+      imageBlock: {
+        setImage: (options = {}) => ({ commands }: { commands: any }) => {
+          return commands.insertContent({
+            type: 'image',
+            attrs: {
+              src: '',
+              width: '100%',
+              alignment: 'center',
+              ...options,
+            },
+          })
+        },
       },
     }
   },

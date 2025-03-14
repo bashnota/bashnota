@@ -194,7 +194,7 @@ export default {
         icon: ImagesIcon,
         keywords: ['subfig', 'figures', 'multiple', 'images', 'imgs'],
         command: ({ editor, range }: CommandArgs) => {
-          editor.chain().focus().deleteRange(range).setSubfigures().run()
+          editor.chain().focus().deleteRange(range).setSubfigure().run()
         },
       },
 
