@@ -3,7 +3,7 @@ import { ref, watch, onMounted } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ClockIcon, XMarkIcon, PlusIcon, FolderPlusIcon } from '@heroicons/vue/24/solid'
+import { Clock, X, Plus, FolderPlus } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import HomeHeader from '@/components/home/HomeHeader.vue'
 import HomeSearchBar from '@/components/home/HomeSearchBar.vue'
@@ -114,7 +114,7 @@ const handlePageChange = (page: number) => {
             class="h-10 shrink-0"
           >
             Clear Filters
-            <XMarkIcon class="h-4 w-4 ml-2" />
+            <X class="h-4 w-4 ml-2" />
           </Button>
         </div>
 
@@ -124,7 +124,7 @@ const handlePageChange = (page: number) => {
             <div class="flex items-center justify-between">
               <div>
                 <CardTitle class="flex items-center gap-2">
-                  <ClockIcon class="h-5 w-5 text-primary" />
+                  <Clock class="h-4 w-4" />
                   {{ showFavorites ? 'Favorite' : 'Recent' }} Notas
                 </CardTitle>
                 <CardDescription>
@@ -133,11 +133,11 @@ const handlePageChange = (page: number) => {
               </div>
               <div class="flex items-center gap-2">
                 <Button variant="outline" size="sm" @click="createNewNota">
-                  <PlusIcon class="h-4 w-4 mr-2" />
+                  <Plus class="h-4 w-4 mr-2" />
                   New Nota
                 </Button>
                 <Button variant="outline" size="sm" @click="handleImport">
-                  <FolderPlusIcon class="h-4 w-4 mr-2" />
+                  <FolderPlus class="h-4 w-4 mr-2" />
                   Import
                 </Button>
               </div>

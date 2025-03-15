@@ -2,15 +2,15 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
-  PlusIcon,
-  MagnifyingGlassIcon,
-  StarIcon,
-  FolderPlusIcon,
-  XMarkIcon,
-  Squares2X2Icon,
-  ListBulletIcon,
-  TableCellsIcon,
-} from '@heroicons/vue/24/solid'
+  Plus,
+  Search,
+  Star,
+  FolderPlus,
+  X,
+  LayoutGrid,
+  List,
+  Table2
+} from 'lucide-vue-next'
 import { useDebounceFn } from '@vueuse/core'
 import { ref } from 'vue'
 import { useNotaStore } from '@/stores/nota'
@@ -31,9 +31,9 @@ const emit = defineEmits<{
 }>()
 
 const viewOptions = [
-  { id: 'grid', icon: Squares2X2Icon, label: 'Grid View' },
-  { id: 'list', icon: ListBulletIcon, label: 'List View' },
-  { id: 'compact', icon: TableCellsIcon, label: 'Compact View' },
+  { id: 'grid', icon: LayoutGrid, label: 'Grid View' },
+  { id: 'list', icon: List, label: 'List View' },
+  { id: 'compact', icon: Table2, label: 'Compact View' },
 ]
 
 const debouncedSearch = useDebounceFn((value: string) => {
@@ -77,17 +77,17 @@ const quickActions = [
   // TODO: remove this later
   // {
   //   title: 'New Nota',
-  //   icon: PlusIcon,
+  //   icon: Plus,
   //   action: () => emit('create-nota'),
   // },
   // {
   //   title: 'Import',
-  //   icon: FolderPlusIcon,
+  //   icon: FolderPlus,
   //   action: handleImport,
   // },
   {
     title: 'Favorites',
-    icon: StarIcon,
+    icon: Star,
     action: () => emit('update:showFavorites', !props.showFavorites),
   },
 ]
@@ -96,7 +96,7 @@ const quickActions = [
 <template>
   <div :class="['flex items-center justify-between gap-4', props.class]">
     <div class="relative flex-1">
-      <MagnifyingGlassIcon
+      <Search
         class="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
       />
       <Input
@@ -112,7 +112,7 @@ const quickActions = [
         class="absolute right-2 top-1/2 -translate-y-1/2"
         @click="clearSearch"
       >
-        <XMarkIcon class="h-4 w-4" />
+        <X class="h-4 w-4" />
       </Button>
     </div>
 

@@ -2,15 +2,14 @@
 import { useNotaStore } from '@/stores/nota'
 import { ref, onMounted, onUnmounted } from 'vue'
 import {
-  ChevronDownIcon,
-  ChevronRightIcon,
-  PencilIcon,
-  TrashIcon,
-  FolderIcon,
-  DocumentTextIcon,
-  PlusIcon,
-  StarIcon,
-} from '@heroicons/vue/24/solid'
+  ChevronRight,
+  FileText,
+  Star,
+  Settings,
+  Plus,
+  FolderPlus,
+  X
+} from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -133,8 +132,7 @@ onUnmounted(() => {
           @click="toggleItem(item.id)"
           class="w-4 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground flex-shrink-0"
         >
-          <ChevronDownIcon v-if="expandedItems.has(item.id)" class="h-3 w-3" />
-          <ChevronRightIcon v-else class="h-3 w-3" />
+          <ChevronRight class="h-4 w-4" />
         </button>
         <div v-else class="w-4 flex-shrink-0"></div>
 
@@ -154,11 +152,10 @@ onUnmounted(() => {
           :to="`/nota/${item.id}`"
           class="flex items-center gap-1.5 min-w-0 flex-1 px-1.5 py-0.5 rounded-sm hover:bg-slate-200/50"
         >
-          <FolderIcon
+          <FileText
             v-if="hasChildren(item.id)"
             class="h-3.5 w-3.5 text-muted-foreground flex-shrink-0"
           />
-          <DocumentTextIcon v-else class="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
           <span class="truncate overflow-hidden min-w-0 max-w-full">
             {{ item.title }}
           </span>
@@ -174,7 +171,7 @@ onUnmounted(() => {
             @click="emit('show-new-input', item.id)"
             title="Add Sub-Nota"
           >
-            <PlusIcon class="h-3 w-3" />
+            <Plus class="h-4 w-4" />
           </Button>
           <Button
             variant="ghost"
@@ -183,7 +180,7 @@ onUnmounted(() => {
             @click="startRename(item)"
             title="Rename"
           >
-            <PencilIcon class="h-3 w-3" />
+            <Settings class="h-4 w-4" />
           </Button>
           <Button
             variant="ghost"
@@ -192,7 +189,7 @@ onUnmounted(() => {
             @click="handleDelete(item.id)"
             title="Delete"
           >
-            <TrashIcon class="h-3 w-3" />
+            <X class="h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -210,19 +207,19 @@ onUnmounted(() => {
           v-for="action in [
             {
               label: 'New Sub-Nota',
-              icon: PlusIcon,
+              icon: Plus,
               action: () => emit('show-new-input', item.id),
             },
-            { label: 'Rename', icon: PencilIcon, action: () => startRename(item) },
-            { label: 'Delete', icon: TrashIcon, action: () => handleDelete(item.id) },
+            { label: 'Rename', icon: Settings, action: () => startRename(item) },
+            { label: 'Delete', icon: X, action: () => handleDelete(item.id) },
             {
               label: item.favorite ? 'Remove Favorite' : 'Add Favorite',
-              icon: StarIcon,
+              icon: Star,
               action: () => store.toggleFavorite(item.id),
             },
             {
               label: 'Add to Favorites',
-              icon: StarIcon,
+              icon: Star,
               action: () => {
                 isModalOpen = true
               },

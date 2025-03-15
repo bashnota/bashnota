@@ -2,9 +2,24 @@
 import { ref, onMounted, computed } from 'vue'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ServerIcon, CpuChipIcon, Cog6ToothIcon, ArrowPathIcon, TrashIcon, DocumentDuplicateIcon } from '@heroicons/vue/24/solid'
-import { CommandLineIcon, PaintBrushIcon, AdjustmentsHorizontalIcon } from '@heroicons/vue/24/outline'
-import { Keyboard, Code2, Database, Palette, Monitor, Cpu, SparklesIcon } from 'lucide-vue-next'
+import { 
+  Keyboard, 
+  Code2, 
+  Database, 
+  Palette, 
+  Monitor, 
+  Cpu, 
+  SparklesIcon,
+  Server,
+  Settings,
+  RotateCw,
+  Trash2,
+  Copy,
+  Terminal,
+  Paintbrush,
+  Settings2,
+  Pencil
+} from 'lucide-vue-next'
 import { useShortcutsStore } from '@/stores/shortcutsStore'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
@@ -18,7 +33,6 @@ import { Separator } from '@/components/ui/separator'
 import { toast } from '@/components/ui/toast'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { PencilIcon } from '@heroicons/vue/24/outline'
 import AISettings from '@/components/settings/AISettings.vue'
 
 // Use shortcuts from the store instead of duplicating them
@@ -304,7 +318,7 @@ function formatShortcutKey(key: string) {
           <p class="text-muted-foreground mt-1">Customize your BashNota experience</p>
         </div>
         <Button variant="outline" @click="resetAllSettings" class="flex items-center gap-2">
-          <ArrowPathIcon class="h-4 w-4" />
+          <RotateCw class="h-4 w-4" />
           Reset All
         </Button>
       </div>
@@ -313,7 +327,7 @@ function formatShortcutKey(key: string) {
         <TabsList class="grid w-full grid-cols-3 mb-8">
           <TabsTrigger value="appearance" class="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <div class="flex items-center justify-center gap-2 p-2">
-              <PaintBrushIcon class="w-4 h-4 shrink-0" />
+              <Paintbrush class="w-4 h-4 shrink-0" />
               <span class="text-sm font-medium">Appearance</span>
             </div>
           </TabsTrigger>
@@ -394,7 +408,7 @@ function formatShortcutKey(key: string) {
             <Card class="overflow-hidden border-2 hover:border-primary/50 transition-all">
               <CardHeader class="bg-muted/50">
                 <CardTitle class="flex items-center gap-2">
-                  <AdjustmentsHorizontalIcon class="h-5 w-5 text-primary" />
+                  <Settings class="h-5 w-5 text-primary" />
                   Interface
                 </CardTitle>
                 <CardDescription>Adjust the user interface</CardDescription>
@@ -489,7 +503,7 @@ function formatShortcutKey(key: string) {
                       </TableCell>
                       <TableCell>
                         <Button variant="ghost" size="sm" @click="editShortcut(shortcut)">
-                          <PencilIcon class="h-4 w-4" />
+                          <Pencil class="h-4 w-4" />
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -498,7 +512,7 @@ function formatShortcutKey(key: string) {
                 
                 <div class="flex justify-end">
                   <Button variant="outline" @click="resetShortcuts" class="flex items-center gap-2">
-                    <ArrowPathIcon class="h-4 w-4" />
+                    <RotateCw class="h-4 w-4" />
                     Reset to Defaults
                   </Button>
                 </div>
@@ -586,7 +600,7 @@ function formatShortcutKey(key: string) {
             <Card class="overflow-hidden border-2 hover:border-primary/50 transition-all">
               <CardHeader class="bg-muted/50">
                 <CardTitle class="flex items-center gap-2">
-                  <CpuChipIcon class="h-5 w-5 text-primary" />
+                  <Cpu class="h-5 w-5 text-primary" />
                   Code Editing
                 </CardTitle>
                 <CardDescription>Configure code-specific settings</CardDescription>
@@ -674,7 +688,7 @@ function formatShortcutKey(key: string) {
                     <h3 class="text-base font-medium">Export Data</h3>
                     <p class="text-sm text-muted-foreground mb-2">Export all your notas and settings as a backup</p>
                     <Button variant="default" @click="notaStore.exportAllNotas()" class="w-full flex items-center justify-center gap-2">
-                      <DocumentDuplicateIcon class="h-4 w-4" />
+                      <Copy class="h-4 w-4" />
                       Export All Data
                     </Button>
                   </div>
@@ -685,7 +699,7 @@ function formatShortcutKey(key: string) {
                     <h3 class="text-base font-medium">Cache Management</h3>
                     <p class="text-sm text-muted-foreground mb-2">Clear application cache to free up space</p>
                     <Button variant="outline" @click="clearCache" class="w-full flex items-center justify-center gap-2">
-                      <TrashIcon class="h-4 w-4" />
+                      <Trash2 class="h-4 w-4" />
                       Clear Cache
                     </Button>
                   </div>
@@ -697,7 +711,7 @@ function formatShortcutKey(key: string) {
             <Card class="overflow-hidden border-2 hover:border-primary/50 transition-all">
               <CardHeader class="bg-muted/50">
                 <CardTitle class="flex items-center gap-2">
-                  <ServerIcon class="h-5 w-5 text-primary" />
+                  <Server class="h-5 w-5 text-primary" />
                   System Information
                 </CardTitle>
                 <CardDescription>View system details and performance</CardDescription>
@@ -729,7 +743,7 @@ function formatShortcutKey(key: string) {
                     <h3 class="text-base font-medium">Reset Application</h3>
                     <p class="text-sm text-muted-foreground mb-2">Reset all settings to their default values</p>
                     <Button variant="destructive" @click="resetAllSettings" class="w-full flex items-center justify-center gap-2">
-                      <ArrowPathIcon class="h-4 w-4" />
+                      <RotateCw class="h-4 w-4" />
                       Reset All Settings
                     </Button>
                   </div>

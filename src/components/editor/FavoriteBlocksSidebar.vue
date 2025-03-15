@@ -4,7 +4,7 @@ import { useFavoriteBlocksStore } from '@/stores/favoriteBlocksStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { StarIcon, MagnifyingGlassIcon, XMarkIcon, PlusIcon, Bars3Icon, ChevronRightIcon, Cog6ToothIcon } from '@heroicons/vue/24/solid'
+import { Star, Search, X, Plus, Menu, ChevronRight, Settings } from 'lucide-vue-next'
 import { TagsInput, TagsInputInput, TagsInputItem } from '@/components/ui/tags-input'
 import { toast } from '@/lib/utils'
 import { onKeyStroke } from '@vueuse/core'
@@ -187,10 +187,7 @@ const openCustomizationSettings = () => {
       aria-label="Toggle Favorites Sidebar"
       tabindex="0"
     >
-      <ChevronRightIcon 
-        class="w-4 h-4 transition-transform duration-200" 
-        :class="{ 'rotate-180': isOpen }" 
-      />
+      <ChevronRight class="h-4 w-4" />
     </Button>
 
     <!-- Sidebar Content -->
@@ -200,17 +197,17 @@ const openCustomizationSettings = () => {
       <div class="p-4 border-b">
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-semibold flex items-center gap-2">
-            <StarIcon class="w-5 h-5 text-yellow-400" />
+            <Star class="h-4 w-4" />
             Favorite Blocks
           </h3>
           <Button variant="ghost" size="icon" @click="isOpen = false">
-            <XMarkIcon class="w-4 h-4" />
+            <X class="h-4 w-4" />
           </Button>
         </div>
         
         <div class="space-y-4">
           <div class="relative">
-            <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               :value="searchQuery"
               @input="(e: Event) => debouncedSearch((e.target as HTMLInputElement).value)"
@@ -243,10 +240,10 @@ const openCustomizationSettings = () => {
               </div>
               <div class="flex items-center gap-1">
                 <Button variant="ghost" size="icon" @click.stop="insertBlock(block.content)">
-                  <PlusIcon class="h-3 w-3" />
+                  <Plus class="h-4 w-4" />
                 </Button>
                 <Button variant="ghost" size="icon" @click.stop="removeBlock(block.id)">
-                  <XMarkIcon class="h-3 w-3" />
+                  <X class="h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -271,7 +268,7 @@ const openCustomizationSettings = () => {
 
           <!-- Empty State -->
           <div v-if="filteredBlocks.length === 0" class="text-center py-8">
-            <StarIcon class="w-12 h-12 text-muted-foreground/20 mx-auto mb-4" />
+            <Star class="w-12 h-12 text-muted-foreground/20 mx-auto mb-4" />
             <h4 class="font-medium mb-2">No Blocks Found</h4>
             <p class="text-sm text-muted-foreground">
               {{ searchQuery || selectedTags.length > 0 
@@ -284,7 +281,7 @@ const openCustomizationSettings = () => {
 
       <!-- Add a button to open settings for customization -->
       <Button variant="ghost" size="icon" @click="openCustomizationSettings">
-        <Cog6ToothIcon class="w-4 h-4" />
+        <Settings class="h-4 w-4" />
       </Button>
     </div>
   </div>

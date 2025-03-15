@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { FolderIcon, StarIcon, ClockIcon } from '@heroicons/vue/24/solid'
+import { Folder, Star, Clock } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { watch } from 'vue'
 
@@ -20,9 +20,9 @@ const emit = defineEmits<{
 }>()
 
 const viewOptions: ViewOption[] = [
-  { id: 'all', label: 'All Notes', icon: FolderIcon },
-  { id: 'favorites', label: 'Favorites', icon: StarIcon },
-  { id: 'recent', label: 'Recent', icon: ClockIcon },
+  { id: 'all', label: 'All Notes', icon: Folder },
+  { id: 'favorites', label: 'Favorites', icon: Star },
+  { id: 'recent', label: 'Recent', icon: Clock },
 ]
 
 // Save view preference to localStorage
@@ -45,7 +45,7 @@ watch(() => props.modelValue, (newView) => {
       @click="emit('update:modelValue', option.id)"
       :title="option.label"
     >
-      <component :is="option.icon" class="h-3.5 w-3.5" />
+      <component :is="option.icon" class="h-4 w-4" />
     </Button>
   </div>
 </template> 

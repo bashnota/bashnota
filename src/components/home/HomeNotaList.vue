@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { StarIcon, DocumentTextIcon, Cog6ToothIcon, ClockIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/24/solid'
+import { Star, FileText, Settings, Clock, ChevronLeft, ChevronRight } from 'lucide-vue-next'
 import { useNotaStore } from '@/stores/nota'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import Badge from '@/components/ui/badge/Badge.vue'
@@ -161,7 +161,7 @@ const displayedPages = computed(() => {
     class="flex flex-col items-center justify-center p-12 text-center"
   >
     <component
-      :is="showFavorites ? StarIcon : DocumentTextIcon"
+      :is="showFavorites ? Star : FileText"
       class="w-12 h-12 text-muted-foreground/50 mb-4"
     />
     <h3 class="text-lg font-semibold mb-2">
@@ -188,7 +188,7 @@ const displayedPages = computed(() => {
           <CardHeader>
             <div class="flex items-center justify-between flex-wrap gap-2">
               <div class="flex items-center gap-2 min-w-0 flex-1">
-                <DocumentTextIcon class="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                <FileText class="w-5 h-5 text-muted-foreground flex-shrink-0" />
                 <CardTitle class="text-lg truncate">{{ nota.title }}</CardTitle>
               </div>
               <div class="flex items-center gap-2 flex-shrink-0">
@@ -198,7 +198,7 @@ const displayedPages = computed(() => {
                   class="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
                   @click.prevent="toggleFavorite(nota.id)"
                 >
-                  <StarIcon
+                  <Star
                     class="w-5 h-5"
                     :class="nota.favorite ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground'"
                   />
@@ -209,12 +209,12 @@ const displayedPages = computed(() => {
                   class="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
                   @click.prevent="openSettings(nota.id)"
                 >
-                  <Cog6ToothIcon class="w-5 h-5 text-muted-foreground" />
+                  <Settings class="w-5 h-5 text-muted-foreground" />
                 </Button>
               </div>
             </div>
             <div class="flex items-center text-sm text-muted-foreground mt-2">
-              <ClockIcon class="w-4 h-4 mr-1 flex-shrink-0" />
+              <Clock class="w-4 h-4 mr-1 flex-shrink-0" />
               {{ formatDate(nota.updatedAt) }}
             </div>
           </CardHeader>
@@ -238,31 +238,31 @@ const displayedPages = computed(() => {
     <div v-else-if="viewType === 'list'" class="flex flex-col space-y-3">
       <RouterLink v-for="nota in filteredNotas" :key="nota.id" :to="`/nota/${nota.id}`">
         <div class="flex items-start gap-4 p-4 rounded-lg hover:bg-muted/50 transition-colors group border">
-          <DocumentTextIcon class="w-5 h-5 text-muted-foreground mt-1 flex-shrink-0" />
+          <FileText class="w-5 h-5 text-muted-foreground mt-1 flex-shrink-0" />
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 justify-between flex-wrap">
               <div class="flex items-center gap-2 flex-1 min-w-0">
                 <h3 class="font-medium truncate">{{ nota.title }}</h3>
-                <StarIcon
+                <Star
                   v-if="nota.favorite"
                   class="w-4 h-4 text-yellow-400 fill-yellow-400 flex-shrink-0"
                 />
               </div>
               <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                 <Button variant="ghost" size="icon" class="h-8 w-8" @click.prevent="toggleFavorite(nota.id)">
-                  <StarIcon
+                  <Star
                     class="w-4 h-4"
                     :class="nota.favorite ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground'"
                   />
                 </Button>
                 <Button variant="ghost" size="icon" class="h-8 w-8" @click.prevent="openSettings(nota.id)">
-                  <Cog6ToothIcon class="w-4 h-4 text-muted-foreground" />
+                  <Settings class="w-4 h-4 text-muted-foreground" />
                 </Button>
               </div>
             </div>
             <div class="flex items-center gap-4 mt-2 flex-wrap">
               <span class="text-xs text-muted-foreground flex items-center flex-shrink-0">
-                <ClockIcon class="w-3 h-3 mr-1" />
+                <Clock class="w-3 h-3 mr-1" />
                 {{ formatDate(nota.updatedAt) }}
               </span>
               <div class="flex flex-wrap gap-2">
@@ -284,14 +284,14 @@ const displayedPages = computed(() => {
     <div v-else class="divide-y">
       <RouterLink v-for="nota in filteredNotas" :key="nota.id" :to="`/nota/${nota.id}`">
         <div class="flex items-center gap-3 py-2 hover:bg-muted/50 transition-colors px-2 border-b">
-          <DocumentTextIcon class="w-4 h-4 text-muted-foreground flex-shrink-0" />
+          <FileText class="w-4 h-4 text-muted-foreground flex-shrink-0" />
           <span class="font-medium truncate">{{ nota.title }}</span>
-          <StarIcon
+          <Star
             v-if="nota.favorite"
             class="w-4 h-4 text-yellow-400 fill-yellow-400 flex-shrink-0"
           />
           <span class="text-xs text-muted-foreground ml-auto flex items-center gap-1">
-            <ClockIcon class="w-3 h-3" />
+            <Clock class="w-3 h-3" />
             {{ formatDate(nota.updatedAt) }}
           </span>
         </div>
@@ -312,7 +312,7 @@ const displayedPages = computed(() => {
           :disabled="currentPage === 1"
           class="h-8 w-8 p-0"
         >
-          <ChevronLeftIcon class="h-4 w-4" />
+          <ChevronLeft class="h-4 w-4" />
         </Button>
         
         <template v-for="(page, index) in displayedPages" :key="page">
@@ -344,7 +344,7 @@ const displayedPages = computed(() => {
           :disabled="currentPage === totalPages"
           class="h-8 w-8 p-0"
         >
-          <ChevronRightIcon class="h-4 w-4" />
+          <ChevronRight class="h-4 w-4" />
         </Button>
       </div>
     </div>

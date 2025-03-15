@@ -6,13 +6,16 @@ import { useAuthStore } from '@/stores/auth'
 import { onKeyStroke } from '@vueuse/core'
 import DarkModeToggle from './DarkModeToggle.vue'
 import {
-  PlusIcon,
-  MagnifyingGlassIcon,
-  FolderIcon,
-  Cog6ToothIcon,
-  QuestionMarkCircleIcon,
-  UserIcon,
-} from '@heroicons/vue/24/solid'
+  ChevronRight,
+  FileText,
+  Star,
+  Settings,
+  Plus,
+  FolderPlus,
+  X,
+  Search,
+  Menu
+} from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import NotaTree from '../NotaTree.vue'
 import { RouterLink } from 'vue-router'
@@ -162,20 +165,20 @@ const handleAuthNavigation = () => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" class="h-7 w-7">
-                <Cog6ToothIcon class="h-3.5 w-3.5" />
+                <Menu class="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem @click="shortcutsDialog.isOpen = true">
-                <QuestionMarkCircleIcon class="h-4 w-4 mr-2" />
+                <Search class="h-4 w-4 mr-2" />
                 <span>Shortcuts</span>
               </DropdownMenuItem>
               <DropdownMenuItem @click="router.push('/settings')">
-                <Cog6ToothIcon class="h-4 w-4 mr-2" />
+                <Settings class="h-4 w-4 mr-2" />
                 <span>Settings</span>
               </DropdownMenuItem>
               <DropdownMenuItem @click="handleAuthNavigation">
-                <UserIcon class="h-4 w-4 mr-2" />
+                <FileText class="h-4 w-4 mr-2" />
                 <span>{{ authStore.isAuthenticated ? 'Your Profile' : 'Login' }}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -236,7 +239,7 @@ const handleAuthNavigation = () => {
           class="flex flex-col items-center justify-center h-24 text-sm text-muted-foreground gap-1.5 my-4"
         >
           <div class="rounded-full bg-muted/50 p-2">
-            <component :is="searchQuery ? MagnifyingGlassIcon : FolderIcon" class="w-4 h-4" />
+            <Search class="h-4 w-4" />
           </div>
           <p>{{ searchQuery ? 'No items found' : 'Create your first nota' }}</p>
           <Button 
@@ -246,7 +249,7 @@ const handleAuthNavigation = () => {
             size="sm" 
             class="mt-1"
           >
-            <PlusIcon class="h-3.5 w-3.5 mr-1" />
+            <Plus class="h-4 w-4 mr-1" />
             New Nota
           </Button>
         </div>

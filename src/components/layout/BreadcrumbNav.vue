@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useNotaStore } from '@/stores/nota'
-import { ChevronRightIcon, HomeIcon } from '@heroicons/vue/24/solid'
+import { ChevronRight, Home } from 'lucide-vue-next'
 
 const route = useRoute()
 const store = useNotaStore()
@@ -35,10 +35,10 @@ const breadcrumbs = computed(() => {
       to="/"
       class="flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
     >
-      <HomeIcon class="h-4 w-4" />
+      <Home class="h-4 w-4" />
     </RouterLink>
 
-    <ChevronRightIcon class="h-4 w-4 mx-2 text-muted-foreground/50" aria-hidden="true" />
+    <ChevronRight class="h-4 w-4 mx-2 text-muted-foreground/50" aria-hidden="true" />
 
     <ol class="flex items-center">
       <li v-for="(item, index) in breadcrumbs" :key="item.path" class="flex items-center">
@@ -55,7 +55,7 @@ const breadcrumbs = computed(() => {
           {{ item.name }}
         </RouterLink>
 
-        <ChevronRightIcon
+        <ChevronRight
           v-if="index < breadcrumbs.length - 1"
           class="h-4 w-4 mx-2 text-muted-foreground/50"
           aria-hidden="true"

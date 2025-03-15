@@ -4,14 +4,16 @@ import NotaConfigModal from '@/components/editor/blocks/nota-config/NotaConfigMo
 import { ref, onMounted, watch, nextTick } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { computed } from 'vue'
-import {
-  CheckCircleIcon,
-  ArrowPathIcon,
-  StarIcon,
-  ArrowDownTrayIcon,
-  CpuChipIcon,
-} from '@heroicons/vue/24/outline'
-import { Share2 } from 'lucide-vue-next'
+import { 
+  Share2,
+  CheckCircle,
+  RotateCw,
+  Star,
+  Download,
+  Cpu,
+  Loader2,
+  PlayCircle
+} from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { formatDate } from '@/lib/utils'
 import { TagsInput } from '@/components/ui/tags-input'
@@ -20,7 +22,6 @@ import TagsInputItemText from '@/components/ui/tags-input/TagsInputItemText.vue'
 import TagsInputItemDelete from '@/components/ui/tags-input/TagsInputItemDelete.vue'
 import TagsInputInput from '@/components/ui/tags-input/TagsInputInput.vue'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
-import { Loader2, PlayCircle } from 'lucide-vue-next'
 import { toast } from '@/components/ui/toast'
 import PublishNotaModal from '@/components/editor/PublishNotaModal.vue'
 
@@ -190,11 +191,11 @@ const exportNota = async () => {
               :class="{ 'opacity-0': !isSaving && !showSaved }"
             >
               <span v-if="isSaving" class="flex items-center gap-1">
-                <ArrowPathIcon class="w-3 h-3 animate-spin" />
+                <RotateCw class="w-3 h-3 animate-spin" />
                 Saving
               </span>
               <span v-else-if="showSaved" class="flex items-center gap-1">
-                <CheckCircleIcon class="w-3 h-3 text-green-600" />
+                <CheckCircle class="w-3 h-3 text-green-600" />
                 Saved
               </span>
             </div>
@@ -235,7 +236,7 @@ const exportNota = async () => {
           @click="store.toggleFavorite(id)"
           v-if="nota"
         >
-          <StarIcon
+          <Star
             class="w-5 h-5"
             :class="{ 'text-yellow-400 fill-yellow-400': nota?.favorite }"
           />
@@ -259,12 +260,12 @@ const exportNota = async () => {
           v-if="nota"
           class="flex items-center gap-2"
         >
-          <CpuChipIcon class="w-5 h-5" />
+          <Cpu class="w-5 h-5" />
           <span class="hidden sm:inline">Jupyter Settings</span>
         </Button>
 
         <Button variant="ghost" size="icon" title="Export" @click="exportNota" v-if="nota">
-          <ArrowDownTrayIcon class="w-5 h-5" />
+          <Download class="w-5 h-5" />
         </Button>
       </div>
     </header>

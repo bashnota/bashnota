@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, watch, nextTick } from 'vue'
-import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/vue/24/solid'
+import { Search, X } from 'lucide-vue-next'
+import { onKeyStroke } from '@vueuse/core'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { onKeyStroke } from '@vueuse/core'
 
 const props = defineProps<{
   modelValue: string
@@ -58,7 +58,7 @@ const clearSearch = () => {
   >
     <div v-if="showSearch" class="relative w-full">
       <div class="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none">
-        <MagnifyingGlassIcon class="h-3 w-3 text-muted-foreground" />
+        <Search class="h-4 w-4 text-muted-foreground" />
       </div>
       <Input
         :value="modelValue"
@@ -73,7 +73,7 @@ const clearSearch = () => {
         class="absolute right-1 top-1/2 -translate-y-1/2 h-4 w-4"
         @click="clearSearch"
       >
-        <XMarkIcon class="h-3 w-3" />
+        <X v-if="modelValue" class="h-4 w-4" />
       </Button>
     </div>
     <Button
@@ -84,7 +84,7 @@ const clearSearch = () => {
       @click="emit('update:showSearch', true)"
       title="Search (⌘K)"
     >
-      <MagnifyingGlassIcon class="h-3.5 w-3.5" />
+      <Search class="h-3.5 w-3.5" />
     </Button>
   </Transition>
 </template> 

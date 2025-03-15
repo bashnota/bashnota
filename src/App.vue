@@ -3,12 +3,13 @@ import { RouterView } from 'vue-router'
 import AppSidebar from './components/layout/AppSidebar.vue'
 import BreadcrumbNav from './components/layout/BreadcrumbNav.vue'
 import AuthHeader from './components/auth/AuthHeader.vue'
-import { Bars3Icon as MenuIcon } from '@heroicons/vue/24/solid'
 import { ref, onMounted, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import Toaster from '@/components/ui/toast/Toaster.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useRoute } from 'vue-router'
+import { Menu } from 'lucide-vue-next'
 
 const isSidebarOpen = ref(false)
 const sidebarWidth = ref(300)
@@ -116,7 +117,7 @@ const handleMouseMove = (event: MouseEvent) => {
               @click="isSidebarOpen = !isSidebarOpen"
               :title="isSidebarOpen ? 'Hide sidebar' : 'Show sidebar'"
             >
-              <MenuIcon class="h-5 w-5" />
+              <Menu class="h-5 w-5" />
             </Button>
             <BreadcrumbNav />
           </div>

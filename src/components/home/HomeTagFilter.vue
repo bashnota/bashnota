@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Button } from '@/components/ui/button'
-import { XMarkIcon } from '@heroicons/vue/24/solid'
+import { X } from 'lucide-vue-next'
 import type { Nota } from '@/types/nota'
 
 const props = defineProps<{
@@ -44,7 +44,7 @@ const allTags = computed(() => {
         class="absolute right-2 top-1/2 -translate-y-1/2"
         @click="emit('update:selectedTag', '')"
       >
-        <XMarkIcon class="h-4 w-4" />
+        <X class="h-3 w-3" />
       </Button>
     </div>
   </div>

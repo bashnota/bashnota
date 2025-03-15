@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowTurnDownLeftIcon } from '@heroicons/vue/24/outline'
+import { CornerDownLeft } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 
 interface CommandItem {
@@ -137,7 +137,7 @@ defineExpose({
               v-if="itemToGlobalIndex.get(item) === selectedIndex"
               class="text-xs tracking-widest text-muted-foreground/50"
             >
-              <ArrowTurnDownLeftIcon class="h-3 w-3" />
+              <CornerDownLeft class="h-3 w-3" />
             </span>
           </button>
 

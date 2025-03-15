@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/24/solid'
+import { ChevronLeft, ChevronRight } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 
 interface Props {
@@ -74,7 +74,7 @@ const pageNumbers = () => {
         :disabled="currentPage === 1"
         @click="goToPage(currentPage - 1)"
       >
-        <ChevronLeftIcon class="h-3 w-3" />
+        <ChevronLeft class="h-4 w-4" />
       </Button>
       
       <div v-for="(page, index) in pageNumbers()" :key="index" class="flex items-center">
@@ -98,7 +98,7 @@ const pageNumbers = () => {
         :disabled="currentPage === totalPages"
         @click="goToPage(currentPage + 1)"
       >
-        <ChevronRightIcon class="h-3 w-3" />
+        <ChevronRight class="h-4 w-4" />
       </Button>
     </div>
   </div>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { TrashIcon } from '@heroicons/vue/24/solid'
+import { Trash2 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -91,7 +91,7 @@ const handleColumnTypeUpdate = (columnId: string, type: ColumnType) => {
               class="h-6 w-6 absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100"
               @click="emit('deleteColumn', column.id)"
             >
-              <TrashIcon class="h-4 w-4" />
+              <Trash2 class="h-4 w-4" />
             </Button>
           </TableHead>
           <TableHead class="w-[100px]"></TableHead>
@@ -132,7 +132,7 @@ const handleColumnTypeUpdate = (columnId: string, type: ColumnType) => {
               class="h-6 w-6 opacity-0 group-hover:opacity-100"
               @click="emit('deleteRow', row.id)"
             >
-              <TrashIcon class="h-4 w-4" />
+              <Trash2 class="h-4 w-4" />
             </Button>
           </TableCell>
         </TableRow>
