@@ -12,6 +12,7 @@
           v-if="!isEditing" 
           :latex="latex" 
           :isReadOnly="isReadOnly"
+          :numbered="true"
           @edit="startEditing"
         />
         <MathInput
@@ -29,6 +30,7 @@
       <MathDisplay 
         :latex="latex" 
         :isReadOnly="isReadOnly"
+        :numbered="true"
       />
     </div>
   </node-view-wrapper>
@@ -50,7 +52,7 @@ const latex = ref(props.node.attrs.latex || '')
 const isReadOnly = computed(() => !props.editor.isEditable)
 
 // Watch for changes in the node attributes
-const updateLatexFromNode = () => {
+const updateFromNodeAttrs = () => {
   if (props.node.attrs.latex !== undefined) {
     latex.value = props.node.attrs.latex
   }
@@ -80,7 +82,7 @@ const cancelEditing = () => {
 // Watch for external changes to the node
 watch(
   () => props.node.attrs.latex,
-  () => updateLatexFromNode()
+  () => updateFromNodeAttrs()
 )
 
 // Watch for changes in read-only status

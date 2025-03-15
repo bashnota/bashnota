@@ -44,7 +44,7 @@ export const MathExtension = Node.create<MathOptions>({
             'data-latex': attributes.latex,
           }
         },
-      },
+      }
     }
   },
 
@@ -56,7 +56,7 @@ export const MathExtension = Node.create<MathOptions>({
           if (typeof node === 'string') return {}
           const element = node as HTMLElement
           return {
-            latex: element.getAttribute('data-latex') || '',
+            latex: element.getAttribute('data-latex') || ''
           }
         },
       },
@@ -74,7 +74,7 @@ export const MathExtension = Node.create<MathOptions>({
           type: this.name,
           attrs: options,
         })
-      },
+      }
     }
   },
 
