@@ -162,7 +162,7 @@ const exportNota = async () => {
         <div class="flex items-center gap-3">
           <div class="flex-1 flex items-center gap-4">
             <h1
-              class="text-2xl font-semibold tracking-tight whitespace-nowrap flex items-center gap-2"
+              class="text-2xl font-semibold tracking-tight whitespace-nowrap flex items-center gap-2 max-w-[400px]"
             >
               <template v-if="isEditingTitle">
                 <input
@@ -177,7 +177,7 @@ const exportNota = async () => {
               </template>
               <span
                 v-else
-                class="cursor-pointer hover:text-primary transition-colors"
+                class="cursor-pointer hover:text-primary transition-colors truncate"
                 @click="startTitleEdit"
               >
                 {{ nota?.title || 'Untitled' }}

@@ -108,7 +108,7 @@ const handleModalSubmit = (name: string) => {
     name,
     content,
     type: 'block',
-    tags: []
+    tags: [],
   })
 }
 
@@ -152,17 +152,21 @@ onUnmounted(() => {
         <RouterLink
           v-else
           :to="`/nota/${item.id}`"
-          class="flex items-center gap-1.5 flex-1 px-1.5 py-0.5 rounded-sm hover:bg-slate-200/50 mr-1"
+          class="flex items-center gap-1.5 min-w-0 flex-1 px-1.5 py-0.5 rounded-sm hover:bg-slate-200/50"
         >
           <FolderIcon
             v-if="hasChildren(item.id)"
             class="h-3.5 w-3.5 text-muted-foreground flex-shrink-0"
           />
           <DocumentTextIcon v-else class="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-          <span class="truncate min-w-0 flex-1">{{ item.title }}</span>
+          <span class="truncate overflow-hidden min-w-0 max-w-full">
+            {{ item.title }}
+          </span>
         </RouterLink>
 
-        <div class="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 flex-shrink-0">
+        <div
+          class="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 flex-shrink-0 ml-auto"
+        >
           <Button
             variant="ghost"
             size="icon"
@@ -221,7 +225,7 @@ onUnmounted(() => {
               icon: StarIcon,
               action: () => {
                 isModalOpen = true
-              }
+              },
             },
           ]"
           :key="action.label"
