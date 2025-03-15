@@ -52,7 +52,6 @@ import { useApiData } from './composables/useApiData'
 import { useExportPlot, type ExportFormat } from './composables/useExportPlot'
 import PlotControls from './components/PlotControls.vue'
 import PlotVisualization from './components/PlotVisualization.vue'
-import * as d3 from 'd3'
 
 const props = defineProps<NodeViewProps>()
 
@@ -445,10 +444,7 @@ const restorePlotState = (state: PlotState) => {
   
   // Restore zoom state if available
   if (state.zoomTransform) {
-    // Create a proper D3 ZoomTransform object instead of using a simple object
-    zoomState.value.transform = d3.zoomIdentity
-      .translate(state.zoomTransform.x, state.zoomTransform.y)
-      .scale(state.zoomTransform.k)
+    zoomState.value.transform = state.zoomTransform
     zoomState.value.isZoomed = state.isZoomed || false
   }
   
