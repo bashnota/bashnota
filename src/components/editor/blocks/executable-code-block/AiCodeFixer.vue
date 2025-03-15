@@ -31,7 +31,10 @@ const {
   goToAISettings,
   retryGeneration,
   getDiffSummary
-} = useAiCodeFixer()
+} = useAiCodeFixer({
+  onApplyFix: (fixedCode: string) => emit('apply-fix', fixedCode),
+  onClose: () => emit('close')
+})
 
 // Initialize
 onMounted(() => {
