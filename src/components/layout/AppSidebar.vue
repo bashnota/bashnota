@@ -14,7 +14,8 @@ import {
   FolderPlus,
   X,
   Search,
-  Menu
+  Menu,
+  Settings2
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import NotaTree from '../NotaTree.vue'
@@ -164,8 +165,8 @@ const handleAuthNavigation = () => {
           <DarkModeToggle />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" class="h-7 w-7">
-                <Menu class="h-4 w-4" />
+              <Button variant="ghost" size="sm">
+                <Settings2 class="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
