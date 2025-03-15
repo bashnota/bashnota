@@ -196,11 +196,11 @@ export class JupyterService {
     }
   }
 
-  private async deleteKernel(server: JupyterServer, kernelId: string): Promise<void> {
+  async deleteKernel(server: JupyterServer, kernelId: string): Promise<void> {
     try {
       await axios.delete(this.getUrlWithToken(server, `/kernels/${kernelId}`))
     } catch (error) {
-      console.warn('Failed to delete kernel:', error)
+      this.handleError(error, 'Failed to delete kernel')
     }
   }
 
@@ -270,6 +270,39 @@ export class JupyterService {
         success: false,
         message,
       }
+    }
+  }
+
+  async getRunningKernels(server: JupyterServer) {
+    try {
+      const response = await axios.get(this.getUrlWithToken(server, '/kernels'))
+      return response.data.map((kernel: any) => ({
+        id: kernel.id,
+        name: kernel.name,
+        lastActivity: kernel.last_activity,
+        executionState: kernel.execution_state,
+        connections: kernel.connections
+      }))
+    } catch (error) {
+      this.handleError(error, 'Failed to get running kernels')
+    }
+  }
+
+  async getActiveSessions(server: JupyterServer) {
+    try {
+      const response = await axios.get(this.getUrlWithToken(server, '/sessions'))
+      return response.data.map((session: any) => ({
+        id: session.id,
+        name: session.name || session.path.split('/').pop() || 'Untitled',
+        path: session.path,
+        kernel: {
+          id: session.kernel.id,
+          name: session.kernel.name,
+          lastActivity: session.kernel.last_activity
+        }
+      }))
+    } catch (error) {
+      this.handleError(error, 'Failed to get active sessions')
     }
   }
 }

@@ -10,9 +10,8 @@ import {
 } from '@/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import NotaConfigServers from './NotaConfigServers.vue'
-import NotaConfigKernels from './NotaConfigKernels.vue'
-import NotaConfigGeneral from './NotaConfigGeneral.vue'
-import { ServerIcon, CpuChipIcon, Cog6ToothIcon } from '@heroicons/vue/24/outline'
+import NotaConfigSessions from './NotaConfigSessions.vue'
+import { ServerIcon, PlayCircleIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps<{
   notaId: string
@@ -41,31 +40,25 @@ const config = computed(() => {
   <Dialog :open="open" @update:open="(value) => emit('update:open', value)">
     <DialogContent class="max-w-4xl max-h-[90vh] overflow-y-auto">
       <DialogHeader>
-        <DialogTitle>Nota Configuration</DialogTitle>
+        <DialogTitle>Jupyter Configuration</DialogTitle>
         <DialogDescription>
-          Configure settings, Jupyter servers, and kernels for your Nota
+          Configure Jupyter servers and kernels for your Nota
         </DialogDescription>
       </DialogHeader>
 
       <div class="mt-6">
         <Tabs default-value="servers" class="w-full">
-          <TabsList class="grid w-full grid-cols-3">
+          <TabsList class="grid w-full grid-cols-2">
             <TabsTrigger value="servers">
               <div class="flex items-center justify-center gap-2 p-1">
                 <ServerIcon class="w-4 h-4 shrink-0" />
                 <span class="text-sm">Servers</span>
               </div>
             </TabsTrigger>
-            <TabsTrigger value="kernels">
+            <TabsTrigger value="sessions">
               <div class="flex items-center justify-center gap-2 p-1">
-                <CpuChipIcon class="w-4 h-4 shrink-0" />
-                <span class="text-sm">Kernels</span>
-              </div>
-            </TabsTrigger>
-            <TabsTrigger value="settings">
-              <div class="flex items-center justify-center gap-2 p-1">
-                <Cog6ToothIcon class="w-4 h-4 shrink-0" />
-                <span class="text-sm">Settings</span>
+                <PlayCircleIcon class="w-4 h-4 shrink-0" />
+                <span class="text-sm">Sessions</span>
               </div>
             </TabsTrigger>
           </TabsList>
@@ -77,15 +70,8 @@ const config = computed(() => {
             />
           </TabsContent>
 
-          <TabsContent value="kernels">
-            <NotaConfigKernels
-              :nota-id="notaId"
-              :config="config"
-            />
-          </TabsContent>
-
-          <TabsContent value="settings">
-            <NotaConfigGeneral
+          <TabsContent value="sessions">
+            <NotaConfigSessions
               :nota-id="notaId"
               :config="config"
             />
