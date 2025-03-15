@@ -1,55 +1,34 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { NodeViewWrapper } from '@tiptap/vue-3'
-import CodeBlockWithExecution from './CodeBlockWithExecution.vue'
-import { useRoute } from 'vue-router'
-import { useNotaStore } from '@/stores/nota'
-import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
 import { Card, CardContent } from '@/components/ui/card'
+import { useCodeExecution } from './composables/useCodeExecution'
+import CodeBlockWithExecution from './CodeBlockWithExecution.vue'
 import OutputRenderer from './OutputRenderer.vue'
+import type { CodeBlockProps } from './types'
 
-const props = defineProps<{
-  node: any
-  updateAttributes: (attrs: any) => void
-  editor: any
-  getPos: () => number | undefined
-}>()
+const props = defineProps<CodeBlockProps>()
 
-const route = useRoute()
-const store = useNotaStore()
-const codeExecutionStore = useCodeExecutionStore()
+const {
+  notaId,
+  blockId,
+  kernelPreference,
+  initializeSession,
+  executeCode,
+  onKernelSelect,
+  onSessionSelect
+} = useCodeExecution(props)
 
-const notaId = computed(() => route.params.id as string)
-const blockId = computed(() => props.node.attrs.id || '')
 const isExecutable = computed(() => props.node.attrs.executable)
 const language = computed(() => props.node.attrs.language)
-const output = computed(() => props.node.attrs.output)
-const kernelName = computed(() => props.node.attrs.kernelName)
-const serverID = computed(() => props.node.attrs.serverID)
-const sessionId = computed(() => props.node.attrs.sessionId)
+const output = computed(() => props.node.attrs.output || null)
+const kernelName = computed(() => props.node.attrs.kernelName || null)
+const serverID = computed(() => props.node.attrs.serverID || null)
+const sessionId = computed(() => props.node.attrs.sessionId || null)
 const code = computed(() => props.node.textContent || '')
 
-// Get saved kernel preference for this block
-const kernelPreference = computed(() => {
-  const nota = store.getCurrentNota(route.params.id as string)
-  if (!nota?.config?.kernelPreferences) return null
-  return nota.config.kernelPreferences[blockId.value] || null
-})
-
 // Initialize session if saved
-onMounted(() => {
-  if (sessionId.value) {
-    const existingSession = codeExecutionStore.kernelSessions.get(sessionId.value)
-    if (!existingSession) {
-      // Recreate the session if it doesn't exist
-      const sessionNumber = parseInt(sessionId.value.split('-').pop() || '1')
-      const newSession = codeExecutionStore.createSession(`Session ${sessionNumber}`)
-      if (blockId.value) {
-        codeExecutionStore.addCellToSession(blockId.value, newSession)
-      }
-    }
-  }
-})
+onMounted(initializeSession)
 
 const updateCode = (newCode: string) => {
   const pos = props.getPos()
@@ -62,22 +41,14 @@ const updateCode = (newCode: string) => {
   props.editor.view.dispatch(transaction)
 }
 
-const onKernelSelect = async (kernelName: string, serverID: string) => {
-  props.updateAttributes({ kernelName, serverID })
-}
-
 const updateOutput = (newOutput: string) => {
   props.updateAttributes({ output: newOutput })
-}
-
-const onSessionSelect = (sessionId: string) => {
-  props.updateAttributes({ sessionId })
 }
 </script>
 
 <template>
-  <node-view-wrapper class="my-6">
-    <Card class="overflow-hidden" v-if="isExecutable">
+  <NodeViewWrapper class="my-6">
+    <Card class="overflow-hidden border-none shadow-md" v-if="isExecutable">
       <CardContent class="p-0">
         <CodeBlockWithExecution
           :id="blockId"
@@ -94,11 +65,12 @@ const onSessionSelect = (sessionId: string) => {
           @kernel-select="onKernelSelect"
           @update:output="updateOutput"
           @update:session-id="onSessionSelect"
+          @execute="executeCode"
         />
       </CardContent>
     </Card>
 
-    <Card v-else class="overflow-hidden">
+    <Card v-else class="overflow-hidden border-none shadow-md">
       <CardContent class="p-0">
         <OutputRenderer
           :content="code"
@@ -108,26 +80,35 @@ const onSessionSelect = (sessionId: string) => {
         />
       </CardContent>
     </Card>
-  </node-view-wrapper>
+  </NodeViewWrapper>
 </template>
 
 <style scoped>
+.my-6 {
+  margin-top: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.overflow-hidden {
+  overflow: hidden;
+}
+
 /* Add styles for scrollable code blocks */
-pre {
+:deep(pre) {
   scrollbar-width: thin;
   scrollbar-color: rgba(155, 155, 155, 0.5) transparent;
 }
 
-pre::-webkit-scrollbar {
+:deep(pre::-webkit-scrollbar) {
   width: 8px;
   height: 8px;
 }
 
-pre::-webkit-scrollbar-track {
+:deep(pre::-webkit-scrollbar-track) {
   background: transparent;
 }
 
-pre::-webkit-scrollbar-thumb {
+:deep(pre::-webkit-scrollbar-thumb) {
   background-color: rgba(155, 155, 155, 0.5);
   border-radius: 4px;
 }
