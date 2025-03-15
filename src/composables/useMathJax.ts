@@ -9,12 +9,18 @@ declare global {
 
 export function useMathJax() {
   const isMathJaxLoaded = ref(false)
+  const error = ref<Error | null>(null)
   
   // Check if MathJax is loaded
   const checkMathJaxLoaded = () => {
-    if (window.MathJax) {
-      isMathJaxLoaded.value = true
-      return true
+    try {
+      if (window.MathJax) {
+        isMathJaxLoaded.value = true
+        return true
+      }
+    } catch (err) {
+      error.value = err instanceof Error ? err : new Error(String(err))
+      console.error('Error checking MathJax:', err)
     }
     return false
   }
@@ -23,10 +29,16 @@ export function useMathJax() {
   const initMathJax = () => {
     return new Promise<boolean>((resolve) => {
       const check = () => {
-        if (checkMathJaxLoaded()) {
-          resolve(true)
-        } else {
-          setTimeout(check, 100)
+        try {
+          if (checkMathJaxLoaded()) {
+            resolve(true)
+          } else {
+            setTimeout(check, 100)
+          }
+        } catch (err) {
+          error.value = err instanceof Error ? err : new Error(String(err))
+          console.error('Error initializing MathJax:', err)
+          resolve(false)
         }
       }
       check()
@@ -35,27 +47,44 @@ export function useMathJax() {
 
   // Render LaTeX to SVG
   const renderLatex = (latex: string, element: HTMLElement | null, display = true) => {
-    if (!element || !latex || !isMathJaxLoaded.value) return false
+    if (!element) return false
+    if (!latex) {
+      // Clear the element if no LaTeX
+      if (element) element.innerHTML = ''
+      return true
+    }
+    
+    if (!isMathJaxLoaded.value) {
+      element.innerHTML = '<span class="text-muted-foreground">Loading math renderer...</span>'
+      return false
+    }
     
     try {
       const output = window.MathJax.tex2svg(latex, { display })
       element.innerHTML = ''
       element.appendChild(output)
       return true
-    } catch (error) {
-      console.error('Error rendering LaTeX:', error)
-      element.innerHTML = '<span style="color: red;">Invalid LaTeX</span>'
+    } catch (err) {
+      error.value = err instanceof Error ? err : new Error(String(err))
+      console.error('Error rendering LaTeX:', err)
+      element.innerHTML = '<span class="text-destructive">Invalid LaTeX</span>'
       return false
     }
   }
 
   onMounted(() => {
-    initMathJax()
+    try {
+      initMathJax()
+    } catch (err) {
+      error.value = err instanceof Error ? err : new Error(String(err))
+      console.error('Error in MathJax onMounted:', err)
+    }
   })
 
   return {
     isMathJaxLoaded,
     renderLatex,
-    initMathJax
+    initMathJax,
+    error
   }
 } 

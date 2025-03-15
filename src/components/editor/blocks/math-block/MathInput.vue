@@ -1,15 +1,17 @@
 <template>
   <div class="math-input w-full">
-    <Textarea
-      v-model="latexValue"
-      class="font-mono"
-      :placeholder="placeholder"
-      :rows="rows"
-      @keydown.enter.prevent="onEnter"
-      @keydown.esc="onEscape"
-      @blur="onBlur"
-      ref="textareaRef"
-    />
+    <div class="relative">
+      <textarea
+        v-model="latexValue"
+        class="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-mono"
+        :placeholder="placeholder"
+        :rows="rows"
+        @keydown.enter.prevent="onEnter"
+        @keydown.esc="onEscape"
+        @blur="onBlur"
+        ref="textareaRef"
+      ></textarea>
+    </div>
     <div class="flex justify-end gap-2 mt-2">
       <Button 
         variant="outline" 
@@ -30,9 +32,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, defineProps, defineEmits } from 'vue'
+import { ref, onMounted, watch, defineProps, defineEmits, nextTick } from 'vue'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
+import { cn } from '@/lib/utils'
 
 const props = defineProps<{
   modelValue: string
@@ -75,8 +77,12 @@ watch(() => props.modelValue, (newValue) => {
   latexValue.value = newValue
 })
 
-onMounted(() => {
+onMounted(async () => {
+  // Wait for the DOM to update
+  await nextTick()
   // Focus the textarea when mounted
-  textareaRef.value?.focus()
+  if (textareaRef.value) {
+    textareaRef.value.focus()
+  }
 })
 </script> 

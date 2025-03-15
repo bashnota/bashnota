@@ -35,26 +35,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onErrorCaptured } from 'vue'
 import { NodeViewWrapper } from '@tiptap/vue-3'
+import type { NodeViewProps } from '@tiptap/vue-3'
 import { Card, CardContent } from '@/components/ui/card'
 import MathDisplay from './MathDisplay.vue'
 import MathInput from './MathInput.vue'
 
-const props = defineProps({
-  node: {
-    type: Object,
-    required: true,
-  },
-  updateAttributes: {
-    type: Function,
-    required: true,
-  },
-  editor: {
-    type: Object,
-    required: true,
-  },
-})
+// Props - use NodeViewProps interface
+const props = defineProps<NodeViewProps>()
 
 const isEditing = ref(false)
 const latex = ref(props.node.attrs.latex || '')
@@ -100,5 +89,12 @@ watch(isReadOnly, (newValue) => {
   if (newValue && isEditing.value) {
     stopEditing()
   }
+})
+
+// Capture errors from child components
+onErrorCaptured((err, instance, info) => {
+  console.error('Error in MathBlock component:', err, info)
+  // Return false to prevent the error from propagating further
+  return false
 })
 </script>
