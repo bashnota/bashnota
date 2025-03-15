@@ -3,11 +3,7 @@ import { ref } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { JupyterService } from '@/services/jupyterService'
 import type { JupyterServer, KernelSpec, KernelConfig } from '@/types/jupyter'
-import {
-  ServerIcon,
-  PlusIcon,
-  LinkIcon,
-} from '@heroicons/vue/24/outline'
+import { Server, Plus, Link } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -168,7 +164,7 @@ const parseJupyterUrl = () => {
           variant="outline"
           class="flex items-center gap-2"
         >
-          <PlusIcon class="w-4 h-4" />
+          <Plus class="w-4 h-4" />
           Add Server
         </Button>
       </div>
@@ -193,7 +189,7 @@ const parseJupyterUrl = () => {
                 @click="parseJupyterUrl"
                 class="flex items-center gap-2"
               >
-                <LinkIcon class="w-4 h-4" />
+                <Link class="w-4 h-4" />
                 Parse URL
               </Button>
             </div>
@@ -256,7 +252,7 @@ const parseJupyterUrl = () => {
         v-if="config.jupyterServers.length === 0"
         class="rounded-lg border border-dashed p-8 text-center"
       >
-        <ServerIcon class="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
+        <Server class="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
         <p class="text-sm font-medium mb-2">No Jupyter Servers Configured</p>
         <p class="text-sm text-muted-foreground max-w-md mx-auto">
           Add a Jupyter server to enable code execution in your notebooks. You can connect to a local or remote Jupyter server.

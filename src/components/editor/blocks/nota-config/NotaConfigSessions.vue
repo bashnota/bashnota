@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { JupyterService } from '@/services/jupyterService'
 import type { JupyterServer } from '@/types/jupyter'
-import { ServerIcon, PlayCircleIcon, ArrowPathIcon, CpuChipIcon, TrashIcon, XCircleIcon } from '@heroicons/vue/24/outline'
+import { Server, PlayCircle, RotateCw, Cpu, Trash2, XCircle } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -149,7 +149,7 @@ onMounted(refreshAllSessions)
         :disabled="isRefreshingSessions"
         class="flex items-center gap-2"
       >
-        <ArrowPathIcon class="w-4 h-4" :class="{ 'animate-spin': isRefreshingSessions }" />
+        <RotateCw class="w-4 h-4" :class="{ 'animate-spin': isRefreshingSessions }" />
         {{ isRefreshingSessions ? 'Refreshing...' : 'Refresh All' }}
       </Button>
     </div>
@@ -159,7 +159,7 @@ onMounted(refreshAllSessions)
         <CardHeader>
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-3">
-              <ServerIcon class="w-5 h-5 text-muted-foreground" />
+              <Server class="w-5 h-5 text-muted-foreground" />
               <CardTitle class="text-base">
                 <code>{{ server.ip }}:{{ server.port }}</code>
               </CardTitle>
@@ -171,7 +171,7 @@ onMounted(refreshAllSessions)
               @click="cleanIdleKernels(server)"
               class="flex items-center gap-2"
             >
-              <XCircleIcon class="w-4 h-4" />
+              <XCircle class="w-4 h-4" />
               Clean Idle Kernels
             </Button>
           </div>
@@ -180,11 +180,11 @@ onMounted(refreshAllSessions)
           <Tabs defaultValue="sessions" class="w-full">
             <TabsList class="w-full grid grid-cols-2">
               <TabsTrigger value="sessions" class="flex items-center gap-2">
-                <PlayCircleIcon class="w-4 h-4" />
+                <PlayCircle class="w-4 h-4" />
                 Sessions
               </TabsTrigger>
               <TabsTrigger value="kernels" class="flex items-center gap-2">
-                <CpuChipIcon class="w-4 h-4" />
+                <Cpu class="w-4 h-4" />
                 Kernels
               </TabsTrigger>
             </TabsList>
@@ -200,7 +200,7 @@ onMounted(refreshAllSessions)
                   class="flex items-center justify-between p-3 rounded-lg bg-muted/50"
                 >
                   <div class="flex items-center gap-3">
-                    <PlayCircleIcon class="w-4 h-4 text-green-500" />
+                    <PlayCircle class="w-4 h-4 text-green-500" />
                     <div>
                       <div class="font-medium">{{ session.name || 'Untitled' }}</div>
                       <div class="text-sm text-muted-foreground">
@@ -223,7 +223,7 @@ onMounted(refreshAllSessions)
                   class="flex items-center justify-between p-3 rounded-lg bg-muted/50"
                 >
                   <div class="flex items-center gap-3">
-                    <CpuChipIcon class="w-4 h-4" :class="{
+                    <Cpu class="w-4 h-4" :class="{
                       'text-green-500': kernel.executionState === 'idle',
                       'text-yellow-500': kernel.executionState === 'busy',
                       'text-blue-500': kernel.executionState === 'starting'
@@ -243,7 +243,7 @@ onMounted(refreshAllSessions)
                     @click="deleteKernel(server, kernel.id)"
                     class="text-destructive hover:text-destructive"
                   >
-                    <TrashIcon class="w-4 h-4" :class="{ 'animate-spin': isDeletingKernels[kernel.id] }" />
+                    <Trash2 class="w-4 h-4" :class="{ 'animate-spin': isDeletingKernels[kernel.id] }" />
                   </Button>
                 </div>
               </div>

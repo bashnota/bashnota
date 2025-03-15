@@ -11,7 +11,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import NotaConfigServers from './NotaConfigServers.vue'
 import NotaConfigSessions from './NotaConfigSessions.vue'
-import { ServerIcon, PlayCircleIcon } from '@heroicons/vue/24/outline'
+import { Server, PlayCircle } from 'lucide-vue-next'
 
 const props = defineProps<{
   notaId: string
@@ -51,13 +51,13 @@ const config = computed(() => {
           <TabsList class="grid w-full grid-cols-2">
             <TabsTrigger value="servers">
               <div class="flex items-center justify-center gap-2 p-1">
-                <ServerIcon class="w-4 h-4 shrink-0" />
+                <Server class="w-4 h-4 shrink-0" />
                 <span class="text-sm">Servers</span>
               </div>
             </TabsTrigger>
             <TabsTrigger value="sessions">
               <div class="flex items-center justify-center gap-2 p-1">
-                <PlayCircleIcon class="w-4 h-4 shrink-0" />
+                <PlayCircle class="w-4 h-4 shrink-0" />
                 <span class="text-sm">Sessions</span>
               </div>
             </TabsTrigger>

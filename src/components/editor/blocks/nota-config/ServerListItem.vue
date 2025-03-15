@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import type { JupyterServer, KernelSpec } from '@/types/jupyter'
-import { ServerIcon, CpuChipIcon, ArrowPathIcon, TrashIcon, ChevronDownIcon } from '@heroicons/vue/24/outline'
+import { Server, Cpu, RotateCw, Trash2, ChevronDown } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -69,7 +69,7 @@ onMounted(() => {
               'bg-blue-50 dark:bg-blue-700 border-blue-950': serverStatus === null
             }"
           >
-            <ServerIcon class="w-6 h-6" />
+            <Server class="w-6 h-6" />
           </div>
           <div>
             <h3 class="font-medium">
@@ -100,7 +100,7 @@ onMounted(() => {
             :disabled="isRefreshing"
             class="flex items-center gap-2"
           >
-            <ArrowPathIcon class="w-4 h-4" :class="{ 'animate-spin': isRefreshing }" />
+            <RotateCw class="w-4 h-4" :class="{ 'animate-spin': isRefreshing }" />
             {{ isRefreshing ? 'Refreshing...' : 'Refresh' }}
           </Button>
           <Button
@@ -109,11 +109,11 @@ onMounted(() => {
             @click.stop="emit('remove', server)"
             class="text-destructive hover:text-destructive"
           >
-            <TrashIcon class="w-4 h-4" />
+            <Trash2 class="w-4 h-4" />
           </Button>
           <CollapsibleTrigger>
             <Button variant="ghost" size="sm">
-              <ChevronDownIcon 
+              <ChevronDown 
                 class="w-4 h-4 transition-transform duration-200"
                 :class="{ 'transform rotate-180': isOpen }"
               />
@@ -130,7 +130,7 @@ onMounted(() => {
         </div>
         <div v-if="kernels && kernels.length > 0" class="space-y-3">
           <div v-for="kernel in kernels" :key="kernel.name" class="flex items-center gap-3 p-2 rounded-md bg-muted/50">
-            <CpuChipIcon class="w-5 h-5" />
+            <Cpu class="w-5 h-5" />
             <div>
               <div class="font-medium">{{ kernel.spec.display_name }}</div>
               <div class="text-sm text-muted-foreground">{{ kernel.spec.language }}</div>
