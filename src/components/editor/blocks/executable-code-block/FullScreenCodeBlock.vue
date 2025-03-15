@@ -1,128 +1,61 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue'
+import { onMounted, onBeforeUnmount } from 'vue'
 import { Button } from '@/components/ui/button'
 import { X, Play, Loader2 } from 'lucide-vue-next'
 import CodeMirror from './CodeMirror.vue'
 import OutputRenderer from './OutputRenderer.vue'
+import { useFullscreenCode } from './composables/useFullscreenCode'
 
-const props = defineProps<{
+interface Props {
   code: string
-  output: string | null | undefined
+  output: string | null
   outputType?: 'text' | 'html' | 'json' | 'table' | 'image' | 'error'
   isOpen: boolean
   language: string
-  onClose: () => void
-  onUpdate: (code: string) => void
-  onExecute: () => Promise<void>
   isExecuting?: boolean
   isReadOnly?: boolean
+}
+
+const props = defineProps<Props>()
+const emit = defineEmits<{
+  'update:isOpen': [value: boolean]
+  'update:code': [code: string]
+  'execute': []
 }>()
 
-defineEmits(['update:isOpen'])
-const localCode = ref(props.code)
-const resizing = ref(false)
-const splitPosition = ref(50) // Default split at 50%
-const startX = ref(0)
-const isOutputFullscreen = ref(false)
-
-// Watch for external code changes
-watch(
-  () => props.code,
-  (newCode) => {
-    localCode.value = newCode
-  },
-)
-
-// Update code and notify parent
-const updateCode = (newCode: string) => {
-  localCode.value = newCode
-  props.onUpdate(newCode)
-}
-
-// Helper function to detect Mac OS
-const isMac = () => {
-  return typeof navigator !== 'undefined' && navigator.platform.includes('Mac')
-}
-
-// Handle keyboard shortcuts
-const handleKeyDown = (e: KeyboardEvent) => {
-  if (!props.isOpen) return
-
-  // Escape key to close
-  if (e.key === 'Escape' && !props.isExecuting) {
-    if (isOutputFullscreen.value) {
-      isOutputFullscreen.value = false
-      e.preventDefault()
-      return
-    }
-    props.onClose()
-  }
-
-  // Ctrl+Shift+Alt+Enter to run code (only if not readonly)
-  if (
-    !props.isReadOnly &&
-    (e.ctrlKey || e.metaKey) &&
-    e.shiftKey &&
-    e.altKey &&
-    e.key === 'Enter' &&
-    !props.isExecuting
-  ) {
-    e.preventDefault()
-    props.onExecute()
-  }
-}
-
-// Start resizing panels
-const startResize = (e: MouseEvent) => {
-  resizing.value = true
-  startX.value = e.clientX
-  document.body.style.cursor = 'col-resize'
-  document.body.style.userSelect = 'none'
-}
-
-// Handle resize movement
-const handleResize = (e: MouseEvent) => {
-  if (!resizing.value) return
-
-  const containerWidth = document.querySelector('.editor-container')?.clientWidth || 0
-  const deltaX = e.clientX - startX.value
-  const newPosition =
-    (((splitPosition.value * containerWidth) / 100 + deltaX) / containerWidth) * 100
-
-  // Limit the resize range (10% to 90%)
-  splitPosition.value = Math.min(Math.max(newPosition, 10), 90)
-  startX.value = e.clientX
-}
-
-// End resizing
-const endResize = () => {
-  resizing.value = false
-  document.body.style.cursor = ''
-  document.body.style.userSelect = ''
-}
-
-// Toggle output fullscreen mode
-const toggleOutputFullscreen = () => {
-  isOutputFullscreen.value = !isOutputFullscreen.value
-  if (isOutputFullscreen.value) {
-    splitPosition.value = 0 // Hide editor when output is fullscreen
-  } else {
-    splitPosition.value = 50 // Reset to default split
-  }
-}
+const {
+  resizing,
+  isOutputFullscreen,
+  isMac,
+  handleKeyDown,
+  startResize,
+  handleResize,
+  endResize,
+  toggleOutputFullscreen,
+  editorContainerStyle,
+  outputContainerStyle
+} = useFullscreenCode()
 
 // Setup event listeners
 onMounted(() => {
   document.addEventListener('mousemove', handleResize)
   document.addEventListener('mouseup', endResize)
-  document.addEventListener('keydown', handleKeyDown)
+  document.addEventListener('keydown', (e) => handleKeyDown(e, onClose, props.isExecuting || false))
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('mousemove', handleResize)
   document.removeEventListener('mouseup', endResize)
-  document.removeEventListener('keydown', handleKeyDown)
+  document.removeEventListener('keydown', (e) => handleKeyDown(e, onClose, props.isExecuting || false))
 })
+
+const onClose = () => {
+  emit('update:isOpen', false)
+}
+
+const onCodeUpdate = (newCode: string) => {
+  emit('update:code', newCode)
+}
 </script>
 
 <template>
@@ -142,9 +75,7 @@ onBeforeUnmount(() => {
       <div class="flex items-center gap-2">
         <!-- Keyboard shortcut help text (hidden in readonly mode) -->
         <div v-if="!isReadOnly" class="text-xs text-muted-foreground mr-2">
-          <kbd class="px-1.5 py-0.5 border rounded"
-            >{{ isMac() ? '⌘' : 'Ctrl' }}+Shift+Alt+Enter</kbd
-          >
+          <kbd class="px-1.5 py-0.5 border rounded">{{ isMac() ? '⌘' : 'Ctrl' }}+Shift+Alt+Enter</kbd>
           to run
         </div>
 
@@ -154,7 +85,7 @@ onBeforeUnmount(() => {
           variant="default"
           size="sm"
           :disabled="isExecuting"
-          @click="onExecute"
+          @click="$emit('execute')"
           class="h-8"
           aria-label="Run code"
         >
@@ -173,23 +104,22 @@ onBeforeUnmount(() => {
 
     <!-- Content -->
     <div class="flex flex-1 overflow-hidden editor-container">
-      <!-- Code Editor (hidden when output is fullscreen) -->
+      <!-- Code Editor -->
       <div 
         class="h-full overflow-hidden transition-all" 
-        :style="{ width: isOutputFullscreen ? '0%' : `${splitPosition}%` }"
-        :class="{ 'hidden': isOutputFullscreen }"
+        :style="editorContainerStyle"
       >
         <CodeMirror
-          v-model="localCode"
+          :modelValue="code"
           :language="language"
-          @update:modelValue="updateCode"
+          @update:modelValue="onCodeUpdate"
           :fullScreen="true"
           :readonly="isReadOnly"
           aria-label="Code editor"
         />
       </div>
 
-      <!-- Resize handle (hidden when output is fullscreen) -->
+      <!-- Resize handle -->
       <div
         v-if="!isOutputFullscreen"
         class="w-1 cursor-col-resize hover:bg-primary/20 active:bg-primary/40 transition-colors"
@@ -200,9 +130,8 @@ onBeforeUnmount(() => {
       <!-- Output -->
       <div 
         class="flex flex-col h-full transition-all" 
-        :style="{ width: isOutputFullscreen ? '100%' : `${100 - splitPosition}%` }"
+        :style="outputContainerStyle"
       >
-        <!-- Use the enhanced OutputRenderer component -->
         <OutputRenderer 
           v-if="output"
           :content="output" 
@@ -210,9 +139,9 @@ onBeforeUnmount(() => {
           :showControls="true"
           :isFullscreenable="true"
           :isCollapsible="true"
-          :originalCode="localCode"
+          :originalCode="code"
           class="h-full flex-1"
-          @fix-with-ai="onExecute"
+          @toggle-fullscreen="toggleOutputFullscreen"
         />
         <div v-else class="flex-1 flex items-center justify-center text-sm text-muted-foreground">
           No output to display

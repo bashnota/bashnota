@@ -4,6 +4,7 @@ import { useNotaStore } from '@/stores/nota'
 import { useCodeExecution } from '@/composables/useCodeExecution'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
 import type { KernelConfig, KernelSpec } from '@/types/jupyter'
+import { useCodeBlock } from './composables/useCodeBlock'
 import {
   Copy,
   Check,
@@ -54,6 +55,81 @@ const emit = defineEmits<{
   'update:session-id': [sessionId: string]
 }>()
 
+// Component refs
+const codeBlockRef = ref<HTMLElement | null>(null)
+const outputRendererRef = ref<InstanceType<typeof OutputRenderer> | null>(null)
+
+// Cell state from code execution store
+const { cell, copyOutput } = useCodeExecution(props.id)
+
+// Initialize code block composable
+const {
+  // State
+  codeValue,
+  hasUnsavedChanges,
+  isFullScreen,
+  executionInProgress,
+  isCodeCopied,
+  
+  // Toolbar state
+  isServerOpen,
+  isKernelOpen,
+  isSessionOpen,
+  isCodeVisible,
+  selectedServer,
+  selectedKernel,
+  selectedSession,
+  isSettingUp,
+  
+  // Computed
+  isReadyToExecute,
+  availableSessions,
+  notaConfig,
+  availableServers,
+  availableKernels,
+  
+  // Methods
+  createNewSession,
+  executeCode,
+  updateCode,
+  saveChanges,
+  copyCode,
+  handleServerSelect,
+  handleKernelSelect,
+  handleSessionSelect,
+  toggleCodeVisibility,
+  
+  // AI Fixer
+  isOpen: isAiFixerOpen,
+  handleFixRequest,
+  applyFix,
+  close: closeAiFixer,
+} = useCodeBlock({
+  code: props.code,
+  id: props.id,
+  notaId: props.notaId,
+  serverID: props.serverID,
+  kernelName: props.kernelName,
+  sessionId: props.sessionId,
+  kernelPreference: props.kernelPreference,
+  isReadOnly: props.isReadOnly,
+  onUpdate: (code: string) => emit('update:code', code),
+  onKernelSelect: (kernelName: string, serverId: string) => emit('kernel-select', kernelName, serverId),
+  onUpdateOutput: (output: string) => emit('update:output', output),
+  onUpdateSessionId: (sessionId: string) => emit('update:session-id', sessionId),
+})
+
+// Stores
+const store = useNotaStore()
+const codeExecutionStore = useCodeExecutionStore()
+
+// Computed properties
+const rootNotaId = computed(() => {
+  const currentNota = store.getCurrentNota(props.notaId)
+  if (!currentNota?.parentId) return props.notaId
+  return store.getRootNotaId(currentNota.parentId)
+})
+
 // Utils
 const showConsoleMessage = (
   title: string,
@@ -70,285 +146,8 @@ const showConsoleMessage = (
   }
 }
 
-// Stores
-const store = useNotaStore()
-const codeExecutionStore = useCodeExecutionStore()
-
-// Component state
-// Server configuration
-const selectedServer = ref(props.serverID || 'none')
-const isServerOpen = ref(false)
-
-// Kernel configuration
-const selectedKernel = ref(props.kernelName || 'none')
-const isKernelOpen = ref(false)
-
-// Session management
-const selectedSession = ref(props.sessionId || '')
-const isSessionOpen = ref(false)
-const isSettingUp = ref(false)
-
-// UI state
-const isCodeVisible = ref(true)
-const isOutputVisible = ref(true)
-const isFullScreen = ref(false)
-const codeBlockRef = ref<HTMLElement | null>(null)
-
-// Code state
-const codeValue = ref(props.code)
-const lastSavedCode = ref(props.code)
-const isCodeCopied = ref(false)
-
-// Code execution
-const { cell, execute, copyOutput, isCopied } = useCodeExecution(props.id)
-const executionInProgress = ref(false)
-const originalCodeBeforeExecution = ref('')
-
-// Computed properties
-const hasUnsavedChanges = computed(() => codeValue.value !== lastSavedCode.value)
-const availableSessions = computed(() => codeExecutionStore.getAllSessions)
-
-const rootNotaId = computed(() => {
-  const currentNota = store.getCurrentNota(props.notaId)
-  if (!currentNota?.parentId) return props.notaId
-  return store.getRootNotaId(currentNota.parentId)
-})
-
-const notaConfig = computed(() => {
-  const nota = store.getCurrentNota(rootNotaId.value)
-  if (!nota?.config) {
-    return {
-      jupyterServers: [],
-      kernels: {} as Record<string, KernelSpec[]>,
-      notebooks: [],
-    }
-  }
-  return nota.config
-})
-
-const availableServers = computed(() => {
-  return notaConfig.value.jupyterServers.map((server) => ({
-    ...server,
-    displayName: `${server.ip}:${server.port}`,
-  }))
-})
-
-const availableKernels = computed(() => {
-  if (!selectedServer.value || selectedServer.value === 'none') return []
-  return notaConfig.value.kernels[selectedServer.value] || []
-})
-
-const isReadyToExecute = computed(
-  () =>
-    selectedKernel.value &&
-    selectedKernel.value !== 'none' &&
-    selectedServer.value &&
-    selectedServer.value !== 'none' &&
-    !cell.value?.isExecuting,
-)
-
-// Add AI code fixer state
-const isAiFixerOpen = ref(false)
-const outputRendererRef = ref<InstanceType<typeof OutputRenderer> | null>(null)
-
-// Methods
-const createNewSession = async () => {
-  try {
-    isSettingUp.value = true
-    const sessionName = `Session ${availableSessions.value.length + 1}`
-
-    // Create new session
-    const sessionId = codeExecutionStore.createSession(sessionName)
-
-    // Select the new session
-    selectedSession.value = sessionId
-    codeExecutionStore.addCellToSession(props.id, sessionId)
-    emit('update:session-id', sessionId)
-
-    // Save sessions to config
-    await codeExecutionStore.saveSessions(props.notaId)
-    showConsoleMessage('New session created', `Created session: ${sessionName}`, 'success')
-  } catch (error) {
-    console.error('Failed to create session:', error)
-    showConsoleMessage(
-      'Error creating session',
-      'Failed to create new session. Please try again.',
-      'error',
-    )
-  } finally {
-    isSettingUp.value = false
-  }
-}
-
-const handleSessionChange = async () => {
-  if (selectedSession.value) {
-    try {
-      isSettingUp.value = true
-      codeExecutionStore.addCellToSession(props.id, selectedSession.value)
-      emit('update:session-id', selectedSession.value)
-      await codeExecutionStore.saveSessions(props.notaId)
-    } catch (error) {
-      console.error('Failed to change session:', error)
-      showConsoleMessage(
-        'Error changing session',
-        'Failed to update session. Please try again.',
-        'error',
-      )
-    } finally {
-      isSettingUp.value = false
-    }
-  }
-}
-
-const handleExecution = async () => {
-  if (!isReadyToExecute.value) {
-    if (!selectedServer.value || selectedServer.value === 'none') {
-      showConsoleMessage(
-        'Server not selected',
-        'Please select a server before executing code.',
-        'warning',
-      )
-      return
-    }
-
-    if (!selectedKernel.value || selectedKernel.value === 'none') {
-      showConsoleMessage(
-        'Kernel not selected',
-        'Please select a kernel before executing code.',
-        'warning',
-      )
-      return
-    }
-
-    return
-  }
-
-  try {
-    // Save the original code to restore after execution if needed
-    originalCodeBeforeExecution.value = codeValue.value
-    executionInProgress.value = true
-
-    await execute()
-    emit('update:output', cell.value?.output || '')
-    // Save after successful execution
-    lastSavedCode.value = codeValue.value
-  } catch (error) {
-    console.error('Error executing code:', error)
-    showConsoleMessage('Execution error', 'An error occurred during code execution.', 'error')
-
-    // Restore original code if it was changed during execution
-    if (codeValue.value !== originalCodeBeforeExecution.value) {
-      codeValue.value = originalCodeBeforeExecution.value
-    }
-  } finally {
-    executionInProgress.value = false
-  }
-}
-
-const updateCode = (newCode: string) => {
-  codeValue.value = newCode
-  emit('update:code', newCode)
-}
-
-const saveChanges = () => {
-  emit('update:code', codeValue.value)
-  lastSavedCode.value = codeValue.value
-  showConsoleMessage('Changes saved', 'Your code changes have been saved.', 'success')
-}
-
-const copyCode = async () => {
-  try {
-    await navigator.clipboard.writeText(codeValue.value)
-    isCodeCopied.value = true
-    setTimeout(() => {
-      isCodeCopied.value = false
-    }, 2000)
-    showConsoleMessage('Code copied', 'Code has been copied to clipboard.', 'success')
-  } catch (err) {
-    console.error('Failed to copy code:', err)
-    showConsoleMessage('Failed to copy', 'Could not copy code to clipboard.', 'error')
-  }
-}
-
-const handleFullScreen = () => {
-  isFullScreen.value = true
-}
-
-// Handle AI fix request
-const handleAiFixRequest = (originalCode: string, errorOutput: string) => {
-  isAiFixerOpen.value = true
-}
-
-// Apply AI fix
-const applyAiFix = (fixedCode: string) => {
-  // Update the code
-  codeValue.value = fixedCode
-  emit('update:code', fixedCode)
-  
-  // Reset the output renderer loading state
-  if (outputRendererRef.value) {
-    outputRendererRef.value.resetAiFixLoading()
-  }
-  
-  // Close the AI fixer
-  isAiFixerOpen.value = false
-  
-  // Execute the fixed code
-  handleExecution()
-}
-
-// Close AI fixer
-const closeAiFixer = () => {
-  isAiFixerOpen.value = false
-  
-  // Reset the output renderer loading state
-  if (outputRendererRef.value) {
-    outputRendererRef.value.resetAiFixLoading()
-  }
-}
-
-// Event handlers
-const handleKeyDown = (e: KeyboardEvent) => {
-  // Run code: Ctrl+Shift+Alt+Enter
-  if (e.ctrlKey && e.shiftKey && e.altKey && e.key === 'Enter') {
-    e.preventDefault()
-    handleExecution()
-    return
-  }
-
-  // Save changes: Ctrl+S
-  if (e.ctrlKey && e.key === 's') {
-    e.preventDefault()
-    saveChanges()
-    return
-  }
-
-  // Toggle fullscreen: Ctrl+M
-  if (e.ctrlKey && e.key === 'm') {
-    e.preventDefault()
-    isFullScreen.value = !isFullScreen.value
-    return
-  }
-}
-
 // Lifecycle hooks
 onMounted(async () => {
-  try {
-    if (props.kernelPreference) {
-      selectedServer.value = props.kernelPreference.serverId || 'none'
-    }
-
-    if (props.sessionId) {
-      selectedSession.value = props.sessionId
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-
-    lastSavedCode.value = props.code
-  } catch (error) {
-    console.error('Error initializing code block:', error)
-  }
-
   await nextTick()
   if (codeBlockRef.value && !props.isReadOnly) {
     const editor = codeBlockRef.value.querySelector('.cm-editor')
@@ -359,15 +158,11 @@ onMounted(async () => {
 })
 
 // Watchers
-watch(
-  () => props.code,
-  (newCode) => {
-    if (newCode !== codeValue.value) {
-      codeValue.value = newCode
-      lastSavedCode.value = newCode
-    }
-  },
-)
+watch(() => props.code, (newCode) => {
+  if (newCode !== codeValue.value) {
+    updateCode(newCode)
+  }
+})
 
 watch(
   () => cell.value?.output,
@@ -386,9 +181,21 @@ watch(
   },
 )
 
-onBeforeUnmount(() => {
-  window.removeEventListener('keydown', handleKeyDown)
-})
+// Template helpers
+const handleServerChange = (value: string) => {
+  handleServerSelect(value)
+  isServerOpen.value = false
+}
+
+const handleKernelChange = (value: string) => {
+  handleKernelSelect(value)
+  isKernelOpen.value = false
+}
+
+const handleSessionChange = (value: string) => {
+  handleSessionSelect(value)
+  isSessionOpen.value = false
+}
 </script>
 
 <template>
@@ -452,13 +259,7 @@ onBeforeUnmount(() => {
                 :model-value="selectedSession"
                 placeholder="Search sessions..."
                 :searchable="true"
-                @select="
-                  (value: string) => {
-                    selectedSession = value
-                    handleSessionChange()
-                    isSessionOpen = false
-                  }
-                "
+                @select="handleSessionChange"
               />
             </PopoverContent>
           </Popover>
@@ -469,7 +270,7 @@ onBeforeUnmount(() => {
           variant="outline"
           size="sm"
           class="gap-2 h-8"
-          @click="isCodeVisible = !isCodeVisible"
+          @click="toggleCodeVisibility"
           :title="isCodeVisible ? 'Hide Code' : 'Show Code'"
           aria-label="Toggle code visibility"
         >
@@ -523,13 +324,7 @@ onBeforeUnmount(() => {
                 :model-value="selectedServer"
                 placeholder="Search servers..."
                 :searchable="true"
-                @select="
-                  (value: string) => {
-                    selectedServer = value
-                    emit('kernel-select', selectedKernel, selectedServer)
-                    isServerOpen = false
-                  }
-                "
+                @select="handleServerChange"
               />
               <div
                 v-if="availableServers.length === 0"
@@ -595,13 +390,7 @@ onBeforeUnmount(() => {
               :model-value="selectedKernel"
               placeholder="Search kernels..."
               :searchable="true"
-              @select="
-                (value: string) => {
-                  selectedKernel = value
-                  emit('kernel-select', selectedKernel, selectedServer)
-                  isKernelOpen = false
-                }
-              "
+              @select="handleKernelChange"
             />
             <div
               v-if="availableKernels.length === 0"
@@ -664,7 +453,7 @@ onBeforeUnmount(() => {
           variant="default"
           size="sm"
           :disabled="!isReadyToExecute"
-          @click="handleExecution"
+          @click="executeCode"
           class="h-8"
           :title="cell?.isExecuting ? 'Executing...' : 'Run Code'"
           aria-label="Run code"
@@ -679,7 +468,7 @@ onBeforeUnmount(() => {
           variant="ghost"
           size="sm"
           class="h-8 w-8 p-0"
-          @click="handleFullScreen"
+          @click="isFullScreen = true"
           title="Full Screen Mode"
           aria-label="Full screen mode"
         >
@@ -751,24 +540,21 @@ onBeforeUnmount(() => {
         :maxHeight="'300px'"
         :originalCode="codeValue"
         @copy="copyOutput"
-        @fix-with-ai="handleAiFixRequest"
+        @fix-with-ai="handleFixRequest"
       />
     </div>
 
     <!-- Fullscreen Modal -->
     <FullScreenCodeBlock
       v-if="isFullScreen"
-      :code="codeValue"
-      :output="cell?.output"
+      v-model:code="codeValue"
+      :output="cell?.output || null"
       :outputType="cell?.hasError ? 'error' : undefined"
       :language="language"
-      :is-open="isFullScreen"
+      v-model:isOpen="isFullScreen"
       :is-executing="cell?.isExecuting"
       :is-read-only="isReadOnly"
-      @update:is-open="isFullScreen = $event"
-      :on-close="() => (isFullScreen = false)"
-      :on-update="updateCode"
-      :on-execute="handleExecution"
+      @execute="executeCode"
     />
     
     <!-- AI Code Fixer -->
@@ -779,7 +565,7 @@ onBeforeUnmount(() => {
       :is-open="isAiFixerOpen"
       :language="language"
       @close="closeAiFixer"
-      @apply-fix="applyAiFix"
+      @apply-fix="applyFix"
     />
   </div>
 </template>
