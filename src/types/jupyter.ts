@@ -41,6 +41,13 @@ export interface NotaConfig {
     id: string
     name: string
   }>
+  settings?: {
+    autoSave: boolean
+    defaultKernel?: string
+    theme?: 'light' | 'dark' | 'system'
+    fontSize?: number
+    lineNumbers?: boolean
+  }
 }
 
 export interface KernelSpec {

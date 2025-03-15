@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import NotaEditor from '@/components/editor/NotaEditor.vue'
-import NotaConfigPage from '@/components/NotaConfigPage.vue'
+import NotaConfigModal from '@/components/editor/blocks/nota-config/NotaConfigModal.vue'
 import { ref, onMounted, watch, nextTick } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { computed } from 'vue'
@@ -34,7 +34,7 @@ const isExecutingAll = ref(false)
 const isReady = ref(false)
 
 const nota = computed(() => store.getCurrentNota(props.id))
-const showConfigPage = ref(false)
+const showConfigModal = ref(false)
 const showShareDialog = ref(false)
 const isSaving = ref(false)
 const showSaved = ref(false)
@@ -84,8 +84,8 @@ const executeAllCells = async () => {
   }
 }
 
-const toggleConfigPage = () => {
-  showConfigPage.value = !showConfigPage.value
+const toggleConfigModal = () => {
+  showConfigModal.value = !showConfigModal.value
 }
 
 // New function to toggle share dialog
@@ -255,7 +255,7 @@ const exportNota = async () => {
         <Button
           variant="outline"
           title="Jupyter Settings"
-          @click="toggleConfigPage"
+          @click="toggleConfigModal"
           v-if="nota"
           class="flex items-center gap-2"
         >
@@ -271,13 +271,19 @@ const exportNota = async () => {
 
     <main>
       <template v-if="isReady">
-        <NotaEditor v-if="!showConfigPage && nota" :nota-id="id" @saving="handleSaving" :key="id" />
-        <NotaConfigPage v-else-if="nota" :nota-id="id" />
+        <NotaEditor v-if="nota" :nota-id="id" @saving="handleSaving" :key="id" />
       </template>
       <div v-else class="flex items-center justify-center h-full">
         <p class="text-muted-foreground">Loading...</p>
       </div>
     </main>
+
+    <!-- Configuration Modal -->
+    <NotaConfigModal
+      v-if="nota"
+      :nota-id="id"
+      v-model:open="showConfigModal"
+    />
 
     <!-- Share Dialog -->
     <PublishNotaModal v-if="nota" :nota-id="id" v-model:open="showShareDialog" />
