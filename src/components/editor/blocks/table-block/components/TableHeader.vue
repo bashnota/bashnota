@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Button } from '@/components/ui/button'
-import { PlusIcon, PencilIcon } from '@heroicons/vue/24/solid'
+import { Plus, Pencil } from 'lucide-vue-next'
 import { Input } from '@/components/ui/input'
 import { ref, watch } from 'vue'
 
@@ -57,17 +57,17 @@ const saveName = () => {
         <h3 v-else class="text-lg font-semibold flex items-center gap-2">
           {{ tableName }}
           <Button variant="ghost" size="sm" class="h-6 w-6" @click="emit('startEditingName')">
-            <PencilIcon class="h-4 w-4" />
+            <Pencil class="h-4 w-4" />
           </Button>
         </h3>
       </div>
       <div class="flex items-center gap-2">
         <Button variant="outline" size="sm" @click="emit('addColumn')">
-          <PlusIcon class="h-4 w-4 mr-2" />
+          <Plus class="h-4 w-4 mr-2" />
           Add Column
         </Button>
         <Button variant="outline" size="sm" @click="emit('addRow')">
-          <PlusIcon class="h-4 w-4 mr-2" />
+          <Plus class="h-4 w-4 mr-2" />
           Add Row
         </Button>
       </div>

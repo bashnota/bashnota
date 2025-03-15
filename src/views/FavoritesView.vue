@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { DocumentTextIcon, ClockIcon, StarIcon } from '@heroicons/vue/24/solid'
+import { FileText, Clock, Star } from 'lucide-vue-next'
 import { formatDate } from '@/lib/utils'
 
 const store = useNotaStore()
@@ -22,7 +22,7 @@ const favoriteNotas = computed(() => {
   <div class="container py-8 space-y-8">
     <div class="space-y-4">
       <h1 class="text-4xl font-bold tracking-tight flex items-center gap-2">
-        <StarIcon class="w-8 h-8 text-yellow-400" />
+        <Star class="h-8 w-8 text-yellow-400" />
         Favorite Notas
       </h1>
       <p class="text-muted-foreground">Your starred notas for quick access</p>
@@ -34,7 +34,7 @@ const favoriteNotas = computed(() => {
           v-if="favoriteNotas.length === 0"
           class="flex flex-col items-center justify-center p-12 text-center"
         >
-          <StarIcon class="w-12 h-12 text-muted-foreground/50 mb-4" />
+          <Star class="h-12 w-12 text-muted-foreground/50 mb-4" />
           <h3 class="text-lg font-semibold mb-2">No Favorites Yet</h3>
           <p class="text-muted-foreground">Star your important notas for quick access</p>
         </div>
@@ -45,11 +45,11 @@ const favoriteNotas = computed(() => {
                 <CardHeader>
                   <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
-                      <DocumentTextIcon class="w-5 h-5 text-muted-foreground" />
+                      <FileText class="h-4 w-4 text-muted-foreground" />
                       <CardTitle>{{ nota.title }}</CardTitle>
                     </div>
                     <div class="flex items-center text-sm text-muted-foreground">
-                      <ClockIcon class="w-4 h-4 mr-1" />
+                      <Clock class="h-4 w-4 mr-1" />
                       {{ formatDate(nota.updatedAt) }}
                     </div>
                   </div>

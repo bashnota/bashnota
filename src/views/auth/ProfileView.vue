@@ -13,13 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import {
-  UserIcon,
-  EnvelopeIcon,
-  ShieldCheckIcon,
-  CalendarIcon,
-  ClockIcon,
-} from '@heroicons/vue/24/solid'
+import { Eye, EyeOff, Mail, Lock, User, ShieldCheck, Calendar, Clock } from 'lucide-vue-next'
 import { toast } from '@/lib/utils'
 import { formatDate } from '@/lib/utils'
 
@@ -135,7 +129,7 @@ const handleLogout = async () => {
           <div class="space-y-2">
             <Label class="text-muted-foreground">Display Name</Label>
             <div class="flex items-center gap-2 px-3 py-2 border rounded-md bg-muted/20">
-              <UserIcon class="h-4 w-4 text-muted-foreground" />
+              <User class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <span>{{ currentUser.displayName || 'No display name set' }}</span>
             </div>
           </div>
@@ -144,13 +138,13 @@ const handleLogout = async () => {
           <div class="space-y-2">
             <Label class="text-muted-foreground">Email</Label>
             <div class="flex items-center gap-2 px-3 py-2 border rounded-md bg-muted/20">
-              <EnvelopeIcon class="h-4 w-4 text-muted-foreground" />
+              <Mail class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <span>{{ currentUser.email }}</span>
               <span
                 v-if="currentUser.emailVerified"
                 class="ml-auto text-sm text-green-600 dark:text-green-400 flex items-center"
               >
-                <ShieldCheckIcon class="h-4 w-4 mr-1" />
+                <ShieldCheck class="h-4 w-4 mr-1" />
                 Verified
               </span>
               <span v-else class="ml-auto text-sm text-amber-600 dark:text-amber-400">
@@ -163,7 +157,7 @@ const handleLogout = async () => {
           <div class="space-y-2">
             <Label class="text-muted-foreground">Account Created</Label>
             <div class="flex items-center gap-2 px-3 py-2 border rounded-md bg-muted/20">
-              <CalendarIcon class="h-4 w-4 text-muted-foreground" />
+              <Calendar class="h-4 w-4 text-muted-foreground" />
               <span>{{ formatDateDisplay(currentUser.createdAt) }}</span>
             </div>
           </div>
@@ -172,7 +166,7 @@ const handleLogout = async () => {
           <div class="space-y-2">
             <Label class="text-muted-foreground">Last Login</Label>
             <div class="flex items-center gap-2 px-3 py-2 border rounded-md bg-muted/20">
-              <ClockIcon class="h-4 w-4 text-muted-foreground" />
+              <Clock class="h-4 w-4 text-muted-foreground" />
               <span>{{ formatDateDisplay(currentUser.lastLoginAt) }}</span>
             </div>
           </div>

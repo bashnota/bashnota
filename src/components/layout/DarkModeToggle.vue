@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { SunIcon, MoonIcon } from '@heroicons/vue/24/solid'
+import { Sun, Moon } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 
 const isDark = ref(false)
@@ -35,7 +35,7 @@ const updateTheme = () => {
     :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
     class="h-9 w-9 transition-colors hover:bg-accent hover:text-accent-foreground"
   >
-    <SunIcon v-if="!isDark" class="h-5 w-5" />
-    <MoonIcon v-else class="h-5 w-5" />
+    <Sun v-if="!isDark" class="h-5 w-5" />
+    <Moon v-else class="h-5 w-5" />
   </Button>
 </template>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Button } from '@/components/ui/button'
-import { PlusIcon, SparklesIcon, CodeBracketIcon, DocumentTextIcon } from '@heroicons/vue/24/solid'
+import { Plus, Sparkles, Code2, FileText } from 'lucide-vue-next'
 import { Card, CardContent } from '@/components/ui/card'
 
 defineEmits<{
@@ -16,7 +16,7 @@ defineEmits<{
       <div class="space-y-6">
         <div class="space-y-2">
           <div class="inline-flex items-center rounded-full border bg-background/95 px-3 py-1 text-sm">
-            <SparklesIcon class="mr-2 h-3.5 w-3.5 text-primary flex-shrink-0" />
+            <Sparkles class="mr-2 h-3.5 w-3.5 text-primary flex-shrink-0" />
             <span class="text-muted-foreground truncate">Welcome to your smart workspace</span>
           </div>
           <h1 class="text-2xl sm:text-4xl font-bold tracking-tight">
@@ -57,7 +57,7 @@ defineEmits<{
           class="group relative overflow-hidden w-full"
         >
           <div class="absolute inset-0 bg-primary opacity-0 group-hover:opacity-10 transition-opacity"></div>
-          <PlusIcon class="h-5 w-5 mr-2 flex-shrink-0" />
+          <Plus class="h-5 w-5 mr-2 flex-shrink-0" />
           New Nota
         </Button>
       </div>

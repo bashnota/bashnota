@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { ArrowRightOnRectangleIcon, UserIcon } from '@heroicons/vue/24/solid'
+import { LogOut, User } from 'lucide-vue-next'
 import { toast } from '@/lib/utils'
 
 const authStore = useAuthStore()
@@ -100,12 +100,12 @@ const handleProfileClick = () => {
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem @click="handleProfileClick">
-            <UserIcon class="mr-2 h-4 w-4" />
+            <User class="mr-2 h-4 w-4" />
             <span>Profile</span>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem @click="handleLogout">
-            <ArrowRightOnRectangleIcon class="mr-2 h-4 w-4" />
+            <LogOut class="mr-2 h-4 w-4" />
             <span>Logout</span>
           </DropdownMenuItem>
         </DropdownMenuContent>

@@ -13,13 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import {
-  EyeIcon,
-  EyeSlashIcon,
-  EnvelopeIcon,
-  LockClosedIcon,
-  UserIcon,
-} from '@heroicons/vue/24/solid'
+import { Eye, EyeOff, Mail, Lock, User } from 'lucide-vue-next'
 import { toast } from '@/lib/utils'
 
 const authStore = useAuthStore()
@@ -128,9 +122,7 @@ const handleGoogleSignup = async () => {
         <div class="space-y-2">
           <Label for="name">Name</Label>
           <div class="relative">
-            <UserIcon
-              class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground"
-            />
+            <User class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               id="name"
               :value="displayName"
@@ -150,9 +142,7 @@ const handleGoogleSignup = async () => {
         <div class="space-y-2">
           <Label for="email">Email</Label>
           <div class="relative">
-            <EnvelopeIcon
-              class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground"
-            />
+            <Mail class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               id="email"
               :value="email"
@@ -172,9 +162,7 @@ const handleGoogleSignup = async () => {
         <div class="space-y-2">
           <Label for="password">Password</Label>
           <div class="relative">
-            <LockClosedIcon
-              class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground"
-            />
+            <Lock class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               id="password"
               :value="password"
@@ -189,8 +177,8 @@ const handleGoogleSignup = async () => {
               class="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
               @click="showPassword = !showPassword"
             >
-              <EyeIcon v-if="showPassword" class="h-4 w-4" />
-              <EyeSlashIcon v-else class="h-4 w-4" />
+              <Eye v-if="showPassword" class="h-4 w-4" />
+              <EyeOff v-else class="h-4 w-4" />
             </button>
           </div>
           <p v-if="password && !isPasswordValid" class="text-sm text-red-500">
@@ -202,9 +190,7 @@ const handleGoogleSignup = async () => {
         <div class="space-y-2">
           <Label for="confirmPassword">Confirm Password</Label>
           <div class="relative">
-            <LockClosedIcon
-              class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground"
-            />
+            <Lock class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               id="confirmPassword"
               :value="confirmPassword"
@@ -219,8 +205,8 @@ const handleGoogleSignup = async () => {
               class="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
               @click="showConfirmPassword = !showConfirmPassword"
             >
-              <EyeIcon v-if="showConfirmPassword" class="h-4 w-4" />
-              <EyeSlashIcon v-else class="h-4 w-4" />
+              <Eye v-if="showConfirmPassword" class="h-4 w-4" />
+              <EyeOff v-else class="h-4 w-4" />
             </button>
           </div>
           <p v-if="confirmPassword && !isConfirmPasswordValid" class="text-sm text-red-500">

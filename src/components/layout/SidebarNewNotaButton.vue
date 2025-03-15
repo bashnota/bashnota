@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { PlusIcon } from '@heroicons/vue/24/solid'
+import { Plus } from 'lucide-vue-next'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
@@ -36,7 +36,7 @@ const handleKeydown = (event: KeyboardEvent) => {
       variant="default"
       size="sm"
     >
-      <PlusIcon class="h-3.5 w-3.5" />
+      <Plus class="h-4 w-4" />
       <span>New Nota</span>
     </Button>
 

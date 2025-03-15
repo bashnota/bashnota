@@ -14,7 +14,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
-import { EyeIcon, EyeSlashIcon, EnvelopeIcon, LockClosedIcon } from '@heroicons/vue/24/solid'
+import { Eye, EyeOff, Mail, Lock } from 'lucide-vue-next'
 import { toast } from '@/lib/utils'
 
 const authStore = useAuthStore()
@@ -139,7 +139,7 @@ initFromStorage()
         <div class="space-y-2">
           <Label for="email">Email</Label>
           <div class="relative">
-            <EnvelopeIcon
+            <Mail
               class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground"
             />
             <Input
@@ -170,7 +170,7 @@ initFromStorage()
             </Button>
           </div>
           <div class="relative">
-            <LockClosedIcon
+            <Lock
               class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground"
             />
             <Input
@@ -187,8 +187,8 @@ initFromStorage()
               class="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
               @click="showPassword = !showPassword"
             >
-              <EyeIcon v-if="showPassword" class="h-4 w-4" />
-              <EyeSlashIcon v-else class="h-4 w-4" />
+              <Eye v-if="showPassword" class="h-4 w-4" />
+              <EyeOff v-else class="h-4 w-4" />
             </button>
           </div>
           <p v-if="password && !isPasswordValid" class="text-sm text-red-500">
