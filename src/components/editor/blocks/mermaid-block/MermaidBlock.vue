@@ -1,25 +1,24 @@
 <template>
-  <node-view-wrapper class="mermaid-block" :class="{ readonly: isReadOnly }">
-    <div class="mermaid-controls" v-if="!isReadOnly">
-      <button
-        class="preview-toggle"
+  <node-view-wrapper class="relative w-full" :class="{ 'p-4 border rounded-lg': !isReadOnly }">
+    <div v-if="!isReadOnly" class="flex justify-end mb-2">
+      <Button
+        variant="outline"
+        size="sm"
         @click="isEditing = !isEditing"
         :title="isEditing ? 'Show Preview' : 'Edit Diagram'"
       >
         {{ isEditing ? 'Preview' : 'Edit' }}
-      </button>
+      </Button>
     </div>
 
-    <div v-if="isEditing && !isReadOnly" class="mermaid-editor">
-      <textarea
+    <div v-if="isEditing && !isReadOnly">
+      <MermaidEditor
         v-model="localContent"
-        @blur="updateContent"
-        class="mermaid-textarea"
-        placeholder="Enter mermaid diagram code..."
-      ></textarea>
+        @update:modelValue="updateContent"
+      />
     </div>
 
-    <div v-else class="mermaid-container">
+    <div v-else class="w-full overflow-x-auto">
       <div v-if="nodeContent" ref="mermaidRef" class="mermaid">
         {{ nodeContent }}
       </div>
@@ -29,54 +28,28 @@
 
 <script setup lang="ts">
 import { NodeViewWrapper } from '@tiptap/vue-3'
-import { onMounted, ref, watch, computed, nextTick } from 'vue'
-import mermaid from 'mermaid'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { Button } from '@/components/ui/button'
+import MermaidEditor from './MermaidEditor.vue'
+import { useMermaid } from './useMermaid'
+import type { MermaidBlockProps } from './types'
 
-const props = defineProps({
-  node: {
-    type: Object,
-    required: true,
-  },
-  updateAttributes: {
-    type: Function,
-    required: true,
-  },
-  editor: {
-    type: Object,
-    required: true,
-  },
-})
+const props = defineProps<MermaidBlockProps>()
 
-const mermaidRef = ref<HTMLElement | null>(null)
 const isEditing = ref(false)
 const localContent = ref(props.node.attrs.content)
 const nodeContent = computed(() => props.node.attrs.content)
 const isReadOnly = computed(() => !props.editor.isEditable)
 
+const { mermaidRef, renderMermaid } = useMermaid(nodeContent)
+
 const updateContent = () => {
   props.updateAttributes({ content: localContent.value })
-}
-
-const renderMermaid = async () => {
-  if (!mermaidRef.value || !nodeContent.value) return
-
-  try {
-    // Clear the previous render
-    mermaidRef.value.innerHTML = nodeContent.value
-
-    mermaid.initialize({ startOnLoad: true })
-    await mermaid.run({
-      nodes: [mermaidRef.value],
-    })
-  } catch (error) {
-    console.error('Error rendering mermaid diagram:', error)
-  }
 }
 
 // Watch for edit mode changes
 watch(isEditing, (newValue) => {
   if (!newValue) {
-    // When switching to preview mode, wait for DOM update then render
     nextTick(() => renderMermaid())
   }
 })
@@ -84,7 +57,6 @@ watch(isEditing, (newValue) => {
 // Watch for read-only mode changes
 watch(isReadOnly, (newValue) => {
   if (newValue && isEditing.value) {
-    // Force preview mode when switching to read-only
     isEditing.value = false
   }
   nextTick(() => renderMermaid())
@@ -93,15 +65,6 @@ watch(isReadOnly, (newValue) => {
 onMounted(() => {
   renderMermaid()
 })
-
-watch(
-  () => props.node.attrs.content,
-  () => {
-    if (!isEditing.value) {
-      renderMermaid()
-    }
-  },
-)
 </script>
 
 <style scoped>
