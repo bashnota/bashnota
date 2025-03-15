@@ -2,7 +2,7 @@
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import { useNotaStore } from '@/stores/nota'
 import EditorToolbar from './EditorToolbar.vue'
-import { ref, watch, computed, onUnmounted, onMounted, reactive } from 'vue'
+import { ref, watch, computed, onUnmounted, onMounted, reactive, provide } from 'vue'
 import 'highlight.js/styles/github.css'
 import { useRouter } from 'vue-router'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
@@ -15,6 +15,7 @@ import { getURLWithoutProtocol, toast } from '@/lib/utils'
 import VersionHistoryDialog from './VersionHistoryDialog.vue'
 import FavoriteBlocksSidebar from './FavoriteBlocksSidebar.vue'
 import { getEditorExtensions } from './extensions'
+import { useEquationCounter, EQUATION_COUNTER_KEY } from '@/composables/useEquationCounter'
 
 // Import shared CSS
 import '@/assets/editor-styles.css'
@@ -187,6 +188,12 @@ watch(
   },
   { immediate: true },
 )
+
+// Watch for content changes to reset the equation counter
+watch(() => content.value, () => {
+  // Reset the equation counter when the content changes
+  resetEquationCounter()
+})
 
 const isLoading = ref(true)
 
@@ -485,6 +492,22 @@ const createAndLinkSubNota = async (title: string) => {
     toast('Failed to create sub-nota')
   }
 }
+
+// Setup equation counter
+const { counters, reset: resetEquationCounter } = useEquationCounter()
+
+// Provide the equation counter to all child components
+provide(EQUATION_COUNTER_KEY, {
+  counters,
+  getNumber: (id: string) => {
+    if (!counters.has(id)) {
+      const nextNumber = counters.size + 1
+      counters.set(id, nextNumber)
+    }
+    return counters.get(id) || 0
+  },
+  reset: resetEquationCounter
+})
 
 defineExpose({
   insertSubNotaLink,
