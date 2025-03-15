@@ -3,11 +3,12 @@ import { ref, onMounted } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { JupyterService } from '@/services/jupyterService'
 import type { JupyterServer } from '@/types/jupyter'
-import { ServerIcon, PlayCircleIcon, ArrowPathIcon, CpuChipIcon } from '@heroicons/vue/24/outline'
+import { ServerIcon, PlayCircleIcon, ArrowPathIcon, CpuChipIcon, TrashIcon, XCircleIcon } from '@heroicons/vue/24/outline'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { toast } from '@/lib/utils'
 
 const props = defineProps<{
   notaId: string
@@ -37,6 +38,7 @@ const runningKernels = ref<Record<string, Array<{
   executionState: string
   connections: number
 }>>>({})
+const isDeletingKernels = ref<Record<string, boolean>>({})
 
 // Refresh sessions for a server
 const refreshSessions = async (server: JupyterServer) => {
@@ -88,6 +90,43 @@ const getRelativeTime = (timestamp: string) => {
   return `${days}d ago`
 }
 
+// Delete a specific kernel
+const deleteKernel = async (server: JupyterServer, kernelId: string) => {
+  const serverKey = `${server.ip}:${server.port}`
+  isDeletingKernels.value[kernelId] = true
+  
+  try {
+    await jupyterService.deleteKernel(server, kernelId)
+    await refreshSessions(server)
+    toast('Kernel deleted successfully')
+  } catch (error) {
+    console.error('Failed to delete kernel:', error)
+    toast('Failed to delete kernel')
+  } finally {
+    isDeletingKernels.value[kernelId] = false
+  }
+}
+
+// Clean up all idle kernels on a server
+const cleanIdleKernels = async (server: JupyterServer) => {
+  const serverKey = `${server.ip}:${server.port}`
+  const idleKernels = runningKernels.value[serverKey]?.filter(k => k.executionState === 'idle') || []
+  
+  if (idleKernels.length === 0) {
+    toast('No idle kernels to clean')
+    return
+  }
+
+  try {
+    await Promise.all(idleKernels.map(kernel => jupyterService.deleteKernel(server, kernel.id)))
+    await refreshSessions(server)
+    toast(`Cleaned ${idleKernels.length} idle kernel(s)`)
+  } catch (error) {
+    console.error('Failed to clean idle kernels:', error)
+    toast('Failed to clean some kernels')
+  }
+}
+
 // Load sessions on mount
 onMounted(refreshAllSessions)
 </script>
@@ -118,11 +157,23 @@ onMounted(refreshAllSessions)
     <div v-for="server in config.jupyterServers" :key="`${server.ip}:${server.port}`">
       <Card>
         <CardHeader>
-          <div class="flex items-center gap-3">
-            <ServerIcon class="w-5 h-5 text-muted-foreground" />
-            <CardTitle class="text-base">
-              <code>{{ server.ip }}:{{ server.port }}</code>
-            </CardTitle>
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <ServerIcon class="w-5 h-5 text-muted-foreground" />
+              <CardTitle class="text-base">
+                <code>{{ server.ip }}:{{ server.port }}</code>
+              </CardTitle>
+            </div>
+            <Button 
+              v-if="runningKernels[`${server.ip}:${server.port}`]?.some(k => k.executionState === 'idle')"
+              variant="outline"
+              size="sm"
+              @click="cleanIdleKernels(server)"
+              class="flex items-center gap-2"
+            >
+              <XCircleIcon class="w-4 h-4" />
+              Clean Idle Kernels
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -184,6 +235,16 @@ onMounted(refreshAllSessions)
                       </div>
                     </div>
                   </div>
+                  <Button
+                    v-if="kernel.executionState !== 'busy'"
+                    variant="ghost"
+                    size="sm"
+                    :disabled="isDeletingKernels[kernel.id]"
+                    @click="deleteKernel(server, kernel.id)"
+                    class="text-destructive hover:text-destructive"
+                  >
+                    <TrashIcon class="w-4 h-4" :class="{ 'animate-spin': isDeletingKernels[kernel.id] }" />
+                  </Button>
                 </div>
               </div>
             </TabsContent>
@@ -192,4 +253,4 @@ onMounted(refreshAllSessions)
       </Card>
     </div>
   </div>
-</template> 
+</template>
