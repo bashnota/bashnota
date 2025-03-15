@@ -1,32 +1,45 @@
 <template>
-  <node-view-wrapper class="math-block" :class="{ readonly: isReadOnly }">
-    <div class="math-display" v-show="!isEditing" @dblclick="startEditing">
-      <div ref="mathOutput"></div>
-    </div>
-    <div v-show="isEditing && !isReadOnly" class="math-input">
-      <textarea
-        ref="textarea"
-        v-model="latex"
-        @blur="stopEditing"
-        @keydown.enter.prevent="stopEditing"
-        @keydown.esc="stopEditing"
-        rows="2"
-        placeholder="Enter LaTeX expression..."
-      ></textarea>
+  <node-view-wrapper 
+    class="math-block" 
+    :class="{ 
+      'border border-border rounded-md p-4 my-4': !isReadOnly,
+      'my-4': isReadOnly
+    }"
+  >
+    <Card v-if="!isReadOnly" class="shadow-sm">
+      <CardContent class="p-4">
+        <MathDisplay 
+          v-if="!isEditing" 
+          :latex="latex" 
+          :isReadOnly="isReadOnly"
+          @edit="startEditing"
+        />
+        <MathInput
+          v-else
+          v-model="latex"
+          placeholder="Enter LaTeX expression..."
+          :rows="2"
+          @save="stopEditing"
+          @cancel="cancelEditing"
+        />
+      </CardContent>
+    </Card>
+    
+    <div v-else>
+      <MathDisplay 
+        :latex="latex" 
+        :isReadOnly="isReadOnly"
+      />
     </div>
   </node-view-wrapper>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { NodeViewWrapper } from '@tiptap/vue-3'
-import 'mathjax/es5/tex-svg'
-
-declare global {
-  interface Window {
-    MathJax: any
-  }
-}
+import { Card, CardContent } from '@/components/ui/card'
+import MathDisplay from './MathDisplay.vue'
+import MathInput from './MathInput.vue'
 
 const props = defineProps({
   node: {
@@ -45,39 +58,22 @@ const props = defineProps({
 
 const isEditing = ref(false)
 const latex = ref(props.node.attrs.latex || '')
-const mathOutput = ref<HTMLElement | null>(null)
-const textarea = ref<HTMLTextAreaElement | null>(null)
 const isReadOnly = computed(() => !props.editor.isEditable)
 
-const renderMath = () => {
-  if (mathOutput.value && latex.value) {
-    try {
-      const output = window.MathJax.tex2svg(latex.value, {
-        display: true,
-      })
-      mathOutput.value.innerHTML = ''
-      mathOutput.value.appendChild(output)
-    } catch (error) {
-      console.error('Error rendering LaTeX:', error)
-      mathOutput.value.innerHTML = '<span style="color: red;">Invalid LaTeX</span>'
-    }
-  } else if (mathOutput.value && !latex.value) {
-    // Hide empty math blocks in read-only mode
-    if (isReadOnly.value) {
-      mathOutput.value.parentElement?.parentElement?.classList.add('hidden')
-    }
+// Watch for changes in the node attributes
+const updateLatexFromNode = () => {
+  if (props.node.attrs.latex !== undefined) {
+    latex.value = props.node.attrs.latex
   }
 }
 
+// Start editing mode
 const startEditing = () => {
   if (isReadOnly.value) return
-
   isEditing.value = true
-  setTimeout(() => {
-    textarea.value?.focus()
-  })
 }
 
+// Save changes and exit editing mode
 const stopEditing = () => {
   isEditing.value = false
   props.updateAttributes({
@@ -85,73 +81,24 @@ const stopEditing = () => {
   })
 }
 
+// Cancel editing without saving
+const cancelEditing = () => {
+  isEditing.value = false
+  // Reset to the original value
+  latex.value = props.node.attrs.latex || ''
+}
+
+// Watch for external changes to the node
 watch(
   () => props.node.attrs.latex,
-  (newLatex) => {
-    latex.value = newLatex
-    renderMath()
-  },
+  () => updateLatexFromNode()
 )
 
 // Watch for changes in read-only status
-watch(isReadOnly, () => {
+watch(isReadOnly, (newValue) => {
   // Force stop editing when switched to read-only
-  if (isReadOnly.value && isEditing.value) {
+  if (newValue && isEditing.value) {
     stopEditing()
   }
-  renderMath()
-})
-
-onMounted(() => {
-  // Wait for MathJax to be loaded
-  const checkMathJax = () => {
-    if (window.MathJax) {
-      renderMath()
-    } else {
-      setTimeout(checkMathJax, 100)
-    }
-  }
-  checkMathJax()
 })
 </script>
-
-<style scoped>
-.math-block {
-  margin: 1em 0;
-  padding: 0.5em;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-}
-
-.math-block.readonly {
-  border: none;
-  padding: 0;
-}
-
-.math-display {
-  min-height: 2em;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.math-display:not(.readonly) {
-  cursor: pointer;
-}
-
-.math-input {
-  width: 100%;
-}
-
-.math-input textarea {
-  width: 100%;
-  padding: 0.5em;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-family: monospace;
-}
-
-.hidden {
-  display: none;
-}
-</style>

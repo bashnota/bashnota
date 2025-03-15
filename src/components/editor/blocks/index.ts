@@ -14,6 +14,12 @@ import SubfigureExtension, {
   SubfigureCaption,
 } from './subfigure-block'
 
+import MathExtension, {
+  MathBlock,
+  MathDisplay,
+  MathInput,
+} from './math-block'
+
 // Re-export everything
 export {
   // Image block components
@@ -30,12 +36,19 @@ export {
   SubfigureGrid,
   SubfigureItem,
   SubfigureCaption,
+
+  // Math block components
+  MathExtension,
+  MathBlock,
+  MathDisplay,
+  MathInput,
 }
 
 // Export a map of all extensions for easier registration
 export const blockExtensions = {
   image: ImageExtension,
   subfigure: SubfigureExtension,
+  math: MathExtension,
 }
 
 export default blockExtensions 
