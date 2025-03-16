@@ -99,8 +99,30 @@ const resultTokenCount = computed(() => {
 
 const selectedText = ref<string>('')
 
+// Reset loading state on mount to ensure it's not stuck
+onMounted(() => {
+  if (props.node.attrs.isLoading) {
+    props.updateAttributes({
+      isLoading: false,
+      error: ''
+    })
+  }
+})
+
+// Watch for changes in the loading state
+watch(() => props.node.attrs.isLoading, (newValue) => {
+  // Remove debug log
+})
+
+// After the other watchers
+watch(promptInput, (newValue) => {
+  // Remove debug log
+}, { immediate: true })
+
 const generateText = () => {
-  if (!promptInput.value.trim()) return
+  if (!promptInput.value.trim()) {
+    return
+  }
   
   // Add to command history
   if (commandHistory.value.indexOf(promptInput.value) === -1) {
@@ -124,7 +146,6 @@ const generateText = () => {
     
     // Use a setTimeout to ensure the attribute update has been processed
     setTimeout(() => {
-      // Call the generate command
       try {
         props.editor.commands.generateInlineAI(props.getPos(), promptInput.value)
       } catch (error) {
@@ -145,6 +166,10 @@ const generateText = () => {
     isExpanded.value = false
   } catch (error) {
     console.error('Error in generateText:', error)
+    props.updateAttributes({
+      isLoading: false,
+      error: 'Failed to update AI generation settings'
+    })
     toast({
       title: 'Error',
       description: 'Failed to update AI generation settings',
@@ -553,6 +578,11 @@ const insertMessageToDocument = (content: string) => {
     })
   }
 }
+
+// Add this with the other computed properties
+const isPromptEmpty = computed(() => {
+  return !promptInput.value || promptInput.value.trim().length === 0
+})
 </script>
 
 <template>
@@ -704,9 +734,9 @@ const insertMessageToDocument = (content: string) => {
             <span>{{ promptTokenCount }} tokens (approx)</span>
             <Button 
               size="sm" 
-              class="bg-green-600 hover:bg-green-500 text-white text-xs px-3 py-1 rounded-md transition-colors shadow-sm"
+              class="bg-emerald-500 hover:bg-emerald-400 text-white text-xs px-3 py-1 rounded-md transition-colors shadow-sm"
               @click="generateText" 
-              :disabled="!promptInput.trim() || node.attrs.isLoading"
+              :disabled="isPromptEmpty"
             >
               <LoaderIcon v-if="node.attrs.isLoading" class="mr-1.5 h-3.5 w-3.5 animate-spin" />
               <SparklesIcon v-else class="mr-1.5 h-3.5 w-3.5" />
