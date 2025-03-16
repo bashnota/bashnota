@@ -24,12 +24,6 @@ export interface KernelPreference {
   serverId: string
 }
 
-export interface CodeFixResult {
-  fixedCode: string
-  explanation: string
-  provider: string
-}
-
 export interface OutputProps {
   content: string
   type?: 'text' | 'html' | 'json' | 'table' | 'image' | 'error'
