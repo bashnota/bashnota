@@ -177,8 +177,10 @@ const parseJupyterUrl = () => {
           <div class="space-y-2">
             <label class="text-sm font-medium">Jupyter URL (Optional)</label>
             <div class="flex gap-2">
+              
               <Input
-                v-model="serverForm.url"
+                :value="serverForm.url"
+                @input="(e: Event) => serverForm.url = (e.target as HTMLInputElement).value"
                 type="text"
                 placeholder="https://jupyter-server.example.com:8888/?token=abc123"
                 class="flex-1"
@@ -202,7 +204,8 @@ const parseJupyterUrl = () => {
             <div class="space-y-2">
               <label class="text-sm font-medium">Server IP</label>
               <Input
-                v-model="serverForm.ip"
+                :value="serverForm.ip"
+                @input="(e: Event) => serverForm.ip = (e.target as HTMLInputElement).value"
                 type="text"
                 placeholder="localhost"
                 required
@@ -211,7 +214,8 @@ const parseJupyterUrl = () => {
             <div class="space-y-2">
               <label class="text-sm font-medium">Port</label>
               <Input
-                v-model="serverForm.port"
+                :value="serverForm.port"
+                @input="(e: Event) => serverForm.port = (e.target as HTMLInputElement).value"
                 type="text"
                 inputmode="numeric"
                 pattern="[0-9]*"
@@ -223,7 +227,8 @@ const parseJupyterUrl = () => {
           <div class="space-y-2">
             <label class="text-sm font-medium">Token</label>
             <Input
-              v-model="serverForm.token"
+              :value="serverForm.token"
+              @input="(e: Event) => serverForm.token = (e.target as HTMLInputElement).value"
               type="password"
               placeholder="Jupyter token"
             />
