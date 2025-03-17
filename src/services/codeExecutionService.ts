@@ -197,12 +197,6 @@ export class CodeExecutionService {
           reject(new Error('WebSocket closed before execution completed'))
         }
       }
-
-      // Execution timeout
-      setTimeout(() => {
-        ws.close()
-        reject(new Error('Execution timeout'))
-      }, 30000)
     })
   }
 
