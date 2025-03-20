@@ -11,6 +11,11 @@ export class JupyterService {
    */
   parseJupyterUrl(url: string): JupyterServer | null {
     try {
+      // Handle URLs without protocol (add http:// by default)
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = `http://${url}`
+      }
+      
       const urlObj = new URL(url)
       
       // Handle Kaggle Jupyter URLs
@@ -41,7 +46,13 @@ export class JupyterService {
       // Handle standard Jupyter URLs
       const protocol = urlObj.protocol
       const hostname = urlObj.hostname
-      const ip = `${protocol}//${hostname}`
+      
+      // For localhost or IP addresses, we can keep just the hostname
+      // For other domains, include the protocol
+      const ip = hostname === 'localhost' || this.isIPAddress(hostname) 
+        ? hostname 
+        : `${protocol}//${hostname}`
+      
       const port = urlObj.port || (protocol === 'https:' ? '443' : '80')
       
       // Extract token from query parameters
@@ -58,7 +69,16 @@ export class JupyterService {
     }
   }
 
+  // Helper method to check if a string is an IP address
+  private isIPAddress(str: string): boolean {
+    // Simple IPv4 check
+    const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/
+    return ipv4Regex.test(str)
+  }
+
   private getBaseUrl(server: JupyterServer): string {
+    // If the IP already has a protocol, use it as is
+    // Otherwise, add http:// protocol for localhost and IP addresses
     const protocol = server.ip.startsWith('http') ? '' : 'http://'
     return `${protocol}${server.ip}:${server.port}/api`
   }
@@ -102,10 +122,17 @@ export class JupyterService {
   }
 
   private getWebSocketUrl(server: JupyterServer, kernelId: string): string {
-    const protocol = server.ip.startsWith('https') ? 'wss' : 'ws'
-    const baseUrl = server.ip.startsWith('http')
-      ? server.ip.replace(/^http(s?):\/\//, '')
-      : server.ip
+    // For IPs with protocol, extract the hostname
+    // Otherwise, use the IP directly (localhost or IP address)
+    let baseUrl = server.ip
+    let protocol = 'ws'
+    
+    if (server.ip.startsWith('http')) {
+      // For URLs with protocol, determine ws/wss based on http/https
+      protocol = server.ip.startsWith('https') ? 'wss' : 'ws'
+      baseUrl = server.ip.replace(/^http(s?):\/\//, '')
+    }
+    
     return `${protocol}://${baseUrl}:${server.port}/api/kernels/${kernelId}/channels`
   }
 
@@ -248,27 +275,58 @@ export class JupyterService {
 
   async testConnection(server: JupyterServer) {
     try {
-      const response = await axios.get(this.getUrlWithToken(server, '/kernels'))
-      return {
-        success: true,
-        version: response.data.version,
-        message: 'Connected successfully',
+      // First, validate the server parameters
+      if (!server.ip) {
+        return {
+          success: false,
+          message: 'Server IP is required',
+        }
+      }
+      
+      if (!server.port) {
+        return {
+          success: false,
+          message: 'Server port is required',
+        }
+      }
+      
+      // Test the API endpoint
+      try {
+        const response = await axios.get(this.getUrlWithToken(server, '/kernels'))
+        return {
+          success: true,
+          version: response.data.version,
+          message: 'Connected successfully',
+        }
+      } catch (error) {
+        let message = 'Connection failed'
+        
+        if (axios.isAxiosError(error)) {
+          if (error.code === 'ECONNREFUSED') {
+            message = 'Server is not reachable. Check IP and port settings.'
+          } else if (error.response?.status === 403) {
+            message = 'Authentication failed. Please check your token.'
+          } else if (error.response?.status === 401) {
+            message = 'Unauthorized. Please check your credentials.'
+          } else if (error.code === 'ETIMEDOUT') {
+            message = 'Connection timed out. Check if server is running.'
+          } else if (error.code === 'ENOTFOUND') {
+            message = 'Host not found. Check your server address.'
+          } else if (error.message) {
+            message = `Connection error: ${error.message}`
+          }
+          console.error('Connection error:', error.message)
+        }
+        
+        return {
+          success: false,
+          message,
+        }
       }
     } catch (error) {
-      let message = 'Connection failed'
-      if (axios.isAxiosError(error)) {
-        if (error.code === 'ECONNREFUSED') {
-          message = 'Server is not reachable'
-        } else if (error.response?.status === 403) {
-          message = 'Invalid token'
-        } else if (error.code === 'ETIMEDOUT') {
-          message = 'Connection timed out'
-        }
-        console.error('Connection error:', error.message)
-      }
       return {
         success: false,
-        message,
+        message: 'An unexpected error occurred while testing the connection',
       }
     }
   }
