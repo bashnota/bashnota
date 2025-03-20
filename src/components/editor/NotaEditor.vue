@@ -10,13 +10,15 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import TableOfContents from './TableOfContents.vue'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { ListIcon } from 'lucide-vue-next'
+import { ListIcon, BookIcon } from 'lucide-vue-next'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
 import { getURLWithoutProtocol, toast } from '@/lib/utils'
 import VersionHistoryDialog from './VersionHistoryDialog.vue'
 import FavoriteBlocksSidebar from './FavoriteBlocksSidebar.vue'
+import ReferencesSidebar from './ReferencesSidebar.vue'
 import { getEditorExtensions } from './extensions'
 import { useEquationCounter, EQUATION_COUNTER_KEY } from '@/composables/useEquationCounter'
+import { useCitationStore } from '@/stores/citationStore'
 
 // Import shared CSS
 import '@/assets/editor-styles.css'
@@ -33,8 +35,10 @@ const emit = defineEmits<{
 const notaStore = useNotaStore()
 const jupyterStore = useJupyterStore()
 const codeExecutionStore = useCodeExecutionStore()
+const citationStore = useCitationStore()
 const router = useRouter()
 const isSidebarOpen = ref(false)
+const isReferencesOpen = ref(false)
 const autoSaveEnabled = ref(true)
 const showVersionHistory = ref(false)
 
@@ -159,6 +163,9 @@ const editor = useEditor({
 
     // Then register code cells which will associate them with sessions
     registerCodeCells(editor.getJSON())
+
+    // Update citation numbers
+    updateCitationNumbers()
 
     editor.view.dom.addEventListener('click', (event) => {
       const target = event.target as HTMLElement
@@ -511,6 +518,45 @@ provide(EQUATION_COUNTER_KEY, {
   reset: resetEquationCounter
 })
 
+// Function to update citation numbers
+const updateCitationNumbers = () => {
+  if (!editor.value) return
+  
+  // Get all citations in the current nota
+  const notaCitations = citationStore.getCitationsByNotaId(props.notaId)
+  
+  // Create a map of citation keys to their numbers
+  const citationMap = new Map()
+  notaCitations.forEach((citation, index) => {
+    citationMap.set(citation.key, index + 1)
+  })
+  
+  // Find all citation nodes in the document
+  editor.value.state.doc.descendants((node, pos) => {
+    if (node.type.name === 'citation') {
+      const citationKey = node.attrs.citationKey
+      const citationNumber = citationMap.get(citationKey)
+      
+      if (citationNumber !== undefined && citationNumber !== node.attrs.citationNumber) {
+        // Update the citation number if it has changed
+        editor.value?.commands.command(({ tr }) => {
+          tr.setNodeMarkup(pos, undefined, {
+            ...node.attrs,
+            citationNumber
+          })
+          return true
+        })
+      }
+    }
+    return true
+  })
+}
+
+// Watch for changes in citations and update numbers
+watch(() => Array.from(citationStore.citations.values()), () => {
+  updateCitationNumbers()
+}, { deep: true })
+
 defineExpose({
   insertSubNotaLink,
   createAndLinkSubNota,
@@ -534,8 +580,23 @@ defineExpose({
       </div>
     </div>
 
+    <!-- References Sidebar -->
+    <div
+      class="transition-all duration-300 ease-in-out sticky top-0 h-full"
+      :class="{
+        'w-72': isReferencesOpen,
+        'w-0': !isReferencesOpen,
+      }"
+    >
+      <div v-show="isReferencesOpen" :style="{ width: isReferencesOpen ? 'inherit' : '0' }">
+        <ScrollArea class="h-[calc(100vh-2rem)] px-6 py-4">
+          <ReferencesSidebar :editor="editor" :nota-id="props.notaId" />
+        </ScrollArea>
+      </div>
+    </div>
+
     <!-- Main Editor Area -->
-    <div class="flex-1 flex flex-col min-w-0" :class="{ 'border-l': isSidebarOpen }">
+    <div class="flex-1 flex flex-col min-w-0" :class="{ 'border-l': isSidebarOpen || isReferencesOpen }">
       <!-- Editor Toolbar -->
       <div class="border-b bg-background sticky top-0 z-10">
         <EditorToolbar v-if="editor" :editor="editor" class="px-4 py-2" />
@@ -544,15 +605,28 @@ defineExpose({
         <div
           class="flex items-center justify-between px-4 py-2 text-sm text-muted-foreground border-t"
         >
-          <Button
-            variant="ghost"
-            size="sm"
-            class="flex items-center gap-2"
-            @click="isSidebarOpen = !isSidebarOpen"
-          >
-            <ListIcon class="h-4 w-4" />
-            <span class="text-xs">Contents</span>
-          </Button>
+          <div class="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              class="flex items-center gap-2"
+              @click="isSidebarOpen = !isSidebarOpen; isReferencesOpen = false"
+            >
+              <ListIcon class="h-4 w-4" />
+              <span class="text-xs">Contents</span>
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              class="flex items-center gap-2"
+              @click="isReferencesOpen = !isReferencesOpen; isSidebarOpen = false"
+            >
+              <BookIcon class="h-4 w-4" />
+              <span class="text-xs">References</span>
+            </Button>
+          </div>
+          
           <div class="flex items-center gap-2">
             <Button
               variant="outline"

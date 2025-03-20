@@ -4,6 +4,7 @@ import CommandsList from '@/components/editor/blocks/CommandsList.vue'
 import 'tippy.js/dist/tippy.css'
 import router from '@/router'
 import { useNotaStore } from '@/stores/nota'
+import { useCitationStore } from '@/stores/citationStore'
 import {
   TextIcon,
   Heading1,
@@ -26,6 +27,7 @@ import {
   SquareCheck,
   PenTool,
   SparklesIcon,
+  BookIcon,
 } from 'lucide-vue-next'
 import { toast } from '@/lib/utils'
 
@@ -338,6 +340,56 @@ export default {
               type: 'aiGeneration',
             }).run()
           }
+        },
+      },
+      {
+        title: 'Citation',
+        category: 'Advanced',
+        icon: BookIcon,
+        keywords: ['cite', 'citation', 'reference', 'bib', 'bibtex'],
+        command: ({ editor, range }: CommandArgs) => {
+          // Get current nota ID from router
+          const currentRoute = router.currentRoute.value
+          const notaId = currentRoute.params.id as string
+          
+          // Get citations from the store
+          const citationStore = useCitationStore()
+          const citations = citationStore.getCitationsByNotaId(notaId)
+          
+          if (citations.length === 0) {
+            toast('No citations available. Add citations in the References panel first.')
+            return
+          }
+          
+          // Simple citation picker (could be enhanced with a modal)
+          const citationOptions = citations.map((citation, index) => 
+            `${index + 1}. ${citation.key} - ${citation.title}`
+          ).join('\n')
+          
+          const selectedIndex = prompt(`Choose a citation by number:\n${citationOptions}`)
+          if (!selectedIndex) return
+          
+          const index = parseInt(selectedIndex) - 1
+          if (isNaN(index) || index < 0 || index >= citations.length) {
+            toast('Invalid selection')
+            return
+          }
+          
+          const citation = citations[index]
+          
+          // Insert citation at current cursor position
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .insertContent({
+              type: 'citation',
+              attrs: {
+                citationKey: citation.key,
+                citationNumber: index + 1
+              }
+            })
+            .run()
         },
       },
     ]
