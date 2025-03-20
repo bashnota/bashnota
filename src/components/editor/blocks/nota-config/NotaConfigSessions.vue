@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useNotaStore } from '@/stores/nota'
+import { useJupyterStore } from '@/stores/jupyterStore'
 import { JupyterService } from '@/services/jupyterService'
 import type { JupyterServer } from '@/types/jupyter'
 import { Server, PlayCircle, RotateCw, Cpu, Trash2, XCircle } from 'lucide-vue-next'
@@ -13,12 +14,16 @@ import { toast } from '@/lib/utils'
 const props = defineProps<{
   notaId: string
   config: {
-    jupyterServers: JupyterServer[]
     savedSessions: Array<{ id: string; name: string }>
   }
 }>()
 
 const store = useNotaStore()
+const jupyterStore = useJupyterStore()
+
+// Use jupyterServers from the global store instead of props
+const jupyterServers = jupyterStore.jupyterServers
+
 const jupyterService = new JupyterService()
 const isRefreshingSessions = ref(false)
 const sessions = ref<Record<string, Array<{
@@ -67,7 +72,7 @@ const refreshSessions = async (server: JupyterServer) => {
 const refreshAllSessions = async () => {
   isRefreshingSessions.value = true
   try {
-    await Promise.all(props.config.jupyterServers.map(refreshSessions))
+    await Promise.all(jupyterServers.map(refreshSessions))
   } finally {
     isRefreshingSessions.value = false
   }
@@ -132,7 +137,7 @@ onMounted(refreshAllSessions)
 </script>
 
 <template>
-  <div v-if="config.jupyterServers.length === 0">
+  <div v-if="jupyterServers.length === 0">
     <Alert>
       <AlertDescription>
         No servers configured. Add a server to view active sessions and kernels.
@@ -154,7 +159,7 @@ onMounted(refreshAllSessions)
       </Button>
     </div>
 
-    <div v-for="server in config.jupyterServers" :key="`${server.ip}:${server.port}`">
+    <div v-for="server in jupyterServers" :key="`${server.ip}:${server.port}`">
       <Card>
         <CardHeader>
           <div class="flex items-center justify-between">

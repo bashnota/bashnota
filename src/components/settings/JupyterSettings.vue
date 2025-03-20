@@ -1,25 +1,15 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useNotaStore } from '@/stores/nota'
+import { ref } from 'vue'
 import { useJupyterStore } from '@/stores/jupyterStore'
 import { JupyterService } from '@/services/jupyterService'
-import type { JupyterServer, KernelSpec, KernelConfig } from '@/types/jupyter'
+import type { JupyterServer } from '@/types/jupyter'
 import { Server, Plus, Link } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import ServerListItem from './ServerListItem.vue'
+import ServerListItem from '@/components/editor/blocks/nota-config/ServerListItem.vue'
 import { toast } from '@/lib/utils'
 
-const props = defineProps<{
-  notaId: string
-  config: {
-    kernelPreferences: Record<string, KernelConfig>
-    savedSessions: Array<{ id: string; name: string }>
-  }
-}>()
-
-const store = useNotaStore()
 const jupyterStore = useJupyterStore()
 const jupyterService = new JupyterService()
 
@@ -86,16 +76,6 @@ const addServer = async () => {
     token: serverForm.value.token.trim(),
   }
 
-  // Check if server with same IP and port already exists
-  const serverExists = jupyterStore.jupyterServers.some(
-    (s) => s.ip.toLowerCase() === server.ip.toLowerCase() && s.port === server.port,
-  )
-
-  if (serverExists) {
-    toast('A server with this IP and port already exists')
-    return
-  }
-
   // Test connection before adding
   toast('Testing connection to server...')
   await testConnection(server)
@@ -148,7 +128,7 @@ const parseJupyterUrl = () => {
     <CardHeader>
       <div class="flex items-center justify-between">
         <div>
-          <CardTitle>Connected Servers</CardTitle>
+          <CardTitle>Jupyter Servers</CardTitle>
           <CardDescription>Manage your Jupyter server connections</CardDescription>
         </div>
         <Button

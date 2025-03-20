@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import { useNotaStore } from '@/stores/nota'
+import { useJupyterStore } from '@/stores/jupyterStore'
 import EditorToolbar from './EditorToolbar.vue'
 import { ref, watch, computed, onUnmounted, onMounted, reactive, provide } from 'vue'
 import 'highlight.js/styles/github.css'
@@ -30,9 +31,10 @@ const emit = defineEmits<{
 }>()
 
 const notaStore = useNotaStore()
+const jupyterStore = useJupyterStore()
 const codeExecutionStore = useCodeExecutionStore()
 const router = useRouter()
-const isSidebarOpen = ref(true)
+const isSidebarOpen = ref(false)
 const autoSaveEnabled = ref(true)
 const showVersionHistory = ref(false)
 
@@ -60,7 +62,7 @@ const registerCodeCells = (content: any) => {
   }
 
   const codeBlocks = findCodeBlocks(content)
-  const servers = currentNota.value?.config?.jupyterServers || []
+  const servers = jupyterStore.jupyterServers
 
   // Register each code block with the store
   codeBlocks.forEach((block) => {

@@ -3,6 +3,7 @@ import NotaEditor from '@/components/editor/NotaEditor.vue'
 import NotaConfigModal from '@/components/editor/blocks/nota-config/NotaConfigModal.vue'
 import { ref, onMounted, watch, nextTick } from 'vue'
 import { useNotaStore } from '@/stores/nota'
+import { useJupyterStore } from '@/stores/jupyterStore'
 import { computed } from 'vue'
 import { 
   Share2,
@@ -30,6 +31,7 @@ const props = defineProps<{
 }>()
 
 const store = useNotaStore()
+const jupyterStore = useJupyterStore()
 const codeExecutionStore = useCodeExecutionStore()
 const isExecutingAll = ref(false)
 const isReady = ref(false)
@@ -64,8 +66,8 @@ onMounted(async () => {
 
   // Check if this is a root nota and has no Jupyter servers configured
   if (nota.value && !nota.value.parentId) {
-    const config = nota.value.config
-    if (!config?.jupyterServers || config.jupyterServers.length === 0) {
+    // Check global Jupyter servers instead of nota-specific config
+    if (jupyterStore.jupyterServers.length === 0) {
       toast({
         title: 'Configure Jupyter',
         description: 'Set up your Jupyter server to enable code execution in this notebook.',

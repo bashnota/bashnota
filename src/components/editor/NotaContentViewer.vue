@@ -19,7 +19,7 @@ const props = defineProps<{
 }>()
 
 const codeExecutionStore = useCodeExecutionStore()
-const isSidebarOpen = ref(true)
+const isSidebarOpen = ref(false)
 
 const registerCodeCells = (content: any) => {
   // Find all executable code blocks in the content
