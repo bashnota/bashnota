@@ -32,7 +32,7 @@ const emit = defineEmits<{
 const notaStore = useNotaStore()
 const codeExecutionStore = useCodeExecutionStore()
 const router = useRouter()
-const isSidebarOpen = ref(true)
+const isSidebarOpen = ref(false)
 const autoSaveEnabled = ref(true)
 const showVersionHistory = ref(false)
 
