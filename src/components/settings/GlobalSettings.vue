@@ -34,6 +34,7 @@ import { toast } from '@/components/ui/toast'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import AISettings from '@/components/settings/AISettings.vue'
+import JupyterSettings from '@/components/settings/JupyterSettings.vue'
 
 // Use shortcuts from the store instead of duplicating them
 const shortcutsStore = useShortcutsStore()
@@ -324,7 +325,7 @@ function formatShortcutKey(key: string) {
       </div>
 
       <Tabs default-value="appearance" class="w-full">
-        <TabsList class="grid w-full grid-cols-3 mb-8">
+        <TabsList class="grid w-full grid-cols-5">
           <TabsTrigger value="appearance" class="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <div class="flex items-center justify-center gap-2 p-2">
               <Paintbrush class="w-4 h-4 shrink-0" />
@@ -347,6 +348,12 @@ function formatShortcutKey(key: string) {
             <div class="flex items-center justify-center gap-2 p-2">
               <SparklesIcon class="h-4 w-4 shrink-0" />
               <span class="text-sm font-medium">AI Generation</span>
+            </div>
+          </TabsTrigger>
+          <TabsTrigger value="jupyter">
+            <div class="flex items-center justify-center gap-2 p-1">
+              <Server class="h-4 w-4 shrink-0" />
+              <span class="text-sm">Jupyter</span>
             </div>
           </TabsTrigger>
         </TabsList>
@@ -756,6 +763,11 @@ function formatShortcutKey(key: string) {
         <!-- AI Generation Tab -->
         <TabsContent value="ai">
           <AISettings />
+        </TabsContent>
+
+        <!-- Jupyter Tab -->
+        <TabsContent value="jupyter" class="space-y-6">
+          <JupyterSettings />
         </TabsContent>
       </Tabs>
     </div>

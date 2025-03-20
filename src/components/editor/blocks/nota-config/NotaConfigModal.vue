@@ -28,8 +28,6 @@ const store = useNotaStore()
 const currentNota = computed(() => store.getCurrentNota(props.notaId))
 const config = computed(() => {
   return {
-    jupyterServers: currentNota.value?.config?.jupyterServers || [],
-    kernels: currentNota.value?.config?.kernels || {},
     kernelPreferences: currentNota.value?.config?.kernelPreferences || {},
     savedSessions: currentNota.value?.config?.savedSessions || []
   }
