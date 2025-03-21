@@ -226,7 +226,7 @@
                               class="flex-1"
                             >
                               <ClipboardCopy class="h-4 w-4 mr-2" />
-                              Insert Result Above
+                              Insert Result Below
                             </Button>
                             
                             <Button
@@ -939,14 +939,24 @@ function insertTaskResult(task) {
       return
     }
     
-    // Create a function to insert all the content at the position before the Vibe block
-    const insertContentBeforeBlock = (content) => {
-      // Insert the content at the position right before the Vibe block
-      return props.editor.commands.insertContentAt(vibePos, content)
+    // Get the size of the Vibe block to position after it
+    const vibeNode = props.editor.state.doc.nodeAt(vibePos)
+    if (!vibeNode) {
+      console.error('Could not find Vibe node in document')
+      return
     }
     
-    // Insert spacing paragraph above
-    insertContentBeforeBlock({ type: 'paragraph' })
+    // Calculate position after the Vibe block
+    const posAfterBlock = vibePos + vibeNode.nodeSize
+    
+    // Create a function to insert all the content at the position after the Vibe block
+    const insertContentAfterBlock = (content) => {
+      // Insert the content at the position right after the Vibe block
+      return props.editor.commands.insertContentAt(posAfterBlock, content)
+    }
+    
+    // Insert spacing paragraph below
+    insertContentAfterBlock({ type: 'paragraph' })
     
     // Insert content based on actor type
     switch (task.actorType) {
@@ -954,21 +964,21 @@ function insertTaskResult(task) {
         // For researcher, insert content as paragraphs with proper structure
         if (typeof task.result === 'object') {
           // Insert headings and sections
-          insertContentBeforeBlock({ type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Research Results' }] })
-          insertContentBeforeBlock({ type: 'paragraph' })
+          insertContentAfterBlock({ type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Research Results' }] })
+          insertContentAfterBlock({ type: 'paragraph' })
           
           // Insert summary if available
           if (task.result.summary) {
-            insertContentBeforeBlock({ type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Summary' }] })
-            insertContentBeforeBlock({ type: 'paragraph' })
-            insertContentBeforeBlock(task.result.summary)
-            insertContentBeforeBlock({ type: 'paragraph' })
+            insertContentAfterBlock({ type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Summary' }] })
+            insertContentAfterBlock({ type: 'paragraph' })
+            insertContentAfterBlock(task.result.summary)
+            insertContentAfterBlock({ type: 'paragraph' })
           }
           
           // Insert key findings if available
           if (task.result.keyFindings && task.result.keyFindings.length > 0) {
-            insertContentBeforeBlock({ type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Key Findings' }] })
-            insertContentBeforeBlock({ type: 'paragraph' })
+            insertContentAfterBlock({ type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Key Findings' }] })
+            insertContentAfterBlock({ type: 'paragraph' })
             
             // For bullet lists, we need to create the entire list structure at once
             const listItems = task.result.keyFindings.map(finding => ({
@@ -976,22 +986,22 @@ function insertTaskResult(task) {
               content: [{ type: 'paragraph', content: [{ type: 'text', text: finding }] }]
             }))
             
-            insertContentBeforeBlock({
+            insertContentAfterBlock({
               type: 'bulletList',
               content: listItems
             })
             
-            insertContentBeforeBlock({ type: 'paragraph' })
+            insertContentAfterBlock({ type: 'paragraph' })
           }
           
           // Insert content if available
           if (task.result.content) {
-            insertContentBeforeBlock({ type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Detailed Research' }] })
-            insertContentBeforeBlock({ type: 'paragraph' })
-            insertContentBeforeBlock(task.result.content)
+            insertContentAfterBlock({ type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Detailed Research' }] })
+            insertContentAfterBlock({ type: 'paragraph' })
+            insertContentAfterBlock(task.result.content)
           }
         } else {
-          insertContentBeforeBlock(task.result.toString())
+          insertContentAfterBlock(task.result.toString())
         }
         break
         
@@ -999,18 +1009,18 @@ function insertTaskResult(task) {
         // For analyst, insert visualizations in a structured manner
         if (typeof task.result === 'object') {
           // Insert title and summary
-          insertContentBeforeBlock({ type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Analysis Results' }] })
-          insertContentBeforeBlock({ type: 'paragraph' })
+          insertContentAfterBlock({ type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Analysis Results' }] })
+          insertContentAfterBlock({ type: 'paragraph' })
           
           if (task.result.summary) {
-            insertContentBeforeBlock(task.result.summary)
-            insertContentBeforeBlock({ type: 'paragraph' })
+            insertContentAfterBlock(task.result.summary)
+            insertContentAfterBlock({ type: 'paragraph' })
           }
           
           // Insert insights
           if (task.result.insights && task.result.insights.length > 0) {
-            insertContentBeforeBlock({ type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Insights' }] })
-            insertContentBeforeBlock({ type: 'paragraph' })
+            insertContentAfterBlock({ type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Insights' }] })
+            insertContentAfterBlock({ type: 'paragraph' })
             
             // Create bullet list with all items at once
             const insightItems = task.result.insights.map(insight => ({
@@ -1018,33 +1028,33 @@ function insertTaskResult(task) {
               content: [{ type: 'paragraph', content: [{ type: 'text', text: insight }] }]
             }))
             
-            insertContentBeforeBlock({
+            insertContentAfterBlock({
               type: 'bulletList',
               content: insightItems
             })
             
-            insertContentBeforeBlock({ type: 'paragraph' })
+            insertContentAfterBlock({ type: 'paragraph' })
           }
           
           // Insert visualizations if available
           if (task.result.visualizations && task.result.visualizations.length > 0) {
-            insertContentBeforeBlock({ type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Visualizations' }] })
-            insertContentBeforeBlock({ type: 'paragraph' })
+            insertContentAfterBlock({ type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Visualizations' }] })
+            insertContentAfterBlock({ type: 'paragraph' })
             
             // Insert each visualization
             for (const viz of task.result.visualizations) {
               // Insert title
-              insertContentBeforeBlock({ type: 'heading', attrs: { level: 4 }, content: [{ type: 'text', text: viz.title }] })
-              insertContentBeforeBlock({ type: 'paragraph' })
+              insertContentAfterBlock({ type: 'heading', attrs: { level: 4 }, content: [{ type: 'text', text: viz.title }] })
+              insertContentAfterBlock({ type: 'paragraph' })
               
               // Insert based on type
               switch (viz.type) {
                 case 'table':
                   // For now, just describe the table
-                  insertContentBeforeBlock(`Table visualization: ${JSON.stringify(viz.data).substring(0, 100)}...`)
+                  insertContentAfterBlock(`Table visualization: ${JSON.stringify(viz.data).substring(0, 100)}...`)
                   break
                 case 'scatter':
-                  insertContentBeforeBlock({
+                  insertContentAfterBlock({
                     type: 'scatterPlot',
                     attrs: {
                       title: viz.title,
@@ -1053,7 +1063,7 @@ function insertTaskResult(task) {
                   })
                   break
                 case 'mermaid':
-                  insertContentBeforeBlock({
+                  insertContentAfterBlock({
                     type: 'mermaid',
                     attrs: {
                       content: viz.data,
@@ -1061,7 +1071,7 @@ function insertTaskResult(task) {
                   })
                   break
                 case 'math':
-                  insertContentBeforeBlock({
+                  insertContentAfterBlock({
                     type: 'mathBlock',
                     attrs: {
                       latex: viz.data,
@@ -1069,14 +1079,14 @@ function insertTaskResult(task) {
                   })
                   break
                 default:
-                  insertContentBeforeBlock(JSON.stringify(viz.data))
+                  insertContentAfterBlock(JSON.stringify(viz.data))
               }
               
-              insertContentBeforeBlock({ type: 'paragraph' })
+              insertContentAfterBlock({ type: 'paragraph' })
             }
           }
         } else {
-          insertContentBeforeBlock(task.result.toString())
+          insertContentAfterBlock(task.result.toString())
         }
         break
         
@@ -1084,11 +1094,11 @@ function insertTaskResult(task) {
         // For coder, insert code blocks with proper language
         if (typeof task.result === 'object' && task.result.code) {
           // Insert title
-          insertContentBeforeBlock({ type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: `Generated ${task.result.language} Code` }] })
-          insertContentBeforeBlock({ type: 'paragraph' })
+          insertContentAfterBlock({ type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: `Generated ${task.result.language} Code` }] })
+          insertContentAfterBlock({ type: 'paragraph' })
           
           // Insert code block
-          insertContentBeforeBlock({
+          insertContentAfterBlock({
             type: 'executableCodeBlock',
             attrs: {
               language: task.result.language || 'javascript',
@@ -1099,12 +1109,12 @@ function insertTaskResult(task) {
           
           // If there's execution output, insert it too
           if (task.result.execution) {
-            insertContentBeforeBlock({ type: 'paragraph' })
-            insertContentBeforeBlock({ type: 'heading', attrs: { level: 4 }, content: [{ type: 'text', text: 'Execution Result' }] })
-            insertContentBeforeBlock({ type: 'paragraph' })
+            insertContentAfterBlock({ type: 'paragraph' })
+            insertContentAfterBlock({ type: 'heading', attrs: { level: 4 }, content: [{ type: 'text', text: 'Execution Result' }] })
+            insertContentAfterBlock({ type: 'paragraph' })
             
             // Use executableCodeBlock instead of codeBlock as codeBlock is not defined in the editor schema
-            insertContentBeforeBlock({
+            insertContentAfterBlock({
               type: 'executableCodeBlock',
               attrs: { 
                 language: 'console',
@@ -1114,12 +1124,12 @@ function insertTaskResult(task) {
             })
           }
         } else {
-          insertContentBeforeBlock(task.result.toString())
+          insertContentAfterBlock(task.result.toString())
         }
         break
         
       default:
-        insertContentBeforeBlock(
+        insertContentAfterBlock(
           typeof task.result === 'string' 
             ? task.result 
             : JSON.stringify(task.result, null, 2)
@@ -1127,11 +1137,11 @@ function insertTaskResult(task) {
     }
     
     // Add a final paragraph for spacing
-    insertContentBeforeBlock({ type: 'paragraph' })
+    insertContentAfterBlock({ type: 'paragraph' })
     
     toast({
       title: 'Success',
-      description: 'Task result has been inserted above the Vibe block'
+      description: 'Task result has been inserted below the Vibe block'
     })
   } catch (error) {
     console.error('Error inserting result:', error)
