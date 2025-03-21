@@ -14,8 +14,10 @@ export function useTaskGraph(options: UseTaskGraphOptions = {}) {
   // Elements for the graph
   const elements = ref<(TaskNode | TaskEdge)[]>([])
   
-  // Set up Vue Flow instance
+  // Set up Vue Flow instance with a unique ID
+  const flowId = 'task-dependency-graph'
   const vueFlowInstance = useVueFlow({
+    id: flowId,
     defaultEdgeOptions: {
       type: 'default',
       style: { strokeWidth: 2 }
@@ -70,6 +72,7 @@ export function useTaskGraph(options: UseTaskGraphOptions = {}) {
             y: 100 + Math.floor(index / 3) * 200 
           },
           data: {
+            id: task.id,
             title: task.title || 'Untitled Task',
             status: task.status || 'pending',
             actorType: task.actorType || 'Unknown',
@@ -137,6 +140,7 @@ export function useTaskGraph(options: UseTaskGraphOptions = {}) {
           type: 'default',
           position: { x: 100, y: 100 },
           data: {
+            id: 'test-1',
             title: 'Test Task 1',
             status: 'completed',
             actorType: 'RESEARCHER',
@@ -148,6 +152,7 @@ export function useTaskGraph(options: UseTaskGraphOptions = {}) {
           type: 'default',
           position: { x: 400, y: 100 },
           data: {
+            id: 'test-2',
             title: 'Test Task 2',
             status: 'in_progress',
             actorType: 'CODER',
@@ -220,20 +225,22 @@ export function useTaskGraph(options: UseTaskGraphOptions = {}) {
   watch(() => selectedTaskId, (newId) => {
     if (newId) {
       // Highlight the selected node
-      elements.value = elements.value.map(el => {
+      const updatedElements = elements.value.map(el => {
         if (el.id === newId && el.type !== 'edge') {
           return {
             ...el,
-            style: { ...el.style, border: '2px solid #3b82f6', boxShadow: '0 0 10px rgba(59, 130, 246, 0.5)' }
+            style: { border: '2px solid #3b82f6', boxShadow: '0 0 10px rgba(59, 130, 246, 0.5)' }
           }
         } else if (el.type !== 'edge') {
-          return {
-            ...el,
-            style: { ...el.style, border: null, boxShadow: null }
-          }
+          // For non-selected nodes, don't modify style
+          const { style, ...rest } = el
+          return rest
         }
         return el
       })
+      
+      // Update elements with type-safe assignment
+      elements.value = updatedElements as (TaskNode | TaskEdge)[]
     }
   })
   

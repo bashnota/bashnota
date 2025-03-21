@@ -31,6 +31,7 @@ const extractTasks = () => {
   if (!props.block || !props.block.data || !props.block.data.tasks) {
     console.warn('No tasks data available in block:', props.block)
     tasks.value = []
+    loading.value = false
     return
   }
 
@@ -55,12 +56,14 @@ const handleNodeClick = (nodeId) => {
 }
 
 // Watch for changes in block data
-watch(() => props.block?.data, () => {
+watch(() => props.block?.data?.tasks, () => {
+  console.log('Block data changed, extracting tasks...')
   extractTasks()
-}, { deep: true })
+}, { deep: true, immediate: true })
 
 // Initialize component
 onMounted(() => {
+  console.log('TaskGraph mounted, extracting tasks...')
   extractTasks()
 })
 </script>
