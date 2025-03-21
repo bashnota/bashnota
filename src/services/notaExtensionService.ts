@@ -110,7 +110,7 @@ export class NotaExtensionService {
       type: 'scatterPlot',
       attrs: {
         title,
-        data: JSON.stringify(data),
+        apiData: data,
       },
     })
   }

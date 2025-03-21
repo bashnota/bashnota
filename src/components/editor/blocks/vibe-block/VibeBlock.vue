@@ -1050,18 +1050,77 @@ function insertTaskResult(task) {
               // Insert based on type
               switch (viz.type) {
                 case 'table':
-                  // For now, just describe the table
-                  insertContentAfterBlock(`Table visualization: ${JSON.stringify(viz.data).substring(0, 100)}...`)
-                  break
+                  // Parse the data if it's a string
+                  let tableData = typeof viz.data === 'string' ? JSON.parse(viz.data) : viz.data;
+                  
+                  // Handle different table data formats
+                  // If tableData is an object with rows property, use that
+                  if (tableData && typeof tableData === 'object' && tableData.rows && Array.isArray(tableData.rows)) {
+                    tableData = tableData.rows;
+                  }
+                  
+                  // Ensure tableData is an array at this point
+                  if (!Array.isArray(tableData)) {
+                    // If it's still not an array, try to convert object to array or create empty array
+                    tableData = (tableData && typeof tableData === 'object') ? [tableData] : [];
+                  }
+                  
+                  // Get headers - either from first row's keys or explicit headers
+                  const headers = tableData.length > 0 
+                    ? Object.keys(tableData[0] || {})
+                    : (viz.data.headers || []);
+                  
+                  // Create table header row
+                  const headerRow = {
+                    type: 'tableRow',
+                    content: headers.map(header => ({
+                      type: 'tableHeader',
+                      content: [{ type: 'paragraph', content: [{ type: 'text', text: String(header) }] }]
+                    }))
+                  };
+                  
+                  // Create table body rows
+                  const bodyRows = tableData.map(row => ({
+                    type: 'tableRow',
+                    content: headers.map(header => ({
+                      type: 'tableCell',
+                      content: [{ type: 'paragraph', content: [{ type: 'text', text: String(row[header] || '') }] }]
+                    }))
+                  }));
+                  
+                  // Insert table
+                  insertContentAfterBlock({
+                    type: 'table',
+                    content: [
+                      { type: 'tableHead', content: [headerRow] },
+                      { type: 'tableBody', content: bodyRows }
+                    ]
+                  });
+                  break;
                 case 'scatter':
+                  // Ensure data is an array of points for the scatter plot
+                  const scatterData = typeof viz.data === 'string' ? JSON.parse(viz.data) : viz.data;
+                  
+                  // Format the data for scatter plot if needed
+                  const formattedData = Array.isArray(scatterData) ? scatterData : 
+                    // If it's an object with data array property, use that
+                    (scatterData.data && Array.isArray(scatterData.data) ? scatterData.data : 
+                    // Otherwise convert object keys to data points if possible
+                    Object.entries(scatterData).map(([key, value]) => ({ 
+                      x: parseFloat(key), 
+                      y: parseFloat(value),
+                      label: 'Data'
+                    })));
+                  
                   insertContentAfterBlock({
                     type: 'scatterPlot',
                     attrs: {
                       title: viz.title,
-                      data: JSON.stringify(viz.data),
+                      // Store the actual data array in apiData rather than stringifying to data
+                      apiData: formattedData
                     }
-                  })
-                  break
+                  });
+                  break;
                 case 'mermaid':
                   insertContentAfterBlock({
                     type: 'mermaid',
@@ -1758,21 +1817,32 @@ function getTableColumns(data) {
   // If data has a columns property, use that
   if (data.columns) return data.columns
   
-  // If data is an array of objects, get all unique keys
-  if (Array.isArray(data)) {
-    const columns = new Set()
-    data.forEach(row => {
-      if (row && typeof row === 'object') {
-        Object.keys(row).forEach(key => columns.add(key))
-      }
-    })
-    return Array.from(columns)
+  // If data has explicit headers property, use that
+  if (data.headers && Array.isArray(data.headers)) return data.headers
+  
+  // Make sure we have an array to work with
+  let rows = data
+  
+  // If data has rows property that's an array, use that
+  if (data.rows && Array.isArray(data.rows)) {
+    rows = data.rows
   }
   
-  // If data has rows property
-  if (data.rows && Array.isArray(data.rows) && data.rows.length > 0) {
+  // If data is not an array yet, try to make it one
+  if (!Array.isArray(rows)) {
+    // If it's an object (but not an array), make it a single-item array
+    if (rows && typeof rows === 'object') {
+      rows = [rows]
+    } else {
+      // Can't extract columns from this data
+      return []
+    }
+  }
+  
+  // If data is an array of objects, get all unique keys
+  if (rows.length > 0) {
     const columns = new Set()
-    data.rows.forEach(row => {
+    rows.forEach(row => {
       if (row && typeof row === 'object') {
         Object.keys(row).forEach(key => columns.add(key))
       }
