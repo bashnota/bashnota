@@ -4,15 +4,15 @@
       <!-- Initial compact view -->
       <div class="vibe-header" @click="toggleExpand">
         <div class="vibe-title">
-          <Zap class="h-4 w-4 mr-2" :class="{ 'text-primary': props.node.attrs.isActive }" />
-          <span v-if="!props.node.attrs.isActive">Vibe Assistant</span>
-          <span v-else>{{ props.node.attrs.query }}</span>
+          <Zap class="h-4 w-4 mr-2" :class="{ 'text-primary': isActive }" />
+          <span v-if="!isActive">Vibe Assistant</span>
+          <span v-else>{{ query }}</span>
         </div>
         <div class="vibe-status">
-          <Loader v-if="props.node.attrs.isLoading" class="h-4 w-4 animate-spin" />
+          <Loader v-if="isLoading" class="h-4 w-4 animate-spin" />
           <CheckCircle v-else-if="hasCompletedTasks" class="h-4 w-4 text-success" />
-          <AlertCircle v-else-if="props.node.attrs.error" class="h-4 w-4 text-destructive" />
-          <CircleEllipsis v-else-if="props.node.attrs.isActive" class="h-4 w-4 text-primary" />
+          <AlertCircle v-else-if="error" class="h-4 w-4 text-destructive" />
+          <CircleEllipsis v-else-if="isActive" class="h-4 w-4 text-primary" />
         </div>
         <div class="vibe-expand-icon">
           <ChevronDown v-if="isExpanded" class="h-4 w-4" />
@@ -23,7 +23,7 @@
       <!-- Expanded content -->
       <div v-if="isExpanded" class="vibe-content">
         <!-- Input form when not active -->
-        <div v-if="!props.node.attrs.isActive" class="vibe-input-panel">
+        <div v-if="!isActive" class="vibe-input-panel">
           <div class="vibe-description">
             Ask Vibe to help you with research, analysis, or code generation.
           </div>
@@ -86,17 +86,17 @@
         <!-- Active content -->
         <div v-else class="vibe-active-panel space-y-3">
           <!-- Loading state -->
-          <div v-if="props.node.attrs.isLoading" class="flex flex-col items-center justify-center p-4 text-center">
+          <div v-if="isLoading" class="flex flex-col items-center justify-center p-4 text-center">
             <Loader class="h-8 w-8 animate-spin mb-3" />
             <p class="text-muted-foreground">{{ loadingMessage }}</p>
           </div>
 
           <!-- Error state -->
-          <div v-else-if="props.node.attrs.error" class="flex flex-col items-center">
+          <div v-else-if="error" class="flex flex-col items-center">
             <Alert variant="destructive" class="mb-3">
               <AlertCircle class="h-4 w-4 mr-2" />
               <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{{ props.node.attrs.error }}</AlertDescription>
+              <AlertDescription>{{ error }}</AlertDescription>
             </Alert>
             <Button @click="resetVibe" variant="outline" class="mt-2">
               <RefreshCw class="h-4 w-4 mr-2" />
@@ -116,23 +116,7 @@
               </div>
               <div class="flex gap-2">
                 <Button 
-                  @click="showTasksTab" 
-                  variant="ghost" 
-                  size="sm"
-                  :class="{ 'bg-secondary': activeTab === 'tasks' }"
-                >
-                  Tasks
-                </Button>
-                <Button 
-                  @click="showDatabaseTab" 
-                  variant="ghost" 
-                  size="sm"
-                  :class="{ 'bg-secondary': activeTab === 'database' }"
-                >
-                  Database
-                </Button>
-                <Button 
-                  v-if="hasInProgressTasks" 
+                  v-if="hasInProgressTasks || boardTasks.length > completedTasks.length + failedTasks.length" 
                   @click="refreshTasks" 
                   variant="ghost" 
                   size="sm"
@@ -140,124 +124,207 @@
                   <RefreshCw class="h-4 w-4 mr-2" />
                   Refresh
                 </Button>
-              </div>
-            </div>
-
-            <!-- Task list tab -->
-            <div v-if="activeTab === 'tasks'" class="space-y-3">
-              <Card 
-                v-for="task in boardTasks" 
-                :key="task.id" 
-                class="overflow-hidden"
-                :class="{
-                  'border-success/20 bg-success/5': task.status === 'completed',
-                  'border-primary/20 bg-primary/5': task.status === 'in_progress',
-                  'border-destructive/20 bg-destructive/5': task.status === 'failed'
-                }"
-              >
-                <CardHeader class="p-3 pb-0">
-                  <div class="flex justify-between items-center">
-                    <Badge variant="secondary" class="uppercase text-xs">
-                      {{ task.actorType }}
-                    </Badge>
-                    <Badge 
-                      :variant="
-                        task.status === 'completed' ? 'success' : 
-                        task.status === 'in_progress' ? 'default' : 
-                        task.status === 'failed' ? 'destructive' : 'outline'
-                      "
-                    >
-                      {{ task.status }}
-                    </Badge>
-                  </div>
-                  <CardTitle class="text-sm mt-2">{{ task.title }}</CardTitle>
-                </CardHeader>
                 
-                <CardContent class="p-3 pt-2">
-                  <!-- Show result preview for completed tasks -->
-                  <div v-if="task.status === 'completed' && task.result" class="mt-2">
-                    <div class="text-xs bg-card p-2 rounded border mb-2 overflow-auto max-h-32">
-                      <pre class="whitespace-pre-wrap text-sm">{{ getResultPreview(task.result) }}</pre>
-                    </div>
-                    <Button 
-                      v-if="canInsertResult(task)" 
-                      @click="insertTaskResult(task)" 
-                      variant="outline"
-                      size="sm"
-                      class="w-full"
-                    >
-                      <Download class="h-3 w-3 mr-2" />
-                      Insert into Document
-                    </Button>
-                  </div>
-                  
-                  <!-- Show error for failed tasks -->
-                  <Alert v-if="task.status === 'failed' && task.error" variant="destructive" class="mt-2">
-                    <AlertCircle class="h-4 w-4 mr-2" />
-                    <AlertDescription class="text-xs">{{ task.error }}</AlertDescription>
-                  </Alert>
-                </CardContent>
-              </Card>
+                <Button 
+                  v-if="hasStuckTasks" 
+                  @click="resetTaskExecution" 
+                  variant="outline" 
+                  size="sm"
+                  class="text-destructive"
+                >
+                  <Undo2 class="h-4 w-4 mr-1" />
+                  Reset
+                </Button>
+              </div>
             </div>
+            
+            <!-- Tabs for task board UI -->
+            <Tabs class="w-full" defaultValue="tasks">
+              <TabsList class="w-full">
+                <TabsTrigger class="flex-1" value="tasks">
+                  <ListChecks class="h-4 w-4 mr-2" />
+                  Tasks
+                </TabsTrigger>
+                <TabsTrigger class="flex-1" value="database">
+                  <Database class="h-4 w-4 mr-2" />
+                  Database
+                </TabsTrigger>
+                <TabsTrigger class="flex-1" value="graph">
+                  <Network class="h-4 w-4 mr-2" />
+                  Graph
+                </TabsTrigger>
+              </TabsList>
 
-            <!-- Database tab -->
-            <div v-else-if="activeTab === 'database'" class="space-y-3">
-              <!-- Database tables list -->
-              <div v-if="databaseTables.length === 0" class="text-center p-4 text-muted-foreground">
-                No database tables available yet
-              </div>
-              <div v-else>
-                <div v-for="table in databaseTables" :key="table.id" class="mb-4">
-                  <Card>
-                    <CardHeader class="p-3 pb-0">
-                      <div class="flex justify-between items-center">
-                        <Badge variant="outline">Table</Badge>
-                        <Badge variant="secondary">{{ table.entries.length }} entries</Badge>
+              <!-- Tasks Panel -->
+              <TabsContent value="tasks" class="p-0 border-0 mt-2">
+                <div class="space-y-2">
+                  <Collapsible 
+                    v-for="task in boardTasks" 
+                    :key="task.id"
+                    :id="'task-' + task.id"
+                    :open="expandedTaskIds.includes(task.id)"
+                    @update:open="toggleTask(task.id)"
+                    class="border rounded-md"
+                    :class="{
+                      'border-primary': task.id === selectedTaskId,
+                      'shadow-sm': task.id === selectedTaskId
+                    }"
+                  >
+                    <CollapsibleTrigger class="flex w-full items-center justify-between p-4 text-left">
+                      <div class="flex items-center">
+                        <div 
+                          class="mr-3 h-3 w-3 rounded-full" 
+                          :class="{
+                            'bg-gray-300': task.status === 'pending',
+                            'bg-blue-500 animate-pulse': task.status === 'in_progress',
+                            'bg-green-500': task.status === 'completed',
+                            'bg-red-500': task.status === 'failed'
+                          }"
+                        ></div>
+                        <div>
+                          <div class="text-sm font-medium">{{ task.title }}</div>
+                          <div class="text-xs text-gray-500">{{ getActorName(task.actorType) }}</div>
+                        </div>
                       </div>
-                      <CardTitle class="text-sm mt-2">{{ table.name }}</CardTitle>
-                      <p class="text-xs text-muted-foreground mt-1">{{ table.description }}</p>
-                    </CardHeader>
-                    
-                    <CardContent class="p-3 pt-2">
-                      <!-- Schema info -->
-                      <div class="text-xs mb-2">
-                        <span class="font-medium">Schema:</span> 
-                        <span v-for="(type, field) in table.schema" :key="field" class="ml-1">
-                          <Badge variant="outline" class="text-xs">{{ field }}: {{ type }}</Badge>
-                        </span>
+                      <ChevronDown class="h-4 w-4 shrink-0 transition-transform ui-open:rotate-180" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent class="p-4 pt-0 text-sm">
+                      <div class="space-y-3">
+                        <!-- Task description -->
+                        <div>
+                          <div class="text-xs text-muted-foreground mb-1">Description:</div>
+                          <div class="text-sm">{{ task.description }}</div>
+                        </div>
+                        
+                        <!-- Task dependencies -->
+                        <div v-if="task.dependencies && task.dependencies.length > 0">
+                          <div class="text-xs text-muted-foreground mb-1">Dependencies:</div>
+                          <div class="flex flex-wrap gap-1">
+                            <span 
+                              v-for="depId in task.dependencies" 
+                              :key="depId"
+                              class="px-2 py-0.5 bg-muted text-xs rounded cursor-pointer"
+                              @click="selectDependency(depId)"
+                            >
+                              {{ getDependencyTitle(depId) }}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <!-- Task result -->
+                        <div v-if="task.status === 'completed'">
+                          <div class="text-xs text-muted-foreground mb-1">Result:</div>
+                          <div class="bg-muted/30 p-2 rounded">
+                            <div class="whitespace-pre-wrap max-h-40 overflow-y-auto">{{ getResultPreview(task.result) }}</div>
+                          </div>
+                          
+                          <div class="mt-2">
+                            <Button 
+                              v-if="canInsertResult(task)" 
+                              @click="insertTaskResult(task)"
+                              size="sm"
+                              class="w-full"
+                            >
+                              <ClipboardCopy class="h-4 w-4 mr-2" />
+                              Insert Result Above
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        <!-- Task error -->
+                        <div v-if="task.status === 'failed'">
+                          <div class="text-xs text-destructive mb-1">Error:</div>
+                          <div class="bg-destructive/10 p-2 rounded text-destructive">
+                            {{ task.error }}
+                          </div>
+                        </div>
+                        
+                        <!-- Task timing -->
+                        <div v-if="task.startedAt || task.completedAt" class="mt-2 text-xs text-muted-foreground">
+                          <div v-if="task.startedAt">Started: {{ formatDate(task.startedAt) }}</div>
+                          <div v-if="task.completedAt">Completed: {{ formatDate(task.completedAt) }}</div>
+                          <div v-if="task.startedAt && task.completedAt">
+                            Duration: {{ calculateDuration(task.startedAt, task.completedAt) }}
+                          </div>
+                        </div>
                       </div>
-                      
-                      <!-- Table entries -->
-                      <Collapsible>
-                        <CollapsibleTrigger class="w-full" @click="toggleTableExpansion(table.id)">
-                          <Button variant="outline" size="sm" class="w-full">
-                            <ChevronDown v-if="expandedTableIds.includes(table.id)" class="h-3 w-3 mr-2" />
-                            <ChevronRight v-else class="h-3 w-3 mr-2" />
-                            {{ expandedTableIds.includes(table.id) ? 'Hide' : 'Show' }} Entries
-                          </Button>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent :forceMount="expandedTableIds.includes(table.id)">
-                          <div v-if="table.entries.length === 0" class="text-center p-2 text-xs text-muted-foreground">
-                            No entries in this table
-                          </div>
-                          <div v-else class="mt-2 space-y-2">
-                            <Card v-for="entry in table.entries" :key="entry.id" class="p-2 text-xs">
-                              <div class="flex justify-between mb-1">
-                                <Badge variant="secondary">{{ entry.type }}</Badge>
-                                <Badge variant="outline">{{ entry.key }}</Badge>
-                              </div>
-                              <div class="bg-muted p-2 rounded max-h-32 overflow-auto">
-                                <pre class="whitespace-pre-wrap text-xs">{{ formatEntryValue(entry.value) }}</pre>
-                              </div>
-                            </Card>
-                          </div>
-                        </CollapsibleContent>
-                      </Collapsible>
-                    </CardContent>
-                  </Card>
+                    </CollapsibleContent>
+                  </Collapsible>
                 </div>
-              </div>
-            </div>
+              </TabsContent>
+
+              <!-- Database Panel -->
+              <TabsContent 
+                value="database" 
+                class="p-0 border-0 mt-2"
+                @select="loadDatabaseTables"
+              >
+                <!-- Database tables list -->
+                <div v-if="databaseTables.length === 0" class="text-center p-4 text-muted-foreground">
+                  No database tables available yet
+                </div>
+                <div v-else>
+                  <div v-for="table in databaseTables" :key="table.id" class="mb-4">
+                    <Card>
+                      <CardHeader class="p-3 pb-0">
+                        <div class="flex justify-between items-center">
+                          <Badge variant="outline">Table</Badge>
+                          <Badge variant="secondary">{{ table.entries.length }} entries</Badge>
+                        </div>
+                        <CardTitle class="text-sm mt-2">{{ table.name }}</CardTitle>
+                        <p class="text-xs text-muted-foreground mt-1">{{ table.description }}</p>
+                      </CardHeader>
+                      
+                      <CardContent class="p-3 pt-2">
+                        <!-- Schema info -->
+                        <div class="text-xs mb-2">
+                          <span class="font-medium">Schema:</span> 
+                          <span v-for="(type, field) in table.schema" :key="field" class="ml-1">
+                            <Badge variant="outline" class="text-xs">{{ field }}: {{ type }}</Badge>
+                          </span>
+                        </div>
+                        
+                        <!-- Table entries -->
+                        <Collapsible>
+                          <CollapsibleTrigger class="w-full" @click="toggleTableExpansion(table.id)">
+                            <Button variant="outline" size="sm" class="w-full">
+                              <ChevronDown v-if="expandedTableIds.includes(table.id)" class="h-3 w-3 mr-2" />
+                              <ChevronRight v-else class="h-3 w-3 mr-2" />
+                              {{ expandedTableIds.includes(table.id) ? 'Hide' : 'Show' }} Entries
+                            </Button>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent :forceMount="expandedTableIds.includes(table.id)">
+                            <div v-if="table.entries.length === 0" class="text-center p-2 text-xs text-muted-foreground">
+                              No entries in this table
+                            </div>
+                            <div v-else class="mt-2 space-y-2">
+                              <Card v-for="entry in table.entries" :key="entry.id" class="p-2 text-xs">
+                                <div class="flex justify-between mb-1">
+                                  <Badge variant="secondary">{{ entry.type }}</Badge>
+                                  <Badge variant="outline">{{ entry.key }}</Badge>
+                                </div>
+                                <div class="bg-muted p-2 rounded max-h-32 overflow-auto">
+                                  <pre class="whitespace-pre-wrap text-xs">{{ formatEntryValue(entry.value) }}</pre>
+                                </div>
+                              </Card>
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              </TabsContent>
+              
+              <!-- Graph Panel -->
+              <TabsContent value="graph" class="p-0 border-0 mt-2">
+                <TaskGraph 
+                  :tasks="boardTasks" 
+                  :selected-task-id="selectedTaskId"
+                  @node-click="handleTaskGraphNodeClick"
+                />
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
       </div>
@@ -269,6 +336,8 @@
 import { ref, computed, onMounted, onUnmounted, watch, onBeforeUnmount } from 'vue'
 import { useToast } from '@/components/ui/toast/use-toast'
 import { useVibeStore } from '@/stores/vibeStore'
+import { useAISettingsStore } from '../../../../stores/aiSettingsStore'
+import { useJupyterStore } from '@/stores/jupyterStore'
 import { ActorType } from '@/types/vibe'
 import { nodeViewProps, NodeViewWrapper } from '@tiptap/vue-3'
 import { 
@@ -282,7 +351,12 @@ import {
   Download,
   CircleEllipsis,
   ServerCog,
-  X
+  X,
+  Undo2,
+  ListChecks,
+  Database,
+  Network,
+  ClipboardCopy
 } from 'lucide-vue-next'
 
 // Import UI components individually
@@ -292,13 +366,16 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 
 // Add import for VibeTaskExecutor
 import { VibeTaskExecutor } from '@/services/vibe/VibeTaskExecutor'
 
 // Import JupyterConfigPanel
 import JupyterConfigPanel from './JupyterConfigPanel.vue'
-import { useJupyterStore } from '@/stores/jupyterStore'
+
+// Import TaskGraph component
+import TaskGraph from './TaskGraph.vue'
 
 // Define TaskStatus enum if not already defined in vibe types
 const TaskStatus = {
@@ -316,46 +393,98 @@ const TaskPriority = {
 }
 
 const props = defineProps({
-  ...nodeViewProps,
-  editor: Object // Editor instance for extension access
+  editor: Object,
+  node: Object,
+  updateAttributes: Function,
+  deleteNode: Function
 })
 
 const { toast } = useToast()
-let vibeStore
+const vibeStore = useVibeStore()
+
+// Safely get the AI settings store with error handling
+let aiSettingsStore
 try {
-  vibeStore = useVibeStore()
-  console.log('VibeStore initialized:', vibeStore)
+  aiSettingsStore = useAISettingsStore()
 } catch (error) {
-  console.error('Failed to initialize vibeStore', error)
+  console.error('Error loading AISettingsStore:', error)
+  // Provide a fallback implementation with basic defaults
+  aiSettingsStore = {
+    settings: {
+      preferredProviderId: 'openai',
+      apiKeys: {},
+      maxTokens: 1024,
+      temperature: 0.7
+    },
+    getApiKey: () => '',
+    preferredProvider: { id: 'openai', name: 'OpenAI' }
+  }
 }
 
+const jupyterStore = useJupyterStore()
+const taskExecutor = ref(null)
+const boardTasks = ref([])
+const databaseTables = ref([])
+const expandedTableIds = ref([])
+const expandedTaskIds = ref([])
+const selectedTaskId = ref(null)
+const refreshInterval = ref(null)
 const queryText = ref('')
 const loadingMessage = ref('')
 const isExpanded = ref(true)
-const boardTasks = ref([])
-const refreshInterval = ref(null)
-const databaseTables = ref([])
-const activeTab = ref('tasks')
-const expandedTableIds = ref([])
 const showJupyterConfig = ref(false)
 const jupyterConfig = ref({
   server: null,
   kernel: null
 })
-const jupyterStore = useJupyterStore()
 
 // Computed properties
+const isActive = computed(() => props.node.attrs.isActive)
+const query = computed(() => props.node.attrs.query)
+const sessionId = computed(() => props.node.attrs.sessionId)
+const taskBoardId = computed(() => props.node.attrs.taskBoardId)
+const isLoading = computed(() => props.node.attrs.isLoading)
+const error = computed(() => props.node.attrs.error)
+const hasTasks = computed(() => boardTasks.value.length > 0)
+const hasInProgressTasks = computed(() => boardTasks.value.some(task => task.status === 'in_progress'))
+
 const hasCompletedTasks = computed(() => 
   boardTasks.value.some(task => task.status === 'completed')
-)
-
-const hasInProgressTasks = computed(() => 
-  boardTasks.value.some(task => task.status === 'in_progress')
 )
 
 const completedTasks = computed(() => 
   boardTasks.value.filter(task => task.status === 'completed')
 )
+
+const failedTasks = computed(() => 
+  boardTasks.value.filter(task => task.status === 'failed')
+)
+
+// Determine if execution might be stuck
+const hasStuckTasks = computed(() => {
+  // Check for pending tasks that aren't running
+  const pendingNotRunning = boardTasks.value.some(task => 
+    task.status === 'pending' && 
+    !task.dependencies?.some(depId => {
+      const dep = boardTasks.value.find(t => t.id === depId)
+      return dep && (dep.status === 'pending' || dep.status === 'in_progress')
+    })
+  )
+  
+  // Check for tasks that have been in progress for too long (over 5 minutes)
+  const stuckInProgress = boardTasks.value.some(task => {
+    if (task.status === 'in_progress' && task.startedAt) {
+      const startTime = new Date(task.startedAt).getTime()
+      const currentTime = new Date().getTime()
+      const executionTime = currentTime - startTime
+      // Consider stuck if running for more than 5 minutes
+      return executionTime > 5 * 60 * 1000
+    }
+    return false
+  })
+  
+  return pendingNotRunning || stuckInProgress
+})
 
 // Toggle expanded state
 function toggleExpand() {
@@ -381,17 +510,6 @@ function formatEntryValue(value) {
   }
   
   return String(value)
-}
-
-// Show tasks tab
-function showTasksTab() {
-  activeTab.value = 'tasks'
-}
-
-// Show database tab
-function showDatabaseTab() {
-  activeTab.value = 'database'
-  loadDatabaseTables()
 }
 
 // Load database tables
@@ -438,11 +556,8 @@ async function loadBoardTasks() {
       boardTasks.value = board.tasks || []
       console.log('Loaded tasks:', boardTasks.value)
       
-      // Load database tables if all tasks are complete and we're on the database tab
-      if (activeTab.value === 'database' && 
-          boardTasks.value.every(task => task.status === 'completed' || task.status === 'failed')) {
-        await loadDatabaseTables()
-      }
+      // Also load database tables proactively
+      await loadDatabaseTables()
     }
   } catch (error) {
     console.error('Error loading board tasks:', error)
@@ -519,62 +634,242 @@ function canInsertResult(task) {
   return !!props.editor && task.status === 'completed' && !!task.result
 }
 
+// Helper function to get formatted execution result summary
+function getExecutionSummary(execution) {
+  if (!execution) return 'No execution data available';
+  
+  // Start with execution status
+  let summary = execution.success 
+    ? '✅ Execution completed successfully\n\n' 
+    : '❌ Execution failed\n\n';
+  
+  // Add error if available
+  if (execution.error) {
+    summary += `Error: ${execution.error}\n\n`;
+  }
+  
+  // Add output
+  if (execution.output) {
+    summary += execution.output;
+  } else {
+    summary += 'No output generated';
+  }
+  
+  return summary;
+}
+
 // Insert a task result into the document
 function insertTaskResult(task) {
   if (!canInsertResult(task)) return
   
   try {
-    // Position after the Vibe block
-    props.editor.commands.focus('end')
+    // Find the current position of the Vibe block
+    const vibePos = props.getPos()
+    console.log('Current Vibe block position:', vibePos)
+    
+    if (vibePos === undefined) {
+      console.error('Could not determine position of Vibe block')
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Could not determine where to insert content'
+      })
+      return
+    }
+    
+    // Create a function to insert all the content at the position before the Vibe block
+    const insertContentBeforeBlock = (content) => {
+      // Insert the content at the position right before the Vibe block
+      return props.editor.commands.insertContentAt(vibePos, content)
+    }
+    
+    // Insert spacing paragraph above
+    insertContentBeforeBlock({ type: 'paragraph' })
     
     // Insert content based on actor type
     switch (task.actorType) {
       case ActorType.RESEARCHER:
-        // For researcher, insert content as paragraphs
-        if (typeof task.result === 'object' && task.result.content) {
-          props.editor.commands.insertContent(task.result.content)
+        // For researcher, insert content as paragraphs with proper structure
+        if (typeof task.result === 'object') {
+          // Insert headings and sections
+          insertContentBeforeBlock({ type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Research Results' }] })
+          insertContentBeforeBlock({ type: 'paragraph' })
+          
+          // Insert summary if available
+          if (task.result.summary) {
+            insertContentBeforeBlock({ type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Summary' }] })
+            insertContentBeforeBlock({ type: 'paragraph' })
+            insertContentBeforeBlock(task.result.summary)
+            insertContentBeforeBlock({ type: 'paragraph' })
+          }
+          
+          // Insert key findings if available
+          if (task.result.keyFindings && task.result.keyFindings.length > 0) {
+            insertContentBeforeBlock({ type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Key Findings' }] })
+            insertContentBeforeBlock({ type: 'paragraph' })
+            
+            // For bullet lists, we need to create the entire list structure at once
+            const listItems = task.result.keyFindings.map(finding => ({
+              type: 'listItem',
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: finding }] }]
+            }))
+            
+            insertContentBeforeBlock({
+              type: 'bulletList',
+              content: listItems
+            })
+            
+            insertContentBeforeBlock({ type: 'paragraph' })
+          }
+          
+          // Insert content if available
+          if (task.result.content) {
+            insertContentBeforeBlock({ type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Detailed Research' }] })
+            insertContentBeforeBlock({ type: 'paragraph' })
+            insertContentBeforeBlock(task.result.content)
+          }
         } else {
-          props.editor.commands.insertContent(task.result.toString())
+          insertContentBeforeBlock(task.result.toString())
         }
         break
         
       case ActorType.ANALYST:
-        // For analyst, insert any visualizations if available
-        if (typeof task.result === 'object' && task.result.visualizations) {
-          // This would insert visualizations - simplified for now
-          props.editor.commands.insertContent(task.result.summary || '')
+        // For analyst, insert visualizations in a structured manner
+        if (typeof task.result === 'object') {
+          // Insert title and summary
+          insertContentBeforeBlock({ type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Analysis Results' }] })
+          insertContentBeforeBlock({ type: 'paragraph' })
+          
+          if (task.result.summary) {
+            insertContentBeforeBlock(task.result.summary)
+            insertContentBeforeBlock({ type: 'paragraph' })
+          }
+          
+          // Insert insights
+          if (task.result.insights && task.result.insights.length > 0) {
+            insertContentBeforeBlock({ type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Insights' }] })
+            insertContentBeforeBlock({ type: 'paragraph' })
+            
+            // Create bullet list with all items at once
+            const insightItems = task.result.insights.map(insight => ({
+              type: 'listItem',
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: insight }] }]
+            }))
+            
+            insertContentBeforeBlock({
+              type: 'bulletList',
+              content: insightItems
+            })
+            
+            insertContentBeforeBlock({ type: 'paragraph' })
+          }
+          
+          // Insert visualizations if available
+          if (task.result.visualizations && task.result.visualizations.length > 0) {
+            insertContentBeforeBlock({ type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Visualizations' }] })
+            insertContentBeforeBlock({ type: 'paragraph' })
+            
+            // Insert each visualization
+            for (const viz of task.result.visualizations) {
+              // Insert title
+              insertContentBeforeBlock({ type: 'heading', attrs: { level: 4 }, content: [{ type: 'text', text: viz.title }] })
+              insertContentBeforeBlock({ type: 'paragraph' })
+              
+              // Insert based on type
+              switch (viz.type) {
+                case 'table':
+                  // For now, just describe the table
+                  insertContentBeforeBlock(`Table visualization: ${JSON.stringify(viz.data).substring(0, 100)}...`)
+                  break
+                case 'scatter':
+                  insertContentBeforeBlock({
+                    type: 'scatterPlot',
+                    attrs: {
+                      title: viz.title,
+                      data: JSON.stringify(viz.data),
+                    }
+                  })
+                  break
+                case 'mermaid':
+                  insertContentBeforeBlock({
+                    type: 'mermaid',
+                    attrs: {
+                      content: viz.data,
+                    }
+                  })
+                  break
+                case 'math':
+                  insertContentBeforeBlock({
+                    type: 'mathBlock',
+                    attrs: {
+                      latex: viz.data,
+                    }
+                  })
+                  break
+                default:
+                  insertContentBeforeBlock(JSON.stringify(viz.data))
+              }
+              
+              insertContentBeforeBlock({ type: 'paragraph' })
+            }
+          }
         } else {
-          props.editor.commands.insertContent(task.result.toString())
+          insertContentBeforeBlock(task.result.toString())
         }
         break
         
       case ActorType.CODER:
-        // For coder, insert code blocks
+        // For coder, insert code blocks with proper language
         if (typeof task.result === 'object' && task.result.code) {
-          props.editor.commands.insertContent({
+          // Insert title
+          insertContentBeforeBlock({ type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: `Generated ${task.result.language} Code` }] })
+          insertContentBeforeBlock({ type: 'paragraph' })
+          
+          // Insert code block
+          insertContentBeforeBlock({
             type: 'executableCodeBlock',
             attrs: {
               language: task.result.language || 'javascript',
               executeable: true,
             },
-            content: [{ type: 'text', text: task.result.code }],
+            content: [{ type: 'text', text: task.result.code }]
           })
+          
+          // If there's execution output, insert it too
+          if (task.result.execution) {
+            insertContentBeforeBlock({ type: 'paragraph' })
+            insertContentBeforeBlock({ type: 'heading', attrs: { level: 4 }, content: [{ type: 'text', text: 'Execution Result' }] })
+            insertContentBeforeBlock({ type: 'paragraph' })
+            
+            // Use executableCodeBlock instead of codeBlock as codeBlock is not defined in the editor schema
+            insertContentBeforeBlock({
+              type: 'executableCodeBlock',
+              attrs: { 
+                language: 'console',
+                executeable: true 
+              },
+              content: [{ type: 'text', text: getExecutionSummary(task.result.execution) }]
+            })
+          }
         } else {
-          props.editor.commands.insertContent(task.result.toString())
+          insertContentBeforeBlock(task.result.toString())
         }
         break
         
       default:
-        props.editor.commands.insertContent(
+        insertContentBeforeBlock(
           typeof task.result === 'string' 
             ? task.result 
             : JSON.stringify(task.result, null, 2)
         )
     }
     
+    // Add a final paragraph for spacing
+    insertContentBeforeBlock({ type: 'paragraph' })
+    
     toast({
       title: 'Success',
-      description: 'Task result has been inserted into your document'
+      description: 'Task result has been inserted above the Vibe block'
     })
   } catch (error) {
     console.error('Error inserting result:', error)
@@ -589,6 +884,14 @@ function insertTaskResult(task) {
 // Reset the Vibe block
 function resetVibe() {
   console.log('Resetting Vibe block')
+  
+  // Clean up task executor if it exists
+  if (taskExecutor.value) {
+    console.log('Disposing task executor')
+    taskExecutor.value.dispose()
+    taskExecutor.value = null
+  }
+  
   props.updateAttributes({
     query: '',
     isActive: false,
@@ -672,10 +975,17 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  console.log('VibeBlock unmounting, clearing interval')
+  console.log('VibeBlock unmounting, clearing interval and disposing executor')
   if (refreshInterval.value) {
     clearInterval(refreshInterval.value)
     refreshInterval.value = null
+  }
+  
+  // Clean up task executor if it exists
+  if (taskExecutor.value) {
+    console.log('Disposing task executor on unmount')
+    taskExecutor.value.dispose()
+    taskExecutor.value = null
   }
 })
 
@@ -685,6 +995,13 @@ const startRefreshInterval = async () => {
   // Clear any existing interval
   if (refreshInterval.value) {
     clearInterval(refreshInterval.value)
+  }
+  
+  // Clean up any existing task executor
+  if (taskExecutor.value) {
+    console.log('Disposing existing task executor')
+    taskExecutor.value.dispose()
+    taskExecutor.value = null
   }
   
   // Load tasks initially
@@ -705,14 +1022,14 @@ const startRefreshInterval = async () => {
       }
       
       // Create a task executor for this board with Jupyter configuration
-      const executor = new VibeTaskExecutor(
+      taskExecutor.value = new VibeTaskExecutor(
         props.node.attrs.taskBoardId, 
         props.editor,
         jupyterConfig.value
       )
       
       // Execute tasks asynchronously
-      executor.executeAllTasks().catch(error => {
+      taskExecutor.value.executeAllTasks().catch(error => {
         console.error('Error executing tasks:', error)
         // Only update error if it's not already set
         if (!props.node.attrs.error) {
@@ -886,6 +1203,165 @@ const activateVibe = async () => {
       description: error instanceof Error ? error.message : 'Failed to create Vibe board'
     })
     loadingMessage.value = ''
+  }
+}
+
+// Reset task execution if it gets stuck
+async function resetTaskExecution() {
+  try {
+    console.log('Attempting to reset task execution')
+    
+    if (!taskExecutor.value) {
+      console.warn('No task executor available to reset')
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Cannot reset execution - no active executor'
+      })
+      return
+    }
+    
+    // Reset the task executor state
+    taskExecutor.value.resetState()
+    
+    // Reset any in_progress tasks back to pending
+    const inProgressTasks = boardTasks.value.filter(task => task.status === 'in_progress')
+    if (inProgressTasks.length > 0) {
+      console.log(`Resetting ${inProgressTasks.length} in-progress tasks back to pending`)
+      
+      for (const task of inProgressTasks) {
+        await vibeStore.updateTask(props.node.attrs.taskBoardId, task.id, {
+          status: 'pending'
+        })
+      }
+    }
+    
+    // Restart task execution
+    await taskExecutor.value.executeAllTasks()
+    
+    // Refresh the task list
+    await refreshTasks()
+    
+    toast({
+      title: 'Execution Reset',
+      description: 'Task execution has been reset and will continue'
+    })
+  } catch (error) {
+    console.error('Error resetting task execution:', error)
+    toast({
+      variant: 'destructive',
+      title: 'Error',
+      description: 'Failed to reset execution: ' + (error.message || 'Unknown error')
+    })
+  }
+}
+
+// Handle task graph node click
+function handleTaskGraphNodeClick(taskId) {
+  selectedTaskId.value = taskId
+  
+  // Expand the task in the tasks tab
+  if (!expandedTaskIds.value.includes(taskId)) {
+    expandedTaskIds.value.push(taskId)
+  }
+  
+  // Find the tab element and programmatically select it
+  const tabsElement = document.querySelector('[data-tabs-root]')
+  if (tabsElement) {
+    // Find the tasks tab trigger and simulate a click
+    const tabsTrigger = tabsElement.querySelector('[data-value="tasks"]')
+    if (tabsTrigger) {
+      tabsTrigger.click()
+    }
+  }
+  
+  // Scroll to the task element after a short delay to ensure DOM is updated
+  setTimeout(() => {
+    const element = document.getElementById(`task-${taskId}`)
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, 100)
+}
+
+// Toggle task expansion function
+function toggleTask(taskId) {
+  const index = expandedTaskIds.value.indexOf(taskId)
+  if (index === -1) {
+    expandedTaskIds.value.push(taskId)
+  } else {
+    expandedTaskIds.value.splice(index, 1)
+  }
+  
+  // Update selected task if we're expanding
+  if (index === -1) {
+    selectedTaskId.value = taskId
+  } else if (selectedTaskId.value === taskId) {
+    selectedTaskId.value = null
+  }
+}
+
+// Get dependency title
+function getDependencyTitle(depId) {
+  const depTask = boardTasks.value.find(t => t.id === depId)
+  return depTask ? depTask.title : `Task ${depId.substring(0, 8)}...`
+}
+
+// Select a dependency task
+function selectDependency(depId) {
+  // Set as selected task
+  selectedTaskId.value = depId
+  
+  // Expand the task
+  if (!expandedTaskIds.value.includes(depId)) {
+    expandedTaskIds.value.push(depId)
+  }
+  
+  // Scroll to the task
+  setTimeout(() => {
+    const element = document.getElementById(`task-${depId}`)
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, 100)
+}
+
+// Format date
+function formatDate(dateString) {
+  const date = new Date(dateString)
+  return date.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  })
+}
+
+// Calculate duration between two dates
+function calculateDuration(start, end) {
+  const startDate = new Date(start)
+  const endDate = new Date(end)
+  const durationMs = endDate.getTime() - startDate.getTime()
+  
+  // Format as minutes and seconds
+  const seconds = Math.floor(durationMs / 1000)
+  const minutes = Math.floor(seconds / 60)
+  const remainingSeconds = seconds % 60
+  
+  return `${minutes}m ${remainingSeconds}s`
+}
+
+// Get actor name for display
+function getActorName(actorType) {
+  switch (actorType) {
+    case ActorType.RESEARCHER: return 'Researcher'
+    case ActorType.ANALYST: return 'Analyst'
+    case ActorType.CODER: return 'Coder'
+    case ActorType.PLANNER: return 'Planner'
+    case ActorType.COMPOSER: return 'Composer'
+    default: return actorType
   }
 }
 </script>

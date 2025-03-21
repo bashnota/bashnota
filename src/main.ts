@@ -6,6 +6,11 @@ import router from './router'
 import { analytics } from './services/firebase'
 import { logAnalyticsEvent } from './services/firebase'
 
+// Import core stores to ensure they're registered
+import '@/stores/aiSettingsStore'
+import '@/stores/vibeStore'
+import '@/stores/jupyterStore'
+
 const app = createApp(App)
 const pinia = createPinia()
 

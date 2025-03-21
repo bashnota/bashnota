@@ -7,15 +7,20 @@ import { notaExtensionService } from '@/services/notaExtensionService'
  * Result structure for the researcher
  */
 export interface ResearchResult {
-  content: string
-  citations: {
-    key: string
-    text: string
-  }[]
   sections: {
     title: string
     content: string
   }[]
+  citations: {
+    id: string
+    title: string
+    url: string
+    authors: string[]
+    date: string
+  }[]
+  summary?: string
+  keyFindings?: string[]
+  content?: string
 }
 
 /**
@@ -38,55 +43,47 @@ export class Researcher extends BaseActor {
     const researchTable = await this.createTable(
       task.boardId,
       'research',
-      'Stores research data and reports',
+      'Stores research findings and citations',
       {
-        title: 'string',
+        query: 'string',
+        summary: 'string',
+        findings: 'array',
         content: 'string',
-        sections: 'array',
         citations: 'array'
       }
     )
-
-    // First, gather information from the task dependencies
-    const dependencyResults = await this.gatherDependencyResults(task)
-    
-    // Generate the research report based on the task and dependency results
-    const report = await this.generateReport(task.description, dependencyResults)
-    
-    // Store the report in the database
+  
+    // Generate research content based on task description
+    console.log('Researcher: Generating research content for task:', task.description)
+    const report = await this.generateReport(task.description, [])
+  
+    // Make sure the report has all necessary fields
+    if (!report.summary) {
+      report.summary = "Research results for: " + task.description;
+    }
+  
+    if (!report.keyFindings) {
+      report.keyFindings = report.sections.map((section: {title: string, content: string}) => section.title);
+    }
+  
+    if (!report.content) {
+      report.content = report.sections.map((section: {title: string, content: string}) => 
+        `## ${section.title}\n\n${section.content}`
+      ).join('\n\n');
+    }
+  
+    // Store the research content in the database
     await this.createEntry(
       researchTable.id,
       task.id,
       DatabaseEntryType.RESULT,
-      'report',
+      'research_report',
       report
     )
-
-    // Also create individual entries for sections to make them easier to access
-    for (const section of report.sections) {
-      await this.createEntry(
-        researchTable.id,
-        task.id,
-        DatabaseEntryType.DATA,
-        `section_${section.title.toLowerCase().replace(/\s+/g, '_')}`,
-        section
-      )
-    }
-
-    // Store the citations
-    if (report.citations.length > 0) {
-      await this.createEntry(
-        researchTable.id,
-        task.id,
-        DatabaseEntryType.DATA,
-        'citations',
-        report.citations
-      )
-    }
-    
-    // Insert the report into the document
-    await this.insertReportToEditor(report)
-    
+  
+    // No longer automatically insert the report - user will do this manually
+    console.log('Researcher: Generated report and stored in database')
+  
     return report
   }
   
@@ -286,37 +283,63 @@ ${this.config.customInstructions || 'Make the report academically rigorous but a
    * @param report The generated research report
    */
   private async insertReportToEditor(report: ResearchResult): Promise<void> {
-    // Insert the title as a heading
-    notaExtensionService.setHeading(1)
+    console.log('Researcher: Attempting to insert report to editor')
     
-    // Extract a title from the first section or use a default title
-    const title = report.sections.length > 0 ? report.sections[0].title : 'Research Report'
-    notaExtensionService.insertContent(title)
-    notaExtensionService.insertContent({ type: 'paragraph' })
-    
-    // Insert each section
-    for (const section of report.sections) {
-      // Insert section title as a heading
-      notaExtensionService.setHeading(2)
-      notaExtensionService.insertContent(section.title)
-      notaExtensionService.insertContent({ type: 'paragraph' })
-      
-      // Insert section content
-      notaExtensionService.setParagraph()
-      notaExtensionService.insertContent(section.content)
-      notaExtensionService.insertContent({ type: 'paragraph' })
+    // Check if editor is available before attempting to insert
+    if (!notaExtensionService.hasEditor()) {
+      console.warn('Researcher: Cannot insert report to editor - no editor instance available')
+      return;
     }
     
-    // Insert a bibliography section if there are citations
-    if (report.citations.length > 0) {
-      notaExtensionService.setHeading(2)
-      notaExtensionService.insertContent('References')
-      notaExtensionService.insertContent({ type: 'paragraph' })
+    try {
+      // Use safelyInsertContent instead of direct insertion
       
-      // Insert bibliography
-      notaExtensionService.insertContent({
-        type: 'bibliography'
-      })
+      // Insert heading
+      this.safelyExecuteCommand('setHeading', { level: 2 })
+      this.safelyInsertContent('Research Results')
+      this.safelyInsertContent({ type: 'paragraph' })
+      
+      // Insert summary section
+      if (report.summary) {
+        this.safelyExecuteCommand('setHeading', { level: 3 })
+        this.safelyInsertContent('Summary')
+        this.safelyInsertContent({ type: 'paragraph' })
+        this.safelyInsertContent(report.summary)
+        this.safelyInsertContent({ type: 'paragraph' })
+      }
+      
+      // Insert key findings
+      if (report.keyFindings && report.keyFindings.length > 0) {
+        this.safelyExecuteCommand('setHeading', { level: 3 })
+        this.safelyInsertContent('Key Findings')
+        this.safelyInsertContent({ type: 'paragraph' })
+        
+        // Create a bullet list
+        this.safelyExecuteCommand('toggleBulletList')
+        
+        for (const finding of report.keyFindings) {
+          this.safelyInsertContent(finding)
+          
+          if (finding !== report.keyFindings[report.keyFindings.length - 1]) {
+            this.safelyExecuteCommand('enter')
+          }
+        }
+        
+        this.safelyExecuteCommand('liftListItem', 'listItem')
+        this.safelyInsertContent({ type: 'paragraph' })
+      }
+      
+      // Insert full content
+      if (report.content) {
+        this.safelyExecuteCommand('setHeading', { level: 3 })
+        this.safelyInsertContent('Detailed Research')
+        this.safelyInsertContent({ type: 'paragraph' })
+        this.safelyInsertContent(report.content)
+      }
+      
+      console.log('Researcher: Successfully inserted report to editor')
+    } catch (error) {
+      console.error('Researcher: Error inserting report to editor:', error)
     }
   }
 } 

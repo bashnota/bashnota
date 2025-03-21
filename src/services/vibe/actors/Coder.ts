@@ -93,8 +93,8 @@ export class Coder extends BaseActor {
         }
       )
       
-      // Insert the code into the document
-      notaExtensionService.insertCodeBlock(codeResult.language, codeResult.code)
+      // No longer automatically insert code - user will do this manually
+      console.log('Coder: Generated code and stored in database')
       
       return codeResult
     }
@@ -116,9 +116,6 @@ export class Coder extends BaseActor {
     
     // Execute the generated code
     try {
-      // Insert the code into the document
-      notaExtensionService.insertCodeBlock(codeResult.language, codeResult.code)
-      
       // Execute the code
       const executionResult = await this.executeCode(codeResult.code, codeResult.language)
       
@@ -152,9 +149,6 @@ export class Coder extends BaseActor {
             code: refinedCodeResult.code
           }
         )
-        
-        // Insert the refined code into the document
-        notaExtensionService.insertCodeBlock(refinedCodeResult.language, refinedCodeResult.code)
         
         // Execute the refined code
         const refinedExecutionResult = await this.executeCode(

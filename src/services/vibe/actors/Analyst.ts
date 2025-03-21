@@ -86,8 +86,9 @@ export class Analyst extends BaseActor {
       )
     }
     
-    // Insert visualizations into the document
-    await this.insertVisualizationsToEditor(analysis)
+    // No longer automatically insert visualizations - user will do this manually
+    console.log('Analyst: Generated analysis and stored in database with', 
+      analysis.visualizations.length, 'visualizations')
     
     return analysis
   }

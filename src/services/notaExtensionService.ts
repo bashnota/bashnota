@@ -23,6 +23,14 @@ export class NotaExtensionService {
   }
 
   /**
+   * Check if an editor instance is available
+   * @returns True if an editor is available, false otherwise
+   */
+  public hasEditor(): boolean {
+    return this.editor !== null
+  }
+
+  /**
    * Check if an editor is available
    * @throws Error if no editor is available
    */

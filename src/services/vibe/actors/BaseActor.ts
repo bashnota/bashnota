@@ -28,8 +28,12 @@ export abstract class BaseActor {
       throw new Error(`Actor ${this.actorType} is disabled`)
     }
     
+    // Keep track of whether we set the editor in this method
+    const setEditorInMethod = !!editor && !notaExtensionService.hasEditor();
+    
     // Set the editor reference in the extension service if provided
     if (editor) {
+      console.log(`${this.actorType} actor: Setting editor instance for task ${task.id}`)
       notaExtensionService.setEditor(editor)
     }
     
@@ -39,6 +43,12 @@ export abstract class BaseActor {
         status: 'in_progress',
         startedAt: new Date()
       })
+      
+      // Check if editor is still available before executing
+      if (!notaExtensionService.hasEditor() && editor) {
+        console.log(`${this.actorType} actor: Re-setting editor instance for task ${task.id} as it was lost`)
+        notaExtensionService.setEditor(editor)
+      }
       
       // Execute the task
       const result = await this.execute(task)
@@ -65,7 +75,8 @@ export abstract class BaseActor {
     } finally {
       // Clear the editor reference from the extension service
       // only if we set it in this method (to avoid clearing it if it was set elsewhere)
-      if (editor) {
+      if (setEditorInMethod) {
+        console.log(`${this.actorType} actor: Clearing editor instance after task ${task.id}`)
         notaExtensionService.clearEditor()
       }
     }
@@ -114,6 +125,46 @@ export abstract class BaseActor {
    * @returns The result of the task execution
    */
   protected abstract execute(task: VibeTask): Promise<any>
+
+  /**
+   * Safely insert content to the editor if available
+   * This is a helper method that actors can use instead of direct notaExtensionService calls
+   * @param content The content to insert
+   * @returns True if insertion was successful, false otherwise
+   */
+  protected safelyInsertContent(content: any): boolean {
+    try {
+      if (!notaExtensionService.hasEditor()) {
+        console.warn(`${this.actorType} actor: Cannot insert content, no editor instance available`)
+        return false
+      }
+      
+      return notaExtensionService.insertContent(content)
+    } catch (error) {
+      console.error(`${this.actorType} actor: Error inserting content:`, error)
+      return false
+    }
+  }
+
+  /**
+   * Safely execute an editor command if editor is available
+   * @param commandName Command to execute
+   * @param params Parameters for the command
+   * @returns Result of the command or false if editor not available
+   */
+  protected safelyExecuteCommand<T = boolean>(commandName: string, params: any = {}): T | false {
+    try {
+      if (!notaExtensionService.hasEditor()) {
+        console.warn(`${this.actorType} actor: Cannot execute command ${commandName}, no editor instance available`)
+        return false as any
+      }
+      
+      return notaExtensionService.executeCommand<T>(commandName, params)
+    } catch (error) {
+      console.error(`${this.actorType} actor: Error executing command ${commandName}:`, error)
+      return false as any
+    }
+  }
 
   /**
    * Create a table in the task board database
