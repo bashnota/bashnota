@@ -1,12 +1,10 @@
 <script setup lang="ts">
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import { useCitationStore } from '@/stores/citationStore'
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Tooltip } from '@/components/ui/tooltip'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Link, ExternalLink, Edit, Copy, ClipboardCheck } from 'lucide-vue-next'
+import { Link, ExternalLink, Edit, Copy, ClipboardCheck, X } from 'lucide-vue-next'
 
 const props = defineProps({
   node: {
@@ -26,8 +24,9 @@ const props = defineProps({
 const router = useRouter()
 const citationStore = useCitationStore()
 const citationKey = computed(() => props.node.attrs.citationKey)
-const showDetailsDialog = ref(false)
+const showDetailsTooltip = ref(false)
 const copiedFormat = ref<string | null>(null)
+const tooltipPosition = ref({ x: 0, y: 0 })
 
 // Get the current nota ID from the route
 const notaId = computed(() => {
@@ -71,18 +70,65 @@ const tooltipContent = computed(() => {
   return text
 })
 
-const openDetailsDialog = () => {
-  showDetailsDialog.value = true
+const toggleDetailsTooltip = (event?: MouseEvent) => {
+  if (event) {
+    event.preventDefault()
+    event.stopPropagation()
+    
+    // Calculate tooltip position
+    let x = event.clientX
+    let y = event.clientY + 20 // Offset slightly below the click
+    
+    // Adjust for window boundaries (basic positioning)
+    const windowWidth = window.innerWidth
+    const windowHeight = window.innerHeight
+    
+    // Ensure tooltip stays within viewport (approx dimensions)
+    const tooltipWidth = 320 // Approximate width
+    const tooltipHeight = 300 // Approximate height
+    
+    // Adjust horizontal position if needed
+    if (x + tooltipWidth > windowWidth) {
+      x = Math.max(0, windowWidth - tooltipWidth - 10)
+    }
+    
+    // Adjust vertical position if needed
+    if (y + tooltipHeight > windowHeight) {
+      y = Math.max(0, event.clientY - tooltipHeight - 10)
+    }
+    
+    tooltipPosition.value = { x, y }
+  }
+  showDetailsTooltip.value = !showDetailsTooltip.value
 }
 
-const jumpToReferences = () => {
-  // Toggle reference sidebar open
-  const event = new CustomEvent('toggle-references', { detail: { open: true } })
-  window.dispatchEvent(event)
-  
-  // Close the dialog
-  showDetailsDialog.value = false
+const closeTooltip = (event?: MouseEvent) => {
+  if (event) {
+    event.preventDefault()
+    event.stopPropagation()
+  }
+  showDetailsTooltip.value = false
 }
+
+// Close tooltip when clicking outside
+const handleOutsideClick = (event: MouseEvent) => {
+  const tooltipEl = document.querySelector('.citation-details-tooltip')
+  const citationEl = event.target as HTMLElement
+  
+  if (tooltipEl && !tooltipEl.contains(event.target as Node) && 
+      !citationEl.classList.contains('citation-reference')) {
+    showDetailsTooltip.value = false
+  }
+}
+
+// Add and remove event listener
+onMounted(() => {
+  document.addEventListener('click', handleOutsideClick)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleOutsideClick)
+})
 
 const formatCitation = (style: string): string => {
   if (!citation.value) return 'Citation not found'
@@ -134,39 +180,50 @@ const citationStatus = computed(() => {
   
   return 'valid'
 })
+
+const jumpToReferences = () => {
+  // Toggle reference sidebar open
+  const event = new CustomEvent('toggle-references', { detail: { open: true } })
+  window.dispatchEvent(event)
+  
+  // Close the tooltip
+  showDetailsTooltip.value = false
+}
 </script>
 
 <template>
   <NodeViewWrapper as="span">
-    <!-- Citation with tooltip -->
-    <Tooltip :content="tooltipContent">
-      <span 
-        :class="[
-          'citation-reference', 
-          `citation-${citationStatus}`
-        ]" 
-        @click="openDetailsDialog"
-      >
-        [{{ node.attrs.citationNumber || '?' }}]
-      </span>
-    </Tooltip>
+    <!-- Citation reference that opens tooltip on click -->
+    <span 
+      :class="[
+        'citation-reference', 
+        `citation-${citationStatus}`
+      ]" 
+      @click.stop.prevent="toggleDetailsTooltip"
+    >
+      [{{ node.attrs.citationNumber || '?' }}]
+    </span>
     
-    <!-- Citation details dialog -->
-    <Dialog v-model:open="showDetailsDialog">
-      <DialogContent class="max-w-md">
-        <DialogHeader>
-          <DialogTitle class="flex items-center gap-2">
-            <span>Citation [{{ node.attrs.citationNumber || '?' }}]</span>
-            <span v-if="citation" class="text-xs text-muted-foreground ml-2">
+    <!-- Enhanced citation details tooltip that shows on click -->
+    <div v-if="showDetailsTooltip" 
+         class="citation-details-tooltip" 
+         :style="`position: fixed; top: ${tooltipPosition.y}px; left: ${tooltipPosition.x}px; z-index: 100;`">
+      <div class="citation-card p-4 bg-white rounded-md border shadow-lg min-w-64 max-w-sm">
+        <!-- Header with close button -->
+        <div class="flex justify-between items-center mb-2">
+          <div class="flex items-center gap-2">
+            <span class="font-medium">Citation [{{ node.attrs.citationNumber || '?' }}]</span>
+            <span v-if="citation" class="text-xs text-muted-foreground">
               {{ citation.key }}
             </span>
-          </DialogTitle>
-          <DialogDescription v-if="citation">
-            {{ formatAuthors(citation.authors, true) }}
-          </DialogDescription>
-        </DialogHeader>
+          </div>
+          <Button variant="ghost" size="sm" class="h-6 w-6 p-0" @click.stop="closeTooltip">
+            <X class="h-4 w-4" />
+          </Button>
+        </div>
         
-        <div v-if="citation" class="space-y-4">
+        <!-- Citation content -->
+        <div v-if="citation" class="space-y-3">
           <!-- Citation details -->
           <div class="space-y-2 text-sm">
             <div class="font-medium">{{ citation.title }}</div>
@@ -191,6 +248,7 @@ const citationStatus = computed(() => {
               :href="`https://doi.org/${citation.doi}`" 
               target="_blank" 
               class="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+              @click.stop
             >
               <Link class="h-3 w-3" />
               <span>DOI: {{ citation.doi }}</span>
@@ -201,6 +259,7 @@ const citationStatus = computed(() => {
               :href="citation.url" 
               target="_blank" 
               class="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+              @click.stop
             >
               <ExternalLink class="h-3 w-3" />
               <span>View online</span>
@@ -217,7 +276,7 @@ const citationStatus = computed(() => {
                 variant="outline" 
                 size="sm" 
                 class="text-xs"
-                @click="copyToClipboard(format)"
+                @click.stop="copyToClipboard(format)"
               >
                 <span>{{ format.toUpperCase() }}</span>
                 <Copy v-if="copiedFormat !== format" class="ml-1 h-3 w-3" />
@@ -225,33 +284,24 @@ const citationStatus = computed(() => {
               </Button>
             </div>
           </div>
+          
+          <!-- Footer -->
+          <div class="flex justify-between pt-2 border-t border-border">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              @click.stop="jumpToReferences"
+            >
+              <span>Go to References</span>
+            </Button>
+          </div>
         </div>
         
         <div v-else class="py-4 text-center text-muted-foreground">
           <p>Citation not found. The key "{{ citationKey }}" might be missing or invalid.</p>
         </div>
-        
-        <DialogFooter class="flex gap-2 justify-between">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            class="mr-auto"
-            @click="jumpToReferences"
-          >
-            <span>Go to References</span>
-          </Button>
-          
-          <Button 
-            v-if="citation"
-            variant="default" 
-            size="sm"
-            @click="showDetailsDialog = false"
-          >
-            <span>Close</span>
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   </NodeViewWrapper>
 </template>
 
@@ -274,5 +324,25 @@ const citationStatus = computed(() => {
 
 .citation-error {
   @apply bg-red-100 text-red-800;
+}
+
+.citation-details-tooltip {
+  animation: fadeIn 0.15s ease;
+}
+
+.citation-card {
+  @apply bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-lg rounded-lg;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style> 
