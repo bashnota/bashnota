@@ -240,20 +240,46 @@ ${this.config.customInstructions || 'Make the analysis clear, insightful, and ba
    */
   private parseAnalysisContent(analysisContent: string): AnalysisResult {
     try {
-      // Extract JSON from the response if it's in a code block
-      const jsonMatch = analysisContent.match(/```(?:json)?([\s\S]*?)```/)
-      const jsonContent = jsonMatch ? jsonMatch[1].trim() : analysisContent
+      // Try multiple approaches to extract JSON
+      let jsonContent = '';
       
-      // Parse the JSON
-      const parsed = JSON.parse(jsonContent)
+      // First, check for standard code blocks with JSON
+      const codeBlockMatch = analysisContent.match(/```(?:json)?([\s\S]*?)```/);
+      if (codeBlockMatch) {
+        jsonContent = codeBlockMatch[1].trim();
+      } else {
+        // If no code blocks, try to find any JSON-like structure in the content
+        const jsonObjectMatch = analysisContent.match(/(\{[\s\S]*\})/);
+        if (jsonObjectMatch) {
+          jsonContent = jsonObjectMatch[0].trim();
+        } else {
+          // Fallback to using the entire content
+          jsonContent = analysisContent.trim();
+        }
+      }
       
-      return {
-        summary: parsed.summary || '',
-        insights: parsed.insights || [],
-        visualizations: parsed.visualizations || []
+      // Try to parse the JSON
+      try {
+        const parsed = JSON.parse(jsonContent);
+        
+        // Validate the structure and provide default values
+        return {
+          summary: parsed.summary || '',
+          insights: Array.isArray(parsed.insights) ? parsed.insights : [],
+          visualizations: Array.isArray(parsed.visualizations) ? parsed.visualizations : []
+        };
+      } catch (parseError) {
+        console.warn('Failed to parse JSON content:', parseError);
+        
+        // Fallback: Return a minimal valid structure with the raw content
+        return {
+          summary: analysisContent,
+          insights: [],
+          visualizations: []
+        };
       }
     } catch (error) {
-      console.error('Error parsing analysis content:', error)
+      console.error('Error in parseAnalysisContent:', error);
       
       // If parsing fails, return a simple structure with the raw content
       return {

@@ -12,16 +12,78 @@ export abstract class BaseActor {
   protected config: ActorConfig
   protected vibeStore = useVibeStore()
   
+  // Static properties for rate limiting across all actor instances
+  private static lastApiCallTime = 0
+  private static minTimeBetweenCalls = 1000 // 1 second minimum between API calls
+  private static callQueue: (() => Promise<any>)[] = []
+  private static isProcessingQueue = false
+  
   constructor(protected actorType: ActorType) {
-    this.config = this.vibeStore.getActorConfig(actorType)
+    // Default configuration can be overridden by subclasses
+    this.config = {
+      enabled: true,
+      modelId: 'default',
+      maxTokens: 2000,
+      temperature: 0.7
+    }
+  }
+  
+  // Static method to wait for the throttle period
+  private static async waitForThrottle(): Promise<void> {
+    const now = Date.now()
+    const timeSinceLastCall = now - this.lastApiCallTime
+    
+    if (timeSinceLastCall < this.minTimeBetweenCalls) {
+      const waitTime = this.minTimeBetweenCalls - timeSinceLastCall
+      console.log(`Rate limiting: Waiting ${waitTime}ms before next API call`)
+      await new Promise(resolve => setTimeout(resolve, waitTime))
+    }
+    
+    this.lastApiCallTime = Date.now()
+  }
+  
+  // Static method to process the queue of API calls
+  private static async processQueue(): Promise<void> {
+    if (this.isProcessingQueue) return
+    
+    this.isProcessingQueue = true
+    
+    try {
+      while (this.callQueue.length > 0) {
+        await this.waitForThrottle()
+        const nextCall = this.callQueue.shift()
+        if (nextCall) {
+          await nextCall()
+        }
+      }
+    } finally {
+      this.isProcessingQueue = false
+    }
+  }
+  
+  // Static method to enqueue an API call
+  private static async enqueueApiCall<T>(apiCallFn: () => Promise<T>): Promise<T> {
+    return new Promise((resolve, reject) => {
+      this.callQueue.push(async () => {
+        try {
+          const result = await apiCallFn()
+          resolve(result)
+        } catch (error) {
+          reject(error)
+        }
+      })
+      
+      // Start processing the queue if it's not already being processed
+      if (!this.isProcessingQueue) {
+        this.processQueue()
+      }
+    })
   }
   
   /**
-   * Executes a task assigned to this actor
-   * @param task The task to execute
-   * @param editor Optional editor instance for interacting with the document
-   *               (can be omitted if using notaExtensionService centrally)
-   * @returns The result of the task execution
+   * Executes a task, updating its status and storing the result
+   * @param task Task to execute
+   * @returns Task result
    */
   public async executeTask(task: VibeTask, editor?: Editor): Promise<any> {
     if (!this.config.enabled) {
@@ -83,15 +145,13 @@ export abstract class BaseActor {
   }
   
   /**
-   * Generates AI completions using the actor's configured model
-   * @param prompt The prompt to send to the AI
-   * @returns The AI completion
+   * Generates text completion using the configured AI service
+   * @param prompt The prompt to generate text from
+   * @returns The generated text
    */
   protected async generateCompletion(prompt: string): Promise<string> {
-    // Get AI settings store
+    // Get AI settings
     const aiSettingsStore = useAISettingsStore()
-    
-    // Use the preferred provider from global settings
     const providerId = aiSettingsStore.settings.preferredProviderId
     const provider = supportedProviders.find(p => p.id === providerId)
     
@@ -104,16 +164,24 @@ export abstract class BaseActor {
     
     console.log(`Using AI provider: ${provider.name}`)
     
-    // Call generateText directly on aiService
-    const response = await aiService.generateText(
-      providerId,
-      apiKey,
-      {
-        prompt,
-        maxTokens: this.config.maxTokens || 2000,
-        temperature: this.config.temperature || 0.7
-      }
-    )
+    // Get model-specific settings for Gemini
+    const modelId = providerId === 'gemini' ? aiSettingsStore.settings.geminiModel : undefined
+    const safetyThreshold = providerId === 'gemini' ? aiSettingsStore.settings.geminiSafetyThreshold : undefined
+    
+    // Use our rate limiting mechanism by wrapping the API call
+    const response = await BaseActor.enqueueApiCall(() => {
+      return aiService.generateText(
+        providerId,
+        apiKey,
+        {
+          prompt,
+          maxTokens: this.config.maxTokens || 2000,
+          temperature: this.config.temperature || 0.7
+        },
+        modelId,
+        safetyThreshold
+      )
+    })
     
     return response.text
   }

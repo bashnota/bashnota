@@ -645,6 +645,9 @@ Provide complete, runnable code that fixes the issue.`;
     const completedTasks = new Set<string>(taskDatabase.completedTasks);
     const taskMap: Record<string, VibeTask> = {};
     
+    // Rate limiting: Delay between task executions
+    const DELAY_BETWEEN_TASKS = 2000; // 2 seconds
+    
     // Create a map of task ID to task
     tasks.forEach(task => {
       taskMap[task.id] = task;
@@ -683,6 +686,12 @@ Provide complete, runnable code that fixes the issue.`;
               status: 'in_progress',
               startedAt: new Date()
             });
+            
+            // Add delay before executing task to prevent rate limiting
+            if (executedCount > 0) {
+              console.log(`Rate limiting: Waiting ${DELAY_BETWEEN_TASKS}ms before next task execution`);
+              await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_TASKS));
+            }
             
             // Execute the task with retry for Coder tasks
             const result = await this.executeTaskWithRetry(task);

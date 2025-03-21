@@ -306,11 +306,6 @@ Focus on improving:
    * @returns The determined language
    */
   private determineLanguage(description: string): string {
-    // Always use Python as requested
-    return 'python';
-    
-    // Original language detection logic (kept as comment for reference)
-    /*
     const lowercaseDesc = description.toLowerCase()
     
     // Check for explicit language mentions
@@ -337,7 +332,6 @@ Focus on improving:
     
     // Default to Python if not specified
     return 'python'
-    */
   }
   
   /**
@@ -425,15 +419,26 @@ Focus on improving:
       }
       
       // Try to extract structured data from the output
-      let data: any = null
+      let data: any = null;
       try {
-        // Look for JSON in the output
-        const jsonMatch = output.match(/({[\s\S]*}|\[[\s\S]*\])/)
-        if (jsonMatch) {
-          data = JSON.parse(jsonMatch[0])
+        // Look for JSON in the output with a more robust pattern
+        // First attempt: Look for valid JSON objects or arrays
+        const jsonRegex = /(\{[\s\S]*?\}|\[[\s\S]*?\])/g;
+        const potentialMatches = [...output.matchAll(jsonRegex)];
+        
+        // Try each potential match until we find valid JSON
+        for (const match of potentialMatches) {
+          try {
+            const jsonText = match[0].trim();
+            data = JSON.parse(jsonText);
+            break; // If parsing succeeds, exit the loop
+          } catch (parseError) {
+            // Continue to the next potential match
+            continue;
+          }
         }
       } catch (error) {
-        console.warn('Could not parse structured data from output:', error)
+        console.warn('Could not parse structured data from output:', error);
       }
       
       // Parse and format the result

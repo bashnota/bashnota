@@ -145,7 +145,9 @@ export const InlineAIGenerationExtension = Node.create({
             prompt,
             maxTokens: aiSettings.settings.maxTokens,
             temperature: aiSettings.settings.temperature
-          }
+          },
+          providerId === 'gemini' ? aiSettings.settings.geminiModel : undefined,
+          providerId === 'gemini' ? aiSettings.settings.geminiSafetyThreshold : undefined
         ).then(result => {
           console.log('Generation successful:', result)
           

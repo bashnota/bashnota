@@ -444,7 +444,7 @@
                   <div v-if="viz.type === 'mermaid'" class="bg-muted p-3 rounded">
                     <div class="mermaid">{{ viz.data }}</div>
                   </div>
-                  <pre v-else-if="viz.type === 'math'" class="bg-muted p-3 rounded">{{ viz.data }}</pre>
+                  <pre v-else-if="viz.type === 'math'" class="bg-muted p-3 rounded">{{ typeof viz.data === 'object' && viz.data.formula ? viz.data.formula : viz.data }}</pre>
                   <div v-else-if="viz.type === 'table'" class="bg-muted p-3 rounded overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-300 text-sm">
                       <thead>
@@ -1074,7 +1074,7 @@ function insertTaskResult(task) {
                   insertContentAfterBlock({
                     type: 'mathBlock',
                     attrs: {
-                      latex: viz.data,
+                      latex: typeof viz.data === 'object' && viz.data.formula ? viz.data.formula : viz.data,
                     }
                   })
                   break

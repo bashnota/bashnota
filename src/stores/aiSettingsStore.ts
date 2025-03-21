@@ -9,15 +9,19 @@ export interface AISettings {
   customPrompt: string
   maxTokens: number
   temperature: number
+  geminiModel?: string // The specific Gemini model to use
+  geminiSafetyThreshold?: string // Safety threshold for content filtering
 }
 
 export const useAISettingsStore = defineStore('aiSettings', () => {
   const settings = ref<AISettings>({
-    preferredProviderId: 'openai',
+    preferredProviderId: 'gemini',
     apiKeys: {},
     customPrompt: '',
     maxTokens: 1024,
-    temperature: 0.7
+    temperature: 0.7,
+    geminiModel: 'gemini-1.5-pro', // Default to Gemini 1.5 Pro
+    geminiSafetyThreshold: 'BLOCK_MEDIUM_AND_ABOVE' // Default safety threshold
   })
 
   const providers = computed(() => supportedProviders)

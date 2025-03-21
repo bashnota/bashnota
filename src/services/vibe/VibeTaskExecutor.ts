@@ -347,10 +347,20 @@ export class VibeTaskExecutor {
       this.retryAttempts = 0
       
       // Start executing ready tasks
-      const promises = readyTasks.map(task => this.executeTask(task))
-      
-      // Wait for all ready tasks to complete
-      await Promise.all(promises)
+      // Instead of running all tasks in parallel, process them sequentially
+      // to avoid overwhelming the API with concurrent requests
+      console.log(`Executing ${readyTasks.length} ready tasks sequentially`)
+      for (const task of readyTasks) {
+        // Check if already disposed before each task
+        if (this.isDisposed) {
+          console.warn('VibeTaskExecutor was disposed during execution, aborting')
+          this.recursionDepth--
+          return
+        }
+        
+        // Execute tasks one at a time
+        await this.executeTask(task)
+      }
       
       // Check for disposed state before continuing
       if (this.isDisposed) {

@@ -254,20 +254,46 @@ ${this.config.customInstructions || 'Make the report academically rigorous but a
    */
   private parseReportContent(reportContent: string): ResearchResult {
     try {
-      // Extract JSON from the response if it's in a code block
-      const jsonMatch = reportContent.match(/```(?:json)?([\s\S]*?)```/)
-      const jsonContent = jsonMatch ? jsonMatch[1].trim() : reportContent
+      // Try multiple approaches to extract JSON
+      let jsonContent = '';
       
-      // Parse the JSON
-      const parsed = JSON.parse(jsonContent)
+      // First, check for standard code blocks with JSON
+      const codeBlockMatch = reportContent.match(/```(?:json)?([\s\S]*?)```/);
+      if (codeBlockMatch) {
+        jsonContent = codeBlockMatch[1].trim();
+      } else {
+        // If no code blocks, try to find any JSON-like structure in the content
+        const jsonObjectMatch = reportContent.match(/(\{[\s\S]*\})/);
+        if (jsonObjectMatch) {
+          jsonContent = jsonObjectMatch[0].trim();
+        } else {
+          // Fallback to using the entire content
+          jsonContent = reportContent.trim();
+        }
+      }
       
-      return {
-        content: parsed.content || '',
-        sections: parsed.sections || [],
-        citations: parsed.citations || []
+      // Try to parse the JSON
+      try {
+        const parsed = JSON.parse(jsonContent);
+        
+        // Validate the structure and provide default values
+        return {
+          content: parsed.content || '',
+          sections: Array.isArray(parsed.sections) ? parsed.sections : [],
+          citations: Array.isArray(parsed.citations) ? parsed.citations : []
+        };
+      } catch (parseError) {
+        console.warn('Failed to parse JSON content:', parseError);
+        
+        // Fallback: Return a minimal valid structure
+        return {
+          content: reportContent,
+          sections: [],
+          citations: []
+        };
       }
     } catch (error) {
-      console.error('Error parsing report content:', error)
+      console.error('Error in parseReportContent:', error);
       
       // If parsing fails, return a simple structure with the raw content
       return {
