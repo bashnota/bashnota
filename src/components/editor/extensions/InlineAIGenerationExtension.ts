@@ -4,8 +4,6 @@ import InlineAIGenerationComponent from '@/components/editor/blocks/InlineAIGene
 import { aiService } from '@/services/aiService'
 import { useAISettingsStore } from '@/stores/aiSettingsStore'
 import { toast } from '@/components/ui/toast'
-import { EditorState } from '@tiptap/pm/state'
-import { Editor } from '@tiptap/core'
 import type { CommandProps } from '@tiptap/core'
 
 export interface InlineAIGenerationAttributes {
