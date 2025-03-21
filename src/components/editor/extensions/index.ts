@@ -28,6 +28,7 @@ import { Youtube } from './youtube'
 import { ImageExtension, SubfigureExtension } from '../blocks'
 import GlobalDragHandle from './DragHandlePlugin'
 import { InlineAIGenerationExtension } from './InlineAIGenerationExtension'
+import { CitationExtension, BibliographyExtension } from './CitationExtension'
 
 // Import command-related extensions
 import SlashCommands from './Commands'
@@ -114,6 +115,8 @@ export function getEditorExtensions() {
     Blockquote,
     HorizontalRule,
     InlineAIGenerationExtension,
+    CitationExtension,
+    BibliographyExtension,
   ]
 }
 
@@ -167,5 +170,6 @@ export function getViewerExtensions() {
     drawIoExtension,
     Blockquote,
     HorizontalRule,
+    CitationExtension,
   ]
 }
