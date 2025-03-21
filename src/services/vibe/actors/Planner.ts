@@ -116,7 +116,9 @@ Create a structured plan to accomplish this task effectively. The plan should in
 Available actor types:
 - RESEARCHER: For tasks involving information gathering, data collection, and knowledge compilation
 - ANALYST: For tasks involving data analysis, insights generation, and summarization
-- CODER: For tasks involving code generation, debugging, and technical implementation
+- CODER: For tasks involving code generation, debugging, and technical implementation using Python
+
+IMPORTANT: All coding tasks MUST be implemented in Python. When creating tasks for the CODER actor, make sure the description explicitly mentions Python as the required programming language.
 
 For each task, include:
 - A descriptive title (1-6 words)
@@ -142,7 +144,9 @@ Respond with a structured JSON format like this:
   ]
 }
 
-Ensure that the plan is comprehensive, logical, and efficient. Tasks should build on each other where appropriate, with clear dependencies.`
+Ensure that the plan is comprehensive, logical, and efficient. Tasks should build on each other where appropriate, with clear dependencies.
+
+Remember: All CODER tasks MUST use Python as the programming language. Include this explicitly in the task descriptions.`
   }
 
   /**

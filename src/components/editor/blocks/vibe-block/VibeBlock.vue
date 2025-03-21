@@ -218,15 +218,25 @@
                             <div class="whitespace-pre-wrap max-h-40 overflow-y-auto">{{ getResultPreview(task.result) }}</div>
                           </div>
                           
-                          <div class="mt-2">
+                          <div class="mt-2 flex gap-2">
                             <Button 
                               v-if="canInsertResult(task)" 
                               @click="insertTaskResult(task)"
                               size="sm"
-                              class="w-full"
+                              class="flex-1"
                             >
                               <ClipboardCopy class="h-4 w-4 mr-2" />
                               Insert Result Above
+                            </Button>
+                            
+                            <Button
+                              @click="showTaskDetailsModal(task)"
+                              size="sm"
+                              variant="outline"
+                              class="flex-1"
+                            >
+                              <Maximize2 class="h-4 w-4 mr-2" />
+                              View Details
                             </Button>
                           </div>
                         </div>
@@ -323,17 +333,266 @@
                   :selected-task-id="selectedTaskId"
                   @node-click="handleTaskGraphNodeClick"
                 />
+                
+                <!-- Task details panel when a node is selected -->
+                <div v-if="selectedTaskId" class="mt-3 border p-3 rounded-md">
+                  <div class="text-sm font-medium">
+                    {{ getSelectedTask()?.title }}
+                    <Badge class="ml-2">{{ getActorName(getSelectedTask()?.actorType) }}</Badge>
+                  </div>
+                  
+                  <div class="text-xs mt-1">{{ getSelectedTask()?.description }}</div>
+                  
+                  <div class="mt-3 flex gap-2">
+                    <Button 
+                      v-if="getSelectedTask() && canInsertResult(getSelectedTask())" 
+                      @click="insertTaskResult(getSelectedTask())"
+                      size="sm"
+                      class="flex-1"
+                    >
+                      <ClipboardCopy class="h-4 w-4 mr-2" />
+                      Insert Result
+                    </Button>
+                    
+                    <Button
+                      @click="showTaskDetailsModal(getSelectedTask())"
+                      size="sm"
+                      variant="outline"
+                      class="flex-1"
+                    >
+                      <Maximize2 class="h-4 w-4 mr-2" />
+                      View Details
+                    </Button>
+                  </div>
+                </div>
               </TabsContent>
             </Tabs>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Add the TaskDetailsModal component -->
+    <Dialog
+      :open="!!selectedTaskForModal"
+      @update:open="open => { if (!open) selectedTaskForModal = null }"
+    >
+      <DialogContent class="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle v-if="selectedTaskForModal">{{ selectedTaskForModal.title }}</DialogTitle>
+          <DialogDescription v-if="selectedTaskForModal">
+            {{ getActorName(selectedTaskForModal.actorType) }} - {{ formatDate(selectedTaskForModal.completedAt) }}
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div v-if="selectedTaskForModal" class="mt-4 space-y-4">
+          <!-- Task description -->
+          <div>
+            <h4 class="text-sm font-medium mb-1">Description:</h4>
+            <div class="text-sm bg-muted/30 p-2 rounded">{{ selectedTaskForModal.description }}</div>
+          </div>
+          
+          <!-- Formatted result based on actor type -->
+          <div v-if="selectedTaskForModal.status === 'completed'">
+            <h4 class="text-sm font-medium mb-1">Result:</h4>
+            
+            <!-- Researcher results -->
+            <div v-if="selectedTaskForModal.actorType === ActorType.RESEARCHER" class="space-y-3">
+              <div v-if="getResearchSummary(selectedTaskForModal)" class="bg-card border rounded-md p-3">
+                <h5 class="text-sm font-medium mb-2">Summary</h5>
+                <div class="text-sm whitespace-pre-wrap">{{ getResearchSummary(selectedTaskForModal) }}</div>
+              </div>
+              
+              <div v-if="getResearchKeyFindings(selectedTaskForModal)?.length" class="bg-card border rounded-md p-3">
+                <h5 class="text-sm font-medium mb-2">Key Findings</h5>
+                <ul class="list-disc pl-5 text-sm space-y-1">
+                  <li v-for="(finding, idx) in getResearchKeyFindings(selectedTaskForModal)" :key="idx">
+                    {{ finding }}
+                  </li>
+                </ul>
+              </div>
+              
+              <div v-if="getResearchContent(selectedTaskForModal)" class="bg-card border rounded-md p-3">
+                <h5 class="text-sm font-medium mb-2">Detailed Research</h5>
+                <div class="text-sm whitespace-pre-wrap">{{ getResearchContent(selectedTaskForModal) }}</div>
+              </div>
+            </div>
+            
+            <!-- Analyst results -->
+            <div v-else-if="selectedTaskForModal.actorType === ActorType.ANALYST" class="space-y-3">
+              <div v-if="getAnalysisSummary(selectedTaskForModal)" class="bg-card border rounded-md p-3">
+                <h5 class="text-sm font-medium mb-2">Summary</h5>
+                <div class="text-sm whitespace-pre-wrap">{{ getAnalysisSummary(selectedTaskForModal) }}</div>
+              </div>
+              
+              <div v-if="getAnalysisInsights(selectedTaskForModal)?.length" class="bg-card border rounded-md p-3">
+                <h5 class="text-sm font-medium mb-2">Insights</h5>
+                <ul class="list-disc pl-5 text-sm space-y-1">
+                  <li v-for="(insight, idx) in getAnalysisInsights(selectedTaskForModal)" :key="idx">
+                    {{ insight }}
+                  </li>
+                </ul>
+              </div>
+              
+              <div v-if="getAnalysisVisualizations(selectedTaskForModal)?.length" class="space-y-3">
+                <h5 class="text-sm font-medium">Visualizations</h5>
+                <div v-for="(viz, idx) in getAnalysisVisualizations(selectedTaskForModal)" :key="idx" 
+                  class="bg-card border rounded-md p-3"
+                >
+                  <h6 class="text-sm font-medium mb-2">{{ viz.title }}</h6>
+                  <!-- Handle different visualization types -->
+                  <div v-if="viz.type === 'mermaid'" class="bg-muted p-3 rounded">
+                    <div class="mermaid">{{ viz.data }}</div>
+                  </div>
+                  <pre v-else-if="viz.type === 'math'" class="bg-muted p-3 rounded">{{ viz.data }}</pre>
+                  <div v-else-if="viz.type === 'table'" class="bg-muted p-3 rounded overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-300 text-sm">
+                      <thead>
+                        <tr>
+                          <th v-for="(col, colIdx) in getTableColumns(viz.data)" :key="colIdx" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            {{ col }}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-gray-200">
+                        <tr v-for="(row, rowIdx) in viz.data.rows || viz.data" :key="rowIdx">
+                          <td v-for="(col, colIdx) in getTableColumns(viz.data)" :key="colIdx" class="px-3 py-2 whitespace-nowrap">
+                            {{ row[col] }}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <pre v-else class="bg-muted p-3 rounded overflow-x-auto text-sm">{{ JSON.stringify(viz.data, null, 2) }}</pre>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Planner results -->
+            <div v-else-if="selectedTaskForModal.actorType === ActorType.PLANNER" class="space-y-3">
+              <div v-if="getPlannerMainGoal(selectedTaskForModal)" class="bg-card border rounded-md p-3">
+                <h5 class="text-sm font-medium mb-2">Main Goal</h5>
+                <div class="text-sm font-medium">{{ getPlannerMainGoal(selectedTaskForModal) }}</div>
+              </div>
+              
+              <div v-if="getPlannerTasks(selectedTaskForModal)?.length" class="bg-card border rounded-md p-3">
+                <h5 class="text-sm font-medium mb-2">Planned Tasks</h5>
+                <div class="space-y-3">
+                  <div 
+                    v-for="(task, idx) in getPlannerTasks(selectedTaskForModal)" 
+                    :key="idx"
+                    class="border rounded p-3"
+                  >
+                    <div class="flex justify-between">
+                      <div class="font-medium text-sm">{{ task.title }}</div>
+                      <Badge>{{ task.actorType }}</Badge>
+                    </div>
+                    <div class="text-sm mt-1">{{ task.description }}</div>
+                    
+                    <div class="flex gap-2 mt-2">
+                      <Badge variant="outline">Priority: {{ task.priority }}</Badge>
+                      <Badge variant="outline">Time: {{ task.estimatedCompletion }}</Badge>
+                    </div>
+                    
+                    <div v-if="task.dependencies?.length > 0" class="mt-2 text-xs">
+                      <span class="text-muted-foreground">Dependencies:</span> 
+                      <span v-for="(dep, depIdx) in task.dependencies" :key="depIdx" class="ml-1">
+                        <Badge variant="secondary" class="text-xs">Task {{ dep }}</Badge>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div v-if="getPlanSummary(selectedTaskForModal)" class="bg-card border rounded-md p-3">
+                <h5 class="text-sm font-medium mb-2">Plan Summary</h5>
+                <div class="text-sm whitespace-pre-wrap">{{ getPlanSummary(selectedTaskForModal) }}</div>
+              </div>
+            </div>
+            
+            <!-- Coder results -->
+            <div v-else-if="selectedTaskForModal.actorType === ActorType.CODER" class="space-y-3">
+              <div class="bg-card border rounded-md p-3">
+                <h5 class="text-sm font-medium mb-2">Generated {{ getCoderLanguage(selectedTaskForModal) }} Code</h5>
+                <pre class="bg-muted p-3 rounded overflow-x-auto text-sm">{{ getCoderCode(selectedTaskForModal) }}</pre>
+              </div>
+              
+              <div v-if="selectedTaskForModal.result?.execution" class="bg-card border rounded-md p-3">
+                <h5 class="text-sm font-medium mb-2">Execution Result</h5>
+                <div class="flex items-center mb-2">
+                  <div 
+                    class="mr-2 h-3 w-3 rounded-full" 
+                    :class="{
+                      'bg-green-500': selectedTaskForModal.result.execution.success,
+                      'bg-red-500': !selectedTaskForModal.result.execution.success
+                    }"
+                  ></div>
+                  <span class="text-sm">
+                    {{ selectedTaskForModal.result.execution.success ? 'Success' : 'Failed' }}
+                  </span>
+                </div>
+                <pre v-if="selectedTaskForModal.result.execution.error" class="bg-destructive/10 p-3 mb-2 rounded text-destructive text-sm">{{ selectedTaskForModal.result.execution.error }}</pre>
+                <pre v-if="selectedTaskForModal.result.execution.output" class="bg-muted p-3 rounded overflow-x-auto text-sm">{{ selectedTaskForModal.result.execution.output }}</pre>
+              </div>
+            </div>
+            
+            <!-- Fallback for other actor types -->
+            <div v-else class="bg-card border rounded-md p-3">
+              <pre class="whitespace-pre-wrap text-sm">{{ formatTaskResult(selectedTaskForModal.result) }}</pre>
+            </div>
+          </div>
+          
+          <!-- Error display -->
+          <div v-if="selectedTaskForModal.status === 'failed'" class="mt-4">
+            <h4 class="text-sm font-medium text-destructive mb-1">Error:</h4>
+            <div class="bg-destructive/10 p-3 rounded text-destructive">
+              {{ selectedTaskForModal.error }}
+            </div>
+            
+            <!-- Show code for failed coder tasks that still have code -->
+            <div v-if="selectedTaskForModal.actorType === ActorType.CODER && getCoderCodeFromResult(selectedTaskForModal)" class="mt-4">
+              <h4 class="text-sm font-medium mb-1">Generated Code (Failed):</h4>
+              <pre class="bg-muted p-3 rounded overflow-x-auto text-sm">{{ getCoderCodeFromResult(selectedTaskForModal) }}</pre>
+              
+              <!-- Show execution details if available -->
+              <div v-if="getCoderExecutionFromResult(selectedTaskForModal)" class="mt-3">
+                <h4 class="text-sm font-medium mb-1">Execution Error:</h4>
+                <pre class="bg-destructive/10 p-3 rounded text-destructive text-sm">{{ getCoderExecutionFromResult(selectedTaskForModal).error }}</pre>
+                
+                <div v-if="getCoderExecutionFromResult(selectedTaskForModal).output" class="mt-2">
+                  <h4 class="text-sm font-medium mb-1">Execution Output:</h4>
+                  <pre class="bg-muted p-3 rounded overflow-x-auto text-sm">{{ getCoderExecutionFromResult(selectedTaskForModal).output }}</pre>
+                </div>
+              </div>
+              
+              <!-- Show retry info if available -->
+              <div v-if="getCoderRetryInfo(selectedTaskForModal)" class="mt-3 border-t pt-3">
+                <h4 class="text-sm font-medium mb-1">Retry Information:</h4>
+                <div class="text-xs text-muted-foreground">
+                  This task failed after {{ getCoderRetryInfo(selectedTaskForModal) }} attempts to fix the code.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <DialogFooter>
+          <Button 
+            v-if="selectedTaskForModal && canInsertResult(selectedTaskForModal)" 
+            @click="insertTaskResult(selectedTaskForModal)"
+          >
+            <ClipboardCopy class="h-4 w-4 mr-2" />
+            Insert Result
+          </Button>
+          <Button variant="outline" @click="selectedTaskForModal = null">Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </node-view-wrapper>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, onBeforeUnmount, nextTick } from 'vue'
 import { useToast } from '@/components/ui/toast/use-toast'
 import { useVibeStore } from '@/stores/vibeStore'
 import { useAISettingsStore } from '../../../../stores/aiSettingsStore'
@@ -356,7 +615,8 @@ import {
   ListChecks,
   Database,
   Network,
-  ClipboardCopy
+  ClipboardCopy,
+  Maximize2
 } from 'lucide-vue-next'
 
 // Import UI components individually
@@ -367,6 +627,7 @@ import { Badge } from '@/components/ui/badge'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 
 // Add import for VibeTaskExecutor
 import { VibeTaskExecutor } from '@/services/vibe/VibeTaskExecutor'
@@ -437,6 +698,7 @@ const jupyterConfig = ref({
   server: null,
   kernel: null
 })
+const selectedTaskForModal = ref(null)
 
 // Computed properties
 const isActive = computed(() => props.node.attrs.isActive)
@@ -1363,6 +1625,179 @@ function getActorName(actorType) {
     case ActorType.COMPOSER: return 'Composer'
     default: return actorType
   }
+}
+
+// Show task details modal
+function showTaskDetailsModal(task) {
+  selectedTaskForModal.value = task
+  
+  // Initialize mermaid after the modal is shown
+  nextTick(() => {
+    if (window.mermaid) {
+      try {
+        window.mermaid.init('.mermaid')
+      } catch (error) {
+        console.error('Failed to initialize mermaid:', error)
+      }
+    }
+  })
+}
+
+// Get research summary
+function getResearchSummary(task) {
+  if (task.result && typeof task.result === 'object' && task.result.summary) {
+    return task.result.summary
+  }
+  return null
+}
+
+// Get research key findings
+function getResearchKeyFindings(task) {
+  if (task.result && typeof task.result === 'object' && task.result.keyFindings) {
+    return task.result.keyFindings
+  }
+  return null
+}
+
+// Get research content
+function getResearchContent(task) {
+  if (task.result && typeof task.result === 'object' && task.result.content) {
+    return task.result.content
+  }
+  return null
+}
+
+// Get analysis summary
+function getAnalysisSummary(task) {
+  if (task.result && typeof task.result === 'object' && task.result.summary) {
+    return task.result.summary
+  }
+  return null
+}
+
+// Get analysis insights
+function getAnalysisInsights(task) {
+  if (task.result && typeof task.result === 'object' && task.result.insights) {
+    return task.result.insights
+  }
+  return null
+}
+
+// Get analysis visualizations
+function getAnalysisVisualizations(task) {
+  if (task.result && typeof task.result === 'object' && task.result.visualizations) {
+    return task.result.visualizations
+  }
+  return null
+}
+
+// Get coder language
+function getCoderLanguage(task) {
+  if (task.result && typeof task.result === 'object' && task.result.language) {
+    return task.result.language
+  }
+  return null
+}
+
+// Get coder code
+function getCoderCode(task) {
+  if (task.result && typeof task.result === 'object' && task.result.code) {
+    return task.result.code
+  }
+  return null
+}
+
+// Format task result
+function formatTaskResult(result) {
+  if (typeof result === 'string') {
+    return result
+  } else if (typeof result === 'object') {
+    return JSON.stringify(result, null, 2)
+  }
+  return 'Result format not recognized'
+}
+
+// Get coder code from result
+function getCoderCodeFromResult(task) {
+  if (task.result && typeof task.result === 'object' && task.result.code) {
+    return task.result.code
+  }
+  return null
+}
+
+// Get coder execution from result
+function getCoderExecutionFromResult(task) {
+  if (task.result && typeof task.result === 'object' && task.result.execution) {
+    return task.result.execution
+  }
+  return null
+}
+
+// Get coder retry info
+function getCoderRetryInfo(task) {
+  if (task.result && typeof task.result === 'object' && task.result.retryInfo) {
+    return task.result.retryInfo
+  }
+  return null
+}
+
+// Get table columns
+function getTableColumns(data) {
+  if (!data) return []
+  
+  // If data has a columns property, use that
+  if (data.columns) return data.columns
+  
+  // If data is an array of objects, get all unique keys
+  if (Array.isArray(data)) {
+    const columns = new Set()
+    data.forEach(row => {
+      if (row && typeof row === 'object') {
+        Object.keys(row).forEach(key => columns.add(key))
+      }
+    })
+    return Array.from(columns)
+  }
+  
+  // If data has rows property
+  if (data.rows && Array.isArray(data.rows) && data.rows.length > 0) {
+    const columns = new Set()
+    data.rows.forEach(row => {
+      if (row && typeof row === 'object') {
+        Object.keys(row).forEach(key => columns.add(key))
+      }
+    })
+    return Array.from(columns)
+  }
+  
+  return []
+}
+
+// Planner helper functions
+function getPlannerMainGoal(task) {
+  if (task.result && typeof task.result === 'object' && task.result.plan && task.result.plan.mainGoal) {
+    return task.result.plan.mainGoal
+  }
+  return null
+}
+
+function getPlannerTasks(task) {
+  if (task.result && typeof task.result === 'object' && task.result.plan && Array.isArray(task.result.plan.tasks)) {
+    return task.result.plan.tasks
+  }
+  return null
+}
+
+function getPlanSummary(task) {
+  if (task.result && typeof task.result === 'object' && task.result.summary) {
+    return task.result.summary
+  }
+  return null
+}
+
+// Get selected task
+function getSelectedTask() {
+  return boardTasks.value.find(task => task.id === selectedTaskId.value)
 }
 </script>
 

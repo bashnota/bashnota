@@ -306,6 +306,11 @@ Focus on improving:
    * @returns The determined language
    */
   private determineLanguage(description: string): string {
+    // Always use Python as requested
+    return 'python';
+    
+    // Original language detection logic (kept as comment for reference)
+    /*
     const lowercaseDesc = description.toLowerCase()
     
     // Check for explicit language mentions
@@ -332,6 +337,7 @@ Focus on improving:
     
     // Default to Python if not specified
     return 'python'
+    */
   }
   
   /**
