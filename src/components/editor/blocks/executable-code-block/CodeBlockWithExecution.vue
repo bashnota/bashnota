@@ -103,7 +103,10 @@ const isReadyToExecute = computed(() => {
   return !executionInProgress.value && selectedServer.value && selectedServer.value !== 'none' && selectedKernel.value
 })
 
-const availableServers = computed(() => store.getCurrentNota(props.notaId)?.config?.jupyterServers || [])
+const availableServers = computed<JupyterServer[]>(() => {
+  // Only use global Jupyter servers from the store
+  return store.getAllGlobalJupyterServers || [];
+})
 const availableSessions = ref<Array<{ id: string; name: string; kernel: { name: string; id: string } }>>([])
 const availableKernels = ref<Array<KernelSpec>>([])
 const runningKernels = ref<Array<{
@@ -159,7 +162,7 @@ const selectSession = async (sessionId: string) => {
   if (!session) return
 
   // Update session in store
-  const server = availableServers.value.find(s => {
+  const server = availableServers.value.find((s: { ip: string, port: string }) => {
     const sessionServer = `${s.ip}:${s.port}`
     return sessionServer === selectedServer.value
   })
@@ -199,7 +202,7 @@ const selectRunningKernel = async (kernelId: string) => {
   // Create a new session with this kernel
   isSettingUp.value = true
   try {
-    const server = availableServers.value.find(s => `${s.ip}:${s.port}` === selectedServer.value)
+    const server = availableServers.value.find((s: { ip: string, port: string }) => `${s.ip}:${s.port}` === selectedServer.value)
     if (!server) throw new Error('Server not found')
 
     const sessionId = codeExecutionStore.createSession(`Session with ${kernel.name}`)
@@ -331,7 +334,7 @@ watch(selectedServer, async (newServer) => {
   }
   
   const server = availableServers.value.find(
-    s => `${s.ip}:${s.port}` === newServer
+    (s: { ip: string, port: string }) => `${s.ip}:${s.port}` === newServer
   )
   if (server) {
     try {
@@ -428,7 +431,7 @@ const createNewSession = async () => {
   isSettingUp.value = true
   try {
     const sessionId = codeExecutionStore.createSession(`Session ${availableSessions.value.length + 1}`)
-    const server = availableServers.value.find(s => `${s.ip}:${s.port}` === selectedServer.value)
+    const server = availableServers.value.find((s: { ip: string, port: string }) => `${s.ip}:${s.port}` === selectedServer.value)
     if (!server) throw new Error('Server not found')
     
     // Create kernel using executionService
@@ -730,7 +733,7 @@ const copyCode = () => {
                   <div class="text-xs font-medium mb-1">Server</div>
                   <CustomSelect
                     :options="
-                      availableServers.map((server) => ({
+                      availableServers.map(server => ({
                         value: `${server.ip}:${server.port}`,
                         label: `${server.ip}:${server.port}`,
                       }))

@@ -114,6 +114,26 @@ export const useNotaStore = defineStore('nota', {
       // Format your public URL as needed
       return `${baseURL}/p/${id}`
     },
+
+    getAllGlobalJupyterServers: (state) => {
+      // Find global Jupyter servers across all notas
+      // Combine all unique servers from all notas' configs
+      const serversMap = new Map();
+      
+      // Check each nota for its Jupyter server configurations
+      state.items.forEach((nota: Nota) => {
+        if (nota.config?.jupyterServers && Array.isArray(nota.config.jupyterServers)) {
+          nota.config.jupyterServers.forEach((server: any) => {
+            const key = `${server.ip}:${server.port}`;
+            if (!serversMap.has(key)) {
+              serversMap.set(key, server);
+            }
+          });
+        }
+      });
+      
+      return Array.from(serversMap.values());
+    },
   },
 
   actions: {
