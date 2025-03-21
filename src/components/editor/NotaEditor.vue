@@ -366,6 +366,14 @@ onMounted(() => {
   // Add keyboard shortcut event listener
   document.addEventListener('keydown', handleKeyboardShortcuts)
 
+  // Add event listener for toggling references
+  window.addEventListener('toggle-references', ((event: CustomEvent) => {
+    if (event.detail && event.detail.open) {
+      isReferencesOpen.value = true
+      isSidebarOpen.value = false
+    }
+  }) as EventListener)
+
   // Load saved editor settings
   const savedEditorSettings = localStorage.getItem('editor-settings')
   if (savedEditorSettings) {
@@ -428,6 +436,7 @@ onMounted(() => {
 onUnmounted(() => {
   // Clean up event listeners
   document.removeEventListener('keydown', handleKeyboardShortcuts)
+  window.removeEventListener('toggle-references', (() => {}) as EventListener)
   codeExecutionStore.cleanup()
 })
 

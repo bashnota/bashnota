@@ -28,7 +28,7 @@ import { Youtube } from './youtube'
 import { ImageExtension, SubfigureExtension } from '../blocks'
 import GlobalDragHandle from './DragHandlePlugin'
 import { InlineAIGenerationExtension } from './InlineAIGenerationExtension'
-import { CitationExtension } from './CitationExtension'
+import { CitationExtension, BibliographyExtension } from './CitationExtension'
 
 // Import command-related extensions
 import SlashCommands from './Commands'
@@ -116,6 +116,7 @@ export function getEditorExtensions() {
     HorizontalRule,
     InlineAIGenerationExtension,
     CitationExtension,
+    BibliographyExtension,
   ]
 }
 

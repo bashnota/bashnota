@@ -20,6 +20,9 @@ import MathExtension, {
   MathInput,
 } from './math-block'
 
+import Citation from './Citation.vue'
+import Bibliography from './Bibliography.vue'
+
 // Re-export everything
 export {
   // Image block components
@@ -42,6 +45,10 @@ export {
   MathBlock,
   MathDisplay,
   MathInput,
+  
+  // Citation components
+  Citation,
+  Bibliography,
 }
 
 // Export a map of all extensions for easier registration

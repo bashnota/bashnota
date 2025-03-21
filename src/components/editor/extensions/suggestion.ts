@@ -28,6 +28,7 @@ import {
   PenTool,
   SparklesIcon,
   BookIcon,
+  FileText
 } from 'lucide-vue-next'
 import { toast } from '@/lib/utils'
 
@@ -387,6 +388,26 @@ export default {
               attrs: {
                 citationKey: citation.key,
                 citationNumber: index + 1
+              }
+            })
+            .run()
+        },
+      },
+      {
+        title: 'Bibliography',
+        category: 'References',
+        icon: FileText,
+        keywords: ['references', 'bibliography', 'citations', 'works cited'],
+        command: ({ editor, range }: CommandArgs) => {
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .insertContent({
+              type: 'bibliography',
+              attrs: {
+                style: 'apa',
+                title: 'References'
               }
             })
             .run()

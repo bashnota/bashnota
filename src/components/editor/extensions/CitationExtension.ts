@@ -1,7 +1,8 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import { VueNodeViewRenderer } from '@tiptap/vue-3'
-import Citation from '@/components/editor/blocks/Citation.vue'
+import { Citation, Bibliography } from '@/components/editor/blocks'
 
+// Citation inline node
 export const CitationExtension = Node.create({
   name: 'citation',
   group: 'inline',
@@ -42,6 +43,48 @@ export const CitationExtension = Node.create({
 
   // Use Vue component to render this node in the editor
   addNodeView() {
-    return VueNodeViewRenderer(Citation)
+    return VueNodeViewRenderer(Citation as any)
+  },
+})
+
+// Bibliography block node
+export const BibliographyExtension = Node.create({
+  name: 'bibliography',
+  group: 'block',
+  content: '',
+  atom: true,
+  draggable: true,
+
+  addAttributes() {
+    return {
+      style: {
+        default: 'apa', // apa, mla, chicago
+      },
+      title: {
+        default: 'References',
+      },
+    }
+  },
+
+  parseHTML() {
+    return [
+      {
+        tag: 'div[data-type="bibliography"]',
+      },
+    ]
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return [
+      'div',
+      mergeAttributes(
+        { 'data-type': 'bibliography', class: 'bibliography-block' },
+        HTMLAttributes
+      ),
+    ]
+  },
+
+  addNodeView() {
+    return VueNodeViewRenderer(Bibliography as any)
   },
 }) 
