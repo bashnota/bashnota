@@ -1,6 +1,35 @@
 import axios from 'axios'
 import * as webllm from "@mlc-ai/web-llm";
 
+// Add Node.js Buffer type for browser environments
+declare global {
+  interface Window {
+    Buffer: typeof Buffer;
+  }
+}
+
+// Polyfill Buffer for browser environments if needed
+const BufferPolyfill = typeof Buffer !== 'undefined' ? Buffer : 
+  (typeof window !== 'undefined' && window.Buffer) ? window.Buffer : 
+  class BufferPolyfillClass {
+    static from(data: string, encoding: string): { toString: (encoding: string) => string } {
+      // Very simple polyfill just for basic base64 conversion
+      // In a real app, consider using base64-js or a similar library
+      const base64Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+      
+      return {
+        toString: (encoding: string) => {
+          if (encoding === 'base64') {
+            // This is a very simplified implementation - not for production use
+            // In a real application, use a proper base64 library
+            return btoa(data);
+          }
+          return data;
+        }
+      };
+    }
+  };
+
 // Add the InitProgressReport interface to match WebLLM's API
 interface InitProgressReport {
   text: string;
@@ -25,6 +54,10 @@ export interface GenerationOptions {
   presencePenalty?: number
 }
 
+export interface MultimodalGenerationOptions extends GenerationOptions {
+  images?: string[] // Base64 encoded images or URLs
+}
+
 export interface GenerationResult {
   text: string
   provider: string
@@ -37,6 +70,14 @@ export interface WebLLMModelInfo {
   size: string
   description: string
   downloadSize: string
+}
+
+export interface GeminiModelInfo {
+  id: string
+  name: string
+  description: string
+  maxTokens: number
+  supportsImages: boolean
 }
 
 export const supportedProviders: LLMProvider[] = [
@@ -59,7 +100,7 @@ export const supportedProviders: LLMProvider[] = [
   {
     id: 'gemini',
     name: 'Google Gemini',
-    apiEndpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
+    apiEndpoint: 'https://generativelanguage.googleapis.com/v1beta/models',
     requiresApiKey: true,
     maxTokens: 8192,
     defaultPrompt: 'You are Gemini, a helpful AI assistant from Google.',
@@ -88,6 +129,37 @@ export class AIService {
   private modelLoadingProgress: number = 0;
   private isModelLoading: boolean = false;
   private modelLoadingError: string | null = null;
+  private defaultGeminiModel: string = 'gemini-1.5-pro';
+  private geminiModels: GeminiModelInfo[] = [
+    {
+      id: 'gemini-1.5-flash',
+      name: 'Gemini 1.5 Flash',
+      description: 'Fast and efficient model for most common tasks',
+      maxTokens: 16384,
+      supportsImages: true
+    },
+    {
+      id: 'gemini-1.5-pro',
+      name: 'Gemini 1.5 Pro',
+      description: 'High-quality model with strong reasoning capabilities',
+      maxTokens: 32768,
+      supportsImages: true
+    },
+    {
+      id: 'gemini-1.5-ultra',
+      name: 'Gemini 1.5 Ultra',
+      description: 'Top-tier model with cutting-edge capabilities',
+      maxTokens: 1048576,
+      supportsImages: true
+    },
+    {
+      id: 'gemini-2.0-pro-exp-02-05',
+      name: 'Gemini 2.0 Pro Exp',
+      description: 'Experimental version of Gemini 2.0 Pro',
+      maxTokens: 32768,
+      supportsImages: true
+    }
+  ];
 
   async isWebGPUSupported(): Promise<boolean> {
     if (typeof navigator === 'undefined') return false;
@@ -144,7 +216,8 @@ export class AIService {
   async generateText(
     providerId: string, 
     apiKey: string, 
-    options: GenerationOptions
+    options: GenerationOptions,
+    modelId?: string
   ): Promise<GenerationResult> {
     const provider = supportedProviders.find(p => p.id === providerId)
     
@@ -159,7 +232,7 @@ export class AIService {
         case 'anthropic':
           return await this.generateWithAnthropic(apiKey, options)
         case 'gemini':
-          return await this.generateWithGemini(apiKey, options)
+          return await this.generateWithGemini(apiKey, options, modelId)
         case 'ollama':
           return await this.generateWithOllama(options)
         case 'webllm':
@@ -235,9 +308,12 @@ export class AIService {
 
   private async generateWithGemini(
     apiKey: string, 
-    options: GenerationOptions
+    options: GenerationOptions,
+    modelId?: string
   ): Promise<GenerationResult> {
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    // Use the provided model ID or fall back to the default
+    const model = modelId || this.defaultGeminiModel;
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
     
     try {
       const response = await axios.post(
@@ -304,7 +380,7 @@ export class AIService {
         console.error('Gemini API error:', error.response.data);
         
         if (error.response.status === 404) {
-          throw new Error('Gemini API model not found. The model name may have changed.');
+          throw new Error(`Gemini model "${model}" not found. Please check if the model ID is correct.`);
         } else if (error.response.status === 400) {
           throw new Error(`Gemini API error: ${error.response.data?.error?.message || 'Bad request'}`);
         } else if (error.response.status === 403) {
@@ -507,6 +583,527 @@ export class AIService {
       } catch (error) {
         console.error('Error aborting generation:', error);
       }
+    }
+  }
+
+  // Add a method to get the available Gemini models
+  getAvailableGeminiModels(): GeminiModelInfo[] {
+    return this.geminiModels;
+  }
+  
+  // Set default Gemini model
+  setDefaultGeminiModel(modelId: string): void {
+    // Check if the model exists in our list
+    const modelExists = this.geminiModels.some(model => model.id === modelId);
+    
+    if (!modelExists) {
+      throw new Error(`Gemini model "${modelId}" not found in the list of available models`);
+    }
+    
+    this.defaultGeminiModel = modelId;
+  }
+
+  // Get the current default Gemini model
+  getDefaultGeminiModel(): string {
+    return this.defaultGeminiModel;
+  }
+
+  async generateMultimodalText(
+    providerId: string,
+    apiKey: string,
+    options: MultimodalGenerationOptions,
+    modelId?: string
+  ): Promise<GenerationResult> {
+    const provider = supportedProviders.find(p => p.id === providerId);
+    
+    if (!provider) {
+      throw new Error(`Provider ${providerId} not supported`);
+    }
+    
+    // Currently only Gemini supports multimodal inputs
+    if (providerId !== 'gemini') {
+      throw new Error(`Multimodal generation is not supported by ${providerId}`);
+    }
+    
+    try {
+      return await this.generateWithGeminiMultimodal(apiKey, options, modelId);
+    } catch (error) {
+      console.error('Multimodal AI generation failed:', error);
+      throw error;
+    }
+  }
+
+  private async generateWithGeminiMultimodal(
+    apiKey: string,
+    options: MultimodalGenerationOptions,
+    modelId?: string
+  ): Promise<GenerationResult> {
+    // Use the provided model ID or fall back to the default
+    const model = modelId || this.defaultGeminiModel;
+    
+    // Check if the model supports images
+    const modelInfo = this.geminiModels.find(m => m.id === model);
+    if (!modelInfo) {
+      throw new Error(`Gemini model "${model}" not found`);
+    }
+    
+    if (!modelInfo.supportsImages && options.images && options.images.length > 0) {
+      throw new Error(`Gemini model "${model}" does not support image inputs`);
+    }
+    
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    
+    try {
+      // Prepare the content parts array with text prompt
+      const parts: any[] = [{ text: options.prompt }];
+      
+      // Add image parts if provided
+      if (options.images && options.images.length > 0) {
+        for (const image of options.images) {
+          // Check if the image is a URL or base64
+          if (image.startsWith('http')) {
+            parts.push({
+              inlineData: {
+                mimeType: "image/jpeg", // Assumes JPEG, could be made dynamic
+                data: await this.fetchAndConvertImageToBase64(image)
+              }
+            });
+          } else if (image.startsWith('data:')) {
+            // Extract base64 content from data URI
+            const base64Data = image.split(',')[1];
+            parts.push({
+              inlineData: {
+                mimeType: image.split(';')[0].split(':')[1],
+                data: base64Data
+              }
+            });
+          } else {
+            // Assuming the input is already base64 encoded
+            parts.push({
+              inlineData: {
+                mimeType: "image/jpeg", // Default assumption
+                data: image
+              }
+            });
+          }
+        }
+      }
+      
+      const response = await axios.post(
+        endpoint,
+        {
+          contents: [
+            {
+              parts: parts
+            }
+          ],
+          generationConfig: {
+            maxOutputTokens: options.maxTokens || 1024,
+            temperature: options.temperature || 0.7,
+            topP: options.topP || 0.95,
+            topK: 40,
+          },
+          safetySettings: [
+            {
+              category: "HARM_CATEGORY_HARASSMENT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_HATE_SPEECH",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        }
+      );
+      
+      // Extract the generated text from Gemini's response format
+      let generatedText = '';
+      if (response.data.candidates && 
+          response.data.candidates[0] && 
+          response.data.candidates[0].content &&
+          response.data.candidates[0].content.parts) {
+        
+        // Concatenate all text parts from the response
+        generatedText = response.data.candidates[0].content.parts
+          .filter((part: any) => part.text)
+          .map((part: any) => part.text)
+          .join('');
+      }
+      
+      return {
+        text: generatedText,
+        provider: 'gemini',
+        tokens: 0 // Gemini doesn't provide token count in the same way
+      };
+    } catch (error) {
+      // Add better error handling for debugging
+      if (axios.isAxiosError(error) && error.response) {
+        console.error('Gemini Multimodal API error:', error.response.data);
+        
+        if (error.response.status === 404) {
+          throw new Error(`Gemini model "${model}" not found. Please check if the model ID is correct.`);
+        } else if (error.response.status === 400) {
+          throw new Error(`Gemini API error: ${error.response.data?.error?.message || 'Bad request'}`);
+        } else if (error.response.status === 403) {
+          throw new Error('Gemini API error: Invalid API key or lacking permissions');
+        }
+      }
+      throw error;
+    }
+  }
+  
+  private async fetchAndConvertImageToBase64(imageUrl: string): Promise<string> {
+    try {
+      const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+      const contentType = response.headers['content-type'];
+      
+      // Browser-compatible way to convert ArrayBuffer to base64
+      const arrayBuffer = response.data;
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const base64 = btoa(binary);
+      
+      return base64;
+    } catch (error) {
+      console.error('Error fetching and converting image:', error);
+      throw new Error('Failed to fetch and convert image to base64');
+    }
+  }
+
+  async generateWithGeminiStreaming(
+    apiKey: string,
+    options: GenerationOptions,
+    onChunk: (text: string) => void,
+    onComplete: (result: GenerationResult) => void,
+    modelId?: string
+  ): Promise<void> {
+    // Use the provided model ID or fall back to the default
+    const model = modelId || this.defaultGeminiModel;
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}`;
+    
+    try {
+      let fullText = '';
+      
+      // Set up the request payload
+      const payload = {
+        contents: [
+          {
+            parts: [
+              {
+                text: options.prompt
+              }
+            ]
+          }
+        ],
+        generationConfig: {
+          maxOutputTokens: options.maxTokens || 1024,
+          temperature: options.temperature || 0.7,
+          topP: options.topP || 0.95,
+          topK: 40,
+        },
+        safetySettings: [
+          {
+            category: "HARM_CATEGORY_HARASSMENT",
+            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+          },
+          {
+            category: "HARM_CATEGORY_HATE_SPEECH",
+            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+          },
+          {
+            category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+          },
+          {
+            category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+          }
+        ]
+      };
+
+      // For browser environments, we'll use fetch with ReadableStream
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.body) {
+          throw new Error('Response body is null');
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        const processText = (text: string) => {
+          // Process each line as it might contain multiple JSON objects
+          const lines = (buffer + text).split('\n');
+          // Keep the last potentially incomplete line in the buffer
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.trim() === '') continue;
+            
+            try {
+              const data = JSON.parse(line);
+              
+              // Extract text content from the response
+              if (data.candidates && 
+                  data.candidates[0] && 
+                  data.candidates[0].content && 
+                  data.candidates[0].content.parts) {
+                
+                const parts = data.candidates[0].content.parts;
+                for (const part of parts) {
+                  if (part.text) {
+                    fullText += part.text;
+                    onChunk(part.text);
+                  }
+                }
+              }
+            } catch (parseError) {
+              console.warn('Error parsing JSON chunk:', parseError);
+            }
+          }
+        };
+
+        // Read the stream
+        const read = async () => {
+          try {
+            const { done, value } = await reader.read();
+            
+            if (done) {
+              // Process any remaining buffer
+              if (buffer.trim() !== '') {
+                processText(buffer);
+              }
+              
+              onComplete({
+                text: fullText,
+                provider: 'gemini',
+                tokens: 0
+              });
+              return;
+            }
+
+            // Process this chunk
+            processText(decoder.decode(value, { stream: true }));
+            
+            // Continue reading
+            await read();
+          } catch (error) {
+            console.error('Error reading stream:', error);
+            throw error;
+          }
+        };
+
+        await read();
+      } catch (error) {
+        console.error('Gemini streaming fetch error:', error);
+        throw error;
+      }
+    } catch (error) {
+      console.error('Gemini streaming setup failed:', error);
+      throw error;
+    }
+  }
+
+  async generateWithGeminiMultimodalStreaming(
+    apiKey: string,
+    options: MultimodalGenerationOptions,
+    onChunk: (text: string) => void,
+    onComplete: (result: GenerationResult) => void,
+    modelId?: string
+  ): Promise<void> {
+    // Use the provided model ID or fall back to the default
+    const model = modelId || this.defaultGeminiModel;
+    
+    // Check if the model supports images
+    const modelInfo = this.geminiModels.find(m => m.id === model);
+    if (!modelInfo) {
+      throw new Error(`Gemini model "${model}" not found`);
+    }
+    
+    if (!modelInfo.supportsImages && options.images && options.images.length > 0) {
+      throw new Error(`Gemini model "${model}" does not support image inputs`);
+    }
+    
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}`;
+    
+    try {
+      let fullText = '';
+      
+      // Prepare the content parts array with text prompt
+      const parts: any[] = [{ text: options.prompt }];
+      
+      // Add image parts if provided
+      if (options.images && options.images.length > 0) {
+        for (const image of options.images) {
+          // Check if the image is a URL or base64
+          if (image.startsWith('http')) {
+            parts.push({
+              inlineData: {
+                mimeType: "image/jpeg", // Assumes JPEG, could be made dynamic
+                data: await this.fetchAndConvertImageToBase64(image)
+              }
+            });
+          } else if (image.startsWith('data:')) {
+            // Extract base64 content from data URI
+            const base64Data = image.split(',')[1];
+            parts.push({
+              inlineData: {
+                mimeType: image.split(';')[0].split(':')[1],
+                data: base64Data
+              }
+            });
+          } else {
+            // Assuming the input is already base64 encoded
+            parts.push({
+              inlineData: {
+                mimeType: "image/jpeg", // Default assumption
+                data: image
+              }
+            });
+          }
+        }
+      }
+      
+      // Set up the request payload
+      const payload = {
+        contents: [
+          {
+            parts: parts
+          }
+        ],
+        generationConfig: {
+          maxOutputTokens: options.maxTokens || 1024,
+          temperature: options.temperature || 0.7,
+          topP: options.topP || 0.95,
+          topK: 40,
+        },
+        safetySettings: [
+          {
+            category: "HARM_CATEGORY_HARASSMENT",
+            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+          },
+          {
+            category: "HARM_CATEGORY_HATE_SPEECH",
+            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+          },
+          {
+            category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+          },
+          {
+            category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+          }
+        ]
+      };
+
+      // For browser environments, we'll use fetch with ReadableStream
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.body) {
+          throw new Error('Response body is null');
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        const processText = (text: string) => {
+          // Process each line as it might contain multiple JSON objects
+          const lines = (buffer + text).split('\n');
+          // Keep the last potentially incomplete line in the buffer
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.trim() === '') continue;
+            
+            try {
+              const data = JSON.parse(line);
+              
+              // Extract text content from the response
+              if (data.candidates && 
+                  data.candidates[0] && 
+                  data.candidates[0].content && 
+                  data.candidates[0].content.parts) {
+                
+                const parts = data.candidates[0].content.parts;
+                for (const part of parts) {
+                  if (part.text) {
+                    fullText += part.text;
+                    onChunk(part.text);
+                  }
+                }
+              }
+            } catch (parseError) {
+              console.warn('Error parsing JSON chunk:', parseError);
+            }
+          }
+        };
+
+        // Read the stream
+        const read = async () => {
+          try {
+            const { done, value } = await reader.read();
+            
+            if (done) {
+              // Process any remaining buffer
+              if (buffer.trim() !== '') {
+                processText(buffer);
+              }
+              
+              onComplete({
+                text: fullText,
+                provider: 'gemini',
+                tokens: 0
+              });
+              return;
+            }
+
+            // Process this chunk
+            processText(decoder.decode(value, { stream: true }));
+            
+            // Continue reading
+            await read();
+          } catch (error) {
+            console.error('Error reading stream:', error);
+            throw error;
+          }
+        };
+
+        await read();
+      } catch (error) {
+        console.error('Gemini multimodal streaming fetch error:', error);
+        throw error;
+      }
+    } catch (error) {
+      console.error('Gemini multimodal streaming setup failed:', error);
+      throw error;
     }
   }
 }
