@@ -12,7 +12,7 @@
       <p class="task-description">{{ task.description }}</p>
       
       <div v-if="task.status === 'in_progress'" class="task-progress">
-        <Loader2 class="animate-spin mr-2" size="16" />
+        <Loader2 class="animate-spin mr-2" :size="16" />
         <span>In progress...</span>
       </div>
       
@@ -30,16 +30,16 @@
       </div>
       
       <div v-if="task.status === 'failed'" class="task-error">
-        <AlertTriangle class="text-red-500 mr-2" size="16" />
+        <AlertTriangle class="text-red-500 mr-2" :size="16" />
         <span>{{ task.error }}</span>
       </div>
     </div>
     
     <div class="task-footer">
       <div class="task-meta">
-        <div v-if="task.dependencies.length > 0" class="task-dependencies">
+        <div v-if="task.dependencies && task.dependencies.length > 0" class="task-dependencies">
           <span class="dependencies-label">Dependencies:</span>
-          <span class="dependencies-count">{{ task.dependencies.length }}</span>
+          <span class="dependencies-count">{{ task.dependencies ? task.dependencies.length : 0 }}</span>
         </div>
         
         <div v-if="task.startedAt || task.completedAt" class="task-timing">
@@ -68,7 +68,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, defineComponent, h } from 'vue'
 import { useVibeStore } from '@/stores/vibeStore'
 import { 
   Loader2, 
@@ -81,14 +81,15 @@ import {
   FileText 
 } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
-import { 
-  Accordion as AccordionRoot, 
-  AccordionItem, 
-  AccordionTrigger, 
-  AccordionContent 
-} from '@/components/ui/accordion'
+// TODO: Fix missing accordion components
+// import { 
+//   Accordion as AccordionRoot, 
+//   AccordionItem, 
+//   AccordionTrigger, 
+//   AccordionContent 
+// } from '@/components/ui/accordion'
 import { Button } from '@/components/ui/button'
-import { type VibeTask, ActorType, TaskStatus, TaskPriority } from '@/types/vibe'
+import { type VibeTask, ActorType, TaskPriority } from '@/types/vibe'
 
 const props = defineProps<{
   task: VibeTask
@@ -104,13 +105,13 @@ const vibeStore = useVibeStore()
 // Get the status class for styling
 const taskStatusClass = computed(() => {
   switch (props.task.status) {
-    case TaskStatus.PENDING:
+    case 'pending':
       return 'task-pending'
-    case TaskStatus.IN_PROGRESS:
+    case 'in_progress':
       return 'task-in-progress'
-    case TaskStatus.COMPLETED:
+    case 'completed':
       return 'task-completed'
-    case TaskStatus.FAILED:
+    case 'failed':
       return 'task-failed'
     default:
       return ''
@@ -120,19 +121,19 @@ const taskStatusClass = computed(() => {
 // Determine if a task can be executed based on its dependencies
 const canExecute = computed(() => {
   // Must be pending to execute
-  if (props.task.status !== TaskStatus.PENDING) return false
+  if (props.task.status !== 'pending') return false
   
   // No dependencies, can execute
   if (!props.task.dependencies || props.task.dependencies.length === 0) return true
   
   // Get the board to check dependencies
-  const board = vibeStore.getTaskBoard(props.boardId)
+  const board = vibeStore.getBoard(props.boardId)
   if (!board) return false
   
   // Check if all dependencies are completed
   return props.task.dependencies.every(depId => {
-    const depTask = board.tasks.find(t => t.id === depId)
-    return depTask && depTask.status === TaskStatus.COMPLETED
+    const depTask = board.tasks.find((t: { id: string, status: string }) => t.id === depId)
+    return depTask && depTask.status === 'completed'
   })
 })
 
@@ -197,6 +198,38 @@ const formatTimeAgo = (date: Date | string) => {
   if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`
   return `${Math.floor(seconds / 86400)} days ago`
 }
+
+// Create simple stub components
+const AccordionRoot = defineComponent({
+  name: 'AccordionRoot',
+  setup(_, { slots }: { slots: any }) {
+    return () => h('div', { class: 'accordion-root' }, slots.default?.())
+  }
+})
+
+const AccordionItem = defineComponent({
+  name: 'AccordionItem',
+  props: {
+    value: String
+  },
+  setup(_, { slots }: { slots: any }) {
+    return () => h('div', { class: 'accordion-item' }, slots.default?.())
+  }
+})
+
+const AccordionTrigger = defineComponent({
+  name: 'AccordionTrigger',
+  setup(_, { slots }: { slots: any }) {
+    return () => h('button', { class: 'accordion-trigger' }, slots.default?.())
+  }
+})
+
+const AccordionContent = defineComponent({
+  name: 'AccordionContent',
+  setup(_, { slots }: { slots: any }) {
+    return () => h('div', { class: 'accordion-content' }, slots.default?.())
+  }
+})
 </script>
 
 <style scoped>

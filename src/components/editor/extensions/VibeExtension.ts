@@ -95,15 +95,7 @@ export const VibeExtension = Node.create<VibeOptions>({
   
   addNodeView() {
     // @ts-ignore Vue component compatibility issues
-    return VueNodeViewRenderer(VibeBlock, {
-      // Pass editor to the component
-      extension: this,
-      onBeforeCreate: ({ editor }: { editor: any }) => {
-        return {
-          editor
-        }
-      }
-    })
+    return VueNodeViewRenderer(VibeBlock)
   }
 })
 

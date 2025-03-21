@@ -10,6 +10,16 @@ export enum ActorType {
 }
 
 /**
+ * Task priority levels
+ */
+export enum TaskPriority {
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
+  CRITICAL = 'critical'
+}
+
+/**
  * Task status
  */
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'failed'
@@ -24,6 +34,7 @@ export interface VibeTask {
   description: string
   actorType: ActorType
   status: TaskStatus
+  priority: TaskPriority
   dependencies?: string[]
   result?: any
   error?: string

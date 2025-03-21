@@ -1,5 +1,5 @@
 import { BaseActor } from './BaseActor'
-import { ActorType, type VibeTask } from '@/types/vibe'
+import { ActorType, type VibeTask, TaskPriority } from '@/types/vibe'
 import { Planner, type TaskPlan } from './Planner'
 import { Researcher } from './Researcher'
 import { Analyst } from './Analyst'
@@ -70,7 +70,8 @@ export class Composer extends BaseActor {
       title: 'Create execution plan',
       description: task.description,
       actorType: ActorType.PLANNER,
-      dependencies: []
+      dependencies: [],
+      priority: TaskPriority.HIGH
     })
 
     // Add to database
@@ -167,7 +168,8 @@ export class Composer extends BaseActor {
         title: plannedTask.title,
         description: plannedTask.description,
         actorType: plannedTask.actorType,
-        dependencies: [] // We'll update these after all tasks are created
+        dependencies: [], // We'll update these after all tasks are created
+        priority: this.mapStringToPriority(plannedTask.priority)
       })
 
       // Store the task ID mapping
@@ -820,6 +822,27 @@ Provide complete, runnable code that fixes the issue.`;
         executionResults: {},
         summary: `${composerResult.summary} Failed to execute tasks: ${errorMessage}`
       };
+    }
+  }
+
+  /**
+   * Maps a string priority to TaskPriority enum
+   * @param priority The priority string
+   * @returns The corresponding TaskPriority enum value
+   */
+  private mapStringToPriority(priority?: string): TaskPriority {
+    if (!priority) return TaskPriority.MEDIUM;
+    
+    switch(priority.toLowerCase()) {
+      case 'high':
+        return TaskPriority.HIGH;
+      case 'critical':
+        return TaskPriority.CRITICAL;
+      case 'low':
+        return TaskPriority.LOW;
+      case 'medium':
+      default:
+        return TaskPriority.MEDIUM;
     }
   }
 } 
