@@ -27,6 +27,16 @@
           <div class="vibe-description">
             Ask Vibe to help you with research, analysis, or code generation.
           </div>
+          
+          <!-- Jupyter config panel -->
+          <div v-if="showJupyterConfig" class="mb-4">
+            <JupyterConfigPanel 
+              :initialServer="jupyterConfig.server"
+              :initialKernel="jupyterConfig.kernel"
+              @configUpdated="updateJupyterConfig"
+            />
+          </div>
+          
           <div class="flex gap-2">
             <input
               :value="queryText"
@@ -46,6 +56,30 @@
               <Zap class="h-4 w-4 mr-2" />
               Get Started
             </Button>
+          </div>
+          
+          <!-- Jupyter config toggle and status -->
+          <div class="flex mt-3 justify-between">
+            <div>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                @click="toggleJupyterConfig"
+                class="flex items-center gap-1 text-xs h-8"
+              >
+                <ServerCog v-if="!showJupyterConfig" class="h-3.5 w-3.5" />
+                <X v-else class="h-3.5 w-3.5" />
+                {{ showJupyterConfig ? 'Hide Jupyter Config' : 'Configure Jupyter' }}
+              </Button>
+            </div>
+            
+            <div v-if="!showJupyterConfig" class="flex gap-2 text-xs text-muted-foreground items-center">
+              <span v-if="jupyterConfig.server && jupyterConfig.kernel">
+                Using {{ jupyterConfig.kernel.spec.display_name }} on 
+                {{ jupyterConfig.server.ip }}:{{ jupyterConfig.server.port }}
+              </span>
+              <span v-else>No Jupyter kernel configured</span>
+            </div>
           </div>
         </div>
 
@@ -246,7 +280,9 @@ import {
   ChevronRight, 
   RefreshCw, 
   Download,
-  CircleEllipsis
+  CircleEllipsis,
+  ServerCog,
+  X
 } from 'lucide-vue-next'
 
 // Import UI components individually
@@ -259,6 +295,10 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/component
 
 // Add import for VibeTaskExecutor
 import { VibeTaskExecutor } from '@/services/vibe/VibeTaskExecutor'
+
+// Import JupyterConfigPanel
+import JupyterConfigPanel from './JupyterConfigPanel.vue'
+import { useJupyterStore } from '@/stores/jupyterStore'
 
 // Define TaskStatus enum if not already defined in vibe types
 const TaskStatus = {
@@ -297,6 +337,12 @@ const refreshInterval = ref(null)
 const databaseTables = ref([])
 const activeTab = ref('tasks')
 const expandedTableIds = ref([])
+const showJupyterConfig = ref(false)
+const jupyterConfig = ref({
+  server: null,
+  kernel: null
+})
+const jupyterStore = useJupyterStore()
 
 // Computed properties
 const hasCompletedTasks = computed(() => 
@@ -437,6 +483,37 @@ function getResultPreview(result) {
   return 'Result available'
 }
 
+// Toggle Jupyter configuration panel
+function toggleJupyterConfig() {
+  showJupyterConfig.value = !showJupyterConfig.value
+}
+
+// Update Jupyter configuration
+function updateJupyterConfig(config) {
+  console.log('Updating Jupyter config:', config)
+  jupyterConfig.value = config
+  
+  // Save configuration to localStorage for persistence
+  try {
+    localStorage.setItem('vibe-jupyter-config', JSON.stringify({
+      server: {
+        ip: config.server.ip,
+        port: config.server.port,
+        token: config.server.token
+      },
+      kernel: {
+        name: config.kernel.name,
+        displayName: config.kernel.spec.display_name
+      }
+    }))
+  } catch (error) {
+    console.error('Failed to save Jupyter config to localStorage:', error)
+  }
+  
+  // Hide the config panel after update
+  showJupyterConfig.value = false
+}
+
 // Check if a task result can be inserted
 function canInsertResult(task) {
   return !!props.editor && task.status === 'completed' && !!task.result
@@ -553,6 +630,45 @@ onMounted(async () => {
     console.log('Block has taskBoardId, starting refresh interval')
     await startRefreshInterval()
   }
+  
+  // Load saved Jupyter config if available
+  try {
+    const savedConfig = localStorage.getItem('vibe-jupyter-config')
+    if (savedConfig) {
+      const parsedConfig = JSON.parse(savedConfig)
+      // Try to find matching server and kernel
+      if (parsedConfig.server && parsedConfig.kernel) {
+        // Find server
+        const server = jupyterStore.jupyterServers.find(
+          s => s.ip === parsedConfig.server.ip && s.port === parsedConfig.server.port
+        )
+        
+        if (server) {
+          jupyterConfig.value.server = server
+          
+          // Load kernels for this server if needed
+          const serverKey = `${server.ip}:${server.port}`
+          if (!jupyterStore.kernels[serverKey] || jupyterStore.kernels[serverKey].length === 0) {
+            // We need to refresh kernels before we can select one
+            // This will happen asynchronously
+            console.log('Loading kernels for saved server config')
+          } else {
+            // Find kernel by name
+            const kernel = jupyterStore.kernels[serverKey].find(
+              k => k.name === parsedConfig.kernel.name
+            )
+            
+            if (kernel) {
+              jupyterConfig.value.kernel = kernel
+              console.log('Restored Jupyter config from localStorage')
+            }
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load saved Jupyter config:', error)
+  }
 })
 
 onBeforeUnmount(() => {
@@ -563,7 +679,7 @@ onBeforeUnmount(() => {
   }
 })
 
-// Update startRefreshInterval function to use VibeTaskExecutor
+// Update startRefreshInterval function to use VibeTaskExecutor with Jupyter config
 const startRefreshInterval = async () => {
   console.log('Starting refresh interval')
   // Clear any existing interval
@@ -588,8 +704,12 @@ const startRefreshInterval = async () => {
         return
       }
       
-      // Create a task executor for this board
-      const executor = new VibeTaskExecutor(props.node.attrs.taskBoardId, props.editor)
+      // Create a task executor for this board with Jupyter configuration
+      const executor = new VibeTaskExecutor(
+        props.node.attrs.taskBoardId, 
+        props.editor,
+        jupyterConfig.value
+      )
       
       // Execute tasks asynchronously
       executor.executeAllTasks().catch(error => {
@@ -647,7 +767,7 @@ watch(queryText, (newVal, oldVal) => {
   })
 }, { immediate: true })
 
-// Update activateVibe to use await with startRefreshInterval
+// Update activateVibe to use await with startRefreshInterval and store Jupyter config
 const activateVibe = async () => {
   console.log('activateVibe called with query:', JSON.stringify(queryText.value))
   
@@ -688,7 +808,27 @@ const activateVibe = async () => {
     loadingMessage.value = 'Creating your Vibe board...'
     console.log('Creating board for query:', query)
     
-    const board = await vibeStore.createBoard({ query })
+    // Store Jupyter configuration information for the API
+    const jupyterInfo = jupyterConfig.value.server && jupyterConfig.value.kernel 
+      ? {
+          server: {
+            ip: jupyterConfig.value.server.ip,
+            port: jupyterConfig.value.server.port,
+            token: jupyterConfig.value.server.token
+          },
+          kernel: {
+            name: jupyterConfig.value.kernel.name,
+            displayName: jupyterConfig.value.kernel.spec.display_name
+          }
+        }
+      : null
+      
+    // Create the board with Jupyter info
+    const board = await vibeStore.createBoard({ 
+      query,
+      jupyterConfig: jupyterInfo
+    })
+    
     console.log('Board created:', board)
     
     if (!board) {
@@ -709,11 +849,15 @@ const activateVibe = async () => {
     // Create a composer task that will orchestrate the entire process
     loadingMessage.value = 'Setting up task orchestration...'
     
+    // Add Jupyter config information to the task metadata if available
+    const taskMetadata = jupyterInfo ? { jupyterConfig: jupyterInfo } : undefined
+    
     const composerTask = await vibeStore.createTask(board.id, {
       title: 'Orchestrate tasks',
       description: query,
       actorType: ActorType.COMPOSER,
-      dependencies: []
+      dependencies: [],
+      metadata: taskMetadata
     })
     
     // Update block attributes with board ID

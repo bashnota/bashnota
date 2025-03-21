@@ -1,5 +1,6 @@
 import { BaseActor } from './BaseActor'
 import { ActorType, type VibeTask, DatabaseEntryType } from '@/types/vibe'
+import { notaExtensionService } from '@/services/notaExtensionService'
 
 /**
  * Result structure for the analyst
@@ -85,10 +86,8 @@ export class Analyst extends BaseActor {
       )
     }
     
-    // Insert visualizations into the document if editor is available
-    if (this.editor) {
-      await this.insertVisualizationsToEditor(analysis)
-    }
+    // Insert visualizations into the document
+    await this.insertVisualizationsToEditor(analysis)
     
     return analysis
   }
@@ -269,49 +268,47 @@ ${this.config.customInstructions || 'Make the analysis clear, insightful, and ba
    * @param analysis The generated analysis
    */
   private async insertVisualizationsToEditor(analysis: AnalysisResult): Promise<void> {
-    if (!this.editor) return
-    
     // Insert the summary as a heading and paragraph
-    this.editor.commands.setHeading({ level: 2 })
-    this.editor.commands.insertContent('Analysis Summary')
-    this.editor.commands.insertContent({ type: 'paragraph' })
+    notaExtensionService.setHeading(2)
+    notaExtensionService.insertContent('Analysis Summary')
+    notaExtensionService.insertContent({ type: 'paragraph' })
     
-    this.editor.commands.setParagraph()
-    this.editor.commands.insertContent(analysis.summary)
-    this.editor.commands.insertContent({ type: 'paragraph' })
+    notaExtensionService.setParagraph()
+    notaExtensionService.insertContent(analysis.summary)
+    notaExtensionService.insertContent({ type: 'paragraph' })
     
     // Insert insights as a list
     if (analysis.insights.length > 0) {
-      this.editor.commands.setHeading({ level: 3 })
-      this.editor.commands.insertContent('Key Insights')
-      this.editor.commands.insertContent({ type: 'paragraph' })
+      notaExtensionService.setHeading(3)
+      notaExtensionService.insertContent('Key Insights')
+      notaExtensionService.insertContent({ type: 'paragraph' })
       
       // Create a bullet list using the correct command
-      this.editor.commands.toggleBulletList()
+      notaExtensionService.toggleBulletList()
       
       for (const insight of analysis.insights) {
-        this.editor.commands.insertContent(insight)
+        notaExtensionService.insertContent(insight)
         
         if (insight !== analysis.insights[analysis.insights.length - 1]) {
-          this.editor.commands.enter()
+          notaExtensionService.enter()
         }
       }
       
-      this.editor.commands.liftListItem('listItem')
-      this.editor.commands.insertContent({ type: 'paragraph' })
+      notaExtensionService.liftListItem('listItem')
+      notaExtensionService.insertContent({ type: 'paragraph' })
     }
     
     // Insert visualizations
     if (analysis.visualizations.length > 0) {
-      this.editor.commands.setHeading({ level: 2 })
-      this.editor.commands.insertContent('Visualizations')
-      this.editor.commands.insertContent({ type: 'paragraph' })
+      notaExtensionService.setHeading(2)
+      notaExtensionService.insertContent('Visualizations')
+      notaExtensionService.insertContent({ type: 'paragraph' })
       
       for (const viz of analysis.visualizations) {
         // Insert visualization title
-        this.editor.commands.setHeading({ level: 3 })
-        this.editor.commands.insertContent(viz.title)
-        this.editor.commands.insertContent({ type: 'paragraph' })
+        notaExtensionService.setHeading(3)
+        notaExtensionService.insertContent(viz.title)
+        notaExtensionService.insertContent({ type: 'paragraph' })
         
         // Insert the visualization based on its type
         switch (viz.type) {
@@ -329,7 +326,7 @@ ${this.config.customInstructions || 'Make the analysis clear, insightful, and ba
             break
         }
         
-        this.editor.commands.insertContent({ type: 'paragraph' })
+        notaExtensionService.insertContent({ type: 'paragraph' })
       }
     }
   }
@@ -339,15 +336,13 @@ ${this.config.customInstructions || 'Make the analysis clear, insightful, and ba
    * @param data Table data (rows and columns)
    */
   private insertTableVisualization(data: any): void {
-    if (!this.editor) return
-    
     try {
       // Create a table with appropriate dimensions
       const rows = Array.isArray(data) ? data.length : 0
       const cols = (rows > 0 && Array.isArray(data[0])) ? data[0].length : 0
       
       if (rows > 0 && cols > 0) {
-        this.editor.commands.insertTable({ rows, cols })
+        notaExtensionService.insertTable(rows, cols)
         
         // TODO: Populate the table cells with data
         // This requires more complex editor manipulation that's beyond the scope of this example
@@ -363,16 +358,8 @@ ${this.config.customInstructions || 'Make the analysis clear, insightful, and ba
    * @param data The scatter plot data (x and y values)
    */
   private insertScatterVisualization(title: string, data: any): void {
-    if (!this.editor) return
-    
     try {
-      this.editor.commands.insertContent({
-        type: 'scatterPlot',
-        attrs: {
-          title,
-          data: JSON.stringify(data)
-        }
-      })
+      notaExtensionService.insertScatterPlot(title, data)
     } catch (error) {
       console.error('Error inserting scatter plot visualization:', error)
     }
@@ -383,15 +370,8 @@ ${this.config.customInstructions || 'Make the analysis clear, insightful, and ba
    * @param data The mermaid diagram syntax
    */
   private insertMermaidVisualization(data: string): void {
-    if (!this.editor) return
-    
     try {
-      this.editor.commands.insertContent({
-        type: 'mermaid',
-        attrs: {
-          content: data
-        }
-      })
+      notaExtensionService.insertMermaid(data)
     } catch (error) {
       console.error('Error inserting mermaid visualization:', error)
     }
@@ -402,10 +382,8 @@ ${this.config.customInstructions || 'Make the analysis clear, insightful, and ba
    * @param data The LaTeX formula
    */
   private insertMathVisualization(data: string): void {
-    if (!this.editor) return
-    
     try {
-      this.insertMathBlock(data)
+      notaExtensionService.insertMathBlock(data)
     } catch (error) {
       console.error('Error inserting math visualization:', error)
     }

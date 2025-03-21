@@ -1,6 +1,7 @@
 import { BaseActor } from './BaseActor'
 import { ActorType, type VibeTask, DatabaseEntryType } from '@/types/vibe'
 import { useCitationStore } from '@/stores/citationStore'
+import { notaExtensionService } from '@/services/notaExtensionService'
 
 /**
  * Result structure for the researcher
@@ -72,7 +73,7 @@ export class Researcher extends BaseActor {
       )
     }
 
-    // Store citations separately
+    // Store the citations
     if (report.citations.length > 0) {
       await this.createEntry(
         researchTable.id,
@@ -83,10 +84,8 @@ export class Researcher extends BaseActor {
       )
     }
     
-    // Insert the report into the document if editor is available
-    if (this.editor) {
-      await this.insertReportToEditor(report)
-    }
+    // Insert the report into the document
+    await this.insertReportToEditor(report)
     
     return report
   }
@@ -287,37 +286,35 @@ ${this.config.customInstructions || 'Make the report academically rigorous but a
    * @param report The generated research report
    */
   private async insertReportToEditor(report: ResearchResult): Promise<void> {
-    if (!this.editor) return
-    
     // Insert the title as a heading
-    this.editor.commands.setHeading({ level: 1 })
+    notaExtensionService.setHeading(1)
     
     // Extract a title from the first section or use a default title
     const title = report.sections.length > 0 ? report.sections[0].title : 'Research Report'
-    this.editor.commands.insertContent(title)
-    this.editor.commands.insertContent({ type: 'paragraph' })
+    notaExtensionService.insertContent(title)
+    notaExtensionService.insertContent({ type: 'paragraph' })
     
     // Insert each section
     for (const section of report.sections) {
       // Insert section title as a heading
-      this.editor.commands.setHeading({ level: 2 })
-      this.editor.commands.insertContent(section.title)
-      this.editor.commands.insertContent({ type: 'paragraph' })
+      notaExtensionService.setHeading(2)
+      notaExtensionService.insertContent(section.title)
+      notaExtensionService.insertContent({ type: 'paragraph' })
       
       // Insert section content
-      this.editor.commands.setParagraph()
-      this.editor.commands.insertContent(section.content)
-      this.editor.commands.insertContent({ type: 'paragraph' })
+      notaExtensionService.setParagraph()
+      notaExtensionService.insertContent(section.content)
+      notaExtensionService.insertContent({ type: 'paragraph' })
     }
     
     // Insert a bibliography section if there are citations
     if (report.citations.length > 0) {
-      this.editor.commands.setHeading({ level: 2 })
-      this.editor.commands.insertContent('References')
-      this.editor.commands.insertContent({ type: 'paragraph' })
+      notaExtensionService.setHeading(2)
+      notaExtensionService.insertContent('References')
+      notaExtensionService.insertContent({ type: 'paragraph' })
       
       // Insert bibliography
-      this.editor.commands.insertContent({
+      notaExtensionService.insertContent({
         type: 'bibliography'
       })
     }

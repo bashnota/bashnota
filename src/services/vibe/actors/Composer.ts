@@ -87,43 +87,35 @@ export class Composer extends BaseActor {
       }
     )
 
-    // Execute the planning task
+    // Execute the planner actor
     const planner = new Planner()
     try {
       const planResult = await planner.executeTask(plannerTask)
       
-      // Store the result
+      // Add the planning task to the database
+      taskDatabase.tasks[plannerTask.id] = plannerTask
       taskDatabase.results[plannerTask.id] = planResult
       taskDatabase.completedTasks.push(plannerTask.id)
       
-      // Update the task entry in the database
+      // Store the result in the tasks table
       this.createEntry(
         tasksTable.id,
         task.id,
-        DatabaseEntryType.DATA,
-        `result_${plannerTask.id}`,
+        DatabaseEntryType.RESULT,
+        'plan_result',
         planResult
       )
-
+      
       // Create tasks from the plan
       const createdTasks = await this.createTasksFromPlan(
-        task.boardId, 
-        planResult.plan,
+        task.boardId,
+        planResult.plan, 
         taskDatabase,
         tasksTable.id
       )
       
-      // Create a summary entry in the database
-      this.createEntry(
-        tasksTable.id,
-        task.id,
-        DatabaseEntryType.TEXT,
-        'summary',
-        `Created and organized ${createdTasks.length} tasks based on the plan. Main goal: ${planResult.plan.mainGoal}`
-      )
-
       return {
-        summary: `Created and organized ${createdTasks.length} tasks based on the plan. Main goal: ${planResult.plan.mainGoal}`,
+        summary: `Created ${createdTasks.length} tasks from plan. ${planResult.summary}`,
         tasksCreated: createdTasks.length + 1, // +1 for the planner task
         taskDatabase
       }

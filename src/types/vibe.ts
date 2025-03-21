@@ -51,6 +51,17 @@ export interface TaskBoard {
   title: string
   tasks: VibeTask[]
   createdAt: Date
+  jupyterConfig?: {
+    server: {
+      ip: string
+      port: string
+      token: string
+    }
+    kernel: {
+      name: string
+      displayName: string
+    }
+  }
 }
 
 /**

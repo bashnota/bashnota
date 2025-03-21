@@ -3,14 +3,27 @@
 </template>
 
 <script setup>
-import { defineProps } from 'vue'
+import { defineProps, onMounted, onBeforeUnmount } from 'vue'
 import { toast } from 'vue-hot-toast'
 import { VibeTaskType, ActorType } from '@/types'
 import { Planner, Coder } from '@/actors'
+import { notaExtensionService } from '@/services/notaExtensionService'
 
 const props = defineProps({
   taskBoardId: String,
   editor: Object // Editor instance to pass to actors
+})
+
+// Initialize the extension service when the component is mounted
+onMounted(() => {
+  if (props.editor) {
+    notaExtensionService.setEditor(props.editor)
+  }
+})
+
+// Clean up when the component is unmounted
+onBeforeUnmount(() => {
+  notaExtensionService.clearEditor()
 })
 
 const executeTask = async (task) => {

@@ -2,6 +2,7 @@ import { ActorType, type ActorConfig, type VibeTask, DatabaseEntryType, type Dat
 import { useVibeStore } from '@/stores/vibeStore'
 import { aiService, supportedProviders } from '@/services/aiService'
 import { useAISettingsStore } from '@/stores/aiSettingsStore'
+import { notaExtensionService } from '@/services/notaExtensionService'
 import { type Editor } from '@tiptap/core'
 
 /**
@@ -10,7 +11,6 @@ import { type Editor } from '@tiptap/core'
 export abstract class BaseActor {
   protected config: ActorConfig
   protected vibeStore = useVibeStore()
-  protected editor?: Editor
   
   constructor(protected actorType: ActorType) {
     this.config = this.vibeStore.getActorConfig(actorType)
@@ -20,6 +20,7 @@ export abstract class BaseActor {
    * Executes a task assigned to this actor
    * @param task The task to execute
    * @param editor Optional editor instance for interacting with the document
+   *               (can be omitted if using notaExtensionService centrally)
    * @returns The result of the task execution
    */
   public async executeTask(task: VibeTask, editor?: Editor): Promise<any> {
@@ -27,8 +28,10 @@ export abstract class BaseActor {
       throw new Error(`Actor ${this.actorType} is disabled`)
     }
     
-    // Store the editor reference for use in extensions
-    this.editor = editor
+    // Set the editor reference in the extension service if provided
+    if (editor) {
+      notaExtensionService.setEditor(editor)
+    }
     
     try {
       // Update task status to in progress
@@ -59,6 +62,12 @@ export abstract class BaseActor {
       })
       
       throw error
+    } finally {
+      // Clear the editor reference from the extension service
+      // only if we set it in this method (to avoid clearing it if it was set elsewhere)
+      if (editor) {
+        notaExtensionService.clearEditor()
+      }
     }
   }
   
@@ -96,114 +105,6 @@ export abstract class BaseActor {
     )
     
     return response.text
-  }
-  
-  /**
-   * Use a Nota extension through the editor
-   * @param extensionName The name of the extension
-   * @param method The method to call on the extension
-   * @param params Parameters to pass to the method
-   * @returns Result of the extension method call
-   */
-  protected async useExtension<T = boolean>(extensionName: string, method: string, params: any = {}): Promise<T> {
-    if (!this.editor) {
-      throw new Error('No editor instance available. Extensions cannot be used without an editor.')
-    }
-    
-    // Use type assertion for commands access
-    const commandMethod = (this.editor.commands as any)[method]
-    if (!commandMethod) {
-      throw new Error(`Extension method ${extensionName}.${method} not found`)
-    }
-    
-    return commandMethod(params) as T
-  }
-  
-  /**
-   * Inserts content at the current cursor position
-   * @param content The content to insert
-   * @returns Success status
-   */
-  protected insertContent(content: any): boolean {
-    if (!this.editor) {
-      throw new Error('No editor instance available')
-    }
-    
-    return this.editor.commands.insertContent(content)
-  }
-  
-  /**
-   * Insert a code block with the specified language and code
-   * @param language The programming language
-   * @param code The code to insert
-   * @returns Success status
-   */
-  protected insertCodeBlock(language: string, code: string): boolean {
-    if (!this.editor) {
-      throw new Error('No editor instance available')
-    }
-    
-    return this.editor.commands.insertContent({
-      type: 'executableCodeBlock',
-      attrs: {
-        language,
-        executeable: true,
-      },
-      content: [{ type: 'text', text: code }],
-    })
-  }
-  
-  /**
-   * Insert a math block with the specified LaTeX
-   * @param latex The LaTeX code
-   * @returns Success status
-   */
-  protected insertMathBlock(latex: string): boolean {
-    if (!this.editor) {
-      throw new Error('No editor instance available')
-    }
-    
-    return this.editor.commands.insertContent({
-      type: 'mathBlock',
-      attrs: {
-        latex,
-      },
-    })
-  }
-  
-  /**
-   * Insert a table with the specified dimensions
-   * @param rows Number of rows
-   * @param cols Number of columns
-   * @returns Success status
-   */
-  protected insertTable(rows: number, cols: number): boolean {
-    if (!this.editor) {
-      throw new Error('No editor instance available')
-    }
-    
-    return this.editor.commands.insertTable({ rows, cols })
-  }
-  
-  /**
-   * Insert an image with the specified URL
-   * @param src The image URL
-   * @param alt Alt text for the image
-   * @returns Success status
-   */
-  protected insertImage(src: string, alt?: string): boolean {
-    if (!this.editor) {
-      throw new Error('No editor instance available')
-    }
-    
-    return this.editor.commands.insertContent({
-      type: 'image',
-      attrs: {
-        src,
-        alt: alt || '',
-        title: alt || '',
-      },
-    })
   }
   
   /**

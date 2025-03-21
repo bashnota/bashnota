@@ -49,10 +49,23 @@ export const useVibeStore = defineStore('vibe', () => {
   // Actions
   /**
    * Create a new task board
-   * @param options Board creation options with query
+   * @param options Board creation options with query and optional Jupyter config
    * @returns The created board
    */
-  function createBoard(options: { query: string }): TaskBoard {
+  function createBoard(options: { 
+    query: string,
+    jupyterConfig?: {
+      server: {
+        ip: string
+        port: string
+        token: string
+      }
+      kernel: {
+        name: string
+        displayName: string
+      }
+    } | null
+  }): TaskBoard {
     console.log('Creating board with options:', options)
     
     const board: TaskBoard = {
@@ -60,6 +73,7 @@ export const useVibeStore = defineStore('vibe', () => {
       title: options.query,
       tasks: [],
       createdAt: new Date(),
+      jupyterConfig: options.jupyterConfig || undefined
     }
     
     boards.value.push(board)

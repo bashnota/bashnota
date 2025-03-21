@@ -7,6 +7,8 @@ import { Coder } from './actors/Coder'
 import { Composer } from './actors/Composer'
 import { BaseActor } from './actors/BaseActor'
 import { type Editor } from '@tiptap/core'
+import { notaExtensionService } from '@/services/notaExtensionService'
+import type { JupyterServer, KernelSpec } from '@/types/jupyter'
 
 /**
  * Class for executing tasks in the correct order
@@ -14,15 +16,37 @@ import { type Editor } from '@tiptap/core'
 export class VibeTaskExecutor {
   private vibeStore = useVibeStore()
   private runningTasks: Record<string, Promise<any>> = {}
-  private editor?: Editor
+  private jupyterConfig: {
+    server: JupyterServer | null,
+    kernel: KernelSpec | null
+  }
   
   /**
    * Constructor
    * @param boardId ID of the board to execute tasks for
    * @param editor Editor instance for tasks that need to interact with the document
+   * @param jupyterConfig Optional Jupyter configuration
    */
-  constructor(private boardId: string, editor?: Editor) {
-    this.editor = editor
+  constructor(
+    private boardId: string, 
+    editor?: Editor,
+    jupyterConfig?: {
+      server: JupyterServer | null,
+      kernel: KernelSpec | null
+    }
+  ) {
+    if (editor) {
+      notaExtensionService.setEditor(editor)
+    }
+    
+    this.jupyterConfig = jupyterConfig || { server: null, kernel: null }
+  }
+  
+  /**
+   * Clean up resources when executor is no longer needed
+   */
+  public dispose(): void {
+    notaExtensionService.clearEditor()
   }
   
   /**
@@ -94,7 +118,7 @@ export class VibeTaskExecutor {
   public async executeTask(task: VibeTask): Promise<any> {
     // Skip already completed or failed tasks
     if (task.status === 'completed' || task.status === 'failed') {
-      return
+      return task.result
     }
     
     // Skip already running tasks
@@ -119,29 +143,30 @@ export class VibeTaskExecutor {
     
     if (!allDependenciesComplete) {
       // Can't execute this task yet
-      return
+      throw new Error(`Cannot execute task ${task.id}: dependencies not complete`)
     }
     
-    // Get the appropriate actor
+    console.log(`Executing task ${task.id}: ${task.title}`)
+    
+    // Get the appropriate actor for the task
     const actor = this.getActorForType(task.actorType)
     
     // Execute the task
     try {
-      const promise = actor.executeTask(task, this.editor)
+      const promise = actor.executeTask(task)
       this.runningTasks[task.id] = promise
       
+      // Wait for the task to complete
       const result = await promise
       
-      // Clear from running tasks
-      delete this.runningTasks[task.id]
-      
+      console.log(`Task ${task.id} completed`)
       return result
     } catch (error) {
-      // Clear from running tasks
-      delete this.runningTasks[task.id]
-      
-      // Re-throw the error
+      console.error(`Error executing task ${task.id}:`, error)
       throw error
+    } finally {
+      // Remove the task from the running tasks list
+      delete this.runningTasks[task.id]
     }
   }
   
@@ -188,8 +213,16 @@ export class VibeTaskExecutor {
         return new Researcher()
       case ActorType.ANALYST:
         return new Analyst()
-      case ActorType.CODER:
-        return new Coder()
+      case ActorType.CODER: {
+        const coder = new Coder()
+        
+        // Set Jupyter configuration if available
+        if (this.jupyterConfig.server && this.jupyterConfig.kernel) {
+          coder.setJupyterConfig(this.jupyterConfig.server, this.jupyterConfig.kernel)
+        }
+        
+        return coder
+      }
       case ActorType.PLANNER:
         return new Planner()
       case ActorType.COMPOSER:
