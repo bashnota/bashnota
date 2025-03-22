@@ -122,6 +122,12 @@ AVAILABLE ACTOR TYPES:
 
 - CODER: Specializes in code generation, debugging, and technical implementation. Best for tasks requiring programming, algorithm development, data manipulation through code, and practical software solutions.
 
+- REVIEWER: Specializes in critical evaluation, quality assessment, and feedback provision. Best for tasks requiring thorough review of content, identifying gaps or errors, and providing constructive feedback on improvements.
+
+- VISUALIZER: Specializes in creating visual representations of data and concepts. Best for tasks requiring clear data visualization, diagram creation, graphical illustrations, and visual storytelling.
+
+- SUMMARIZER: Specializes in condensing complex information into concise, comprehensive summaries. Best for tasks requiring synthesis of research findings, creating executive summaries, and distilling key points from extensive content.
+
 PLAN STRUCTURE REQUIREMENTS:
 For each task in your plan, provide:
 - A descriptive title (2-6 words) that clearly communicates the task's purpose
@@ -130,7 +136,7 @@ For each task in your plan, provide:
   * Key methods or approaches to use
   * Expected outputs or deliverables
   * Any special considerations or constraints
-- The most appropriate actor type (RESEARCHER, ANALYST, or CODER)
+- The most appropriate actor type (RESEARCHER, ANALYST, CODER, REVIEWER, VISUALIZER, or SUMMARIZER)
 - Dependencies (which tasks must be completed before this one can start)
 - Priority level (high, medium, or low) based on task importance and impact
 - Estimated completion time (short: <30 min, medium: 30-60 min, long: >60 min)
@@ -150,7 +156,7 @@ Respond with a structured JSON format exactly as follows:
     {
       "title": "Descriptive Task Title",
       "description": "Detailed task description explaining what needs to be done, methods to use, and expected outputs",
-      "actorType": "RESEARCHER|ANALYST|CODER",
+      "actorType": "RESEARCHER|ANALYST|CODER|REVIEWER|VISUALIZER|SUMMARIZER",
       "dependencies": [], // Empty array for tasks with no dependencies, or array of task indices (0-based) for dependent tasks
       "priority": "high|medium|low",
       "estimatedCompletion": "short|medium|long"
@@ -335,6 +341,12 @@ The plan should be highly specific to the requested task and reflect the most ef
           actorType = ActorType.ANALYST;
         } else if (actorTypeStr === 'CODER') {
           actorType = ActorType.CODER;
+        } else if (actorTypeStr === 'REVIEWER') {
+          actorType = ActorType.REVIEWER;
+        } else if (actorTypeStr === 'VISUALIZER') {
+          actorType = ActorType.VISUALIZER;
+        } else if (actorTypeStr === 'SUMMARIZER') {
+          actorType = ActorType.SUMMARIZER;
         }
         
         // Validate dependencies

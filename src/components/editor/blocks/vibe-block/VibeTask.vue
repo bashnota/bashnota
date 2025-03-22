@@ -78,7 +78,9 @@ import {
   ListTodo, 
   Code, 
   BarChart, 
-  FileText 
+  FileText,
+  CheckCheck,
+  BarChart2
 } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 // TODO: Fix missing accordion components
@@ -142,7 +144,7 @@ const getActorIcon = (actorType: ActorType) => {
   switch (actorType) {
     case ActorType.PLANNER:
       return Brain
-    case ActorType.COMPOSER:
+    case ActorType.SUMMARIZER:
       return ListTodo
     case ActorType.CODER:
       return Code
@@ -150,6 +152,12 @@ const getActorIcon = (actorType: ActorType) => {
       return BarChart
     case ActorType.RESEARCHER:
       return FileText
+    case ActorType.REVIEWER:
+      return CheckCheck
+    case ActorType.VISUALIZER:
+      return BarChart2
+    case ActorType.COMPOSER:
+      return ListTodo
     default:
       return Brain
   }

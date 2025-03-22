@@ -14,36 +14,57 @@ export const useVibeStore = defineStore('vibe', () => {
   const actorConfigs = ref<Record<ActorType, ActorConfig>>({
     [ActorType.CODER]: {
       enabled: true,
-      modelId: 'anthropic/claude-3-opus',
+      modelId: 'google/gemini-pro',
       temperature: 0.1,
       maxTokens: 4000,
     },
     [ActorType.RESEARCHER]: {
       enabled: true,
-      modelId: 'anthropic/claude-3-opus',
+      modelId: 'google/gemini-pro',
       temperature: 0.3,
       maxTokens: 8000,
     },
     [ActorType.ANALYST]: {
       enabled: true,
-      modelId: 'anthropic/claude-3-opus',
+      modelId: 'google/gemini-pro',
       temperature: 0.2,
       maxTokens: 4000,
     },
     [ActorType.PLANNER]: {
       enabled: true,
-      modelId: 'anthropic/claude-3-opus',
+      modelId: 'google/gemini-pro',
       temperature: 0.2,
       maxTokens: 4000,
       customInstructions: 'Create detailed, logical plans with clear dependencies between tasks.'
     },
     [ActorType.COMPOSER]: {
       enabled: true,
-      modelId: 'anthropic/claude-3-opus',
+      modelId: 'google/gemini-pro',
       temperature: 0.1,
       maxTokens: 2000,
       customInstructions: 'Orchestrate and coordinate task execution efficiently.'
     },
+    [ActorType.SUMMARIZER]: {
+      enabled: true,
+      modelId: 'google/gemini-pro',
+      temperature: 0.2,
+      maxTokens: 4000,
+      customInstructions: 'Create concise, comprehensive summaries of complex information.'
+    },
+    [ActorType.REVIEWER]: {
+      enabled: true,
+      modelId: 'google/gemini-pro',
+      temperature: 0.3,
+      maxTokens: 3000,
+      customInstructions: 'Provide thorough, constructive feedback and evaluations on content.'
+    },
+    [ActorType.VISUALIZER]: {
+      enabled: true,
+      modelId: 'google/gemini-pro',
+      temperature: 0.2,
+      maxTokens: 3000,
+      customInstructions: 'Create effective data visualizations and clear graphical representations.'
+    }
   })
 
   // Actions

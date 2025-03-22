@@ -11,6 +11,9 @@ export function getActorName(actorType: string): string {
     case ActorType.CODER: return 'Coder'
     case ActorType.PLANNER: return 'Planner'
     case ActorType.COMPOSER: return 'Composer'
+    case ActorType.SUMMARIZER: return 'Summarizer'
+    case ActorType.REVIEWER: return 'Reviewer'
+    case ActorType.VISUALIZER: return 'Visualizer'
     default: return actorType
   }
 }

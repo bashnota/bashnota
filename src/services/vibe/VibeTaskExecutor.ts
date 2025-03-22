@@ -9,6 +9,9 @@ import { BaseActor } from './actors/BaseActor'
 import { type Editor } from '@tiptap/core'
 import { notaExtensionService } from '@/services/notaExtensionService'
 import type { JupyterServer, KernelSpec } from '@/types/jupyter'
+import { Summarizer } from './actors/Summarizer'
+import { Reviewer } from './actors/Reviewer'
+import { Visualizer } from './actors/Visualizer'
 
 /**
  * Class for executing tasks in the correct order
@@ -623,6 +626,12 @@ export class VibeTaskExecutor {
         return new Planner()
       case ActorType.COMPOSER:
         return new Composer()
+      case ActorType.SUMMARIZER:
+        return new Summarizer()
+      case ActorType.REVIEWER:
+        return new Reviewer()
+      case ActorType.VISUALIZER:
+        return new Visualizer()
       default:
         throw new Error(`Unsupported actor type: ${actorType}`)
     }

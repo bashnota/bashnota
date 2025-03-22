@@ -2,11 +2,14 @@
  * Actor types in the Vibe system
  */
 export enum ActorType {
-  CODER = 'coder',
-  RESEARCHER = 'researcher',
-  ANALYST = 'analyst',
-  PLANNER = 'planner',
-  COMPOSER = 'composer'
+  PLANNER = 'PLANNER',
+  RESEARCHER = 'RESEARCHER',
+  ANALYST = 'ANALYST',
+  CODER = 'CODER',
+  SUMMARIZER = 'SUMMARIZER',
+  REVIEWER = 'REVIEWER',
+  VISUALIZER = 'VISUALIZER',
+  COMPOSER = 'COMPOSER'
 }
 
 /**

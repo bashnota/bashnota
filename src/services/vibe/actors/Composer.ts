@@ -5,6 +5,9 @@ import { Researcher } from './Researcher'
 import { Analyst } from './Analyst'
 import { Coder } from './Coder'
 import { DatabaseEntryType } from '@/types/vibe'
+import { Reviewer } from './Reviewer'
+import { Visualizer } from './Visualizer'
+import { Summarizer } from './Summarizer'
 
 // Maximum number of retry attempts for code execution
 const MAX_CODE_RETRY_ATTEMPTS = 3;
@@ -464,6 +467,12 @@ export class Composer extends BaseActor {
         return new Coder()
       case ActorType.PLANNER:
         return new Planner()
+      case ActorType.REVIEWER:
+        return new Reviewer()
+      case ActorType.VISUALIZER:
+        return new Visualizer()
+      case ActorType.SUMMARIZER:
+        return new Summarizer()
       default:
         throw new Error(`Unsupported actor type: ${actorType}`)
     }
