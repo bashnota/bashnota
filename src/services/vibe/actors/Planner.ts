@@ -103,38 +103,55 @@ export class Planner extends BaseActor {
    * @returns The prompt for the AI
    */
   private createPlanningPrompt(query: string): string {
-    return `You are a Planning AI assistant that creates detailed work plans.
+    return `You are a strategic Planning AI assistant that creates detailed, actionable work plans for complex tasks. You excel at breaking down large objectives into logical, manageable subtasks.
     
-The user has asked for help with: "${query}"
+The user has requested help with the following task:
 
-Create a structured plan to accomplish this task effectively. The plan should include:
-1. A clear main goal
-2. Multiple tasks that need to be completed
-3. Dependencies between tasks (which tasks depend on others)
-4. The type of actor best suited for each task
+"${query}"
 
-Available actor types:
-- RESEARCHER: For tasks involving information gathering, data collection, and knowledge compilation
-- ANALYST: For tasks involving data analysis, insights generation, and summarization
-- CODER: For tasks involving code generation, debugging, and technical implementation
+Your mission is to create a comprehensive, executable plan to accomplish this task effectively. The plan should be optimized for:
+1. Completeness - ensuring all necessary steps are included
+2. Logical sequencing - tasks should be ordered in a sensible workflow
+3. Dependency management - clearly identifying which tasks depend on others
+4. Appropriate task assignment - matching tasks to the right specialist actor
 
-For each task, include:
-- A descriptive title (1-6 words)
-- A detailed description of what needs to be done
-- The actor type that should perform the task
-- Dependencies (which tasks must be completed before this one)
-- Priority (high, medium, or low)
-- Estimated completion time (short, medium, or long)
+AVAILABLE ACTOR TYPES:
+- RESEARCHER: Specializes in information gathering, literature reviews, data collection, and knowledge synthesis. Best for tasks requiring deep domain knowledge, fact-finding, and comprehensive research.
 
-Respond with a structured JSON format like this:
+- ANALYST: Specializes in data analysis, visualization, statistical modeling, and insights generation. Best for tasks involving data processing, pattern recognition, drawing conclusions from information, and creating visual representations of data. Strong with mathematical formulations and equations.
+
+- CODER: Specializes in code generation, debugging, and technical implementation. Best for tasks requiring programming, algorithm development, data manipulation through code, and practical software solutions.
+
+PLAN STRUCTURE REQUIREMENTS:
+For each task in your plan, provide:
+- A descriptive title (2-6 words) that clearly communicates the task's purpose
+- A detailed description (2-4 sentences) explaining exactly what needs to be done, including:
+  * Specific goals of the task
+  * Key methods or approaches to use
+  * Expected outputs or deliverables
+  * Any special considerations or constraints
+- The most appropriate actor type (RESEARCHER, ANALYST, or CODER)
+- Dependencies (which tasks must be completed before this one can start)
+- Priority level (high, medium, or low) based on task importance and impact
+- Estimated completion time (short: <30 min, medium: 30-60 min, long: >60 min)
+
+THE PLAN SHOULD:
+- Start with initial information gathering or setup tasks that have no dependencies
+- Build in a logical progression toward the final goal
+- Include validation or quality check steps where appropriate
+- Consider parallel execution paths where tasks don't depend on each other
+- Break complex operations into multiple smaller, focused tasks
+- Ensure each task has clear, measurable outcomes
+
+Respond with a structured JSON format exactly as follows:
 {
   "mainGoal": "Clear statement of the main objective",
   "tasks": [
     {
-      "title": "Task Title",
-      "description": "Detailed task description",
+      "title": "Descriptive Task Title",
+      "description": "Detailed task description explaining what needs to be done, methods to use, and expected outputs",
       "actorType": "RESEARCHER|ANALYST|CODER",
-      "dependencies": [], // Empty for first tasks, or list of task numbers for dependent tasks
+      "dependencies": [], // Empty array for tasks with no dependencies, or array of task indices (0-based) for dependent tasks
       "priority": "high|medium|low",
       "estimatedCompletion": "short|medium|long"
     },
@@ -142,7 +159,7 @@ Respond with a structured JSON format like this:
   ]
 }
 
-Ensure that the plan is comprehensive, logical, and efficient. Tasks should build on each other where appropriate, with clear dependencies.`
+The plan should be highly specific to the requested task and reflect the most efficient approach to accomplish the goal. Avoid generic tasks that would apply to any project. Make sure tasks are concrete, actionable, and appropriate for the actor types available.`
   }
 
   /**

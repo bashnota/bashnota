@@ -185,7 +185,7 @@ Result: ${JSON.stringify(dep.result, null, 2)}
     
     // Create the prompt
     return `
-You are a data analyst. Your task is to analyze data and provide insights based on the following task description and input data:
+You are a data analyst with expertise in data visualization, statistical analysis, and mathematical modeling. Your task is to analyze data and provide insightful, actionable findings based on the following task description and input data:
 
 TASK DESCRIPTION:
 ${description}
@@ -194,42 +194,78 @@ INPUT DATA:
 ${formattedResults || 'No input data available.'}
 
 Create a comprehensive analysis with the following:
-1. A summary of the data and key findings
-2. A list of specific insights derived from the data
-3. Visualizations to illustrate the findings
+1. A clear and concise summary of the data and key findings
+2. A detailed list of specific insights derived from the data, including patterns, correlations, and anomalies
+3. Strategic recommendations based on your analysis, if applicable
+4. Visualizations that effectively illustrate your findings
 
 For visualizations, you can create:
-- Tables (structured data in rows and columns)
-- Scatter plots (for showing relationships between variables)
-- Mermaid diagrams (for flowcharts, sequences, or relationship diagrams)
-- Mathematical visualizations (for formulas and mathematical relationships)
+- Tables: Structured data in rows and columns with clear headers and formatting
+- Scatter plots: For showing relationships between variables with optional trend lines
+- Mermaid diagrams: For flowcharts, sequences, or relationship diagrams
+- Mathematical visualizations: For formulas and mathematical relationships
+
+IMPORTANT FOR MATHEMATICAL CONTENT:
+- Format all mathematical expressions and equations using LaTeX syntax
+- Wrap inline math expressions with single dollar signs: $x^2 + y^2 = z^2$
+- Wrap block/display math with double dollar signs: $$\\sum_{i=1}^{n} i = \\frac{n(n+1)}{2}$$
+- Use proper LaTeX notation for fractions (\\frac{num}{denom}), subscripts (x_i), superscripts (x^2), etc.
+- Include explanations for complex mathematical concepts
 
 Return the content in the following structure:
 \`\`\`json
 {
   "summary": "Overall summary of the analysis",
   "insights": [
-    "Specific insight 1",
-    "Specific insight 2",
+    "Specific insight 1 with supporting evidence",
+    "Specific insight 2 with supporting evidence",
+    "..."
+  ],
+  "recommendations": [
+    "Actionable recommendation 1",
+    "Actionable recommendation 2",
     "..."
   ],
   "visualizations": [
     {
-      "type": "table | scatter | mermaid | math",
-      "title": "Visualization title",
+      "type": "table",
+      "title": "Descriptive title for the table",
+      "description": "Brief explanation of what the table shows",
       "data": {
-        // For tables: rows and columns of data
-        // For scatter: x and y values
-        // For mermaid: diagram syntax
-        // For math: LaTeX formula
+        "headers": ["Column1", "Column2", "..."],
+        "rows": [
+          ["Value1", "Value2", "..."],
+          ["Value1", "Value2", "..."]
+        ]
       }
     },
-    // Additional visualizations
+    {
+      "type": "scatter",
+      "title": "Descriptive title for the scatter plot",
+      "description": "What the scatter plot reveals about the data",
+      "data": {
+        "x": [x1, x2, ...],
+        "y": [y1, y2, ...],
+        "labels": ["Point1", "Point2", "..."] // Optional
+      }
+    },
+    {
+      "type": "mermaid",
+      "title": "Descriptive title for the diagram",
+      "description": "What the diagram represents",
+      "data": "graph TD;\\nA-->B;\\nA-->C;\\nB-->D;\\nC-->D;"
+    },
+    {
+      "type": "math",
+      "title": "Descriptive title for the mathematical expression",
+      "description": "What this formula represents or calculates",
+      "data": "\\sum_{i=1}^{n} x_i = \\frac{n(n+1)}{2}"
+    }
   ]
 }
 \`\`\`
 
-${this.config.customInstructions || 'Make the analysis clear, insightful, and backed by the data.'}
+${this.config.customInstructions || 'Ensure your analysis is thorough, insightful, and backed by the data. Present information in a way that is accessible to both technical and non-technical audiences.'}
 `
   }
   
@@ -302,58 +338,68 @@ ${this.config.customInstructions || 'Make the analysis clear, insightful, and ba
     
     notaExtensionService.setParagraph()
     notaExtensionService.insertContent(analysis.summary)
-    notaExtensionService.insertContent({ type: 'paragraph' })
     
-    // Insert insights as a list
-    if (analysis.insights.length > 0) {
-      notaExtensionService.setHeading(3)
+    // Insert insights if available
+    if (analysis.insights && analysis.insights.length > 0) {
+      notaExtensionService.insertContent({ type: 'paragraph' })
+      notaExtensionService.setHeading(2)
       notaExtensionService.insertContent('Key Insights')
       notaExtensionService.insertContent({ type: 'paragraph' })
       
-      // Create a bullet list using the correct command
+      // Insert insights as bullet points
       notaExtensionService.toggleBulletList()
-      
       for (const insight of analysis.insights) {
         notaExtensionService.insertContent(insight)
-        
-        if (insight !== analysis.insights[analysis.insights.length - 1]) {
-          notaExtensionService.enter()
-        }
       }
-      
-      notaExtensionService.liftListItem('listItem')
       notaExtensionService.insertContent({ type: 'paragraph' })
     }
     
-    // Insert visualizations
-    if (analysis.visualizations.length > 0) {
+    // Insert visualizations if available
+    if (analysis.visualizations && analysis.visualizations.length > 0) {
+      notaExtensionService.insertContent({ type: 'paragraph' })
       notaExtensionService.setHeading(2)
       notaExtensionService.insertContent('Visualizations')
-      notaExtensionService.insertContent({ type: 'paragraph' })
       
+      // Process each visualization
       for (const viz of analysis.visualizations) {
-        // Insert visualization title
+        notaExtensionService.insertContent({ type: 'paragraph' })
         notaExtensionService.setHeading(3)
-        notaExtensionService.insertContent(viz.title)
+        notaExtensionService.insertContent(viz.title || 'Visualization')
         notaExtensionService.insertContent({ type: 'paragraph' })
         
-        // Insert the visualization based on its type
-        switch (viz.type) {
-          case 'table':
-            this.insertTableVisualization(viz.data)
-            break
-          case 'scatter':
-            this.insertScatterVisualization(viz.title, viz.data)
-            break
-          case 'mermaid':
-            this.insertMermaidVisualization(viz.data)
-            break
-          case 'math':
-            this.insertMathVisualization(viz.data)
-            break
+        // Insert description if available
+        if ('description' in viz && viz.description) {
+          notaExtensionService.setParagraph()
+          notaExtensionService.insertContent(viz.description as string)
+          notaExtensionService.insertContent({ type: 'paragraph' })
         }
         
-        notaExtensionService.insertContent({ type: 'paragraph' })
+        try {
+          // Insert visualization based on type
+          switch (viz.type?.toLowerCase()) {
+            case 'table':
+              this.insertTableVisualization(viz.data)
+              break
+            case 'scatter':
+              this.insertScatterVisualization(viz.title, viz.data)
+              break
+            case 'mermaid':
+              this.insertMermaidVisualization(viz.data)
+              break
+            case 'math':
+              this.insertMathVisualization(viz.data)
+              break
+            default:
+              // For unknown types, just insert as text
+              notaExtensionService.setParagraph()
+              notaExtensionService.insertContent(`Visualization data: ${JSON.stringify(viz.data, null, 2)}`)
+              break
+          }
+        } catch (error: unknown) {
+          console.error(`Error inserting visualization of type ${viz.type}:`, error)
+          notaExtensionService.setParagraph()
+          notaExtensionService.insertContent(`Error displaying visualization: ${error instanceof Error ? error.message : String(error)}`)
+        }
       }
     }
   }
@@ -410,9 +456,43 @@ ${this.config.customInstructions || 'Make the analysis clear, insightful, and ba
    */
   private insertMathVisualization(data: string): void {
     try {
-      notaExtensionService.insertMathBlock(data)
-    } catch (error) {
-      console.error('Error inserting math visualization:', error)
+      // Clean the expression to ensure proper LaTeX rendering
+      let cleanExpression = data.trim();
+      
+      // Check if the expression is already wrapped in LaTeX delimiters
+      const hasInlineDelimiters = cleanExpression.startsWith('$') && cleanExpression.endsWith('$');
+      const hasDisplayDelimiters = cleanExpression.startsWith('$$') && cleanExpression.endsWith('$$');
+      
+      // Remove existing delimiters if present
+      if (hasInlineDelimiters) {
+        cleanExpression = cleanExpression.substring(1, cleanExpression.length - 1);
+      } else if (hasDisplayDelimiters) {
+        cleanExpression = cleanExpression.substring(2, cleanExpression.length - 2);
+      }
+      
+      // Insert as a display math block if it appears to be a complex formula
+      // or as inline math if it's simpler
+      const isComplexFormula = cleanExpression.includes('\\frac') || 
+                              cleanExpression.includes('\\sum') || 
+                              cleanExpression.includes('\\int') ||
+                              cleanExpression.includes('\\begin{');
+      
+      notaExtensionService.setParagraph();
+      
+      if (isComplexFormula) {
+        // Insert as display math (centered, larger)
+        notaExtensionService.insertContent(`$$${cleanExpression}$$`);
+      } else {
+        // Insert as inline math within a paragraph
+        notaExtensionService.insertContent(`$${cleanExpression}$`);
+      }
+      
+      // Add some space after the equation
+      notaExtensionService.insertContent({ type: 'paragraph' });
+    } catch (error: unknown) {
+      console.error('Error inserting math visualization:', error);
+      notaExtensionService.setParagraph();
+      notaExtensionService.insertContent(`Unable to render the mathematical expression: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 } 

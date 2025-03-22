@@ -199,7 +199,7 @@ Journal: ${citation.journal || 'N/A'}
     
     // Create the prompt
     return `
-You are an academic researcher and writer. Your task is to create a comprehensive report based on the following task description and results from previous analyses:
+You are an expert academic researcher and technical writer specializing in producing high-quality scholarly content. Your task is to create a comprehensive, well-structured report based on the following task description and results from previous analyses:
 
 TASK DESCRIPTION:
 ${description}
@@ -210,40 +210,62 @@ ${formattedResults || 'No previous results available.'}
 AVAILABLE CITATIONS:
 ${formattedCitations || 'No citations available.'}
 
-Create a well-structured academic report with the following:
-1. A clear title and introduction
-2. Multiple sections with appropriate headings
-3. Citations where relevant (use the citation keys provided)
-4. A conclusion summarizing the findings
+Create a professional academic report with the following components:
+1. A compelling title and executive summary that clearly conveys the core findings
+2. A methodical introduction establishing context and relevance
+3. Multiple well-structured sections with descriptive headings
+4. Precise citations where relevant (using the citation keys provided)
+5. A thorough conclusion summarizing findings and suggesting areas for further research
 
-Format your response as follows:
-- Use markdown formatting for headings, lists, etc.
+FORMATTING GUIDELINES:
+- Use markdown formatting for headings (##, ###), lists, emphasis, etc.
 - Use citation keys in square brackets [citation_key] when citing sources
-- Include at least 3-5 distinct sections depending on the content
+- Structure complex data in tables using markdown table syntax
+- Include visual elements described as markdown diagrams where appropriate
+
+IMPORTANT FOR MATHEMATICAL CONTENT:
+- Format all mathematical expressions and equations using LaTeX syntax
+- Wrap inline math expressions with single dollar signs: $x^2 + y^2 = z^2$
+- Wrap block/display math with double dollar signs: $$\\sum_{i=1}^{n} i = \\frac{n(n+1)}{2}$$
+- Use proper LaTeX notation for fractions (\\frac{num}{denom}), subscripts (x_i), superscripts (x^2), etc.
+- Include explanations alongside complex mathematical concepts
+
+CONTENT REQUIREMENTS:
+- Include at least 4-6 distinct sections with appropriate headings based on the topic
+- Ensure logical flow between sections with clear transitions
+- Balance technical precision with accessibility
+- Support key claims with evidence from available citations
+- Identify limitations in the current research when appropriate
 
 Return the content in the following structure:
 \`\`\`json
 {
-  "title": "Report Title",
-  "content": "Full markdown content of the report",
+  "title": "Descriptive and Engaging Report Title",
+  "content": "Full markdown content of the report, including all sections properly formatted",
+  "summary": "Concise executive summary capturing key findings (150-250 words)",
+  "keyFindings": [
+    "Key finding 1 with supporting evidence",
+    "Key finding 2 with supporting evidence",
+    "Key finding 3 with supporting evidence"
+  ],
   "sections": [
     {
-      "title": "Section Title",
-      "content": "Section content with appropriate citations and analysis"
+      "title": "Descriptive Section Title",
+      "content": "Comprehensive section content with appropriate citations, analysis, and any relevant mathematical formulas properly formatted in LaTeX"
     },
-    // Additional sections
+    // Additional sections with similar structure
   ],
   "citations": [
     {
       "key": "citation_key",
-      "text": "How this citation is used in the report"
+      "text": "Detailed description of how this citation is used in the report and its relevance"
     }
-    // All citations used
+    // All citations used in the report
   ]
 }
 \`\`\`
 
-${this.config.customInstructions || 'Make the report academically rigorous but accessible to an educated reader.'}
+${this.config.customInstructions || 'Produce content that is academically rigorous yet accessible, balancing scholarly depth with clarity of expression for an educated audience.'}
 `
   }
   

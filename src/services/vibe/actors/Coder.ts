@@ -215,13 +215,35 @@ export class Coder extends BaseActor {
     const language = this.determineLanguage(description)
     
     const prompt = `
-You are an expert programmer. Your task is to generate ${language} code that accomplishes the following task:
+You are an expert programmer with deep knowledge of ${language} and best practices. Your task is to generate high-quality, efficient ${language} code that accomplishes the following task:
 
+TASK DESCRIPTION:
 ${description}
 
-Write only the code, without any explanations, markdown formatting, or comments. The code should be complete, correct, and ready to execute.
-If the task involves data visualization, ensure the code includes appropriate visualization commands.
-If the task involves data processing, make sure to include appropriate print or display statements so results are visible.
+REQUIREMENTS:
+1. Write clean, well-structured, and optimized code that follows industry best practices for ${language}
+2. Ensure the code is complete, correct, and ready to execute without modifications
+3. Use appropriate error handling to gracefully manage potential issues
+4. Include only essential comments for complex logic that needs explanation
+5. Follow conventions and idioms specific to ${language}
+
+OUTPUT GUIDELINES:
+- If the task involves data visualization:
+  - Include appropriate visualization commands with clear labels, titles, and legends
+  - Configure visualizations with appropriate colors, sizes, and styles for readability
+  - Handle different data types and edge cases appropriately
+
+- If the task involves data processing:
+  - Include appropriate print or display statements so results are clearly visible
+  - Handle edge cases such as empty data, missing values, or unexpected input formats
+  - Implement efficient algorithms for data manipulation
+
+- If the task involves mathematical calculations:
+  - Use appropriate libraries for complex mathematics (numpy, scipy, etc. for Python)
+  - Ensure numerical stability in calculations
+  - Validate inputs to mathematical functions
+
+IMPORTANT: Write only the code, without any explanations, markdown formatting, or surrounding text. The code should be ready to copy and execute.
 `
     
     const completion = await this.generateCompletion(prompt)
@@ -257,7 +279,7 @@ If the task involves data processing, make sure to include appropriate print or 
     executionResult: any
   ): Promise<CodeResult> {
     const prompt = `
-You are an expert programmer. Your task is to refine the following ${language} code based on its execution results:
+You are an expert programmer specializing in debugging and optimizing ${language} code. Your task is to refine and improve the following code based on its execution results:
 
 ORIGINAL TASK:
 ${description}
@@ -272,14 +294,27 @@ ${executionResult.output}
 
 ${executionResult.error ? `ERROR:\n${executionResult.error}\n` : ''}
 
-Please analyze the execution results and improve the code. The refined code should fix any issues and improve functionality.
-Write only the improved code, without any explanations, markdown formatting, or comments.
-The code should be complete, correct, and ready to execute.
-Focus on improving:
-1. Any errors or bugs
-2. Efficiency or performance issues
-3. Enhancing visualization or output clarity
-4. Addressing the original task more effectively
+REFINEMENT GUIDELINES:
+1. First, identify and fix any bugs, errors, or issues in the code
+2. Then, optimize the code for efficiency, readability, and maintainability
+3. Ensure the code correctly addresses all aspects of the original task
+4. Improve error handling to make the code more robust against unexpected inputs
+5. Enhance output formatting and visualization for better readability
+
+SPECIFIC IMPROVEMENTS TO MAKE:
+- If there were execution errors: Address the root cause of the errors, not just the symptoms
+- If performance is an issue: Optimize algorithms, data structures, or resource usage
+- If visualizations are involved: Enhance clarity, labels, and visual appeal
+- If mathematical calculations are present: Ensure correctness and consider numerical stability
+- If data processing is involved: Improve handling of edge cases and error conditions
+
+IMPORTANT FOR CODE QUALITY:
+- Follow ${language} best practices and idiomatic patterns
+- Use appropriate variable/function naming conventions
+- Structure the code logically with clear separation of concerns
+- Only add comments for complex logic that needs explanation
+
+Return ONLY the improved code without explanations, markdown formatting, or surrounding text. The code should be ready to execute without further modifications.
 `
     
     const completion = await this.generateCompletion(prompt)

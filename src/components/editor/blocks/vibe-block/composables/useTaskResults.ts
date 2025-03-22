@@ -485,15 +485,60 @@ export function useTaskResults(editor: Ref<any>, getPos: () => number | undefine
         insertContentAfterBlock({ type: 'heading', attrs: { level: 4 }, content: [{ type: 'text', text: 'Execution Result' }] })
         insertContentAfterBlock({ type: 'paragraph' })
         
-        // Use executableCodeBlock for execution output
-        insertContentAfterBlock({
-          type: 'executableCodeBlock',
-          attrs: { 
-            language: 'console',
-            executeable: true 
-          },
-          content: [{ type: 'text', text: getExecutionSummary(task.result.execution) }]
-        })
+        // Extract execution output text
+        const executionText = getExecutionSummary(task.result.execution)
+        
+        // Parse for image tags
+        const imgRegex = /<img\s+src=["']([^"']+)["'][^>]*>/gi
+        const images: string[] = []
+        let match
+        const textWithoutImages = executionText.replace(imgRegex, (match, src) => {
+          images.push(src)
+          return '' // Remove the img tag from the text
+        }).trim()
+        
+        // Insert execution output text (without images)
+        if (textWithoutImages) {
+          insertContentAfterBlock({
+            type: 'executableCodeBlock',
+            attrs: { 
+              language: 'console',
+              executeable: true 
+            },
+            content: [{ type: 'text', text: textWithoutImages }]
+          })
+          insertContentAfterBlock({ type: 'paragraph' })
+        }
+        
+        // Insert images if any were found
+        if (images.length > 0) {
+          insertContentAfterBlock({ type: 'heading', attrs: { level: 4 }, content: [{ type: 'text', text: 'Generated Images' }] })
+          insertContentAfterBlock({ type: 'paragraph' })
+          
+          // Insert each image
+          for (const imgSrc of images) {
+            try {
+              insertContentAfterBlock({
+                type: 'image',
+                attrs: {
+                  src: imgSrc,
+                  alt: 'Generated image',
+                  title: 'Generated image'
+                }
+              })
+              insertContentAfterBlock({ type: 'paragraph' })
+            } catch (error) {
+              console.error('Failed to insert image:', error)
+              insertContentAfterBlock({ 
+                type: 'paragraph', 
+                content: [{ 
+                  type: 'text', 
+                  text: `Failed to insert image: ${imgSrc}` 
+                }] 
+              })
+            }
+          }
+        }
       }
     } else {
       insertContentAfterBlock(task.result.toString())
