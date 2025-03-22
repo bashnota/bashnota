@@ -17,6 +17,7 @@ declare module '@tiptap/core' {
         csvContent?: string
         xAxisLabel?: string
         yAxisLabel?: string
+        apiData?: any[]
       }) => ReturnType
     }
   }
@@ -44,6 +45,9 @@ export const ScatterPlot = Node.create<ScatterPlotOptions>({
         default: null
       },
       csvContent: {
+        default: null
+      },
+      apiData: {
         default: null
       },
       xAxisLabel: {

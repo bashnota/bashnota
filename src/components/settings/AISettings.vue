@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useAISettingsStore } from '@/stores/aiSettingsStore'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -10,8 +10,9 @@ import { Slider } from '@/components/ui/slider'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from '@/components/ui/toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { SparklesIcon, KeyIcon, Save, Trash2Icon, CpuIcon } from 'lucide-vue-next'
+import { SparklesIcon, KeyIcon, Save, Trash2Icon, CpuIcon, RefreshCcwIcon } from 'lucide-vue-next'
 import WebLLMSettings from '@/components/settings/WebLLMSettings.vue'
+import { aiService } from '@/services/aiService'
 
 const aiSettings = useAISettingsStore()
 const apiKeys = ref<Record<string, string>>({...aiSettings.settings.apiKeys})
@@ -20,6 +21,14 @@ const maxTokens = ref([aiSettings.settings.maxTokens])
 const temperature = ref([aiSettings.settings.temperature])
 const preferredProviderId = ref(aiSettings.settings.preferredProviderId)
 const activeTab = ref('api-keys')
+const geminiModels = ref(aiService.getAvailableGeminiModels())
+const selectedGeminiModel = ref(aiSettings.settings.geminiModel || aiService.getDefaultGeminiModel())
+const loadingGeminiModels = ref(false)
+const safetyThreshold = ref(aiSettings.settings.geminiSafetyThreshold || 'BLOCK_MEDIUM_AND_ABOVE')
+const showAdvancedGeminiSettings = ref(false)
+
+// Only show Gemini model settings when Gemini is selected
+const showGeminiSettings = computed(() => preferredProviderId.value === 'gemini')
 
 const saveSettings = () => {
   // Update API keys
@@ -34,8 +43,15 @@ const saveSettings = () => {
     preferredProviderId: preferredProviderId.value,
     customPrompt: customPrompt.value,
     maxTokens: maxTokens.value[0],
-    temperature: temperature.value[0]
+    temperature: temperature.value[0],
+    geminiModel: selectedGeminiModel.value,
+    geminiSafetyThreshold: safetyThreshold.value
   })
+
+  // Set default Gemini model if using Gemini
+  if (preferredProviderId.value === 'gemini') {
+    aiService.setDefaultGeminiModel(selectedGeminiModel.value)
+  }
 
   toast({
     title: 'Settings Saved',
@@ -63,10 +79,6 @@ const formatTemperature = (temp: number) => {
 // Add helper method for getting API key instructions
 const getApiKeyInstructions = (providerId: string) => {
   switch(providerId) {
-    case 'openai':
-      return 'Available from OpenAI dashboard at https://platform.openai.com/api-keys'
-    case 'anthropic':
-      return 'Available from Anthropic console at https://console.anthropic.com/settings/keys'
     case 'gemini':
       return 'Available from Google AI Studio at https://makersuite.google.com/app/apikey'
     case 'ollama':
@@ -75,6 +87,54 @@ const getApiKeyInstructions = (providerId: string) => {
       return 'API key required for this provider'
   }
 }
+
+// Function to fetch Gemini models from API
+const fetchGeminiModels = async () => {
+  const apiKey = aiSettings.getApiKey('gemini')
+  if (!apiKey) {
+    toast({
+      title: 'API Key Required',
+      description: 'Please enter a Gemini API key to fetch available models.',
+      variant: 'destructive'
+    })
+    return
+  }
+  
+  try {
+    loadingGeminiModels.value = true
+    const models = await aiService.fetchAvailableGeminiModels(apiKey)
+    geminiModels.value = models
+    
+    // If current model isn't in the list, select the first one
+    if (!models.find(m => m.id === selectedGeminiModel.value) && models.length > 0) {
+      selectedGeminiModel.value = models[0].id
+    }
+    
+    toast({
+      title: 'Models Loaded',
+      description: `Found ${models.length} Gemini models.`
+    })
+  } catch (error) {
+    toast({
+      title: 'Error',
+      description: 'Failed to fetch Gemini models. Using default models instead.',
+      variant: 'destructive'
+    })
+  } finally {
+    loadingGeminiModels.value = false
+  }
+}
+
+// Watch for provider changes to update model list
+watch(preferredProviderId, (newValue) => {
+  if (newValue === 'gemini') {
+    // Try to load models with existing API key
+    const apiKey = aiSettings.getApiKey('gemini')
+    if (apiKey) {
+      fetchGeminiModels()
+    }
+  }
+})
 
 onMounted(() => {
   // Initialize API keys from store
@@ -86,6 +146,14 @@ onMounted(() => {
       }
     }
   })
+  
+  // Try to load Gemini models if Gemini is selected
+  if (preferredProviderId.value === 'gemini') {
+    const apiKey = aiSettings.getApiKey('gemini')
+    if (apiKey) {
+      fetchGeminiModels()
+    }
+  }
 })
 
 // Handle API key change
@@ -165,7 +233,7 @@ const handlePaste = (providerId: string, event: ClipboardEvent) => {
                   <SelectTrigger id="preferred-provider">
                     <SelectValue placeholder="Select AI provider" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent class="max-h-[200px] overflow-auto">
                     <SelectItem 
                       v-for="provider in aiSettings.providers" 
                       :key="provider.id" 
@@ -175,6 +243,105 @@ const handlePaste = (providerId: string, event: ClipboardEvent) => {
                     </SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <!-- Gemini Model Selection (only shown when Gemini is selected) -->
+              <div v-if="showGeminiSettings" class="space-y-2">
+                <div class="flex items-center justify-between">
+                  <Label for="gemini-model">Gemini Model</Label>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    @click="fetchGeminiModels" 
+                    :disabled="loadingGeminiModels || !apiKeys['gemini']"
+                    class="h-8 px-2 text-xs"
+                  >
+                    <RefreshCcwIcon :class="{'animate-spin': loadingGeminiModels}" class="mr-2 h-3 w-3" />
+                    Refresh Models
+                  </Button>
+                </div>
+                <Select v-model="selectedGeminiModel">
+                  <SelectTrigger id="gemini-model">
+                    <SelectValue placeholder="Select Gemini model" />
+                  </SelectTrigger>
+                  <SelectContent class="max-h-[200px] overflow-auto">
+                    <SelectItem 
+                      v-for="model in geminiModels" 
+                      :key="model.id" 
+                      :value="model.id"
+                    >
+                      <div>
+                        <div>{{ model.name }}</div>
+                        <div class="text-xs text-gray-500">{{ model.description }}</div>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p class="text-xs text-gray-500">
+                  Select the specific Gemini model to use for AI text generation.
+                  <span v-if="geminiModels.length > 0">
+                    Token limit: {{ geminiModels.find(m => m.id === selectedGeminiModel)?.maxTokens.toLocaleString() || 'Unknown' }} tokens.
+                  </span>
+                </p>
+                
+                <!-- Advanced Gemini Settings -->
+                <div class="mt-4">
+                  <button 
+                    @click="showAdvancedGeminiSettings = !showAdvancedGeminiSettings"
+                    class="text-sm flex items-center text-primary"
+                  >
+                    <span v-if="!showAdvancedGeminiSettings">▶</span>
+                    <span v-else>▼</span>
+                    Advanced Gemini Settings
+                  </button>
+                  
+                  <div v-if="showAdvancedGeminiSettings" class="mt-3 space-y-4">
+                    <!-- Safety Thresholds -->
+                    <div class="space-y-2">
+                      <Label for="safety-threshold">Content Safety Filter</Label>
+                      <Select v-model="safetyThreshold">
+                        <SelectTrigger id="safety-threshold">
+                          <SelectValue placeholder="Select safety threshold" />
+                        </SelectTrigger>
+                        <SelectContent class="max-h-[200px] overflow-auto">
+                          <SelectItem value="BLOCK_NONE">
+                            <div>
+                              <div>No filtering</div>
+                              <div class="text-xs text-gray-500">Allow all content without safety filtering</div>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="BLOCK_LOW_AND_ABOVE">
+                            <div>
+                              <div>Low filtering</div>
+                              <div class="text-xs text-gray-500">Block content with low or higher harm probability</div>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="BLOCK_MEDIUM_AND_ABOVE">
+                            <div>
+                              <div>Medium filtering (recommended)</div>
+                              <div class="text-xs text-gray-500">Block content with medium or higher harm probability</div>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="BLOCK_HIGH_AND_ABOVE">
+                            <div>
+                              <div>High filtering</div>
+                              <div class="text-xs text-gray-500">Only block content with high harm probability</div>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="BLOCK_ONLY_HIGH">
+                            <div>
+                              <div>Only block highest risk content</div>
+                              <div class="text-xs text-gray-500">Minimal filtering for only the highest risk content</div>
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p class="text-xs text-gray-500">
+                        Controls how strictly the AI filters potentially harmful or inappropriate content.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <!-- API Keys -->

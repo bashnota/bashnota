@@ -29,6 +29,7 @@ import { ImageExtension, SubfigureExtension } from '../blocks'
 import GlobalDragHandle from './DragHandlePlugin'
 import { InlineAIGenerationExtension } from './InlineAIGenerationExtension'
 import { CitationExtension, BibliographyExtension } from './CitationExtension'
+import { VibeExtension } from './VibeExtension'
 
 // Import command-related extensions
 import SlashCommands from './Commands'
@@ -117,6 +118,7 @@ export function getEditorExtensions() {
     InlineAIGenerationExtension,
     CitationExtension,
     BibliographyExtension,
+    VibeExtension,
   ]
 }
 

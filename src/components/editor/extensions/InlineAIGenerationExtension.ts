@@ -4,8 +4,6 @@ import InlineAIGenerationComponent from '@/components/editor/blocks/InlineAIGene
 import { aiService } from '@/services/aiService'
 import { useAISettingsStore } from '@/stores/aiSettingsStore'
 import { toast } from '@/components/ui/toast'
-import { EditorState } from '@tiptap/pm/state'
-import { Editor } from '@tiptap/core'
 import type { CommandProps } from '@tiptap/core'
 
 export interface InlineAIGenerationAttributes {
@@ -135,7 +133,9 @@ export const InlineAIGenerationExtension = Node.create({
             prompt,
             maxTokens: aiSettings.settings.maxTokens,
             temperature: aiSettings.settings.temperature
-          }
+          },
+          providerId === 'gemini' ? aiSettings.settings.geminiModel : undefined,
+          providerId === 'gemini' ? aiSettings.settings.geminiSafetyThreshold : undefined
         ).then(result => {
           console.log('Generation successful:', result)
           

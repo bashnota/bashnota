@@ -728,6 +728,26 @@ export default {
             .run()
         },
       },
+      {
+        title: 'Vibe',
+        category: 'Advanced',
+        icon: SparklesIcon,
+        keywords: ['vibe', 'agent', 'ai', 'assistant', 'help', 'task'],
+        command: ({ editor, range }: CommandArgs) => {
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .insertContent({
+              type: 'vibe',
+              attrs: {
+                query: '',
+                isActive: false
+              }
+            })
+            .run()
+        },
+      },
     ]
 
     if (!query) {
