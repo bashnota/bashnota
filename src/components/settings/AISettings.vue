@@ -233,7 +233,7 @@ const handlePaste = (providerId: string, event: ClipboardEvent) => {
                   <SelectTrigger id="preferred-provider">
                     <SelectValue placeholder="Select AI provider" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent class="max-h-[200px] overflow-auto">
                     <SelectItem 
                       v-for="provider in aiSettings.providers" 
                       :key="provider.id" 
@@ -264,7 +264,7 @@ const handlePaste = (providerId: string, event: ClipboardEvent) => {
                   <SelectTrigger id="gemini-model">
                     <SelectValue placeholder="Select Gemini model" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent class="max-h-[200px] overflow-auto">
                     <SelectItem 
                       v-for="model in geminiModels" 
                       :key="model.id" 
@@ -303,7 +303,7 @@ const handlePaste = (providerId: string, event: ClipboardEvent) => {
                         <SelectTrigger id="safety-threshold">
                           <SelectValue placeholder="Select safety threshold" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent class="max-h-[200px] overflow-auto">
                           <SelectItem value="BLOCK_NONE">
                             <div>
                               <div>No filtering</div>

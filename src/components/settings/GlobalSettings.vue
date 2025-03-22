@@ -18,7 +18,8 @@ import {
   Terminal,
   Paintbrush,
   Settings2,
-  Pencil
+  Pencil,
+  Brain
 } from 'lucide-vue-next'
 import { useShortcutsStore } from '@/stores/shortcutsStore'
 import { Switch } from '@/components/ui/switch'
@@ -35,6 +36,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import AISettings from '@/components/settings/AISettings.vue'
 import JupyterSettings from '@/components/settings/JupyterSettings.vue'
+import VibeSettings from '@/components/settings/VibeSettings.vue'
 
 // Use shortcuts from the store instead of duplicating them
 const shortcutsStore = useShortcutsStore()
@@ -325,7 +327,7 @@ function formatShortcutKey(key: string) {
       </div>
 
       <Tabs default-value="appearance" class="w-full">
-        <TabsList class="grid w-full grid-cols-5">
+        <TabsList class="grid w-full grid-cols-6">
           <TabsTrigger value="appearance" class="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <div class="flex items-center justify-center gap-2 p-2">
               <Paintbrush class="w-4 h-4 shrink-0" />
@@ -348,6 +350,12 @@ function formatShortcutKey(key: string) {
             <div class="flex items-center justify-center gap-2 p-2">
               <SparklesIcon class="h-4 w-4 shrink-0" />
               <span class="text-sm font-medium">AI Generation</span>
+            </div>
+          </TabsTrigger>
+          <TabsTrigger value="vibe" class="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <div class="flex items-center justify-center gap-2 p-2">
+              <Brain class="h-4 w-4 shrink-0" />
+              <span class="text-sm font-medium">Vibe</span>
             </div>
           </TabsTrigger>
           <TabsTrigger value="jupyter">
@@ -763,6 +771,11 @@ function formatShortcutKey(key: string) {
         <!-- AI Generation Tab -->
         <TabsContent value="ai">
           <AISettings />
+        </TabsContent>
+
+        <!-- Vibe Tab -->
+        <TabsContent value="vibe">
+          <VibeSettings />
         </TabsContent>
 
         <!-- Jupyter Tab -->
