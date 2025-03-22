@@ -1,15 +1,15 @@
 // Export all Vibe block components
 import VibeBlock from './VibeBlock.vue'
-import VibeTaskBoard from './VibeTaskBoard.vue'
-import VibeTask from './VibeTask.vue'
 import VibeExtension from '@/components/editor/extensions/VibeExtension'
+
+// Import modular components
+import * as VibeComponents from './components'
 
 // Re-export everything
 export {
   VibeBlock,
-  VibeTaskBoard,
-  VibeTask,
-  VibeExtension
+  VibeExtension,
+  VibeComponents
 }
 
 // Export default extension
