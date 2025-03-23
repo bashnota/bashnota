@@ -2,33 +2,36 @@
   <node-view-wrapper class="youtube-block">
     <div class="youtube-block-container">
       <div v-if="isEditing" class="youtube-url-input">
-        <input
-          ref="urlInput"
-          v-model="urlInput"
-          type="text"
-          placeholder="Paste YouTube URL here"
-          @keydown.enter="applyUrl"
-          @blur="applyUrl"
-        />
-        <button class="apply-button" @click="applyUrl">Apply</button>
-        <p v-if="parserError" class="url-error">{{ parserError }}</p>
+        <div class="flex gap-2 w-full">
+          <Input
+            ref="urlInputRef"
+            :modelValue="urlInput"
+            @update:modelValue="urlInput = String($event)"
+            placeholder="Paste YouTube URL here"
+            @keydown.enter="applyUrl"
+            @blur="applyUrl"
+            class="w-full"
+          />
+          <Button @click="applyUrl" variant="default">Apply</Button>
+        </div>
+        <Alert v-if="parserError" variant="destructive" class="mt-2">
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{{ parserError }}</AlertDescription>
+        </Alert>
       </div>
       
       <div v-else class="youtube-content">
-        <youtube-player 
+        <YoutubePlayer 
           :video-id="videoId" 
           :start-time="startTime"
           :autoplay="autoplay"
         />
         
         <div class="youtube-controls">
-          <button class="edit-button" @click="startEditing" title="Edit URL">
+          <Button variant="ghost" size="icon" class="edit-button" @click="startEditing" title="Edit URL">
             <span class="sr-only">Edit URL</span>
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-            </svg>
-          </button>
+            <Edit class="h-4 w-4" />
+          </Button>
         </div>
       </div>
     </div>
@@ -39,7 +42,11 @@
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import { computed, ref, onMounted, nextTick } from 'vue'
 import YoutubePlayer from './YoutubePlayer.vue'
-import { useYoutubeParser } from '@/components/editor/blocks/youtube-block/useYoutubeParser'
+import { useYoutubeParser } from './useYoutubeParser'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+import { Edit } from 'lucide-vue-next'
 
 interface NodeAttrs {
   url: string
@@ -90,24 +97,38 @@ const startEditing = () => {
 }
 
 const applyUrl = () => {
-  if (!urlInput.value) {
+  const trimmedInput = urlInput.value.trim()
+  
+  if (!trimmedInput) {
     isEditing.value = false
     return
   }
   
-  const result = parseYoutubeUrl(urlInput.value)
+  console.log('Parsing URL:', trimmedInput)
+  const result = parseYoutubeUrl(trimmedInput)
   
-  if (result) {
+  if (result && result.videoId) {
+    console.log('Successfully parsed YouTube URL:', result)
+    
+    // Update the node attributes with the new video information
     props.updateAttributes({
-      url: urlInput.value,
+      url: trimmedInput,
       videoId: result.videoId,
       startTime: result.startTime
     })
     
+    // Exit editing mode after successful URL parsing
     isEditing.value = false
     
-    // Return focus to editor
-    props.editor.commands.focus()
+    // Ensure the UI updates after attribute change
+    nextTick(() => {
+      console.log('Attributes updated, videoId is now:', props.node.attrs.videoId)
+      // Return focus to editor
+      props.editor.commands.focus()
+    })
+  } else {
+    console.error('Failed to parse YouTube URL:', trimmedInput, 'Error:', parserError.value)
+    // Stay in editing mode to allow user to correct the URL
   }
 }
 
@@ -122,6 +143,25 @@ onMounted(() => {
         startTime: result.startTime
       })
     }
+  }
+  
+  // Debug parser with various URL formats
+  const testUrls = [
+    'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    'https://youtu.be/dQw4w9WgXcQ',
+    'https://www.youtube.com/embed/dQw4w9WgXcQ',
+    'https://www.youtube.com/shorts/dQw4w9WgXcQ',
+    'https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=30s'
+  ]
+  
+  if (import.meta.env.DEV) {
+    console.log('==== Testing YouTube URL Parser ====')
+    testUrls.forEach(url => {
+      const result = parseYoutubeUrl(url)
+      console.log(`URL: ${url}`)
+      console.log(`Result: ${result ? `ID: ${result.videoId}, Time: ${result.startTime}` : 'Failed to parse'}`)
+    })
+    console.log('==== End Parser Test ====')
   }
 })
 </script>
@@ -139,41 +179,15 @@ onMounted(() => {
 
 .youtube-url-input {
   padding: 1em;
-  background-color: #f5f5f5;
+  background-color: var(--background-secondary);
   border-radius: 4px;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 0.5em;
 }
 
-.youtube-url-input input {
-  flex: 1;
-  min-width: 200px;
-  padding: 0.5em;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 1em;
-}
-
-.youtube-url-input .apply-button {
-  padding: 0.5em 1em;
-  background-color: #4285f4;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 500;
-}
-
-.youtube-url-input .apply-button:hover {
-  background-color: #3367d6;
-}
-
-.url-error {
-  width: 100%;
-  color: #c00;
-  margin: 0.5em 0 0;
-  font-size: 0.9em;
+.youtube-content {
+  position: relative;
 }
 
 .youtube-controls {
@@ -185,10 +199,6 @@ onMounted(() => {
   z-index: 10;
 }
 
-.youtube-content {
-  position: relative;
-}
-
 .youtube-content:hover .youtube-controls {
   opacity: 1;
 }
@@ -196,14 +206,6 @@ onMounted(() => {
 .edit-button {
   background-color: rgba(0, 0, 0, 0.6);
   color: white;
-  border: none;
-  border-radius: 50%;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
 }
 
 .edit-button:hover {
