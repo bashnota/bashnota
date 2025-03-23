@@ -1,10 +1,12 @@
 import { Editor, VueRenderer, type Range } from '@tiptap/vue-3'
 import tippy from 'tippy.js'
 import CommandsList from '@/components/editor/blocks/CommandsList.vue'
+import SubNotaDialog from '@/components/editor/blocks/SubNotaDialog.vue'
 import 'tippy.js/dist/tippy.css'
 import router from '@/router'
 import { useNotaStore } from '@/stores/nota'
 import { useCitationStore } from '@/stores/citationStore'
+import { createSubNota } from '@/services/subNotaService'
 import {
   TextIcon,
   Heading1,
@@ -223,16 +225,94 @@ export default {
         icon: FilePlus,
         keywords: ['page', 'new', 'create', 'nota', 'subnota'],
         command: ({ editor, range }: CommandArgs) => {
-          const createNewPage = async () => {
-            const store = useNotaStore()
-            const currentRoute = router.currentRoute.value
-            const parentId = currentRoute.params.id as string
-
-            const title = prompt('Enter Nota title:')
-            if (!title) return
-
+          // Get the current nota ID from the router
+          const currentRoute = router.currentRoute.value
+          // Make sure we have a valid parentId
+          let parentId = null
+          if (currentRoute.params.id && typeof currentRoute.params.id === 'string') {
+            parentId = currentRoute.params.id
+          }
+          
+          // Add debugging to verify parentId
+          console.log(`Creating sub nota with parentId: ${parentId}`)
+          
+          // Create Vue renderer for the dialog
+          let subNotaDialogRenderer: VueRenderer | null = null
+          let popupInstance: any = null
+          let isDestroying = false  // Add a guard flag to prevent recursive calls
+          
+          // Helper to safely destroy the popup
+          const destroyPopup = () => {
+            // Prevent recursive calls
+            if (isDestroying) {
+              return;
+            }
+            
+            isDestroying = true;
+            
             try {
-              const newPage = await store.createItem(title, parentId)
+              // First set references to local variables to avoid operating on nullified references
+              const currentPopup = popupInstance;
+              const currentRenderer = subNotaDialogRenderer;
+              
+              // Clear the references immediately to prevent circular references
+              popupInstance = null;
+              subNotaDialogRenderer = null;
+              
+              // Now destroy the instances using the local references
+              if (currentPopup) {
+                try {
+                  // Try different approaches to destroy/hide the popup
+                  if (typeof currentPopup.hide === 'function') {
+                    currentPopup.hide();
+                  }
+                  
+                  if (typeof currentPopup.destroy === 'function') {
+                    currentPopup.destroy();
+                  } else if (Array.isArray(currentPopup) && currentPopup[0] && typeof currentPopup[0].destroy === 'function') {
+                    currentPopup[0].destroy();
+                  } else if (currentPopup.popper && currentPopup.popper.parentNode) {
+                    // Manual DOM cleanup as last resort
+                    currentPopup.popper.parentNode.removeChild(currentPopup.popper);
+                  }
+                } catch (e) {
+                  logger.warn('Error cleaning up popup:', e);
+                }
+              }
+              
+              // Destroy the renderer after the popup
+              if (currentRenderer) {
+                try {
+                  currentRenderer.destroy();
+                } catch (e) {
+                  logger.warn('Error destroying renderer:', e);
+                }
+              }
+            } finally {
+              isDestroying = false;
+            }
+          }
+          
+          // Handle successful sub nota creation
+          const handleSuccess = async (newNotaId: string, title: string) => {
+            // Instead of directly calling destroyPopup(), hide the popup first
+            // which will trigger onHide in a controlled way
+            let didHide = false;
+            
+            if (popupInstance && typeof popupInstance.hide === 'function' && !isDestroying) {
+              didHide = true;
+              popupInstance.hide();
+            }
+            
+            // If we couldn't hide properly, use the destroyPopup as fallback
+            if (!didHide) {
+              destroyPopup();
+            }
+            
+            // Only proceed with the following actions after a slight delay
+            // to ensure destruction process has completed
+            setTimeout(() => {
+              // Insert the page link
               editor
                 .chain()
                 .focus()
@@ -240,25 +320,105 @@ export default {
                 .insertContent({
                   type: 'pageLink',
                   attrs: {
-                    href: `/nota/${newPage.id}`,
+                    href: `/nota/${newNotaId}`,
                     title: title,
                   },
                 })
                 .run()
-
-              toast('Sub nota created successfully! Click the link to navigate to it.')
               
-              // Trigger content save by dispatching an update event
+              // Trigger save
               const transaction = editor.state.tr
               editor.view.dispatch(transaction)
               
-              // router.push(`/nota/${newPage.id}`)
-            } catch (error) {
-              logger.error('Failed to create nota:', error)
+              // Show success toast
+              toast(`"${title}" created successfully!`)
+              
+              // Show additional information in the UI
+              setTimeout(() => {
+                const linkElement = document.querySelector(`a[href="/nota/${newNotaId}"]`)
+                if (linkElement) {
+                  linkElement.classList.add('newly-created')
+                  setTimeout(() => {
+                    linkElement.classList.remove('newly-created')
+                  }, 2000)
+                }
+              }, 100)
+            }, 10); // Small delay to ensure cleanup completes first
+          }
+          
+          // Handle dialog cancellation
+          const handleCancel = () => {
+            // Instead of calling destroyPopup() directly, 
+            // just hide the popup which will trigger onHide once
+            if (popupInstance && typeof popupInstance.hide === 'function' && !isDestroying) {
+              popupInstance.hide();
+            } else {
+              // Fallback if hide is not available
+              destroyPopup();
             }
           }
-
-          createNewPage()
+          
+          // Create the dialog component
+          subNotaDialogRenderer = new VueRenderer(SubNotaDialog, {
+            props: {
+              parentId,
+              onSuccess: handleSuccess,
+              onCancel: handleCancel
+            },
+            editor
+          })
+          
+          // @ts-ignore
+          popupInstance = tippy('body', {
+            getReferenceClientRect: () => {
+              // Get position based on editor cursor
+              if (range && typeof range.from === 'number') {
+                const nodePos = range.from
+                const domPos = editor.view.coordsAtPos(nodePos)
+                if (domPos) {
+                  return new DOMRect(
+                    domPos.left,
+                    domPos.bottom,
+                    0,
+                    0
+                  )
+                }
+              }
+              
+              // Fallback: editor element position
+              return editor.view.dom.getBoundingClientRect()
+            },
+            appendTo: () => document.body,
+            content: subNotaDialogRenderer.element,
+            showOnCreate: true,
+            interactive: true,
+            trigger: 'manual',
+            placement: 'bottom-start',
+            theme: 'command-palette',
+            animation: 'scale',
+            duration: 150,
+            maxWidth: 'none',   // Prevent auto-sizing issues
+            popperOptions: {    // More robust positioning
+              strategy: 'fixed',
+              modifiers: [
+                {
+                  name: 'preventOverflow',
+                  options: {
+                    padding: 8,
+                  },
+                }
+              ],
+            },
+            onHide: function() {
+              // Only call destroyPopup if it's not already being destroyed
+              if (!isDestroying) {
+                // Use setTimeout to break the call stack
+                setTimeout(() => {
+                  destroyPopup();
+                }, 0);
+              }
+            }
+          })
         },
       },
       {
