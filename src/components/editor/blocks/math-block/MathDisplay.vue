@@ -20,6 +20,7 @@
 import { ref, onMounted, watch, defineProps, defineEmits, onErrorCaptured, computed } from 'vue'
 import { useMathJax } from '@/composables/useMathJax'
 import { useEquationNumber } from '@/composables/useEquationCounter'
+import { logger } from '@/services/logger'
 
 const props = defineProps<{
   latex: string
@@ -68,7 +69,7 @@ const renderMath = async () => {
     }
   } catch (err) {
     mathError.value = err instanceof Error ? err.message : String(err)
-    console.error('Error in renderMath:', err)
+    logger.error('Error in renderMath:', err)
   }
 }
 
@@ -81,7 +82,7 @@ const onClick = (event: MouseEvent) => {
     }
   } catch (err) {
     mathError.value = err instanceof Error ? err.message : String(err)
-    console.error('Error in onClick:', err)
+    logger.error('Error in onClick:', err)
   }
 }
 
@@ -94,7 +95,7 @@ onMounted(() => {
 // Capture errors
 onErrorCaptured((err) => {
   mathError.value = err instanceof Error ? err.message : String(err)
-  console.error('Error captured in MathDisplay:', err)
+  logger.error('Error captured in MathDisplay:', err)
   return false
 })
 </script> 

@@ -8,6 +8,7 @@ import { Share2 } from 'lucide-vue-next'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import NotaContentViewer from '@/components/editor/NotaContentViewer.vue'
 import { type PublishedNota } from '@/types/nota'
+import { logger } from '@/services/logger'
 
 const route = useRoute()
 const router = useRouter()
@@ -35,7 +36,7 @@ onMounted(async () => {
 
     nota.value = publishedNota
   } catch (err) {
-    console.error('Error loading public nota:', err)
+    logger.error('Error loading public nota:', err)
     error.value = 'Failed to load the nota'
   } finally {
     isLoading.value = false

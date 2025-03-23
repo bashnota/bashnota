@@ -16,6 +16,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox'
 import { Eye, EyeOff, Mail, Lock } from 'lucide-vue-next'
 import { toast } from '@/lib/utils'
+import { logger } from '@/services/logger'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -69,7 +70,7 @@ const handleLogin = async () => {
       router.push(redirectUrl)
     }
   } catch (error) {
-    console.error('Login error:', error)
+    logger.error('Login error:', error)
   } finally {
     isLoading.value = false
   }
@@ -88,7 +89,7 @@ const handleGoogleLogin = async () => {
       router.push(redirectUrl)
     }
   } catch (error) {
-    console.error('Google login error:', error)
+    logger.error('Google login error:', error)
   } finally {
     isLoading.value = false
   }
@@ -106,7 +107,7 @@ const handleForgotPassword = async () => {
   try {
     await authStore.resetPassword(email.value)
   } catch (error) {
-    console.error('Password reset error:', error)
+    logger.error('Password reset error:', error)
   } finally {
     isLoading.value = false
   }

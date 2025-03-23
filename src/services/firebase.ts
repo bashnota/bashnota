@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app'
 import { getAnalytics, logEvent } from 'firebase/analytics'
 import { getAuth, connectAuthEmulator } from 'firebase/auth'
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore'
+import { logger } from './logger'
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -26,7 +27,7 @@ export const logAnalyticsEvent = (eventName: string, eventParams?: Record<string
   try {
     logEvent(analytics, eventName, eventParams)
   } catch (error) {
-    console.error('Failed to log analytics event:', error)
+    logger.error('Failed to log analytics event:', error)
   }
 }
 

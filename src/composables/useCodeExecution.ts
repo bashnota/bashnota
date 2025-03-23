@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
 import { useCodeExecutionStore } from '../stores/codeExecutionStore'
+import { logger } from '@/services/logger'
 
 export function useCodeExecution(cellId: string) {
   const store = useCodeExecutionStore()
@@ -23,7 +24,7 @@ export function useCodeExecution(cellId: string) {
 
       return true
     } catch (error) {
-      console.error('Failed to copy output:', error)
+      logger.error('Failed to copy output:', error)
       return false
     }
   }

@@ -68,6 +68,7 @@ import { Controls } from '@vue-flow/controls'
 import TaskNodeComponent from './TaskNodeComponent.vue'
 import { useTaskGraph } from './useTaskGraph'
 import type { Task } from './types'
+import { logger } from '@/services/logger'
 
 // Import required styles
 import '@vue-flow/core/dist/style.css'
@@ -145,7 +146,7 @@ const handleNodeClick = (e: NodeMouseEvent) => {
 
 // Watch for changes in tasks and rebuild graph
 watch(() => props.tasks, (newTasks) => {
-  console.log('Tasks changed in child component:', newTasks?.length || 0)
+  logger.log('Tasks changed in child component:', newTasks?.length || 0)
   if (newTasks && newTasks.length > 0) {
     updateTasks(newTasks)
     nextTick(() => {
@@ -185,7 +186,7 @@ watch(() => props.selectedTaskId, (newId) => {
 
 // Rebuild graph when component is mounted
 onMounted(() => {
-  console.log('Child TaskGraph mounted, tasks:', props.tasks?.length || 0)
+  logger.log('Child TaskGraph mounted, tasks:', props.tasks?.length || 0)
   
   // Delay slightly to ensure DOM is ready
   setTimeout(() => {

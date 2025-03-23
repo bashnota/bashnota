@@ -1,6 +1,7 @@
 import { BaseActor } from './BaseActor'
 import { ActorType, type VibeTask } from '@/types/vibe'
 import { DatabaseEntryType } from '@/types/vibe'
+import { logger } from '@/services/logger'
 
 /**
  * Result from the Reviewer actor
@@ -128,7 +129,7 @@ Ensure your review is substantive, specific to the content provided, and offers 
       // Fallback if JSON parsing fails
       return this.createFallbackReview(reviewText);
     } catch (error) {
-      console.error('Error parsing review:', error);
+      logger.error('Error parsing review:', error)
       return this.createFallbackReview(reviewText);
     }
   }

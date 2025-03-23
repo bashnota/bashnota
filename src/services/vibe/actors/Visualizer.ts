@@ -1,6 +1,7 @@
 import { BaseActor } from './BaseActor'
 import { ActorType, type VibeTask } from '@/types/vibe'
 import { DatabaseEntryType } from '@/types/vibe'
+import { logger } from '@/services/logger'
 
 /**
  * Visualization types supported by the Visualizer
@@ -174,7 +175,7 @@ Ensure that:
       // Fallback if JSON parsing fails
       return this.createFallbackVisualization(visualizationText);
     } catch (error) {
-      console.error('Error parsing visualizations:', error);
+      logger.error('Error parsing visualizations:', error);
       return this.createFallbackVisualization(visualizationText);
     }
   }

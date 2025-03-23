@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { logger } from '@/services/logger'
 
 export interface YoutubeVideoInfo {
   videoId: string
@@ -41,7 +42,7 @@ export function useYoutubeParser(): YoutubeParserResult {
     
     // If input is already a video ID (11 characters, alphanumeric with some special chars)
     if (/^[a-zA-Z0-9_-]{11}$/.test(url.trim())) {
-      console.log('Direct video ID detected:', url.trim())
+      logger.log('Direct video ID detected:', url.trim())
       return { 
         videoId: url.trim(),
         startTime: 0
@@ -129,12 +130,12 @@ export function useYoutubeParser(): YoutubeParserResult {
     const isValidYoutubeId = /^[a-zA-Z0-9_-]{11}$/.test(videoId);
     
     if (!isValidYoutubeId) {
-      console.warn('Invalid YouTube video ID format:', videoId);
+      logger.warn('Invalid YouTube video ID format:', videoId);
       return '';
     }
     
     // Add debugging
-    console.log('Extracted YouTube video ID:', videoId);
+    logger.log('Extracted YouTube video ID:', videoId);
     
     return videoId;
   }

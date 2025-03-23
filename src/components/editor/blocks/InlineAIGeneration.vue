@@ -25,6 +25,7 @@ import {
 } from 'lucide-vue-next'
 import { useAISettingsStore } from '@/stores/aiSettingsStore'
 import { toast } from '@/components/ui/toast'
+import { logger } from '@/services/logger'
 
 const props = defineProps(nodeViewProps)
 
@@ -149,7 +150,7 @@ const generateText = () => {
       try {
         props.editor.commands.generateInlineAI(props.getPos(), promptInput.value)
       } catch (error) {
-        console.error('Error generating text:', error)
+        logger.error('Error generating text:', error)
         props.updateAttributes({
           isLoading: false,
           error: 'Failed to generate text. Please try again.'
@@ -165,7 +166,7 @@ const generateText = () => {
     // Collapse the input after generating
     isExpanded.value = false
   } catch (error) {
-    console.error('Error in generateText:', error)
+    logger.error('Error in generateText:', error)
     props.updateAttributes({
       isLoading: false,
       error: 'Failed to update AI generation settings'
@@ -196,7 +197,7 @@ const regenerateText = () => {
       try {
         props.editor.commands.generateInlineAI(props.getPos(), props.node.attrs.prompt)
       } catch (error) {
-        console.error('Error regenerating text:', error)
+        logger.error('Error regenerating text:', error)
         props.updateAttributes({
           isLoading: false,
           error: 'Failed to regenerate text. Please try again.'
@@ -204,7 +205,7 @@ const regenerateText = () => {
       }
     }, 0)
   } catch (error) {
-    console.error('Error in regenerateText:', error)
+    logger.error('Error in regenerateText:', error)
     toast({
       title: 'Error',
       description: 'Failed to regenerate text',
@@ -250,7 +251,7 @@ const continueConversation = () => {
         // Generate continuation
         props.editor.commands.generateInlineAI(props.getPos(), fullPrompt, true)
       } catch (error) {
-        console.error('Error continuing conversation:', error)
+        logger.error('Error continuing conversation:', error)
         props.updateAttributes({
           isLoading: false,
           error: 'Failed to continue conversation. Please try again.'
@@ -260,7 +261,7 @@ const continueConversation = () => {
       }
     }, 0)
   } catch (error) {
-    console.error('Error in continueConversation:', error)
+    logger.error('Error in continueConversation:', error)
     toast({
       title: 'Error',
       description: 'Failed to continue conversation',
@@ -340,7 +341,7 @@ const copyToClipboard = () => {
       }, 2000)
     })
     .catch(err => {
-      console.error('Failed to copy text: ', err)
+      logger.error('Failed to copy text: ', err)
       toast({
         title: 'Copy failed',
         description: 'Could not copy text to clipboard',
@@ -364,7 +365,7 @@ const insertToDocument = () => {
       description: 'AI-generated text has been inserted above the terminal'
     })
   } catch (error) {
-    console.error('Error inserting content:', error)
+    logger.error('Error inserting content:', error)
     
     // Alternative approach: use regular insert at current selection
     props.editor.commands.insertContent(props.node.attrs.result)
@@ -401,7 +402,7 @@ const insertSelectionToDocument = () => {
     // Clear the selection after inserting
     selectedText.value = ''
   } catch (error) {
-    console.error('Error inserting selection:', error)
+    logger.error('Error inserting selection:', error)
     
     // Alternative approach: use regular insert at current selection
     props.editor.commands.insertContent(selectedText.value)
@@ -545,7 +546,7 @@ const copyMessageToClipboard = (content: string) => {
       })
     })
     .catch(err => {
-      console.error('Failed to copy text: ', err)
+      logger.error('Failed to copy text: ', err)
       toast({
         title: 'Copy failed',
         description: 'Could not copy text to clipboard',
@@ -567,7 +568,7 @@ const insertMessageToDocument = (content: string) => {
       description: 'Response has been inserted above the terminal'
     })
   } catch (error) {
-    console.error('Error inserting content:', error)
+    logger.error('Error inserting content:', error)
     
     // Alternative approach: use regular insert at current selection
     props.editor.commands.insertContent(content)

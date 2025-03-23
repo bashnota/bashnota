@@ -9,6 +9,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { Input } from '@/components/ui/input'
 import ServerListItem from '@/components/editor/blocks/nota-config/ServerListItem.vue'
 import { toast } from '@/lib/utils'
+import { logger } from '@/services/logger'
 
 const jupyterStore = useJupyterStore()
 const jupyterService = new JupyterService()
@@ -58,7 +59,7 @@ const refreshKernels = async (server: JupyterServer) => {
     const kernels = await jupyterService.getAvailableKernels(server)
     jupyterStore.updateKernels(server, kernels)
   } catch (error) {
-    console.error('Failed to refresh kernels:', error)
+    logger.error('Failed to refresh kernels:', error)
   }
 }
 

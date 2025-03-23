@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/card'
 import { Eye, EyeOff, Mail, Lock, User } from 'lucide-vue-next'
 import { toast } from '@/lib/utils'
+import { logger } from '@/services/logger'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -83,7 +84,7 @@ const handleRegister = async () => {
       router.push('/')
     }
   } catch (error) {
-    console.error('Registration error:', error)
+    logger.error('Registration error:', error)
   } finally {
     isLoading.value = false
   }
@@ -101,7 +102,7 @@ const handleGoogleSignup = async () => {
       router.push('/')
     }
   } catch (error) {
-    console.error('Google signup error:', error)
+    logger.error('Google signup error:', error)
   } finally {
     isLoading.value = false
   }

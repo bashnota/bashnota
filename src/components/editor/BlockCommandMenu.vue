@@ -14,6 +14,7 @@ import type { Selection } from '@tiptap/pm/state'
 import { useFavoriteBlocksStore } from '@/stores/favoriteBlocksStore'
 import AddToFavoritesModal from './AddToFavoritesModal.vue'
 import { toast } from '@/components/ui/toast'
+import { logger } from '@/services/logger'
 
 const props = defineProps<{
   position: { x: number; y: number } | null
@@ -113,7 +114,7 @@ const handleAddToFavorites = async (name: string, tags: string[]) => {
     emit('close')
     props.editorView.focus()
   } catch (error) {
-    console.error('Failed to add block:', error)
+    logger.error('Failed to add block:', error)
     toast({
       title: 'Error',
       description: 'Failed to add block to favorites',

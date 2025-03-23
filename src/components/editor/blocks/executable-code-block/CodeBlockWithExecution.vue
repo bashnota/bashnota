@@ -8,6 +8,7 @@ import { JupyterService } from '@/services/jupyterService'
 import type { KernelConfig, KernelSpec, JupyterServer } from '@/types/jupyter'
 import { useCodeBlockToolbar } from './composables/useCodeBlockToolbar'
 import { useCodeBlockShortcuts } from './composables/useCodeBlockShortcuts'
+import { logger } from '@/services/logger'
 import {
   Copy,
   Check,
@@ -138,11 +139,11 @@ const showConsoleMessage = (
 ) => {
   const logPrefix = `[${type.toUpperCase()}] ${title}: `
   if (type === 'error') {
-    console.error(logPrefix, message)
+    logger.error(logPrefix, message)
   } else if (type === 'warning') {
-    console.warn(logPrefix, message)
+    logger.warn(logPrefix, message)
   } else {
-    console.log(logPrefix, message)
+    logger.log(logPrefix, message)
   }
 }
 
@@ -226,7 +227,7 @@ const selectRunningKernel = async (kernelId: string) => {
     
     showConsoleMessage('Success', `Connected to running kernel: ${kernel.name}`, 'success')
   } catch (error) {
-    console.error('Failed to connect to kernel:', error)
+    logger.error('Failed to connect to kernel:', error)
     showConsoleMessage('Error', 'Failed to connect to kernel', 'error')
   } finally {
     isSettingUp.value = false
@@ -300,7 +301,7 @@ const refreshSessionsAndKernels = async (server: JupyterServer) => {
       showConsoleMessage('Success', 'Sessions and kernels refreshed', 'success')
     }
   } catch (error) {
-    console.error('Failed to refresh sessions/kernels:', error)
+    logger.error('Failed to refresh sessions/kernels:', error)
     showConsoleMessage('Error', 'Failed to refresh sessions/kernels', 'error')
     availableSessions.value = []
     runningKernels.value = []
@@ -319,7 +320,7 @@ const clearAllKernels = async (server: JupyterServer) => {
     
     showConsoleMessage('Success', 'All kernels cleared successfully', 'success')
   } catch (error) {
-    console.error('Failed to clear kernels:', error)
+    logger.error('Failed to clear kernels:', error)
     showConsoleMessage('Error', 'Failed to clear kernels', 'error')
   }
 }
@@ -367,7 +368,7 @@ watch(selectedServer, async (newServer) => {
         }
       })
     } catch (error) {
-      console.error('Failed to fetch kernels/sessions:', error)
+      logger.error('Failed to fetch kernels/sessions:', error)
       showConsoleMessage('Error', 'Failed to fetch kernels/sessions', 'error')
     }
   }
@@ -454,7 +455,7 @@ const createNewSession = async () => {
     const sessions = await jupyterService.getActiveSessions(server)
     availableSessions.value = sessions
   } catch (error) {
-    console.error('Failed to create session:', error)
+    logger.error('Failed to create session:', error)
     showConsoleMessage('Error', 'Failed to create session', 'error')
   } finally {
     isSettingUp.value = false
@@ -488,7 +489,7 @@ const executeCode = async () => {
       emit('update:output', cell.value.output)
     }
   } catch (error) {
-    console.error('Code execution failed:', error)
+    logger.error('Code execution failed:', error)
     showConsoleMessage('Error', 'Code execution failed', 'error')
   } finally {
     executionInProgress.value = false

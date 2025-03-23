@@ -37,6 +37,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import AISettings from '@/components/settings/AISettings.vue'
 import JupyterSettings from '@/components/settings/JupyterSettings.vue'
 import VibeSettings from '@/components/settings/VibeSettings.vue'
+import { logger } from '@/services/logger'
 
 // Use shortcuts from the store instead of duplicating them
 const shortcutsStore = useShortcutsStore()
@@ -110,7 +111,7 @@ onMounted(() => {
     try {
       interfaceSettings.value = { ...interfaceSettings.value, ...JSON.parse(savedInterfaceSettings) }
     } catch (e) {
-      console.error('Failed to parse saved interface settings', e)
+      logger.error('Failed to parse saved interface settings', e)
     }
   }
   
@@ -120,7 +121,7 @@ onMounted(() => {
     try {
       editorSettings.value = { ...editorSettings.value, ...JSON.parse(savedEditorSettings) }
     } catch (e) {
-      console.error('Failed to parse saved editor settings', e)
+      logger.error('Failed to parse saved editor settings', e)
     }
   }
 

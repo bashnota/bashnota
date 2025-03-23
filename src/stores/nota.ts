@@ -7,6 +7,7 @@ import { toast } from '@/lib/utils'
 import { useAuthStore } from './auth'
 import { fetchAPI } from '@/services/axios'
 import { processNotaContent } from '@/services/publishNotaUtilities'
+import { logger } from '@/services/logger'
 
 // Helper functions to convert dates and ensure data is serializable
 const serializeNota = (nota: Partial<Nota> & { id: string }): any => {
@@ -185,8 +186,8 @@ export const useNotaStore = defineStore('nota', {
         const results = await db.notas.toArray()
         this.items = results.map(deserializeNota)
       } catch (e) {
+        logger.error(e)
         this.error = 'Failed to load notas'
-        console.error(e)
       } finally {
         this.loading = false
       }
@@ -284,7 +285,7 @@ export const useNotaStore = defineStore('nota', {
         }
         return this.getCurrentNota(id)
       } catch (error) {
-        console.error('Failed to load nota:', error)
+        logger.error('Failed to load nota:', error)
         return null
       }
     },
@@ -339,7 +340,7 @@ export const useNotaStore = defineStore('nota', {
 
         return true
       } catch (error) {
-        console.error('Failed to import notas:', error)
+        logger.error('Failed to import notas:', error)
         return false
       }
     },
@@ -369,7 +370,7 @@ export const useNotaStore = defineStore('nota', {
 
         return allNotas
       } catch (error) {
-        console.error('Failed to export notas:', error)
+        logger.error('Failed to export notas:', error)
         toast('Failed to export notas')
         return []
       }
@@ -409,7 +410,7 @@ export const useNotaStore = defineStore('nota', {
 
         return notaVersion
       } catch (error) {
-        console.error('Failed to save nota version:', error)
+        logger.error('Failed to save nota version:', error)
         throw error
       }
     },
@@ -436,7 +437,7 @@ export const useNotaStore = defineStore('nota', {
 
         return true
       } catch (error) {
-        console.error('Failed to restore version:', error)
+        logger.error('Failed to restore version:', error)
         throw error
       }
     },
@@ -455,7 +456,7 @@ export const useNotaStore = defineStore('nota', {
 
         return true
       } catch (error) {
-        console.error('Failed to delete version:', error)
+        logger.error('Failed to delete version:', error)
         throw error
       }
     },
@@ -499,7 +500,7 @@ export const useNotaStore = defineStore('nota', {
 
         return publishedNota
       } catch (error) {
-        console.error('Failed to publish nota:', error)
+        logger.error('Failed to publish nota:', error)
         toast('Failed to publish nota')
         throw error
       }
@@ -525,7 +526,7 @@ export const useNotaStore = defineStore('nota', {
 
         return true
       } catch (error) {
-        console.error('Failed to unpublish nota:', error)
+        logger.error('Failed to unpublish nota:', error)
         toast('Failed to unpublish nota')
         throw error
       }
@@ -537,7 +538,7 @@ export const useNotaStore = defineStore('nota', {
         const response = await fetchAPI.get(`/nota/published/${id}`)
         return response.data as PublishedNota
       } catch (error) {
-        console.error('Failed to fetch published nota:', error)
+        logger.error('Failed to fetch published nota:', error)
         throw error
       }
     },
@@ -548,7 +549,7 @@ export const useNotaStore = defineStore('nota', {
         const response = await fetchAPI.get(`/nota/user/${userId}`)
         return response.data as PublishedNota[]
       } catch (error) {
-        console.error('Failed to fetch published notas by user:', error)
+        logger.error('Failed to fetch published notas by user:', error)
         return []
       }
     },
@@ -584,7 +585,7 @@ export const useNotaStore = defineStore('nota', {
 
         return publishedIds
       } catch (error) {
-        console.error('Failed to load published notas:', error)
+        logger.error('Failed to load published notas:', error)
         return []
       }
     },

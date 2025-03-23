@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Search, SortAsc, SortDesc, Filter, Copy, FileText, ChevronDown, ChevronUp } from 'lucide-vue-next'
 import { toast } from '@/lib/utils'
+import { logger } from '@/services/logger'
 
 const props = defineProps({
   node: {
@@ -207,7 +208,7 @@ const refreshBibliography = () => {
         return true
       })
     } catch (error) {
-      console.error('Error refreshing bibliography:', error)
+      logger.error('Error refreshing bibliography:', error)
     }
   })
 }

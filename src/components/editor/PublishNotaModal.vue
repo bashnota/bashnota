@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input'
 import { toast } from '@/lib/utils'
 import { Copy, Share2, Globe, EyeOff, Loader2, RefreshCw } from 'lucide-vue-next'
 import { Switch } from '@/components/ui/switch'
+import { logger } from '@/services/logger'
 
 const props = defineProps<{
   notaId: string
@@ -50,7 +51,7 @@ const publishNota = async () => {
     await notaStore.publishNota(props.notaId)
     toast('Nota published successfully')
   } catch (error) {
-    console.error('Error publishing nota:', error)
+    logger.error('Error publishing nota:', error)
     toast('Failed to publish nota')
   } finally {
     isPublishing.value = false
@@ -63,7 +64,7 @@ const unpublishNota = async () => {
     await notaStore.unpublishNota(props.notaId)
     toast('Nota unpublished')
   } catch (error) {
-    console.error('Error unpublishing nota:', error)
+    logger.error('Error unpublishing nota:', error)
     toast('Failed to unpublish nota')
   } finally {
     isUnpublishing.value = false

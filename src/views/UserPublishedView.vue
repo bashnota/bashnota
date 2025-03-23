@@ -9,6 +9,7 @@ import { ExternalLink } from 'lucide-vue-next'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar' // Import Avatar components
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import { type PublishedNota } from '@/types/nota'
+import { logger } from '@/services/logger'
 
 const route = useRoute()
 const router = useRouter()
@@ -57,7 +58,7 @@ onMounted(async () => {
       return
     }
   } catch (err) {
-    console.error('Error loading published notas:', err)
+    logger.error('Error loading published notas:', err)
     error.value = 'Failed to load published notas'
   } finally {
     isLoading.value = false

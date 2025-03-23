@@ -49,6 +49,7 @@ import { Input } from '@/components/ui/input'
 import { LockIcon } from 'lucide-vue-next'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
+import { logger } from '@/services/logger'
 
 interface CaptionData {
   label: string
@@ -106,7 +107,7 @@ const renderedCaption = computed(() => {
     
     return text
   } catch (error) {
-    console.error('KaTeX parsing error:', error)
+    logger.error('KaTeX parsing error:', error)
     return text
   }
 })

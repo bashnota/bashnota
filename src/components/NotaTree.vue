@@ -18,6 +18,7 @@ import type { Nota } from '@/types/nota'
 import { useFavoriteBlocksStore } from '@/stores/favoriteBlocksStore'
 import Modal from './Modal.vue'
 import type { Editor } from '@tiptap/vue-3'
+import { logger } from '@/services/logger'
 
 interface Props {
   items: Nota[]
@@ -98,7 +99,7 @@ const closeContextMenu = () => {
 
 const handleModalSubmit = (name: string) => {
   if (!editor.value) {
-    console.error('Editor is not initialized')
+    logger.error('Editor is not initialized')
     return
   }
   const selectedContent = editor.value.getJSON()

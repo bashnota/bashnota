@@ -1,6 +1,7 @@
 import { BaseActor } from './BaseActor'
 import { ActorType, type VibeTask, DatabaseEntryType } from '@/types/vibe'
 import { notaExtensionService } from '@/services/notaExtensionService'
+import { logger } from '@/services/logger'
 
 /**
  * Result structure for the analyst
@@ -87,7 +88,7 @@ export class Analyst extends BaseActor {
     }
     
     // No longer automatically insert visualizations - user will do this manually
-    console.log('Analyst: Generated analysis and stored in database with', 
+    logger.log('Analyst: Generated analysis and stored in database with', 
       analysis.visualizations.length, 'visualizations')
     
     return analysis
@@ -144,7 +145,7 @@ export class Analyst extends BaseActor {
           }
         }
       } catch (error) {
-        console.error(`Error gathering dependency result for task ${depId}:`, error)
+        logger.error(`Error gathering dependency result for task ${depId}:`, error)
       }
     }
     
@@ -305,7 +306,7 @@ ${this.config.customInstructions || 'Ensure your analysis is thorough, insightfu
           visualizations: Array.isArray(parsed.visualizations) ? parsed.visualizations : []
         };
       } catch (parseError) {
-        console.warn('Failed to parse JSON content:', parseError);
+        logger.warn('Failed to parse JSON content:', parseError);
         
         // Fallback: Return a minimal valid structure with the raw content
         return {
@@ -315,7 +316,7 @@ ${this.config.customInstructions || 'Ensure your analysis is thorough, insightfu
         };
       }
     } catch (error) {
-      console.error('Error in parseAnalysisContent:', error);
+      logger.error('Error in parseAnalysisContent:', error);
       
       // If parsing fails, return a simple structure with the raw content
       return {
@@ -396,7 +397,7 @@ ${this.config.customInstructions || 'Ensure your analysis is thorough, insightfu
               break
           }
         } catch (error: unknown) {
-          console.error(`Error inserting visualization of type ${viz.type}:`, error)
+          logger.error(`Error inserting visualization of type ${viz.type}:`, error)
           notaExtensionService.setParagraph()
           notaExtensionService.insertContent(`Error displaying visualization: ${error instanceof Error ? error.message : String(error)}`)
         }
@@ -421,7 +422,7 @@ ${this.config.customInstructions || 'Ensure your analysis is thorough, insightfu
         // This requires more complex editor manipulation that's beyond the scope of this example
       }
     } catch (error) {
-      console.error('Error inserting table visualization:', error)
+      logger.error('Error inserting table visualization:', error)
     }
   }
   
@@ -434,7 +435,7 @@ ${this.config.customInstructions || 'Ensure your analysis is thorough, insightfu
     try {
       notaExtensionService.insertScatterPlot(title, data)
     } catch (error) {
-      console.error('Error inserting scatter plot visualization:', error)
+      logger.error('Error inserting scatter plot visualization:', error)
     }
   }
   
@@ -446,7 +447,7 @@ ${this.config.customInstructions || 'Ensure your analysis is thorough, insightfu
     try {
       notaExtensionService.insertMermaid(data)
     } catch (error) {
-      console.error('Error inserting mermaid visualization:', error)
+      logger.error('Error inserting mermaid visualization:', error)
     }
   }
   
@@ -490,7 +491,7 @@ ${this.config.customInstructions || 'Ensure your analysis is thorough, insightfu
       // Add some space after the equation
       notaExtensionService.insertContent({ type: 'paragraph' });
     } catch (error: unknown) {
-      console.error('Error inserting math visualization:', error);
+      logger.error('Error inserting math visualization:', error);
       notaExtensionService.setParagraph();
       notaExtensionService.insertContent(`Unable to render the mathematical expression: ${error instanceof Error ? error.message : String(error)}`);
     }

@@ -11,6 +11,7 @@ import { onKeyStroke } from '@vueuse/core'
 import type { Editor } from '@tiptap/vue-3'
 import { useDebounceFn } from '@vueuse/core'
 import Fuse from 'fuse.js'
+import { logger } from '@/services/logger'
 
 const props = defineProps<{
   editor?: Editor | null
@@ -93,7 +94,7 @@ const insertBlock = async (content: string) => {
       })
       toast('The block was successfully inserted into the document')
     } catch (error) {
-      console.error('Failed to insert block:', error)
+      logger.error('Failed to insert block:', error)
       toast('Failed to insert block')
     }
   }

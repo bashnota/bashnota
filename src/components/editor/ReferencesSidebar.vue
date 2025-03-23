@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useCitationStore, type CitationEntry } from '@/stores/citationStore'
 import type { Editor } from '@tiptap/vue-3'
 import { toast } from '@/lib/utils'
+import { logger } from '@/services/logger'
 
 const props = defineProps<{
   editor?: Editor
@@ -181,7 +182,7 @@ const saveCitation = async () => {
     showAddDialog.value = false
     resetForm()
   } catch (error) {
-    console.error('Error saving citation:', error)
+    logger.error('Error saving citation:', error)
     toast('Failed to save citation')
   } finally {
     isSaving.value = false
@@ -292,7 +293,7 @@ const extractBibEntries = (text: string): string[] => {
       }
     }
   } catch (error) {
-    console.error('Error in BibTeX parsing:', error)
+    logger.error('Error in BibTeX parsing:', error)
   }
   
   return entries
@@ -339,7 +340,7 @@ const parseBibTeX = (bibtex: string) => {
           })
           importedCount++
         } catch (error) {
-          console.error('Error importing citation:', error)
+          logger.error('Error importing citation:', error)
         }
       })
       
@@ -355,7 +356,7 @@ const parseBibTeX = (bibtex: string) => {
       }
     }
   } catch (error) {
-    console.error('Error parsing BibTeX:', error)
+    logger.error('Error parsing BibTeX:', error)
     toast('Failed to parse BibTeX')
   }
 }

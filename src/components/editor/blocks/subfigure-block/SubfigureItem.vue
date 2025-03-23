@@ -87,6 +87,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import UploadZone from '@/components/UploadZone.vue'
 import ImagePreviewModal from '@/components/ImagePreviewModal.vue'
+import { logger } from '@/services/logger'
 
 type ObjectFitType = 'contain' | 'cover' | 'fill' | 'none' | 'scale-down'
 
@@ -239,7 +240,7 @@ const handleFileUpload = async (file: File) => {
     }
     reader.readAsDataURL(file)
   } catch (error) {
-    console.error('Error uploading subfigure:', error)
+    logger.error('Error uploading subfigure:', error)
   }
 }
 

@@ -1,6 +1,7 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { useVueFlow } from '@vue-flow/core'
 import type { Task, TaskNode, TaskEdge } from './types'
+import { logger } from '@/services/logger'
 
 interface UseTaskGraphOptions {
   initialTasks?: Task[]
@@ -46,7 +47,7 @@ export function useTaskGraph(options: UseTaskGraphOptions = {}) {
       const tasksToUse = tasks.value
       
       if (!tasksToUse || tasksToUse.length === 0) {
-        console.warn('Cannot build graph: No valid tasks provided')
+        logger.warn('Cannot build graph: No valid tasks provided')
         elements.value = []
         return
       }
@@ -54,12 +55,12 @@ export function useTaskGraph(options: UseTaskGraphOptions = {}) {
       const nodes: TaskNode[] = []
       const edges: TaskEdge[] = []
       
-      console.log('Building graph with tasks:', tasksToUse)
+      logger.log('Building graph with tasks:', tasksToUse)
       
       // Create a node for each task
       tasksToUse.forEach((task, index) => {
         if (!task.id) {
-          console.warn('Task missing ID, skipping:', task)
+          logger.warn('Task missing ID, skipping:', task)
           return
         }
         
@@ -89,7 +90,7 @@ export function useTaskGraph(options: UseTaskGraphOptions = {}) {
             const dependencyExists = tasksToUse.some(t => t.id === depId);
             
             if (!dependencyExists) {
-              console.warn(`Task ${task.id} depends on missing task ${depId}`)
+              logger.warn(`Task ${task.id} depends on missing task ${depId}`)
               return
             }
             
@@ -108,25 +109,25 @@ export function useTaskGraph(options: UseTaskGraphOptions = {}) {
         }
       })
       
-      console.log('Created nodes:', nodes)
-      console.log('Created edges:', edges)
+      logger.log('Created nodes:', nodes)
+      logger.log('Created edges:', edges)
       
       // Make sure to update the elements with both nodes and edges
       if (nodes.length > 0) {
         elements.value = [...nodes, ...edges]
       } else {
-        console.warn('No valid nodes created')
+        logger.warn('No valid nodes created')
         elements.value = []
       }
     } catch (error) {
-      console.error('Error building graph:', error)
+      logger.error('Error building graph:', error)
       elements.value = []
     }
   }
   
   // Function to use sample test data for debugging
   function useTestData() {
-    console.log('Using test data for debugging')
+    logger.log('Using test data for debugging')
     
     // Clear current elements
     elements.value = []
@@ -189,7 +190,7 @@ export function useTaskGraph(options: UseTaskGraphOptions = {}) {
   
   // Function to handle node click
   function handleNodeClick(event: any, { id }: { id: string }) {
-    console.log('Node clicked:', id)
+    logger.log('Node clicked:', id)
     onNodeClick?.(id)
   }
   
@@ -202,7 +203,7 @@ export function useTaskGraph(options: UseTaskGraphOptions = {}) {
   
   // Watch for changes in tasks and rebuild the graph
   watch(tasks, (newTasks) => {
-    console.log('Tasks changed:', newTasks)
+    logger.log('Tasks changed:', newTasks)
     if (newTasks && newTasks.length > 0) {
       nextTick(() => {
         buildGraph()

@@ -10,6 +10,7 @@ import Toaster from '@/components/ui/toast/Toaster.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRoute } from 'vue-router'
 import { Menu } from 'lucide-vue-next'
+import { logger } from '@/services/logger'
 
 const isSidebarOpen = ref(false)
 const sidebarWidth = ref(300)
@@ -34,7 +35,7 @@ onMounted(async () => {
         sidebarWidth.value = settings.sidebarWidth[0]
       }
     } catch (e) {
-      console.error('Failed to parse saved interface settings', e)
+      logger.error('Failed to parse saved interface settings', e)
     }
   } else {
     const savedWidth = localStorage.getItem('sidebar-width')

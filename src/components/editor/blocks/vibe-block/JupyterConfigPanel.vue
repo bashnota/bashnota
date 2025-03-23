@@ -133,6 +133,7 @@ import {
 } from '@/components/ui/select'
 import { toast } from '@/lib/utils'
 import { useRouter } from 'vue-router'
+import { logger } from '@/services/logger'
 
 // Emits
 const emit = defineEmits(['configUpdated'])
@@ -261,7 +262,7 @@ const refreshKernels = async () => {
     
     toast('Kernels refreshed successfully')
   } catch (error) {
-    console.error('Failed to refresh kernels:', error)
+    logger.error('Failed to refresh kernels:', error)
     toast('Failed to refresh kernels')
   } finally {
     isRefreshing.value = false

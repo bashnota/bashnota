@@ -10,6 +10,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { toast } from '@/lib/utils'
+import { logger } from '@/services/logger'
 
 const props = defineProps<{
   notaId: string
@@ -62,7 +63,7 @@ const refreshSessions = async (server: JupyterServer) => {
       runningKernels.value[serverKey] = []
     }
   } catch (error) {
-    console.error('Failed to refresh sessions:', error)
+    logger.error('Failed to refresh sessions:', error)
     sessions.value[serverKey] = []
     runningKernels.value[serverKey] = []
   }
@@ -105,7 +106,7 @@ const deleteKernel = async (server: JupyterServer, kernelId: string) => {
     await refreshSessions(server)
     toast('Kernel deleted successfully')
   } catch (error) {
-    console.error('Failed to delete kernel:', error)
+    logger.error('Failed to delete kernel:', error)
     toast('Failed to delete kernel')
   } finally {
     isDeletingKernels.value[kernelId] = false
@@ -127,7 +128,7 @@ const cleanIdleKernels = async (server: JupyterServer) => {
     await refreshSessions(server)
     toast(`Cleaned ${idleKernels.length} idle kernel(s)`)
   } catch (error) {
-    console.error('Failed to clean idle kernels:', error)
+    logger.error('Failed to clean idle kernels:', error)
     toast('Failed to clean some kernels')
   }
 }

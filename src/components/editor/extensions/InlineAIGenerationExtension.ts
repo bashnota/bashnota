@@ -5,6 +5,7 @@ import { aiService } from '@/services/aiService'
 import { useAISettingsStore } from '@/stores/aiSettingsStore'
 import { toast } from '@/components/ui/toast'
 import type { CommandProps } from '@tiptap/core'
+import { logger } from '@/services/logger'
 
 export interface InlineAIGenerationAttributes {
   prompt: string
@@ -70,7 +71,7 @@ export const InlineAIGenerationExtension = Node.create({
       },
       
       generateInlineAI: (nodePos, prompt, isContinuation = false) => ({ editor }) => {
-        console.log('generateInlineAI called with:', nodePos, prompt, isContinuation)
+        logger.log('generateInlineAI called with:', nodePos, prompt, isContinuation)
         
         const aiSettings = useAISettingsStore()
         const providerId = aiSettings.settings.preferredProviderId
@@ -79,7 +80,7 @@ export const InlineAIGenerationExtension = Node.create({
         
         if (provider?.requiresApiKey && !apiKey) {
           // Update node with error
-          console.error('API key required for', provider.name)
+          logger.error('API key required for', provider.name)
           
           // Find the node and update it directly
           if (nodePos !== undefined && nodePos >= 0 && nodePos < editor.state.doc.content.size) {
@@ -105,7 +106,7 @@ export const InlineAIGenerationExtension = Node.create({
         }
         
         // Set loading state
-        console.log('Setting loading state at position:', nodePos)
+        logger.log('Setting loading state at position:', nodePos)
         
         // Get the node at the position
         const { state } = editor.view
@@ -137,7 +138,7 @@ export const InlineAIGenerationExtension = Node.create({
           providerId === 'gemini' ? aiSettings.settings.geminiModel : undefined,
           providerId === 'gemini' ? aiSettings.settings.geminiSafetyThreshold : undefined
         ).then(result => {
-          console.log('Generation successful:', result)
+          logger.log('Generation successful:', result)
           
           // Update node with result
           if (nodePos !== undefined && nodePos >= 0 && nodePos < editor.state.doc.content.size) {
@@ -160,7 +161,7 @@ export const InlineAIGenerationExtension = Node.create({
             description: `Generated ${result.text.length} characters with ${provider?.name}.`
           })
         }).catch(error => {
-          console.error('Generation failed:', error)
+          logger.error('Generation failed:', error)
           
           // Update node with error
           if (nodePos !== undefined && nodePos >= 0 && nodePos < editor.state.doc.content.size) {

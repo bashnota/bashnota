@@ -43,6 +43,7 @@ import type { NodeViewProps } from '@tiptap/vue-3'
 import { Card, CardContent } from '@/components/ui/card'
 import MathDisplay from './MathDisplay.vue'
 import MathInput from './MathInput.vue'
+import { logger } from '@/services/logger'
 
 // Props - use NodeViewProps interface
 const props = defineProps<NodeViewProps>()
@@ -95,7 +96,7 @@ watch(isReadOnly, (newValue) => {
 
 // Capture errors from child components
 onErrorCaptured((err, instance, info) => {
-  console.error('Error in MathBlock component:', err, info)
+  logger.error('Error in MathBlock component:', err, info)
   // Return false to prevent the error from propagating further
   return false
 })

@@ -25,6 +25,7 @@ import TagsInputInput from '@/components/ui/tags-input/TagsInputInput.vue'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
 import { toast } from '@/components/ui/toast'
 import PublishNotaModal from '@/components/editor/PublishNotaModal.vue'
+import { logger } from '@/services/logger'
 
 const props = defineProps<{
   id: string
@@ -81,7 +82,7 @@ const executeAllCells = async () => {
   try {
     await codeExecutionStore.executeAll()
   } catch (error) {
-    console.error('Error executing all cells:', error)
+    logger.error('Error executing all cells:', error)
   } finally {
     isExecutingAll.value = false
   }

@@ -1,5 +1,6 @@
 import axios from 'axios'
 import * as webllm from "@mlc-ai/web-llm";
+import { logger } from '@/services/logger'
 
 // Add the InitProgressReport interface to match WebLLM's API
 interface InitProgressReport {
@@ -139,7 +140,7 @@ export class AIService {
     try {
       return 'gpu' in navigator;
     } catch (error) {
-      console.error('Error checking WebGPU support:', error);
+      logger.error('Error checking WebGPU support:', error);
       return false;
     }
   }
@@ -157,7 +158,7 @@ export class AIService {
       // Progress callback function with correct type
       const initProgressCallback = (report: InitProgressReport) => {
         this.modelLoadingProgress = report.progress;
-        console.log(`Loading model: ${Math.round(report.progress * 100)}% - ${report.text}`);
+        logger.log(`Loading model: ${Math.round(report.progress * 100)}% - ${report.text}`);
       };
       
       // If we already have an engine, reload it with the new model
@@ -178,7 +179,7 @@ export class AIService {
       }
     } catch (error) {
       this.modelLoadingError = error instanceof Error ? error.message : 'Unknown error loading model';
-      console.error('Error initializing WebLLM:', error);
+      logger.error('Error initializing WebLLM:', error);
       throw error;
     } finally {
       this.isModelLoading = false;
@@ -242,7 +243,7 @@ export class AIService {
           throw new Error(`Provider ${providerId} not implemented`)
       }
     } catch (error) {
-      console.error('AI generation failed:', error)
+      logger.error('AI generation failed:', error)
       throw error
     }
   }
@@ -350,12 +351,12 @@ export class AIService {
         let shouldRetry = false;
         
         if (axios.isAxiosError(error) && error.response) {
-          console.error(`Gemini API error (attempt ${retryCount + 1}/${MAX_RETRIES + 1}):`, error.response.data);
+          logger.error(`Gemini API error (attempt ${retryCount + 1}/${MAX_RETRIES + 1}):`, error.response.data);
           
           // Check for rate limit error (429)
           if (error.response.status === 429) {
             shouldRetry = true;
-            console.warn(`Rate limit hit with Gemini API. Retrying in ${(INITIAL_RETRY_DELAY * Math.pow(2, retryCount)) / 1000} seconds...`);
+            logger.warn(`Rate limit hit with Gemini API. Retrying in ${(INITIAL_RETRY_DELAY * Math.pow(2, retryCount)) / 1000} seconds...`);
           }
         }
         
@@ -437,7 +438,7 @@ export class AIService {
         tokens: response.usage?.completion_tokens || 0
       };
     } catch (error) {
-      console.error('WebLLM generation failed:', error);
+      logger.error('WebLLM generation failed:', error);
       throw new Error(error instanceof Error ? error.message : 'WebLLM generation failed');
     }
   }
@@ -485,7 +486,7 @@ export class AIService {
         }
       }
     } catch (error) {
-      console.error('WebLLM streaming generation failed:', error);
+      logger.error('WebLLM streaming generation failed:', error);
       throw new Error(error instanceof Error ? error.message : 'WebLLM streaming generation failed');
     }
   }
@@ -573,11 +574,11 @@ export class AIService {
       try {
         // Since there's no direct cancel method, we can try to create a new completion
         // which should effectively cancel the previous one
-        console.log('Attempting to abort WebLLM generation');
+        logger.log('Attempting to abort WebLLM generation');
         // We could potentially reload the model to force a reset
         // or just let the current generation complete
       } catch (error) {
-        console.error('Error aborting generation:', error);
+        logger.error('Error aborting generation:', error);
       }
     }
   }
@@ -660,7 +661,7 @@ export class AIService {
       
       return geminiModels;
     } catch (error) {
-      console.error('Error fetching Gemini models:', error);
+      logger.error('Error fetching Gemini models:', error);
       // On error, return the static list we have
       return this.geminiModels;
     }
@@ -732,7 +733,7 @@ export class AIService {
     try {
       return await this.generateWithGeminiMultimodal(apiKey, options, modelId);
     } catch (error) {
-      console.error('Multimodal AI generation failed:', error);
+      logger.error('Multimodal AI generation failed:', error);
       throw error;
     }
   }
@@ -869,7 +870,7 @@ export class AIService {
     } catch (error) {
       // Add better error handling for debugging
       if (axios.isAxiosError(error) && error.response) {
-        console.error('Gemini Multimodal API error:', error.response.data);
+        logger.error('Gemini Multimodal API error:', error.response.data);
         
         if (error.response.status === 404) {
           throw new Error(`Gemini model "${model}" not found. Please check if the model ID is correct.`);
@@ -899,7 +900,7 @@ export class AIService {
       
       return base64;
     } catch (error) {
-      console.error('Error fetching and converting image:', error);
+      logger.error('Error fetching and converting image:', error);
       throw new Error('Failed to fetch and convert image to base64');
     }
   }
@@ -974,7 +975,7 @@ export class AIService {
                 }
               });
             } catch (error) {
-              console.error(`Failed to process image ${imageUrl}:`, error);
+              logger.error(`Failed to process image ${imageUrl}:`, error);
               // Continue with other images
             }
           }
@@ -1025,14 +1026,14 @@ export class AIService {
           
           // Check for rate limit errors
           if (response.status === 429) {
-            console.warn(`Rate limit hit with Gemini API multimodal streaming (attempt ${retryCount + 1}/${MAX_RETRIES + 1}). Retrying in ${(INITIAL_RETRY_DELAY * Math.pow(2, retryCount)) / 1000} seconds...`);
+            logger.warn(`Rate limit hit with Gemini API multimodal streaming (attempt ${retryCount + 1}/${MAX_RETRIES + 1}). Retrying in ${(INITIAL_RETRY_DELAY * Math.pow(2, retryCount)) / 1000} seconds...`);
             throw new Error('Rate limit exceeded');
           }
           
           // Check for other error responses
           if (!response.ok) {
             const errorText = await response.text();
-            console.error(`Gemini API error (status ${response.status}):`, errorText);
+            logger.error(`Gemini API error (status ${response.status}):`, errorText);
             
             if (response.status === 404) {
               throw new Error(`Gemini model "${model}" not found. Please check if the model ID is correct.`);
@@ -1067,7 +1068,7 @@ export class AIService {
                 const trimmedLine = line.trim();
                 if (!(trimmedLine.startsWith('{') && trimmedLine.endsWith('}')) && 
                     !(trimmedLine.startsWith('[') && trimmedLine.endsWith(']'))) {
-                  console.warn('Skipping non-JSON line:', trimmedLine);
+                  logger.warn('Skipping non-JSON line:', trimmedLine);
                   continue;
                 }
                 
@@ -1088,7 +1089,7 @@ export class AIService {
                   }
                 }
               } catch (parseError) {
-                console.warn('Error parsing JSON chunk:', parseError);
+                logger.warn('Error parsing JSON chunk:', parseError);
               }
             }
           };
@@ -1118,7 +1119,7 @@ export class AIService {
               // Continue reading
               await read();
             } catch (error) {
-              console.error('Error reading stream:', error);
+              logger.error('Error reading stream:', error);
               throw error;
             }
           };
@@ -1134,7 +1135,7 @@ export class AIService {
             throw error; // This will be caught by the outer try/catch
           }
           
-          console.error('Gemini multimodal streaming fetch error:', error);
+          logger.error('Gemini multimodal streaming fetch error:', error);
           throw error;
         }
       } catch (error: any) {
@@ -1153,7 +1154,7 @@ export class AIService {
         // Also retry on network errors
         if (error instanceof TypeError && error.message.includes('fetch')) {
           shouldRetry = true;
-          console.warn(`Network error with Gemini API multimodal streaming. Retrying in ${(INITIAL_RETRY_DELAY * Math.pow(2, retryCount)) / 1000} seconds...`);
+          logger.warn(`Network error with Gemini API multimodal streaming. Retrying in ${(INITIAL_RETRY_DELAY * Math.pow(2, retryCount)) / 1000} seconds...`);
         }
         
         // If we shouldn't retry or we're out of retries, throw the error
@@ -1169,7 +1170,7 @@ export class AIService {
             return;
           }
           
-          console.error('Gemini multimodal streaming setup failed:', error);
+          logger.error('Gemini multimodal streaming setup failed:', error);
           onComplete({
             text: `Error: ${error.message || 'An unknown error occurred'}`,
             provider: 'gemini',

@@ -3,6 +3,7 @@ import { Plugin, PluginKey } from 'prosemirror-state'
 import { Decoration, DecorationSet } from 'prosemirror-view'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
+import { logger } from '@/services/logger'
 
 interface Token {
   type: 'katex-display' | 'katex-inline' | 'bold' | 'italic' | 'code'
@@ -121,7 +122,7 @@ export const MarkdownExtension = Extension.create({
                         })
                       )
                     } catch (error) {
-                      console.error('KaTeX parsing error:', error)
+                      logger.error('KaTeX parsing error:', error)
                     }
                   } else {
                     decos.push(

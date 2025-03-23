@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import ShortcutsDialog from '../ShortcutsDialog.vue'
+import { logger } from '@/services/logger'
 
 // Import our new modular components
 import SidebarSearch from './SidebarSearch.vue'
@@ -125,7 +126,7 @@ const createNewNota = async (parentId: string | null = null) => {
 
     await router.push(`/nota/${nota.id}`)
   } catch (error) {
-    console.error('Failed to create nota:', error)
+    logger.error('Failed to create nota:', error)
   }
 }
 

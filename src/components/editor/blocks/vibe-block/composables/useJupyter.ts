@@ -1,6 +1,7 @@
 // Jupyter integration composable
 import { ref, onMounted } from 'vue'
 import { useJupyterStore } from '@/stores/jupyterStore'
+import { logger } from '@/services/logger'
 
 interface JupyterServer {
   ip: string
@@ -45,7 +46,7 @@ export function useJupyter() {
    * Update Jupyter configuration
    */
   function updateJupyterConfig(config: any) {
-    console.log('Updating Jupyter config:', config)
+    logger.log('Updating Jupyter config:', config)
     jupyterConfig.value = config
     
     // Save configuration to localStorage for persistence
@@ -62,7 +63,7 @@ export function useJupyter() {
         }
       }))
     } catch (error) {
-      console.error('Failed to save Jupyter config to localStorage:', error)
+      logger.error('Failed to save Jupyter config to localStorage:', error)
     }
     
     // Hide the config panel after update
@@ -92,7 +93,7 @@ export function useJupyter() {
             if (!jupyterStore.kernels[serverKey] || jupyterStore.kernels[serverKey].length === 0) {
               // We need to refresh kernels before we can select one
               // This will happen asynchronously
-              console.log('Loading kernels for saved server config')
+              logger.log('Loading kernels for saved server config')
             } else {
               // Find kernel by name
               const kernel = jupyterStore.kernels[serverKey].find(
@@ -101,14 +102,14 @@ export function useJupyter() {
               
               if (kernel) {
                 jupyterConfig.value.kernel = kernel
-                console.log('Restored Jupyter config from localStorage')
+                logger.log('Restored Jupyter config from localStorage')
               }
             }
           }
         }
       }
     } catch (error) {
-      console.error('Failed to load saved Jupyter config:', error)
+      logger.error('Failed to load saved Jupyter config:', error)
     }
   }
 

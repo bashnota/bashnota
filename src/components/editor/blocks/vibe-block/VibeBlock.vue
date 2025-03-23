@@ -128,6 +128,9 @@ import VibeTaskBoard from './components/VibeTaskBoard.vue'
 import VibeDatabaseView from './components/VibeDatabaseView.vue'
 import VibeTaskDetails from './components/VibeTaskDetails.vue'
 
+// Import logger
+import { logger } from '@/services/logger'
+
 const props = defineProps({
   editor: Object,
   node: Object,
@@ -144,7 +147,7 @@ let aiSettingsStore
 try {
   aiSettingsStore = useAISettingsStore()
 } catch (error) {
-  console.error('Error loading AISettingsStore:', error)
+  logger.error('Error loading AISettingsStore:', error)
   // Provide a fallback implementation with basic defaults
   aiSettingsStore = {
     settings: {
@@ -308,11 +311,11 @@ async function loadTasksAndDatabase() {
 
 // Reset the Vibe block
 function resetVibe() {
-  console.log('Resetting Vibe block')
+  logger.log('Resetting Vibe block')
   
   // Clean up task executor if it exists
   if (taskExecutor.value) {
-    console.log('Disposing task executor')
+    logger.log('Disposing task executor')
     taskExecutor.value.dispose()
     taskExecutor.value = null
   }
@@ -343,19 +346,19 @@ watch(() => props.node.attrs.taskBoardId, async (newVal) => {
 
 // Update the onMounted hook with more logging
 onMounted(async () => {
-  console.log('VibeBlock mounted with props:', props.node.attrs)
-  console.log('queryText initial value:', queryText.value)
+  logger.log('VibeBlock mounted with props:', props.node.attrs)
+  logger.log('queryText initial value:', queryText.value)
   
   // Initialize queryText from props if available
   if (props.node.attrs.query) {
-    console.log('Setting queryText from props:', props.node.attrs.query)
+    logger.log('Setting queryText from props:', props.node.attrs.query)
     queryText.value = props.node.attrs.query
-    console.log('queryText after setting from props:', queryText.value)
+    logger.log('queryText after setting from props:', queryText.value)
   }
   
   // If the block already has a board ID, load the tasks
   if (props.node.attrs.taskBoardId) {
-    console.log('Block has taskBoardId, starting refresh interval')
+    logger.log('Block has taskBoardId, starting refresh interval')
     await startRefreshInterval(loadTasksAndDatabase)
   }
   
@@ -379,7 +382,7 @@ onMounted(async () => {
           if (!jupyterStore.kernels[serverKey] || jupyterStore.kernels[serverKey].length === 0) {
             // We need to refresh kernels before we can select one
             // This will happen asynchronously
-            console.log('Loading kernels for saved server config')
+            logger.log('Loading kernels for saved server config')
           } else {
             // Find kernel by name
             const kernel = jupyterStore.kernels[serverKey].find(
@@ -388,19 +391,19 @@ onMounted(async () => {
             
             if (kernel) {
               jupyterConfig.value.kernel = kernel
-              console.log('Restored Jupyter config from localStorage')
+              logger.log('Restored Jupyter config from localStorage')
             }
           }
         }
       }
     }
   } catch (error) {
-    console.error('Failed to load saved Jupyter config:', error)
+    logger.error('Failed to load saved Jupyter config:', error)
   }
 })
 
 onBeforeUnmount(() => {
-  console.log('VibeBlock unmounting, clearing interval and disposing executor')
+  logger.log('VibeBlock unmounting, clearing interval and disposing executor')
   if (refreshInterval.value) {
     clearInterval(refreshInterval.value)
     refreshInterval.value = null
@@ -408,7 +411,7 @@ onBeforeUnmount(() => {
   
   // Clean up task executor if it exists
   if (taskExecutor.value) {
-    console.log('Disposing task executor on unmount')
+    logger.log('Disposing task executor on unmount')
     taskExecutor.value.dispose()
     taskExecutor.value = null
   }
@@ -426,10 +429,10 @@ const onButtonClick = async (event) => {
   queryText.value = String(queryText.value || '').trim()
   
   // Log detailed information about the event and state
-  console.log('Button clicked, event type:', event?.type)
-  console.log('queryText value after trim:', JSON.stringify(queryText.value))
-  console.log('queryText length:', queryText.value.length)
-  console.log('queryText type:', typeof queryText.value)
+  logger.log('Button clicked, event type:', event?.type)
+  logger.log('queryText value after trim:', JSON.stringify(queryText.value))
+  logger.log('queryText length:', queryText.value.length)
+  logger.log('queryText type:', typeof queryText.value)
   
   // Call activateVibe
   await activateVibe()
@@ -437,10 +440,10 @@ const onButtonClick = async (event) => {
 
 // Update activateVibe to use await with startRefreshInterval and store Jupyter config
 const activateVibe = async () => {
-  console.log('activateVibe called with query:', JSON.stringify(queryText.value))
+  logger.log('activateVibe called with query:', JSON.stringify(queryText.value))
   
   if (!vibeStore) {
-    console.error('VibeStore is not available')
+    logger.error('VibeStore is not available')
     toast({
       variant: 'destructive',
       title: 'Error',
@@ -452,7 +455,7 @@ const activateVibe = async () => {
   // Do an explicit check for empty string after trimming
   const trimmedQuery = (queryText.value || '').trim()
   if (!trimmedQuery) {
-    console.log('Query is empty after trimming, showing toast')
+    logger.log('Query is empty after trimming, showing toast')
     toast({
       variant: 'destructive',
       title: 'Error',
@@ -474,7 +477,7 @@ const activateVibe = async () => {
     })
     
     loadingMessage.value = 'Creating your Vibe board...'
-    console.log('Creating board for query:', query)
+    logger.log('Creating board for query:', query)
     
     // Store Jupyter configuration information for the API
     const jupyterInfo = getJupyterInfoForAPI()
@@ -485,10 +488,10 @@ const activateVibe = async () => {
       jupyterConfig: jupyterInfo
     })
     
-    console.log('Board created:', board)
+    logger.log('Board created:', board)
     
     if (!board) {
-      console.error('Board creation failed - returned undefined')
+      logger.error('Board creation failed - returned undefined')
       toast({
         variant: 'destructive',
         title: 'Error',
@@ -517,7 +520,7 @@ const activateVibe = async () => {
     })
     
     // Update block attributes with board ID
-    console.log('Updating node attributes with board ID:', board.id)
+    logger.log('Updating node attributes with board ID:', board.id)
     props.updateAttributes({
       taskBoardId: board.id,
       isLoading: false
@@ -531,7 +534,7 @@ const activateVibe = async () => {
     // Start refresh interval to update tasks
     await startRefreshInterval(loadTasksAndDatabase)
   } catch (error) {
-    console.error('Error in activateVibe:', error)
+    logger.error('Error in activateVibe:', error)
     props.updateAttributes({
       isLoading: false,
       error: error instanceof Error ? error.message : String(error)

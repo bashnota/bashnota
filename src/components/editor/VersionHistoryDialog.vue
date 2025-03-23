@@ -7,6 +7,7 @@ import { formatDate } from '@/lib/utils'
 import { toast } from '@/lib/utils'
 import { Trash2 } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
+import { logger } from '@/services/logger'
 
 const props = defineProps<{
   notaId: string
@@ -57,7 +58,7 @@ const restoreVersion = async (versionId: string) => {
       router.push({ path: currentRoute.path })
     })
   } catch (error) {
-    console.error('Error restoring version:', error)
+    logger.error('Error restoring version:', error)
     toast('Failed to restore version')
   } finally {
     isRestoring.value = false
@@ -76,7 +77,7 @@ const deleteVersion = async (versionId: string) => {
     await notaStore.deleteVersion(props.notaId, versionId)
     toast('Version deleted successfully')
   } catch (error) {
-    console.error('Error deleting version:', error)
+    logger.error('Error deleting version:', error)
     toast('Failed to delete version')
   } finally {
     isDeleting.value = false

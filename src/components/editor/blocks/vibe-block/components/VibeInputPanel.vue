@@ -61,6 +61,7 @@
 import { Button } from '@/components/ui/button'
 import { Zap, ServerCog, X } from 'lucide-vue-next'
 import JupyterConfigPanel from '../JupyterConfigPanel.vue'
+import { logger } from '@/services/logger'
 
 const props = defineProps({
   modelValue: {
@@ -83,7 +84,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'submit', 'toggle-jupyter', 'update-jupyter'])
 
 function updateJupyterConfig(config) {
-  console.log('Updating Jupyter config:', config)
+  logger.log('Updating Jupyter config:', config)
   
   // Emit the updated config to parent
   emit('update-jupyter', config)

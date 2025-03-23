@@ -16,6 +16,7 @@ import {
 import { Eye, EyeOff, Mail, Lock, User, ShieldCheck, Calendar, Clock } from 'lucide-vue-next'
 import { toast } from '@/lib/utils'
 import { formatDate } from '@/lib/utils'
+import { logger } from '@/services/logger'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -50,7 +51,7 @@ const handleResetPassword = async () => {
   try {
     await authStore.resetPassword(currentUser.value.email)
   } catch (error) {
-    console.error('Password reset error:', error)
+    logger.error('Password reset error:', error)
   } finally {
     isLoading.value = false
   }
@@ -71,7 +72,7 @@ const handleDeleteAccount = async () => {
     showDeleteConfirmation.value = false
     deleteConfirmationText.value = ''
   } catch (error) {
-    console.error('Account deletion error:', error)
+    logger.error('Account deletion error:', error)
   } finally {
     isLoading.value = false
   }
@@ -83,7 +84,7 @@ const handleLogout = async () => {
     await authStore.logout()
     router.push('/')
   } catch (error) {
-    console.error('Logout error:', error)
+    logger.error('Logout error:', error)
   }
 }
 </script>

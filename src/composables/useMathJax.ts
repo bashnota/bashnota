@@ -1,5 +1,6 @@
 import { ref, onMounted, watch } from 'vue'
 import 'mathjax/es5/tex-svg'
+import { logger } from '@/services/logger'
 
 declare global {
   interface Window {
@@ -20,7 +21,7 @@ export function useMathJax() {
       }
     } catch (err) {
       error.value = err instanceof Error ? err : new Error(String(err))
-      console.error('Error checking MathJax:', err)
+      logger.error('Error checking MathJax:', err)
     }
     return false
   }
@@ -37,7 +38,7 @@ export function useMathJax() {
           }
         } catch (err) {
           error.value = err instanceof Error ? err : new Error(String(err))
-          console.error('Error initializing MathJax:', err)
+          logger.error('Error initializing MathJax:', err)
           resolve(false)
         }
       }
@@ -66,7 +67,7 @@ export function useMathJax() {
       return true
     } catch (err) {
       error.value = err instanceof Error ? err : new Error(String(err))
-      console.error('Error rendering LaTeX:', err)
+      logger.error('Error rendering LaTeX:', err)
       element.innerHTML = '<span class="text-destructive">Invalid LaTeX</span>'
       return false
     }
@@ -77,7 +78,7 @@ export function useMathJax() {
       initMathJax()
     } catch (err) {
       error.value = err instanceof Error ? err : new Error(String(err))
-      console.error('Error in MathJax onMounted:', err)
+      logger.error('Error in MathJax onMounted:', err)
     }
   })
 

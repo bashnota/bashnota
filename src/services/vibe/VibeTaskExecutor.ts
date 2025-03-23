@@ -12,6 +12,7 @@ import type { JupyterServer, KernelSpec } from '@/types/jupyter'
 import { Summarizer } from './actors/Summarizer'
 import { Reviewer } from './actors/Reviewer'
 import { Visualizer } from './actors/Visualizer'
+import { logger } from '@/services/logger'
 
 /**
  * Class for executing tasks in the correct order
@@ -32,6 +33,7 @@ export class VibeTaskExecutor {
   private startTime: number      // Timestamp when execution started
   private maxExecutionTime = 10 * 60 * 1000  // Maximum execution time (10 minutes)
   private timeoutTimer: any = null   // Timer for execution timeout
+  private executorLogger = logger.createPrefixedLogger('VibeTaskExecutor')
   
   /**
    * Constructor
@@ -71,13 +73,13 @@ export class VibeTaskExecutor {
       return
     }
     
-    console.warn(`VibeTaskExecutor execution timeout after ${this.maxExecutionTime/1000} seconds`)
+    this.executorLogger.warn(`Execution timeout after ${this.maxExecutionTime/1000} seconds`)
     
     try {
       // Get current board state
       const board = await this.vibeStore.getBoard(this.boardId)
       if (!board) {
-        console.warn(`Board ${this.boardId} not found during timeout handling`)
+        this.executorLogger.warn(`Board ${this.boardId} not found during timeout handling`)
         return
       }
       
@@ -87,7 +89,7 @@ export class VibeTaskExecutor {
       )
       
       if (pendingTasks.length > 0) {
-        console.warn(`Marking ${pendingTasks.length} pending tasks as failed due to execution timeout`)
+        this.executorLogger.warn(`Marking ${pendingTasks.length} pending tasks as failed due to execution timeout`)
         
         // Mark all pending tasks as failed
         for (const task of pendingTasks) {
@@ -98,7 +100,7 @@ export class VibeTaskExecutor {
         }
       }
     } catch (error) {
-      console.error('Error handling execution timeout:', error)
+      this.executorLogger.error('Error handling execution timeout:', error)
     } finally {
       // Clean up
       this.dispose()
@@ -110,7 +112,7 @@ export class VibeTaskExecutor {
    * This will prevent further task execution
    */
   public dispose(): void {
-    console.log(`Disposing VibeTaskExecutor for board ${this.boardId}`)
+    this.executorLogger.log(`Disposing VibeTaskExecutor for board ${this.boardId}`)
     
     // Mark as disposed so no new tasks can be executed
     this.isDisposed = true
@@ -125,7 +127,7 @@ export class VibeTaskExecutor {
     // Note: We don't cancel them, we just forget about them
     const runningTaskCount = Object.keys(this.runningTasks).length
     if (runningTaskCount > 0) {
-      console.log(`Abandoning ${runningTaskCount} running tasks during disposal`)
+      this.executorLogger.log(`Abandoning ${runningTaskCount} running tasks during disposal`)
     }
     
     // Clear running tasks map
@@ -145,23 +147,23 @@ export class VibeTaskExecutor {
   public async executeAllTasks(): Promise<void> {
     // Check if already disposed
     if (this.isDisposed) {
-      console.warn('VibeTaskExecutor has been disposed, skipping task execution')
+      this.executorLogger.warn('VibeTaskExecutor has been disposed, skipping task execution')
       return
     }
     
     // Check recursion depth to prevent stack overflow
     if (this.recursionDepth >= this.maxRecursionDepth) {
-      console.error(`Maximum recursion depth (${this.maxRecursionDepth}) reached in executeAllTasks`)
+      this.executorLogger.error(`Maximum recursion depth (${this.maxRecursionDepth}) reached in executeAllTasks`)
       throw new Error('Maximum recursion depth reached in task execution')
     }
     
     this.recursionDepth++
-    console.log(`Executing all tasks, recursion depth: ${this.recursionDepth}`)
+    this.executorLogger.log(`Executing all tasks, recursion depth: ${this.recursionDepth}`)
     
     try {
       const board = await this.vibeStore.getBoard(this.boardId)
       if (!board) {
-        console.warn(`Board ${this.boardId} not found, skipping task execution`)
+        this.executorLogger.warn(`Board ${this.boardId} not found, skipping task execution`)
         return
       }
       
@@ -191,7 +193,7 @@ export class VibeTaskExecutor {
       
       // Check for disposed state before continuing
       if (this.isDisposed) {
-        console.warn('VibeTaskExecutor was disposed during execution, aborting')
+        this.executorLogger.warn('VibeTaskExecutor was disposed during execution, aborting')
         return
       }
       
@@ -200,7 +202,7 @@ export class VibeTaskExecutor {
       
       // Check if there are any ready tasks
       if (readyTasks.length === 0) {
-        console.log('No ready tasks to execute')
+        this.executorLogger.log('No ready tasks to execute')
         
         // Check if there are any running tasks
         const runningTaskCount = Object.keys(this.runningTasks).length
@@ -213,14 +215,14 @@ export class VibeTaskExecutor {
         )
         
         if (pendingTasks.length > 0) {
-          console.log(`There are ${pendingTasks.length} pending tasks, but none are ready yet`)
+          this.executorLogger.log(`There are ${pendingTasks.length} pending tasks, but none are ready yet`)
           
           // Reset retry attempts if we find pending tasks that might become ready
           this.retryAttempts = 0
           
           // If there are running tasks, wait for them to complete before checking again
           if (runningTaskCount > 0) {
-            console.log(`There are ${runningTaskCount} running tasks that might unlock dependencies`)
+            this.executorLogger.log(`There are ${runningTaskCount} running tasks that might unlock dependencies`)
             
             // Decrement recursion depth before waiting
             this.recursionDepth--
@@ -230,7 +232,7 @@ export class VibeTaskExecutor {
             return
           } else {
             // No running tasks but there are pending tasks - this might indicate a dependency issue
-            console.warn('No tasks are running but there are pending tasks - checking for dependency issues')
+            this.executorLogger.warn('No tasks are running but there are pending tasks - checking for dependency issues')
             
             // Visualize the dependency graph for debugging
             this.visualizeDependencyGraph(tasks, dependencyGraph)
@@ -239,11 +241,11 @@ export class VibeTaskExecutor {
             const { hasCircularDependencies, circularPaths, stuckTasks } = this.checkForCircularDependencies(tasks, dependencyGraph)
             
             if (hasCircularDependencies) {
-              console.warn(`Found circular dependencies in tasks. Cycles:`, circularPaths)
+              this.executorLogger.warn(`Found circular dependencies in tasks. Cycles:`, circularPaths)
               
               // Mark all tasks in circular dependencies as failed
               if (stuckTasks.length > 0) {
-                console.warn(`Found ${stuckTasks.length} tasks stuck in dependency cycles`)
+                this.executorLogger.warn(`Found ${stuckTasks.length} tasks stuck in dependency cycles`)
                 
                 // Mark these tasks as failed since their dependencies form a cycle
                 for (const task of stuckTasks) {
@@ -262,7 +264,7 @@ export class VibeTaskExecutor {
             
             // If we've retried too many times in a row without progress, mark all remaining pending tasks as failed
             if (this.retryAttempts >= this.maxRetryAttempts / 2) {
-              console.warn(`Retry count is high (${this.retryAttempts}), checking for tasks with missing dependencies`)
+              this.executorLogger.warn(`Retry count is high (${this.retryAttempts}), checking for tasks with missing dependencies`)
               
               // Check for tasks with potentially unresolvable dependencies (missing or invalid)
               const tasksWithPotentialMissingDependencies = pendingTasks.filter(task => {
@@ -271,7 +273,7 @@ export class VibeTaskExecutor {
               })
               
               if (tasksWithPotentialMissingDependencies.length > 0) {
-                console.warn(`Found ${tasksWithPotentialMissingDependencies.length} tasks with missing dependencies`)
+                this.executorLogger.warn(`Found ${tasksWithPotentialMissingDependencies.length} tasks with missing dependencies`)
                 
                 // Mark these tasks as failed since their dependencies can't be found
                 for (const task of tasksWithPotentialMissingDependencies) {
@@ -290,7 +292,7 @@ export class VibeTaskExecutor {
             
             // If retry count has reached maximum, mark all pending tasks as failed to break out of infinite loop
             if (this.retryAttempts >= this.maxRetryAttempts) {
-              console.warn(`Maximum retry attempts (${this.maxRetryAttempts}) reached, marking all pending tasks as failed`)
+              this.executorLogger.warn(`Maximum retry attempts (${this.maxRetryAttempts}) reached, marking all pending tasks as failed`)
               
               // Mark all pending tasks as failed to break the loop
               for (const task of pendingTasks) {
@@ -315,7 +317,7 @@ export class VibeTaskExecutor {
             })
             
             if (tasksWithUnresolvableDependencies.length > 0) {
-              console.warn(`Found ${tasksWithUnresolvableDependencies.length} tasks with failed dependencies`)
+              this.executorLogger.warn(`Found ${tasksWithUnresolvableDependencies.length} tasks with failed dependencies`)
               
               // Mark these tasks as failed since their dependencies failed
               for (const task of tasksWithUnresolvableDependencies) {
@@ -339,12 +341,12 @@ export class VibeTaskExecutor {
         }
         
         // Since there are no ready tasks and no pending tasks, decrement recursion depth and return
-        console.log('No more tasks to execute')
+        this.executorLogger.log('No more tasks to execute')
         this.recursionDepth--
         return
       }
       
-      console.log(`Executing ${readyTasks.length} ready tasks`)
+      this.executorLogger.log(`Executing ${readyTasks.length} ready tasks`)
       
       // Reset retry attempts since we found tasks to execute
       this.retryAttempts = 0
@@ -352,11 +354,11 @@ export class VibeTaskExecutor {
       // Start executing ready tasks
       // Instead of running all tasks in parallel, process them sequentially
       // to avoid overwhelming the API with concurrent requests
-      console.log(`Executing ${readyTasks.length} ready tasks sequentially`)
+      this.executorLogger.log(`Executing ${readyTasks.length} ready tasks sequentially`)
       for (const task of readyTasks) {
         // Check if already disposed before each task
         if (this.isDisposed) {
-          console.warn('VibeTaskExecutor was disposed during execution, aborting')
+          this.executorLogger.warn('VibeTaskExecutor was disposed during execution, aborting')
           this.recursionDepth--
           return
         }
@@ -367,7 +369,7 @@ export class VibeTaskExecutor {
       
       // Check for disposed state before continuing
       if (this.isDisposed) {
-        console.warn('VibeTaskExecutor was disposed during execution, aborting')
+        this.executorLogger.warn('VibeTaskExecutor was disposed during execution, aborting')
         this.recursionDepth--
         return
       }
@@ -378,18 +380,18 @@ export class VibeTaskExecutor {
       )
       
       if (remainingTasks.length > 0) {
-        console.log(`There are ${remainingTasks.length} remaining tasks, continuing execution`)
+        this.executorLogger.log(`There are ${remainingTasks.length} remaining tasks, continuing execution`)
         // Reset retry attempts for next execution cycle
         this.retryAttempts = 0
         // Recursively execute remaining tasks
         await this.executeAllTasks()
       } else {
-        console.log('All tasks completed successfully')
+        this.executorLogger.log('All tasks completed successfully')
         // Reset retry attempts
         this.retryAttempts = 0
       }
     } catch (error) {
-      console.error(`Error executing tasks for board ${this.boardId}:`, error)
+      this.executorLogger.error(`Error executing tasks for board ${this.boardId}:`, error)
       // Re-throw the error to be handled by the caller
       throw error
     } finally {
@@ -406,7 +408,7 @@ export class VibeTaskExecutor {
   public async executeTask(task: VibeTask): Promise<any> {
     // Check if already disposed
     if (this.isDisposed) {
-      console.warn(`VibeTaskExecutor has been disposed, skipping task ${task.id}`)
+      this.executorLogger.warn(`VibeTaskExecutor has been disposed, skipping task ${task.id}`)
       return
     }
     
@@ -424,7 +426,7 @@ export class VibeTaskExecutor {
       // Check if all dependencies are complete
       const board = await this.vibeStore.getBoard(this.boardId)
       if (!board) {
-        console.warn(`Board ${this.boardId} not found when executing task ${task.id}, skipping`)
+        this.executorLogger.warn(`Board ${this.boardId} not found when executing task ${task.id}, skipping`)
         return
       }
       
@@ -442,7 +444,7 @@ export class VibeTaskExecutor {
           const failedDependencies = dependencies.filter(dep => dep.status === 'failed')
           
           if (failedDependencies.length > 0) {
-            console.warn(`Cannot execute task ${task.id}: dependencies failed`)
+            this.executorLogger.warn(`Cannot execute task ${task.id}: dependencies failed`)
             // Mark this task as failed since its dependencies failed
             await this.vibeStore.updateTask(this.boardId, task.id, {
               status: 'failed',
@@ -452,12 +454,12 @@ export class VibeTaskExecutor {
           }
           
           // Otherwise, dependencies are still pending or in progress
-          console.log(`Cannot execute task ${task.id}: dependencies not complete yet`)
+          this.executorLogger.log(`Cannot execute task ${task.id}: dependencies not complete yet`)
           return
         }
       }
       
-      console.log(`Executing task ${task.id}: ${task.title}`)
+      this.executorLogger.log(`Executing task ${task.id}: ${task.title}`)
       
       // Get the appropriate actor for the task
       const actor = this.getActorForType(task.actorType)
@@ -467,7 +469,7 @@ export class VibeTaskExecutor {
         // Create a promise for the task execution
         // Always pass the editor instance to ensure it's available to actors
         // even if the notaExtensionService editor reference was lost
-        console.log(`VibeTaskExecutor: Starting task ${task.id} (${task.actorType})`)
+        this.executorLogger.log(`Starting task ${task.id} (${task.actorType})`)
         
         // Get the current editor from the extension service or supply our own
         const editorInstance = notaExtensionService.hasEditor() 
@@ -482,16 +484,16 @@ export class VibeTaskExecutor {
         
         // If the executor was disposed during execution, don't update the task
         if (this.isDisposed) {
-          console.warn(`VibeTaskExecutor was disposed during execution of task ${task.id}`)
+          this.executorLogger.warn(`VibeTaskExecutor was disposed during execution of task ${task.id}`)
           return
         }
         
-        console.log(`Task ${task.id} completed`)
+        this.executorLogger.log(`Task ${task.id} completed`)
         return result
       } catch (error) {
         // If not disposed, log the error and rethrow
         if (!this.isDisposed) {
-          console.error(`Error executing task ${task.id}:`, error)
+          this.executorLogger.error(`Error executing task ${task.id}:`, error)
           throw error
         }
       } finally {
@@ -502,7 +504,7 @@ export class VibeTaskExecutor {
       // Make sure to remove from running tasks on error
       delete this.runningTasks[task.id]
       
-      console.error(`Error in executeTask for task ${task.id}:`, error)
+      this.executorLogger.error(`Error in executeTask for task ${task.id}:`, error)
       throw error
     }
   }
@@ -519,11 +521,11 @@ export class VibeTaskExecutor {
     
     // We need to set up the editor again
     if (this.editor) {
-      console.log(`VibeTaskExecutor: Re-setting editor instance from stored reference`)
+      this.executorLogger.log(`Re-setting editor instance from stored reference`)
       return this.editor;
     }
     
-    console.warn(`VibeTaskExecutor: No editor instance available`)
+    this.executorLogger.warn(`No editor instance available`)
     return undefined;
   }
   
@@ -532,7 +534,7 @@ export class VibeTaskExecutor {
    * This can be called if execution gets stuck
    */
   public resetState(): void {
-    console.log(`Resetting VibeTaskExecutor state for board ${this.boardId}`)
+    this.executorLogger.log(`Resetting VibeTaskExecutor state for board ${this.boardId}`)
     
     // Clear running tasks tracking
     this.runningTasks = {}
@@ -593,7 +595,7 @@ export class VibeTaskExecutor {
       
       if (hasFailedDependencies) {
         // Log but don't automatically fail the task - we'll do that in executeTask
-        console.log(`Task ${task.id} has failed dependencies, will be marked as failed`)
+        this.executorLogger.log(`Task ${task.id} has failed dependencies, will be marked as failed`)
       }
       
       // Not ready yet
@@ -643,7 +645,7 @@ export class VibeTaskExecutor {
    */
   private async waitForTasks(): Promise<void> {
     if (this.isDisposed) {
-      console.warn('VibeTaskExecutor was disposed, not waiting for tasks')
+      this.executorLogger.warn('VibeTaskExecutor was disposed, not waiting for tasks')
       return
     }
     
@@ -651,19 +653,19 @@ export class VibeTaskExecutor {
     this.retryAttempts++
     
     if (this.retryAttempts > this.maxRetryAttempts) {
-      console.warn(`Maximum retry attempts (${this.maxRetryAttempts}) reached`)
+      this.executorLogger.warn(`Maximum retry attempts (${this.maxRetryAttempts}) reached`)
       this.retryAttempts = 0
       return
     }
     
-    console.log(`Waiting for running tasks to complete (attempt ${this.retryAttempts}/${this.maxRetryAttempts})`)
+    this.executorLogger.log(`Waiting for running tasks to complete (attempt ${this.retryAttempts}/${this.maxRetryAttempts})`)
     
     const runningTasksArray = Object.values(this.runningTasks)
     
     // Store the current task state to check if we're making progress
     const boardBefore = await this.vibeStore.getBoard(this.boardId)
     if (!boardBefore) {
-      console.warn(`Board ${this.boardId} not found during waitForTasks, aborting`)
+      this.executorLogger.warn(`Board ${this.boardId} not found during waitForTasks, aborting`)
       return
     }
     
@@ -673,24 +675,24 @@ export class VibeTaskExecutor {
     
     // Wait for running tasks or sleep a bit if no running tasks
     if (runningTasksArray.length === 0) {
-      console.log('No running tasks to wait for, will retry immediately')
+      this.executorLogger.log('No running tasks to wait for, will retry immediately')
       // Wait a short time to avoid tight loops
       await new Promise(resolve => setTimeout(resolve, 500))
     } else {
       try {
         // Wait for all running tasks to complete
-        console.log(`Waiting for ${runningTasksArray.length} running tasks to complete`)
+        this.executorLogger.log(`Waiting for ${runningTasksArray.length} running tasks to complete`)
         await Promise.all(runningTasksArray)
-        console.log('All running tasks completed')
+        this.executorLogger.log('All running tasks completed')
       } catch (error) {
-        console.error('Error waiting for running tasks:', error)
+        this.executorLogger.error('Error waiting for running tasks:', error)
       }
     }
     
     // Check if we've made progress by comparing task status before and after
     const boardAfter = await this.vibeStore.getBoard(this.boardId)
     if (!boardAfter) {
-      console.warn(`Board ${this.boardId} not found after waiting, aborting`)
+      this.executorLogger.warn(`Board ${this.boardId} not found after waiting, aborting`)
       return
     }
     
@@ -699,7 +701,7 @@ export class VibeTaskExecutor {
     for (const task of boardAfter.tasks) {
       const statusBefore = taskStatusBefore.get(task.id)
       if (statusBefore !== task.status) {
-        console.log(`Task ${task.id} changed status from ${statusBefore} to ${task.status}`)
+        this.executorLogger.log(`Task ${task.id} changed status from ${statusBefore} to ${task.status}`)
         madeProgress = true
         break
       }
@@ -707,7 +709,7 @@ export class VibeTaskExecutor {
     
     // If we're not making progress after multiple attempts, we might be in a deadlock
     if (!madeProgress && this.retryAttempts > 3) {
-      console.warn(`No progress detected after ${this.retryAttempts} attempts, may be deadlocked`)
+      this.executorLogger.warn(`No progress detected after ${this.retryAttempts} attempts, may be deadlocked`)
       
       // After multiple attempts with no progress, check for circular dependencies
       const dependencyGraph: Record<string, string[]> = {}
@@ -724,7 +726,7 @@ export class VibeTaskExecutor {
       )
       
       if (hasCircularDependencies && stuckTasks.length > 0) {
-        console.warn(`Detected ${stuckTasks.length} tasks stuck in circular dependencies`)
+        this.executorLogger.warn(`Detected ${stuckTasks.length} tasks stuck in circular dependencies`)
         
         // Mark these tasks as failed to break the deadlock
         for (const task of stuckTasks) {
@@ -741,7 +743,7 @@ export class VibeTaskExecutor {
           !(task.id in this.runningTasks)
         )
         
-        console.warn(`Marking ${pendingTasks.length} pending tasks as failed due to lack of progress`)
+        this.executorLogger.warn(`Marking ${pendingTasks.length} pending tasks as failed due to lack of progress`)
         
         for (const task of pendingTasks) {
           await this.vibeStore.updateTask(this.boardId, task.id, {
@@ -754,7 +756,7 @@ export class VibeTaskExecutor {
     
     // Reset recursion depth and retry
     this.recursionDepth = 0
-    console.log('Retrying task execution after waiting')
+    this.executorLogger.log('Retrying task execution after waiting')
     await this.executeAllTasks()
   }
   
@@ -847,29 +849,29 @@ export class VibeTaskExecutor {
    * @param dependencyGraph Dependency graph
    */
   private visualizeDependencyGraph(tasks: VibeTask[], dependencyGraph: Record<string, string[]>): void {
-    console.group('Task Dependency Graph')
+    this.executorLogger.group('Task Dependency Graph')
     
     for (const task of tasks) {
       const deps = dependencyGraph[task.id] || []
       const status = task.status
       const isRunning = task.id in this.runningTasks
       
-      console.log(`Task ${task.id} (${task.title}) - Status: ${status}${isRunning ? ' (RUNNING)' : ''}`)
+      this.executorLogger.log(`Task ${task.id} (${task.title}) - Status: ${status}${isRunning ? ' (RUNNING)' : ''}`)
       
       if (deps.length > 0) {
-        console.group('Dependencies:')
+        this.executorLogger.group('Dependencies:')
         for (const depId of deps) {
           const depTask = tasks.find(t => t.id === depId)
           if (depTask) {
-            console.log(`  ${depId} (${depTask.title}) - Status: ${depTask.status}`)
+            this.executorLogger.log(`  ${depId} (${depTask.title}) - Status: ${depTask.status}`)
           } else {
-            console.log(`  ${depId} - MISSING TASK`)
+            this.executorLogger.log(`  ${depId} - MISSING TASK`)
           }
         }
-        console.groupEnd()
+        this.executorLogger.groupEnd()
       }
     }
     
-    console.groupEnd()
+    this.executorLogger.groupEnd()
   }
 } 
