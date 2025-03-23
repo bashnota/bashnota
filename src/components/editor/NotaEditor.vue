@@ -306,7 +306,6 @@ const handleKeyboardShortcuts = (event: KeyboardEvent) => {
         .run(),
     t: () =>
       editor.value!.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
-    i: () => editor.value!.chain().focus().setImage().run(),
     m: () =>
       editor
         .value!.chain()

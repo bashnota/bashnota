@@ -10,13 +10,13 @@
     @dragleave.prevent="handleDragLeave"
     @dragenter.prevent="handleDragEnter"
   >
-    <input type="file" class="hidden" accept="image/*" @change="handleFileSelect" :ref="el => fileInput = el as HTMLInputElement" :disabled="disabled" />
+    <input type="file" class="hidden" accept="image/*" multiple @change="handleFileSelect" :ref="el => fileInput = el as HTMLInputElement" :disabled="disabled" />
     <div class="flex flex-col items-center gap-2">
       <UploadCloud class="w-12 h-12 text-muted-foreground" />
       <div class="flex flex-col items-center gap-1">
         <Button variant="outline" @click="handleButtonClick" class="relative" :disabled="disabled">
-          <span>Choose image</span>
-          <span class="sr-only">Upload file</span>
+          <span>{{ allowMultiple ? 'Choose images' : 'Choose image' }}</span>
+          <span class="sr-only">Upload file{{ allowMultiple ? 's' : '' }}</span>
         </Button>
         <p class="text-sm text-muted-foreground">or drag and drop</p>
       </div>
@@ -32,11 +32,13 @@ import { UploadCloud } from 'lucide-vue-next'
 
 const props = defineProps<{
   disabled?: boolean
+  allowMultiple?: boolean
 }>()
 
 const emit = defineEmits<{
   'file-selected': [event: Event]
   'file-dropped': [event: DragEvent]
+  'files-selected': [files: File[]]
 }>()
 
 const isDragging = ref(false)
@@ -74,7 +76,16 @@ const handleFileSelect = (event: Event) => {
   }
   
   isDragging.value = false
+  
+  // Legacy event emission for backward compatibility
   emit('file-selected', event)
+  
+  // New multi-file handling
+  const fileList = (event.target as HTMLInputElement).files
+  if (fileList && fileList.length > 0) {
+    const files = Array.from(fileList)
+    emit('files-selected', files)
+  }
 }
 
 const handleDrop = (event: DragEvent) => {
@@ -85,6 +96,15 @@ const handleDrop = (event: DragEvent) => {
   }
   
   isDragging.value = false
+  
+  // Legacy event emission for backward compatibility
   emit('file-dropped', event)
+  
+  // New multi-file handling for drag and drop
+  const fileList = event.dataTransfer?.files
+  if (fileList && fileList.length > 0) {
+    const files = Array.from(fileList)
+    emit('files-selected', files)
+  }
 }
 </script>

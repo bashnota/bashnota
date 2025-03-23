@@ -21,6 +21,7 @@ export interface SubfigureAttributes {
   isLocked: boolean
   caption: string
   label: string
+  gridColumns: number
 }
 
 declare module '@tiptap/core' {
@@ -88,6 +89,9 @@ export const SubfigureExtension = Node.create<SubfigureOptions>({
       label: {
         default: '',
       },
+      gridColumns: {
+        default: 2,
+      },
     }
   },
 
@@ -107,6 +111,7 @@ export const SubfigureExtension = Node.create<SubfigureOptions>({
             isLocked: el.getAttribute('data-locked') === 'true',
             caption: el.querySelector('.subfigure-main-caption')?.textContent || '',
             label: el.querySelector('.subfigure-main-label')?.textContent || '',
+            gridColumns: parseInt(el.getAttribute('data-grid-columns') || '2', 10),
           }
         },
       },
@@ -139,6 +144,7 @@ export const SubfigureExtension = Node.create<SubfigureOptions>({
             isLocked: element.getAttribute('data-locked') === 'true',
             caption: element.querySelector('.subfigure-main-caption')?.textContent || '',
             label: element.querySelector('.subfigure-main-label')?.textContent || '',
+            gridColumns: parseInt(element.getAttribute('data-grid-columns') || '2', 10),
           }
         },
       },
@@ -146,7 +152,7 @@ export const SubfigureExtension = Node.create<SubfigureOptions>({
   },
 
   renderHTML({ HTMLAttributes }) {
-    const { subfigures, layout, unifiedSize, objectFit, isLocked, caption, label, ...rest } = HTMLAttributes
+    const { subfigures, layout, unifiedSize, objectFit, isLocked, caption, label, gridColumns, ...rest } = HTMLAttributes
     
     const attrs = {
       ...rest,
@@ -156,6 +162,7 @@ export const SubfigureExtension = Node.create<SubfigureOptions>({
       'data-object-fit': objectFit || 'contain',
       'data-locked': isLocked ? 'true' : 'false',
       'data-subfigures': JSON.stringify(subfigures || []),
+      'data-grid-columns': gridColumns || 2,
       class: 'subfigure-container',
     }
     
@@ -168,12 +175,28 @@ export const SubfigureExtension = Node.create<SubfigureOptions>({
       ]
     })
     
+    // Create grid style based on layout
+    let gridClass = 'subfigure-grid';
+    const gridStyle: Record<string, string> = {};
+    
+    if (layout === 'vertical') {
+      gridClass += ' subfigure-layout-vertical';
+    } else if (layout === 'horizontal') {
+      gridClass += ' subfigure-layout-horizontal';
+    } else if (layout === 'grid') {
+      gridClass += ' subfigure-layout-grid';
+      gridStyle['grid-template-columns'] = `repeat(${gridColumns || 2}, 1fr)`;
+    }
+    
     return [
       'figure',
       mergeAttributes(this.options.HTMLAttributes, attrs),
       [
         'div',
-        { class: `subfigure-grid subfigure-layout-${layout || 'horizontal'}` },
+        { 
+          class: gridClass,
+          style: Object.entries(gridStyle).map(([key, value]) => `${key}: ${value}`).join(';')
+        },
         ...subfigureItems,
       ],
       label ? ['div', { class: 'subfigure-main-label' }, label] : '',
@@ -189,6 +212,7 @@ export const SubfigureExtension = Node.create<SubfigureOptions>({
           attrs: {
             subfigures: [],
             layout: 'horizontal',
+            gridColumns: 2,
             ...options,
           },
         })

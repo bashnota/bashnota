@@ -25,7 +25,7 @@ import { MarkdownExtension } from './MarkdownExtension'
 import { Mermaid } from './mermaid'
 import { ScatterPlot } from './scatter-plot'
 import { Youtube } from './youtube'
-import { ImageExtension, SubfigureExtension } from '../blocks'
+import { SubfigureExtension } from '../blocks'
 import GlobalDragHandle from './DragHandlePlugin'
 import { InlineAIGenerationExtension } from './InlineAIGenerationExtension'
 import { CitationExtension, BibliographyExtension } from './CitationExtension'
@@ -105,7 +105,6 @@ export function getEditorExtensions() {
     ScatterPlot,
     Youtube,
     SubfigureExtension,
-    ImageExtension,
     TaskList,
     TaskItem.configure({
       nested: true,
@@ -164,7 +163,6 @@ export function getViewerExtensions() {
     ScatterPlot,
     Youtube,
     SubfigureExtension,
-    ImageExtension,
     TaskList,
     TaskItem.configure({
       nested: true,

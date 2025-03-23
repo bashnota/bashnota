@@ -17,6 +17,8 @@
         v-else-if="!isReadOnly"
         @file-selected="handleFileSelected"
         @file-dropped="handleFileDrop"
+        @files-selected="handleMultipleFilesSelected"
+        :allow-multiple="true"
         class="rounded-md"
         :disabled="isLocked"
       />
@@ -31,19 +33,26 @@
         <TrashIcon class="w-4 h-4" />
       </Button>
 
-      <div v-if="subfigure.src" class="mt-2">
+      <!-- Only show subfigure caption if not the only item -->
+      <div v-if="subfigure.src && !isOnlySubfigure" class="mt-2">
         <!-- Read-only subfigure caption -->
         <div v-if="isReadOnly" class="text-sm px-2 py-1">
-          {{ subfigure.caption || defaultLabel }}
+          <span v-if="subfigure.caption">{{ subfigure.caption }}</span>
+          <span v-else class="font-medium">{{ defaultLabel }}</span>
         </div>
 
         <!-- Editable subfigure caption -->
         <div
           v-else-if="!isEditingCaption"
-          class="text-sm hover:bg-muted/50 rounded px-2 py-1 cursor-text"
+          class="text-sm rounded px-2 py-1"
+          :class="isLocked ? 'cursor-lock' : 'hover:bg-muted/50 cursor-text'"
           @click="startEditingCaption"
         >
-          {{ subfigure.caption || defaultLabel }}
+          <div class="flex items-center gap-1">
+            <LockIcon v-if="isLocked" class="w-3 h-3 opacity-50" />
+            <span v-if="subfigure.caption">{{ subfigure.caption }}</span>
+            <span v-else class="font-medium">{{ defaultLabel }}</span>
+          </div>
         </div>
         <Input
           v-else
@@ -73,7 +82,7 @@
 
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import { TrashIcon } from 'lucide-vue-next'
+import { TrashIcon, LockIcon } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import UploadZone from '@/components/UploadZone.vue'
@@ -94,12 +103,14 @@ const props = defineProps<{
   unifiedSize: boolean
   isLocked: boolean
   isReadOnly: boolean
+  totalSubfigures?: number
 }>()
 
 const emit = defineEmits<{
   'update:subfigure': [value: SubfigureData]
   'remove': []
   'unlock': []
+  'add-multiple-subfigures': [files: File[]]
 }>()
 
 // Local state
@@ -111,6 +122,11 @@ const isPreviewOpen = ref(false)
 const imageStyle = computed(() => ({
   objectFit: props.objectFit || 'contain' as ObjectFitType
 }))
+
+// Determine if this is the only subfigure
+const isOnlySubfigure = computed(() => {
+  return props.totalSubfigures === 1
+})
 
 // Watch for external changes
 watch(
@@ -191,6 +207,28 @@ const handleFileSelected = async (event: Event) => {
   }
 }
 
+const handleMultipleFilesSelected = async (files: File[]) => {
+  if (props.isLocked) {
+    emit('unlock')
+    return
+  }
+  
+  if (files.length === 0) return
+  
+  // If this subfigure doesn't have an image yet, use the first image for it
+  if (!props.subfigure.src && files.length > 0) {
+    await handleFileUpload(files[0])
+    
+    // If there are additional files, emit them to be added as new subfigures
+    if (files.length > 1) {
+      emit('add-multiple-subfigures', files.slice(1))
+    }
+  } else {
+    // If this subfigure already has an image, emit all files to be added as new subfigures
+    emit('add-multiple-subfigures', files)
+  }
+}
+
 const handleFileUpload = async (file: File) => {
   try {
     const reader = new FileReader()
@@ -222,4 +260,10 @@ const handleDoubleClick = (event: MouseEvent) => {
     emit('unlock')
   }
 }
-</script> 
+</script>
+
+<style scoped>
+.cursor-lock {
+  cursor: not-allowed;
+}
+</style>

@@ -15,6 +15,23 @@
         </Button>
       </div>
 
+      <!-- Grid Columns Control - only visible when grid layout is selected -->
+      <div v-if="modelValue.layout === 'grid'" class="flex items-center gap-2">
+        <span class="text-sm text-muted-foreground">Columns:</span>
+        <Select
+          :model-value="modelValue.gridColumns.toString()"
+          @update:model-value="updateGridColumns"
+          class="w-20"
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem v-for="n in 4" :key="n" :value="n.toString()">{{ n }}</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       <div class="flex items-center gap-2">
         <Switch 
           :model-value="modelValue.unifiedSize" 
@@ -49,6 +66,13 @@ import {
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 type LayoutType = 'horizontal' | 'vertical' | 'grid'
 
@@ -56,6 +80,7 @@ interface ControlsData {
   layout: LayoutType
   unifiedSize: boolean
   isLocked: boolean
+  gridColumns: number
 }
 
 const props = defineProps<{
@@ -84,6 +109,13 @@ const updateLayout = (layout: LayoutType) => {
 
 const updateUnifiedSize = (value: boolean) => {
   emit('update:modelValue', { ...props.modelValue, unifiedSize: value })
+}
+
+const updateGridColumns = (value: string) => {
+  emit('update:modelValue', { 
+    ...props.modelValue, 
+    gridColumns: parseInt(value) 
+  })
 }
 
 const toggleLock = () => {
