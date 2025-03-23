@@ -289,12 +289,12 @@ export default {
             .chain()
             .focus()
             .deleteRange(range)
-            .setMermaid(
-              `graph TD
+            .setMermaid({
+              content: `graph TD
     A[Client] --> B[Load Balancer]
     B --> C[Server1]
-    B --> D[Server2]`,
-            )
+    B --> D[Server2]`
+            })
             .run()
         },
       },
