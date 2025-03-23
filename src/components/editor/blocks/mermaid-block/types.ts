@@ -10,4 +10,7 @@ export interface MermaidBlockProps {
   editor: {
     isEditable: boolean;
   };
-} 
+  selected?: boolean;
+}
+
+export type MermaidTheme = 'default' | 'forest' | 'dark' | 'neutral'; 
