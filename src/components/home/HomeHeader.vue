@@ -9,7 +9,7 @@ defineEmits<{
 
 // Function to open Discord in a new tab
 const openDiscord = () => {
-  window.open('https://www.mlnomads.com/discord', '_blank')
+  window.open('https://discord.com/invite/2Gs2MTPGWd', '_blank')
 }
 </script>
 
