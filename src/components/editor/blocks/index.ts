@@ -15,6 +15,7 @@ import MathExtension, {
 
 import Citation from './Citation.vue'
 import Bibliography from './Bibliography.vue'
+import SubNotaDialog from './SubNotaDialog.vue'
 
 // Re-export everything
 export {
@@ -35,6 +36,9 @@ export {
   // Citation components
   Citation,
   Bibliography,
+  
+  // Dialog components
+  SubNotaDialog,
 }
 
 // Export a map of all extensions for easier registration
