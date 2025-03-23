@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { Button } from '@/components/ui/button'
-import { Plus, Sparkles, Code2, FileText } from 'lucide-vue-next'
+import { Plus, Sparkles, Code2, FileText, MessagesSquare } from 'lucide-vue-next'
 import { Card, CardContent } from '@/components/ui/card'
 
 defineEmits<{
   (e: 'create-nota'): void
 }>()
 
+// Function to open Discord in a new tab
+const openDiscord = () => {
+  window.open('https://www.mlnomads.com/discord', '_blank')
+}
 </script>
 
 <template>
@@ -50,15 +54,26 @@ defineEmits<{
 
 
       <!-- Bottom Action -->
-      <div class="mt-6">
+      <div class="mt-6 flex gap-3">
         <Button 
           @click="$emit('create-nota')" 
           size="lg" 
-          class="group relative overflow-hidden w-full"
+          class="group relative overflow-hidden flex-1"
         >
           <div class="absolute inset-0 bg-primary opacity-0 group-hover:opacity-10 transition-opacity"></div>
           <Plus class="h-5 w-5 mr-2 flex-shrink-0" />
           New Nota
+        </Button>
+        
+        <Button
+          @click="openDiscord"
+          size="lg"
+          variant="outline"
+          class="group relative overflow-hidden"
+        >
+          <div class="absolute inset-0 bg-primary opacity-0 group-hover:opacity-10 transition-opacity"></div>
+          <MessagesSquare class="h-5 w-5 mr-2 flex-shrink-0" />
+          Join our Discord
         </Button>
       </div>
     </div>
