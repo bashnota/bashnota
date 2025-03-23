@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import * as d3 from 'd3'
 import type { DataPoint, ColumnSelections } from '../types'
+import { logger } from '@/services/logger'
 
 export function useCsvData() {
   const rawCsvData = ref<Array<Record<string, any>>>([])
@@ -188,7 +189,7 @@ export function useCsvData() {
         nonNumeric: nonNumericColumns
       }
     } catch (error) {
-      console.error('Error extracting columns from CSV:', error)
+      logger.error('Error extracting columns from CSV:', error)
       return null
     }
   }
@@ -224,7 +225,7 @@ export function useCsvData() {
       
       return csvData
     } catch (error) {
-      console.error('Error parsing CSV:', error)
+      logger.error('Error parsing CSV:', error)
       throw error
     }
   }

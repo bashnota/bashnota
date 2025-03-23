@@ -4,6 +4,7 @@ import { useVibeStore } from '@/stores/vibeStore'
 import { VibeTaskExecutor } from '@/services/vibe/VibeTaskExecutor'
 import { useToast } from '@/components/ui/toast/use-toast'
 import type { Ref } from 'vue'
+import { logger } from '@/services/logger'
 
 /**
  * Composable for task execution in the Vibe block
@@ -24,7 +25,7 @@ export function useTaskExecutor(
    * Start the refresh interval to periodically check task status
    */
   async function startRefreshInterval(loadTasks: () => Promise<void>) {
-    console.log('Starting refresh interval')
+    logger.log('Starting refresh interval')
     // Clear any existing interval
     if (refreshInterval.value) {
       clearInterval(refreshInterval.value)
@@ -32,7 +33,7 @@ export function useTaskExecutor(
     
     // Clean up any existing task executor
     if (taskExecutor.value) {
-      console.log('Disposing existing task executor')
+      logger.log('Disposing existing task executor')
       taskExecutor.value.dispose()
       taskExecutor.value = null
     }
@@ -47,7 +48,7 @@ export function useTaskExecutor(
         const board = await vibeStore.getBoard(boardId.value)
         
         if (!board) {
-          console.error(`Board ${boardId.value} not found`)
+          logger.error(`Board ${boardId.value} not found`)
           updateAttributes({
             error: `Board not found. It may have been deleted or never created.`
           })
@@ -63,7 +64,7 @@ export function useTaskExecutor(
         
         // Execute tasks asynchronously
         taskExecutor.value.executeAllTasks().catch((error: Error) => {
-          console.error('Error executing tasks:', error)
+          logger.error('Error executing tasks:', error)
           // Only update error if it's not already set
           if (!updateAttributes) return
           updateAttributes({
@@ -71,7 +72,7 @@ export function useTaskExecutor(
           })
         })
       } catch (error: any) {
-        console.error('Error in startRefreshInterval:', error)
+        logger.error('Error in startRefreshInterval:', error)
         updateAttributes({
           error: `Error starting task execution: ${error.message}`
         })
@@ -89,7 +90,7 @@ export function useTaskExecutor(
    * Clean up resources when component is unmounted
    */
   function cleanupExecutor() {
-    console.log('Cleaning up task executor')
+    logger.log('Cleaning up task executor')
     if (refreshInterval.value) {
       clearInterval(refreshInterval.value)
       refreshInterval.value = null
@@ -97,7 +98,7 @@ export function useTaskExecutor(
     
     // Clean up task executor if it exists
     if (taskExecutor.value) {
-      console.log('Disposing task executor')
+      logger.log('Disposing task executor')
       taskExecutor.value.dispose()
       taskExecutor.value = null
     }
@@ -108,10 +109,10 @@ export function useTaskExecutor(
    */
   async function resetTaskExecution(resetInProgressTasks: () => Promise<void>, refreshTasks: () => Promise<void>) {
     try {
-      console.log('Attempting to reset task execution')
+      logger.log('Attempting to reset task execution')
       
       if (!taskExecutor.value) {
-        console.warn('No task executor available to reset')
+        logger.warn('No task executor available to reset')
         toast({
           variant: 'destructive',
           title: 'Error',
@@ -137,7 +138,7 @@ export function useTaskExecutor(
         description: 'Task execution has been reset and will continue'
       })
     } catch (error: any) {
-      console.error('Error resetting task execution:', error)
+      logger.error('Error resetting task execution:', error)
       toast({
         variant: 'destructive',
         title: 'Error',

@@ -4,6 +4,7 @@ import { aiService, supportedProviders } from '@/services/aiService'
 import { useAISettingsStore } from '@/stores/aiSettingsStore'
 import { notaExtensionService } from '@/services/notaExtensionService'
 import { type Editor } from '@tiptap/core'
+import { logger } from '@/services/logger'
 
 /**
  * Base class for all Vibe actors
@@ -11,6 +12,7 @@ import { type Editor } from '@tiptap/core'
 export abstract class BaseActor {
   protected config: ActorConfig
   protected vibeStore = useVibeStore()
+  private actorLogger: any;
   
   // Static properties for rate limiting across all actor instances
   private static lastApiCallTime = 0
@@ -26,6 +28,9 @@ export abstract class BaseActor {
       maxTokens: 2000,
       temperature: 0.7
     }
+    
+    // Create a logger specific to this actor type
+    this.actorLogger = logger.createPrefixedLogger(actorType);
   }
   
   // Static method to wait for the throttle period
@@ -35,7 +40,7 @@ export abstract class BaseActor {
     
     if (timeSinceLastCall < this.minTimeBetweenCalls) {
       const waitTime = this.minTimeBetweenCalls - timeSinceLastCall
-      console.log(`Rate limiting: Waiting ${waitTime}ms before next API call`)
+      logger.debug(`Rate limiting: Waiting ${waitTime}ms before next API call`)
       await new Promise(resolve => setTimeout(resolve, waitTime))
     }
     
@@ -95,7 +100,7 @@ export abstract class BaseActor {
     
     // Set the editor reference in the extension service if provided
     if (editor) {
-      console.log(`${this.actorType} actor: Setting editor instance for task ${task.id}`)
+      this.actorLogger.debug(`Setting editor instance for task ${task.id}`)
       notaExtensionService.setEditor(editor)
     }
     
@@ -108,7 +113,7 @@ export abstract class BaseActor {
       
       // Check if editor is still available before executing
       if (!notaExtensionService.hasEditor() && editor) {
-        console.log(`${this.actorType} actor: Re-setting editor instance for task ${task.id} as it was lost`)
+        this.actorLogger.debug(`Re-setting editor instance for task ${task.id} as it was lost`)
         notaExtensionService.setEditor(editor)
       }
       
@@ -124,7 +129,7 @@ export abstract class BaseActor {
       
       return result
     } catch (error: unknown) {
-      console.error(`Error executing task (${task.id}):`, error)
+      this.actorLogger.error(`Error executing task (${task.id}):`, error)
       
       // Update task with error
       const errorMessage = error instanceof Error ? error.message : String(error)
@@ -138,7 +143,7 @@ export abstract class BaseActor {
       // Clear the editor reference from the extension service
       // only if we set it in this method (to avoid clearing it if it was set elsewhere)
       if (setEditorInMethod) {
-        console.log(`${this.actorType} actor: Clearing editor instance after task ${task.id}`)
+        this.actorLogger.debug(`Clearing editor instance after task ${task.id}`)
         notaExtensionService.clearEditor()
       }
     }
@@ -162,7 +167,7 @@ export abstract class BaseActor {
     // Get API key from AI settings store
     const apiKey = aiSettingsStore.getApiKey(providerId)
     
-    console.log(`Using AI provider: ${provider.name}`)
+    this.actorLogger.debug(`Using AI provider: ${provider.name}`)
     
     // Get model-specific settings for Gemini
     const modelId = providerId === 'gemini' ? aiSettingsStore.settings.geminiModel : undefined
@@ -203,13 +208,13 @@ export abstract class BaseActor {
   protected safelyInsertContent(content: any): boolean {
     try {
       if (!notaExtensionService.hasEditor()) {
-        console.warn(`${this.actorType} actor: Cannot insert content, no editor instance available`)
+        this.actorLogger.warn(`Cannot insert content, no editor instance available`)
         return false
       }
       
       return notaExtensionService.insertContent(content)
     } catch (error) {
-      console.error(`${this.actorType} actor: Error inserting content:`, error)
+      this.actorLogger.error(`Error inserting content:`, error)
       return false
     }
   }
@@ -223,13 +228,13 @@ export abstract class BaseActor {
   protected safelyExecuteCommand<T = boolean>(commandName: string, params: any = {}): T | false {
     try {
       if (!notaExtensionService.hasEditor()) {
-        console.warn(`${this.actorType} actor: Cannot execute command ${commandName}, no editor instance available`)
+        this.actorLogger.warn(`Cannot execute command ${commandName}, no editor instance available`)
         return false as any
       }
       
       return notaExtensionService.executeCommand<T>(commandName, params)
     } catch (error) {
-      console.error(`${this.actorType} actor: Error executing command ${commandName}:`, error)
+      this.actorLogger.error(`Error executing command ${commandName}:`, error)
       return false as any
     }
   }

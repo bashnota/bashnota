@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { logger } from '@/services/logger'
 
 // Define a type for shortcuts
 interface Shortcut {
@@ -87,7 +88,7 @@ export const useShortcutsStore = defineStore('shortcuts', {
           if (parsed.generalShortcuts) this.generalShortcuts = parsed.generalShortcuts
           if (parsed.blockShortcuts) this.blockShortcuts = parsed.blockShortcuts
         } catch (e) {
-          console.error('Failed to parse saved shortcuts', e)
+          logger.error('Failed to parse saved shortcuts', e)
         }
       }
     }

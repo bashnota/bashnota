@@ -5,6 +5,7 @@ import type { CodeCell, KernelSession } from '@/types/codeExecution'
 import type { JupyterServer } from '@/types/jupyter'
 import { useNotaStore } from './nota'
 import { getURLWithoutProtocol } from '@/lib/utils'
+import { logger } from '@/services/logger'
 
 export const useCodeExecutionStore = defineStore('codeExecution', () => {
   const cells = ref<Map<string, CodeCell>>(new Map())
@@ -123,7 +124,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
       if (session.kernelId && session.serverConfig) {
         executionService
           .deleteKernel(session.serverConfig, session.kernelId)
-          .catch((error) => console.error('Failed to delete kernel:', error))
+          .catch((error) => logger.error('Failed to delete kernel:', error))
       }
 
       // Update cells to remove session association
@@ -186,7 +187,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
       }
       return sessionId
     } catch (error) {
-      console.error('Failed to create kernel session:', error)
+      logger.error('Failed to create kernel session:', error)
       throw error
     }
   }
@@ -348,7 +349,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
         try {
           await executionService.deleteKernel(session.serverConfig, session.kernelId)
         } catch (error) {
-          console.error('Failed to delete kernel:', error)
+          logger.error('Failed to delete kernel:', error)
         }
       }
     }

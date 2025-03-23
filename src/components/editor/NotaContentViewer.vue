@@ -7,6 +7,7 @@ import { ListIcon } from 'lucide-vue-next'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import { getViewerExtensions } from './extensions'
 import TableOfContents from './TableOfContents.vue'
+import { logger } from '@/services/logger'
 
 // Import shared CSS
 import '@/assets/editor-styles.css'
@@ -95,7 +96,7 @@ watch(
       try {
         editor.value.commands.setContent(JSON.parse(newContent))
       } catch (err) {
-        console.error('Error parsing content:', err)
+        logger.error('Error parsing content:', err)
       }
     }
   },

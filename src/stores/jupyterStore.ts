@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { JupyterServer, KernelSpec } from '@/types/jupyter'
 import { toast } from '@/lib/utils'
+import { logger } from '@/services/logger'
 
 export const useJupyterStore = defineStore('jupyter', () => {
   const jupyterServers = ref<JupyterServer[]>([])
@@ -14,7 +15,7 @@ export const useJupyterStore = defineStore('jupyter', () => {
       try {
         jupyterServers.value = JSON.parse(savedServers)
       } catch (error) {
-        console.error('Failed to parse saved Jupyter servers', error)
+        logger.error('Failed to parse saved Jupyter servers', error)
       }
     }
 
@@ -23,7 +24,7 @@ export const useJupyterStore = defineStore('jupyter', () => {
       try {
         kernels.value = JSON.parse(savedKernels)
       } catch (error) {
-        console.error('Failed to parse saved Jupyter kernels', error)
+        logger.error('Failed to parse saved Jupyter kernels', error)
       }
     }
   }

@@ -53,6 +53,7 @@ import { useExportPlot, type ExportFormat } from './composables/useExportPlot'
 import PlotControls from './components/PlotControls.vue'
 import PlotVisualization from './components/PlotVisualization.vue'
 import * as d3 from 'd3'
+import { logger } from '@/services/logger'
 
 const props = defineProps<NodeViewProps>()
 
@@ -187,7 +188,7 @@ const initializePlot = async () => {
         saveAllSettings()
       })
     } catch (error) {
-      console.error('Error parsing CSV data:', error)
+      logger.error('Error parsing CSV data:', error)
       
       // Fall back to random data
       const randomData = generateRandomData()
@@ -302,7 +303,7 @@ const handleCsvUpload = async (file: File) => {
     // Redraw the plot
     redrawPlot()
   } catch (error) {
-    console.error('Error handling CSV upload:', error)
+    logger.error('Error handling CSV upload:', error)
     apiError.value = error instanceof Error ? error.message : 'Failed to parse CSV file'
   }
 }

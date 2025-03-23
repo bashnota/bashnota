@@ -19,6 +19,7 @@ import ReferencesSidebar from './ReferencesSidebar.vue'
 import { getEditorExtensions } from './extensions'
 import { useEquationCounter, EQUATION_COUNTER_KEY } from '@/composables/useEquationCounter'
 import { useCitationStore } from '@/stores/citationStore'
+import { logger } from '@/services/logger'
 
 // Import shared CSS
 import '@/assets/editor-styles.css'
@@ -270,7 +271,7 @@ const saveEditorContent = () => {
         emit('saving', false)
       })
   } catch (error) {
-    console.error('Error saving content:', error)
+    logger.error('Error saving content:', error)
     emit('saving', false)
     return Promise.reject(error)
   }
@@ -398,7 +399,7 @@ onMounted(() => {
 
       applyEditorSettings()
     } catch (e) {
-      console.error('Failed to parse saved editor settings', e)
+      logger.error('Failed to parse saved editor settings', e)
     }
   }
 
@@ -457,7 +458,7 @@ const saveVersion = async () => {
 
     toast('Version saved successfully')
   } catch (error) {
-    console.error('Error saving version:', error)
+    logger.error('Error saving version:', error)
     toast('Failed to save version')
   } finally {
     isSavingVersion.value = false
@@ -505,7 +506,7 @@ const createAndLinkSubNota = async (title: string) => {
 
     return newNota
   } catch (error) {
-    console.error('Error creating sub-nota:', error)
+    logger.error('Error creating sub-nota:', error)
     toast('Failed to create sub-nota')
   }
 }

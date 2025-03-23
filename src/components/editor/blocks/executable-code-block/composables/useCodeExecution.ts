@@ -3,6 +3,7 @@ import { useRoute } from 'vue-router'
 import { useNotaStore } from '@/stores/nota'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
 import type { CodeBlockNode } from '../types'
+import { logger } from '@/services/logger'
 
 export function useCodeExecution(props: {
   node: CodeBlockNode
@@ -47,7 +48,7 @@ export function useCodeExecution(props: {
         props.updateAttributes({ output: cell.output })
       }
     } catch (error) {
-      console.error('Code execution failed:', error)
+      logger.error('Code execution failed:', error)
       props.updateAttributes({ 
         output: error instanceof Error ? error.message : 'Code execution failed' 
       })

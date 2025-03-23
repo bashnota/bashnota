@@ -2,6 +2,7 @@ import { BaseActor } from './BaseActor'
 import { ActorType, type VibeTask, DatabaseEntryType } from '@/types/vibe'
 import { useCitationStore } from '@/stores/citationStore'
 import { notaExtensionService } from '@/services/notaExtensionService'
+import { logger } from '@/services/logger'
 
 /**
  * Result structure for the researcher
@@ -54,7 +55,7 @@ export class Researcher extends BaseActor {
     )
   
     // Generate research content based on task description
-    console.log('Researcher: Generating research content for task:', task.description)
+    logger.log('Researcher: Generating research content for task:', task.description)
     const report = await this.generateReport(task.description, [])
   
     // Make sure the report has all necessary fields
@@ -82,7 +83,7 @@ export class Researcher extends BaseActor {
     )
   
     // No longer automatically insert the report - user will do this manually
-    console.log('Researcher: Generated report and stored in database')
+    logger.log('Researcher: Generated report and stored in database')
   
     return report
   }
@@ -137,7 +138,7 @@ export class Researcher extends BaseActor {
           }
         }
       } catch (error) {
-        console.error(`Error gathering dependency result for task ${depId}:`, error)
+        logger.error(`Error gathering dependency result for task ${depId}:`, error)
       }
     }
     
@@ -305,7 +306,7 @@ ${this.config.customInstructions || 'Produce content that is academically rigoro
           citations: Array.isArray(parsed.citations) ? parsed.citations : []
         };
       } catch (parseError) {
-        console.warn('Failed to parse JSON content:', parseError);
+        logger.warn('Failed to parse JSON content:', parseError);
         
         // Fallback: Return a minimal valid structure
         return {
@@ -315,7 +316,7 @@ ${this.config.customInstructions || 'Produce content that is academically rigoro
         };
       }
     } catch (error) {
-      console.error('Error in parseReportContent:', error);
+      logger.error('Error in parseReportContent:', error);
       
       // If parsing fails, return a simple structure with the raw content
       return {
@@ -331,11 +332,11 @@ ${this.config.customInstructions || 'Produce content that is academically rigoro
    * @param report The generated research report
    */
   private async insertReportToEditor(report: ResearchResult): Promise<void> {
-    console.log('Researcher: Attempting to insert report to editor')
+    logger.log('Researcher: Attempting to insert report to editor')
     
     // Check if editor is available before attempting to insert
     if (!notaExtensionService.hasEditor()) {
-      console.warn('Researcher: Cannot insert report to editor - no editor instance available')
+      logger.warn('Researcher: Cannot insert report to editor - no editor instance available')
       return;
     }
     
@@ -385,9 +386,9 @@ ${this.config.customInstructions || 'Produce content that is academically rigoro
         this.safelyInsertContent(report.content)
       }
       
-      console.log('Researcher: Successfully inserted report to editor')
+      logger.log('Researcher: Successfully inserted report to editor')
     } catch (error) {
-      console.error('Researcher: Error inserting report to editor:', error)
+      logger.error('Researcher: Error inserting report to editor:', error)
     }
   }
 } 

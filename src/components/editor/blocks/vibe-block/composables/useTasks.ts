@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { useVibeStore } from '@/stores/vibeStore'
 import type { Ref } from 'vue'
+import { logger } from '@/services/logger'
 
 /**
  * Composable for managing tasks in the Vibe block
@@ -60,18 +61,18 @@ export function useTasks(boardId: Ref<string>) {
   async function loadBoardTasks() {
     try {
       if (!boardId.value) {
-        console.log('No board ID available yet')
+        logger.log('No board ID available yet')
         return
       }
       
-      console.log('Loading tasks for board:', boardId.value)
+      logger.log('Loading tasks for board:', boardId.value)
       const board = await vibeStore.getBoard(boardId.value)
       if (board) {
         boardTasks.value = board.tasks || []
-        console.log('Loaded tasks:', boardTasks.value)
+        logger.log('Loaded tasks:', boardTasks.value)
       }
     } catch (error) {
-      console.error('Error loading board tasks:', error)
+      logger.error('Error loading board tasks:', error)
     }
   }
 
@@ -79,7 +80,7 @@ export function useTasks(boardId: Ref<string>) {
    * Refresh task status
    */
   async function refreshTasks() {
-    console.log('Refreshing task status')
+    logger.log('Refreshing task status')
     await loadBoardTasks()
   }
 
@@ -151,7 +152,7 @@ export function useTasks(boardId: Ref<string>) {
   async function resetInProgressTasks() {
     const inProgressTasks = boardTasks.value.filter(task => task.status === 'in_progress')
     if (inProgressTasks.length > 0) {
-      console.log(`Resetting ${inProgressTasks.length} in-progress tasks back to pending`)
+      logger.log(`Resetting ${inProgressTasks.length} in-progress tasks back to pending`)
       
       for (const task of inProgressTasks) {
         await vibeStore.updateTask(boardId.value, task.id, {

@@ -8,6 +8,7 @@ import { DatabaseEntryType } from '@/types/vibe'
 import { Reviewer } from './Reviewer'
 import { Visualizer } from './Visualizer'
 import { Summarizer } from './Summarizer'
+import { logger } from '@/services/logger'
 
 // Maximum number of retry attempts for code execution
 const MAX_CODE_RETRY_ATTEMPTS = 3;
@@ -127,7 +128,7 @@ export class Composer extends BaseActor {
         taskDatabase
       }
     } catch (error: unknown) {
-      console.error('Error in Composer execution:', error)
+      logger.error('Error in Composer execution:', error)
       taskDatabase.failedTasks.push(plannerTask.id)
       
       const errorMessage = error instanceof Error ? error.message : String(error)
@@ -276,11 +277,11 @@ export class Composer extends BaseActor {
     
     // Log any issues found before updating tasks
     if (Object.keys(invalidDependencies).length > 0) {
-      console.warn('Invalid dependencies detected:', invalidDependencies);
+      logger.warn('Invalid dependencies detected:', invalidDependencies);
     }
     
     if (circularDependencies.length > 0) {
-      console.warn('Circular dependencies detected:', circularDependencies);
+      logger.warn('Circular dependencies detected:', circularDependencies);
       
       // Break circular dependencies by removing the dependency from the task with higher index
       circularDependencies.forEach(([taskIdx, cycle]) => {
@@ -293,7 +294,7 @@ export class Composer extends BaseActor {
           if (current > next) {
             const index = dependencyGraph[current].indexOf(next);
             if (index !== -1) {
-              console.warn(`Breaking circular dependency: Removing dependency from task ${current} to ${next}`);
+              logger.warn(`Breaking circular dependency: Removing dependency from task ${current} to ${next}`);
               dependencyGraph[current].splice(index, 1);
               
               // Remove from planned task dependencies too
@@ -335,7 +336,7 @@ export class Composer extends BaseActor {
     }
 
     if (isolatedTasks.length > 0) {
-      console.warn(`Found ${isolatedTasks.length} isolated tasks that aren't connected to the workflow`);
+      logger.warn(`Found ${isolatedTasks.length} isolated tasks that aren't connected to the workflow`);
       
       // Handle isolated tasks by connecting them to the workflow
       if (rootTasks.length > 0) {
@@ -343,7 +344,7 @@ export class Composer extends BaseActor {
         const primaryRoot = rootTasks[0];
         
         isolatedTasks.forEach(taskIdx => {
-          console.warn(`Connecting isolated task ${taskIdx} to root task ${primaryRoot}`);
+          logger.warn(`Connecting isolated task ${taskIdx} to root task ${primaryRoot}`);
           dependencyGraph[taskIdx] = [primaryRoot];
           plan.tasks[taskIdx].dependencies.push(primaryRoot.toString());
         });
@@ -364,7 +365,7 @@ export class Composer extends BaseActor {
           const current = isolatedTasks[i];
           const previous = isolatedTasks[i-1];
           
-          console.warn(`Connecting isolated task ${current} to depend on task ${previous}`);
+          logger.warn(`Connecting isolated task ${current} to depend on task ${previous}`);
           dependencyGraph[current] = [previous];
           plan.tasks[current].dependencies.push(previous.toString());
         }
@@ -410,7 +411,7 @@ export class Composer extends BaseActor {
           }
           
           if (!dependencyGraph[integrationTaskIdx].includes(idx)) {
-            console.warn(`Adding dependency from final task ${integrationTaskIdx} to terminal task ${idx}`);
+            logger.warn(`Adding dependency from final task ${integrationTaskIdx} to terminal task ${idx}`);
             dependencyGraph[integrationTaskIdx].push(idx);
             plan.tasks[integrationTaskIdx].dependencies.push(idx.toString());
           }
@@ -511,7 +512,7 @@ export class Composer extends BaseActor {
 
     while (attempt <= MAX_CODE_RETRY_ATTEMPTS) {
       try {
-        console.log(`Executing coder task (attempt ${attempt}/${MAX_CODE_RETRY_ATTEMPTS}): ${task.id}`);
+        logger.log(`Executing coder task (attempt ${attempt}/${MAX_CODE_RETRY_ATTEMPTS}): ${task.id}`);
         const startTime = Date.now();
         
         // Get a fresh coder instance for each attempt
@@ -551,7 +552,7 @@ export class Composer extends BaseActor {
               description: enhancedDescription
             };
             
-            console.log(`Coder task failed with error: ${errorMessage}. Retrying...`);
+            logger.log(`Coder task failed with error: ${errorMessage}. Retrying...`);
             attempt++;
             continue;
           }
@@ -591,7 +592,7 @@ export class Composer extends BaseActor {
           }
         );
         
-        console.error(`Exception in coder task (attempt ${attempt}): ${lastError.message}`);
+        logger.error(`Exception in coder task (attempt ${attempt}): ${lastError.message}`);
         
         if (attempt < MAX_CODE_RETRY_ATTEMPTS) {
           attempt++;
@@ -688,7 +689,7 @@ Provide complete, runnable code that fixes the issue.`;
         // Check if all dependencies are met
         if (areDependenciesMet(task)) {
           try {
-            console.log(`Executing task ${task.id}: ${task.title}`);
+            logger.log(`Executing task ${task.id}: ${task.title}`);
             
             // Update task status to in_progress
             await this.vibeStore.updateTask(boardId, task.id, {
@@ -698,7 +699,7 @@ Provide complete, runnable code that fixes the issue.`;
             
             // Add delay before executing task to prevent rate limiting
             if (executedCount > 0) {
-              console.log(`Rate limiting: Waiting ${DELAY_BETWEEN_TASKS}ms before next task execution`);
+              logger.log(`Rate limiting: Waiting ${DELAY_BETWEEN_TASKS}ms before next task execution`);
               await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_TASKS));
             }
             
@@ -730,7 +731,7 @@ Provide complete, runnable code that fixes the issue.`;
             executedCount++;
             progress = true;
           } catch (error) {
-            console.error(`Failed to execute task ${task.id}:`, error);
+            logger.error(`Failed to execute task ${task.id}:`, error);
             
             const errorMessage = error instanceof Error ? error.message : String(error);
             
@@ -764,7 +765,7 @@ Provide complete, runnable code that fixes the issue.`;
     
     // Check if all tasks were executed
     if (executedCount < tasks.length) {
-      console.warn(`Not all tasks were executed. Completed: ${executedCount}/${tasks.length}`);
+      logger.warn(`Not all tasks were executed. Completed: ${executedCount}/${tasks.length}`);
       
       // Log tasks with unmet dependencies
       const unexecuted = tasks.filter(task => 
@@ -772,7 +773,7 @@ Provide complete, runnable code that fixes the issue.`;
         !taskDatabase.failedTasks.includes(task.id)
       );
       
-      console.warn('Unexecuted tasks:', unexecuted.map(t => `${t.id} (${t.title})`));
+      logger.warn('Unexecuted tasks:', unexecuted.map(t => `${t.id} (${t.title})`));
     }
     
     return results;
@@ -821,7 +822,7 @@ Provide complete, runnable code that fixes the issue.`;
         summary: `${composerResult.summary} Executed ${Object.keys(executionResults).length} tasks.`
       };
     } catch (error) {
-      console.error('Error executing task sequence:', error);
+      logger.error('Error executing task sequence:', error);
       
       const errorMessage = error instanceof Error ? error.message : String(error);
       

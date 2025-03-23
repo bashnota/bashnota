@@ -1,6 +1,7 @@
 import axios, { AxiosError } from 'axios'
 import type { JupyterServer, ExecutionResult, KernelSpec, WSMessage } from '@/types/jupyter'
 import { v4 as uuidv4 } from 'uuid'
+import { logger } from '@/services/logger'
 
 export class JupyterService {
   /**
@@ -23,7 +24,7 @@ export class JupyterService {
         // Extract token from query parameters
         const token = urlObj.searchParams.get('token')
         if (!token) {
-          console.error('No token found in Kaggle URL')
+          logger.error('No token found in Kaggle URL')
           return null
         }
         
@@ -64,7 +65,7 @@ export class JupyterService {
         token
       }
     } catch (error) {
-      console.error('Error parsing Jupyter URL:', error)
+      logger.error('Error parsing Jupyter URL:', error)
       return null
     }
   }
@@ -218,7 +219,7 @@ export class JupyterService {
         await this.deleteKernel(server, kernelId)
       }
     } catch (error) {
-      console.error('Execute code error:', error)
+      logger.error('Execute code error:', error)
       throw error
     }
   }
@@ -315,7 +316,7 @@ export class JupyterService {
           } else if (error.message) {
             message = `Connection error: ${error.message}`
           }
-          console.error('Connection error:', error.message)
+          logger.error('Connection error:', error.message)
         }
         
         return {

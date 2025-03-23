@@ -5,6 +5,7 @@ import type {
   MessageStatus,
 } from '@/types/codeExecution'
 import type { JupyterServer } from '@/types/jupyter'
+import { logger } from '@/services/logger'
 
 export class CodeExecutionService {
   private getBaseUrl(server: JupyterServer): string {
@@ -188,7 +189,7 @@ export class CodeExecutionService {
       }
 
       ws.onerror = (error) => {
-        console.error('WebSocket error:', error)
+        logger.error('WebSocket error:', error)
         reject(new Error('WebSocket error'))
       }
 

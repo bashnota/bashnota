@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { supportedProviders, type LLMProvider } from '@/services/aiService'
 import { toast } from '@/components/ui/toast'
+import { logger } from '@/services/logger'
 
 export interface AISettings {
   preferredProviderId: string
@@ -65,7 +66,7 @@ export const useAISettingsStore = defineStore('aiSettings', () => {
           ...parsed
         }
       } catch (error) {
-        console.error('Failed to parse saved AI settings', error)
+        logger.error('Failed to parse saved AI settings', error)
       }
     }
   }

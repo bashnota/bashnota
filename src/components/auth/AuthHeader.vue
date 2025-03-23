@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { LogOut, User } from 'lucide-vue-next'
 import { toast } from '@/lib/utils'
+import { logger } from '@/services/logger'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -52,7 +53,7 @@ const handleLogout = async () => {
     // Navigate to home page after logout
     router.push('/')
   } catch (error) {
-    console.error('Logout error:', error)
+    logger.error('Logout error:', error)
   }
 }
 

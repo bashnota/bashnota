@@ -1,3 +1,6 @@
+// Add logger import at the top
+import { logger } from '@/services/logger'
+
 // Database management composable
 import { ref } from 'vue'
 import { useVibeStore } from '@/stores/vibeStore'
@@ -18,11 +21,11 @@ export function useDatabase(boardId: Ref<string>) {
   async function loadDatabaseTables() {
     try {
       if (!boardId.value) {
-        console.log('No board ID available yet')
+        logger.log('No board ID available yet')
         return
       }
       
-      console.log('Loading database tables for board:', boardId.value)
+      logger.log('Loading database tables for board:', boardId.value)
       const tables = await vibeStore.getTablesForBoard(boardId.value)
       if (tables && tables.length > 0) {
         databaseTables.value = tables
@@ -32,12 +35,12 @@ export function useDatabase(boardId: Ref<string>) {
           table.entries = await vibeStore.getEntriesForTable(table.id)
         }
         
-        console.log('Loaded database tables:', databaseTables.value)
+        logger.log('Loaded database tables:', databaseTables.value)
       } else {
         databaseTables.value = []
       }
     } catch (error) {
-      console.error('Error loading database tables:', error)
+      logger.error('Error loading database tables:', error)
       databaseTables.value = []
     }
   }

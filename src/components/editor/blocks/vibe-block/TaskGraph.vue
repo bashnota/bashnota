@@ -10,6 +10,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import TaskGraph from './task-graph/TaskGraph.vue'
+import { logger } from '@/services/logger'
 
 const props = defineProps({
   block: {
@@ -29,7 +30,7 @@ const selectedTaskId = ref(null)
 // Extract tasks from block data
 const extractTasks = () => {
   if (!props.block || !props.block.data || !props.block.data.tasks) {
-    console.warn('No tasks data available in block:', props.block)
+    logger.warn('No tasks data available in block:', props.block)
     tasks.value = []
     loading.value = false
     return
@@ -44,26 +45,26 @@ const extractTasks = () => {
     dependencies: task.dependencies
   }))
   
-  console.log('Extracted tasks:', tasks.value)
+  logger.log('Extracted tasks:', tasks.value)
   loading.value = false
 }
 
 // Handle node click events
 const handleNodeClick = (nodeId) => {
-  console.log('Node clicked:', nodeId)
+  logger.log('Node clicked:', nodeId)
   selectedTaskId.value = nodeId
   emit('updateGraphData', { selectedTaskId: nodeId })
 }
 
 // Watch for changes in block data
 watch(() => props.block?.data?.tasks, () => {
-  console.log('Block data changed, extracting tasks...')
+  logger.log('Block data changed, extracting tasks...')
   extractTasks()
 }, { deep: true, immediate: true })
 
 // Initialize component
 onMounted(() => {
-  console.log('TaskGraph mounted, extracting tasks...')
+  logger.log('TaskGraph mounted, extracting tasks...')
   extractTasks()
 })
 </script>

@@ -29,6 +29,7 @@
 import { ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import { UploadCloud } from 'lucide-vue-next'
+import { logger } from '@/services/logger'
 
 const props = defineProps<{
   disabled?: boolean
@@ -69,9 +70,9 @@ const handleDragLeave = () => {
 }
 
 const handleFileSelect = (event: Event) => {
-  console.log('File selected event triggered', event, props.disabled)
+  logger.log('File selected event triggered', event, props.disabled)
   if (props.disabled) {
-    console.log('Upload disabled, returning')
+    logger.log('Upload disabled, returning')
     return
   }
   
@@ -89,9 +90,9 @@ const handleFileSelect = (event: Event) => {
 }
 
 const handleDrop = (event: DragEvent) => {
-  console.log('File drop event triggered', event, props.disabled)
+  logger.log('File drop event triggered', event, props.disabled)
   if (props.disabled) {
-    console.log('Upload disabled, returning')
+    logger.log('Upload disabled, returning')
     return
   }
   

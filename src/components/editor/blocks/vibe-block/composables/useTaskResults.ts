@@ -4,6 +4,7 @@ import { ActorType } from '@/types/vibe'
 import { useToast } from '@/components/ui/toast/use-toast'
 import { getExecutionSummary } from '../utils'
 import type { Ref } from 'vue'
+import { logger } from '@/services/logger'
 
 /**
  * Composable for handling task results in the Vibe block
@@ -27,10 +28,10 @@ export function useTaskResults(editor: Ref<any>, getPos: () => number | undefine
     try {
       // Find the current position of the Vibe block
       const vibePos = getPos()
-      console.log('Current Vibe block position:', vibePos)
+      logger.log('Current Vibe block position:', vibePos)
       
       if (vibePos === undefined) {
-        console.error('Could not determine position of Vibe block')
+        logger.error('Could not determine position of Vibe block')
         toast({
           variant: 'destructive',
           title: 'Error',
@@ -42,7 +43,7 @@ export function useTaskResults(editor: Ref<any>, getPos: () => number | undefine
       // Get the size of the Vibe block to position after it
       const vibeNode = editor.value.state.doc.nodeAt(vibePos)
       if (!vibeNode) {
-        console.error('Could not find Vibe node in document')
+        logger.error('Could not find Vibe node in document')
         return
       }
       
@@ -113,7 +114,7 @@ export function useTaskResults(editor: Ref<any>, getPos: () => number | undefine
         description: 'Task result has been inserted below the Vibe block'
       })
     } catch (error: any) {
-      console.error('Error inserting result:', error)
+      logger.error('Error inserting result:', error)
       toast({
         variant: 'destructive',
         title: 'Error',
@@ -273,7 +274,7 @@ export function useTaskResults(editor: Ref<any>, getPos: () => number | undefine
     
     // Ensure tableData is an array at this point
     if (!Array.isArray(tableData)) {
-      console.error('Table data is not in a valid format', tableData)
+      logger.error('Table data is not in a valid format', tableData)
       insertContentAfterBlock({ type: 'paragraph', content: [{ type: 'text', text: 'Could not render table data' }] })
       return
     }
@@ -369,7 +370,7 @@ export function useTaskResults(editor: Ref<any>, getPos: () => number | undefine
       // Insert the table
       insertContentAfterBlock(table)
     } catch (error) {
-      console.error('Error creating table structure:', error)
+      logger.error('Error creating table structure:', error)
       insertContentAfterBlock({ type: 'paragraph', content: [{ type: 'text', text: 'Error rendering table data' }] })
     }
   }
@@ -448,7 +449,7 @@ export function useTaskResults(editor: Ref<any>, getPos: () => number | undefine
         });
       }
     } catch (error) {
-      console.error('Error creating scatter plot:', error);
+      logger.error('Error creating scatter plot:', error);
       insertContentAfterBlock({ 
         type: 'paragraph', 
         content: [{ 
@@ -528,7 +529,7 @@ export function useTaskResults(editor: Ref<any>, getPos: () => number | undefine
               })
               insertContentAfterBlock({ type: 'paragraph' })
             } catch (error) {
-              console.error('Failed to insert image:', error)
+              logger.error('Failed to insert image:', error)
               insertContentAfterBlock({ 
                 type: 'paragraph', 
                 content: [{ 

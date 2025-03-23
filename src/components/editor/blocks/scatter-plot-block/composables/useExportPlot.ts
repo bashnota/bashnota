@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { logger } from '@/services/logger'
 
 export type ExportFormat = 'svg' | 'png' | 'jpeg'
 
@@ -31,7 +32,7 @@ export function useExportPlot() {
       // Get the SVG element from the plot container
       const svgElement = plotContainer.querySelector('svg')
       if (!svgElement) {
-        console.error('No SVG element found in plot container')
+        logger.error('No SVG element found in plot container')
         isExporting.value = false
         return
       }
@@ -113,7 +114,7 @@ export function useExportPlot() {
         // Get canvas context
         const ctx = canvas.getContext('2d')
         if (!ctx) {
-          console.error('Could not get canvas context')
+          logger.error('Could not get canvas context')
           isExporting.value = false
           return
         }
@@ -150,13 +151,13 @@ export function useExportPlot() {
               isExporting.value = false
             })
             .catch(err => {
-              console.error('Error creating blob from data URL:', err)
+              logger.error('Error creating blob from data URL:', err)
               isExporting.value = false
             })
         }
         
         img.onerror = () => {
-          console.error('Error loading SVG as image')
+          logger.error('Error loading SVG as image')
           URL.revokeObjectURL(url)
           isExporting.value = false
         }
@@ -164,7 +165,7 @@ export function useExportPlot() {
         img.src = url
       }
     } catch (error) {
-      console.error('Error exporting plot:', error)
+      logger.error('Error exporting plot:', error)
       isExporting.value = false
     }
   }

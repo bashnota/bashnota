@@ -8,6 +8,7 @@ import { toast } from 'vue-hot-toast'
 import { VibeTaskType, ActorType } from '@/types'
 import { Planner, Coder } from '@/actors'
 import { notaExtensionService } from '@/services/notaExtensionService'
+import { logger } from '@/services/logger'
 
 const props = defineProps({
   taskBoardId: String,
@@ -60,7 +61,7 @@ const executeTask = async (task) => {
       description: `Completed: ${task.title}`,
     })
   } catch (err) {
-    console.error('Error executing task:', err)
+    logger.error('Error executing task:', err)
     toast({
       title: 'Task failed',
       description: err.message,

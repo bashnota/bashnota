@@ -31,6 +31,7 @@ import {
   FileText
 } from 'lucide-vue-next'
 import { toast } from '@/lib/utils'
+import { logger } from '@/services/logger'
 
 type CommandArgs = {
   editor: Editor
@@ -253,7 +254,7 @@ export default {
               
               // router.push(`/nota/${newPage.id}`)
             } catch (error) {
-              console.error('Failed to create nota:', error)
+              logger.error('Failed to create nota:', error)
             }
           }
 
@@ -617,7 +618,7 @@ export default {
                     }, 100)
                   }
                 } catch (e) {
-                  console.warn('Error hiding tippy instance:', e)
+                  logger.warn('Error hiding tippy instance:', e)
                   // Ensure element is removed even if tippy methods fail
                   citationPickerEl.remove()
                 }
@@ -819,7 +820,7 @@ export default {
               })
             }
           } catch (e) {
-            console.warn('Error updating tippy instance:', e)
+            logger.warn('Error updating tippy instance:', e)
           }
         }
       },
@@ -867,7 +868,7 @@ export default {
               popup[0].destroy()
             }
           } catch (e) {
-            console.warn('Error cleaning up tippy instance:', e)
+            logger.warn('Error cleaning up tippy instance:', e)
           }
         }
         

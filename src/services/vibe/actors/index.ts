@@ -6,6 +6,7 @@ import { Summarizer } from './Summarizer'
 import { Reviewer } from './Reviewer'
 import { Visualizer } from './Visualizer'
 import { ActorType } from '@/types/vibe'
+import { logger } from '@/services/logger'
 
 // Factory function to create actors by type
 export function createActor(type: ActorType) {
@@ -26,7 +27,7 @@ export function createActor(type: ActorType) {
       return new Visualizer()
     case ActorType.COMPOSER:
       // Temporarily use Planner as a fallback for Composer
-      console.warn('Composer actor not implemented, using Planner as fallback')
+      logger.warn('Composer actor not implemented, using Planner as fallback')
       return new Planner()
     default:
       throw new Error(`Unknown actor type: ${type}`)

@@ -2,6 +2,7 @@ import { ref, watch, nextTick, computed } from 'vue'
 import mermaid from 'mermaid'
 import type { Ref } from 'vue'
 import type { MermaidTheme } from './types'
+import { logger } from '@/services/logger'
 
 export interface UseMermaidOptions {
   theme?: MermaidTheme;
@@ -30,7 +31,7 @@ function ensureString(value: any): string {
   try {
     return String(value);
   } catch (e) {
-    console.error('Could not convert value to string:', e);
+    logger.error('Could not convert value to string:', e);
     return '';
   }
 }
@@ -96,7 +97,7 @@ export function useMermaid(content: Ref<string | undefined | any>, options: UseM
         nodes: [mermaidRef.value],
       })
     } catch (error) {
-      console.error('Error rendering mermaid diagram:', error)
+      logger.error('Error rendering mermaid diagram:', error)
       renderError.value = extractErrorDetails(error)
     } finally {
       isRendering.value = false

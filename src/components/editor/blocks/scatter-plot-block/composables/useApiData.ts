@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import type { DataPoint } from '../types'
+import { logger } from '@/services/logger'
 
 export function useApiData() {
   const apiUrl = ref('')
@@ -55,7 +56,7 @@ export function useApiData() {
       
       return plotData
     } catch (error) {
-      console.error('Error fetching data:', error)
+      logger.error('Error fetching data:', error)
       apiError.value = error instanceof Error ? error.message : 'Failed to fetch data'
       return null
     } finally {

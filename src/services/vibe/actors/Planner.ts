@@ -1,6 +1,7 @@
 import { BaseActor } from './BaseActor'
 import { ActorType, type VibeTask } from '@/types/vibe'
 import { DatabaseEntryType } from '@/types/vibe'
+import { logger } from '@/services/logger'
 
 /**
  * Result from the Planner actor
@@ -196,7 +197,7 @@ The plan should be highly specific to the requested task and reflect the most ef
               (parsedJson.mainGoal || parsedJson.tasks || parsedJson.tasks?.length > 0)) {
             jsonPlan = parsedJson;
             matched = true;
-            console.log("Matched with strategy 1:", jsonPlan);
+            logger.log("Matched with strategy 1:", jsonPlan);
             break;
           }
         } catch (e) {
@@ -214,7 +215,7 @@ The plan should be highly specific to the requested task and reflect the most ef
             const trimmedMatch = fullMatch[0].trim();
             jsonPlan = JSON.parse(trimmedMatch);
             matched = true;
-            console.log("Matched with strategy 2:", jsonPlan);
+            logger.log("Matched with strategy 2:", jsonPlan);
           } catch (e) {
             // If parsing fails, try to fix common JSON issues
             try {
@@ -229,7 +230,7 @@ The plan should be highly specific to the requested task and reflect the most ef
               
               jsonPlan = JSON.parse(fixedJson);
               matched = true;
-              console.log("Matched with strategy 2 (fixed):", jsonPlan);
+              logger.log("Matched with strategy 2 (fixed):", jsonPlan);
             } catch (e2) {
               // Still failed, continue to next strategy
             }
@@ -239,7 +240,7 @@ The plan should be highly specific to the requested task and reflect the most ef
       
       // Strategy 3: Fallback to extracting key information manually using regex if all else fails
       if (!matched) {
-        console.log("Using fallback extraction strategy");
+        logger.log("Using fallback extraction strategy");
         // Try to find the main goal
         const mainGoalMatch = planText.match(/main\s*goal\s*:?\s*["']?(.*?)["']?(?:,|\n|$)/i);
         const mainGoal = mainGoalMatch ? mainGoalMatch[1].trim() : "Generated plan";
@@ -277,12 +278,12 @@ The plan should be highly specific to the requested task and reflect the most ef
           tasks: tasks
         };
         
-        console.log("Created fallback plan:", jsonPlan);
+        logger.log("Created fallback plan:", jsonPlan);
       }
       
       // Create a minimal valid plan structure if we've still failed
       if (!jsonPlan || typeof jsonPlan !== 'object') {
-        console.log("Creating minimal valid plan as last resort");
+        logger.log("Creating minimal valid plan as last resort");
         jsonPlan = {
           mainGoal: "Complete the requested task",
           tasks: [
@@ -376,7 +377,7 @@ The plan should be highly specific to the requested task and reflect the most ef
         tasks: processedTasks
       };
     } catch (error: unknown) {
-      console.error('Error parsing plan:', error);
+      logger.error('Error parsing plan:', error);
       // Even if parsing fails completely, return a basic valid plan
       return {
         mainGoal: "Explore the topic",

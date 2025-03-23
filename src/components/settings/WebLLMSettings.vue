@@ -23,6 +23,7 @@ import {
 } from 'lucide-vue-next'
 import { aiService } from '@/services/aiService'
 import type { WebLLMModelInfo } from '@/services/aiService'
+import { logger } from '@/services/logger'
 
 // Create a simple Progress component since it might not exist
 const Progress = defineComponent({
@@ -108,7 +109,7 @@ const loadAvailableModels = async () => {
       selectedModelId.value = smallModel?.id || availableModels.value[0].id
     }
   } catch (error) {
-    console.error('Error loading WebLLM models:', error)
+    logger.error('Error loading WebLLM models:', error)
     toast({
       title: 'Error',
       description: 'Failed to load available WebLLM models',
@@ -138,7 +139,7 @@ const loadModel = async () => {
       variant: 'default'
     })
   } catch (error) {
-    console.error('Error loading model:', error)
+    logger.error('Error loading model:', error)
     loadingError.value = error instanceof Error ? error.message : 'Unknown error loading model'
     
     toast({

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { logger } from '@/services/logger'
 
 export interface CitationEntry {
   id: string
@@ -29,7 +30,7 @@ export const useCitationStore = defineStore('citation', () => {
         const parsed = JSON.parse(savedCitations)
         citations.value = new Map(parsed)
       } catch (error) {
-        console.error('Failed to parse saved citations', error)
+        logger.error('Failed to parse saved citations', error)
       }
     }
   }

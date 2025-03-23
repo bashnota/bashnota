@@ -5,12 +5,13 @@ import { EditorView } from '@tiptap/pm/view'
 import * as pmView from '@tiptap/pm/view'
 import { createApp, h } from 'vue'
 import BlockCommandMenu from '../BlockCommandMenu.vue'
+import { logger } from '@/services/logger'
 
 function getPmView() {
   try {
     return pmView
-  } catch (error: any) {
-    console.error('Error while trying to get ProseMirror view:', error)
+  } catch (error) {
+    logger.error('Error while trying to get ProseMirror view:', error)
     return null
   }
 }

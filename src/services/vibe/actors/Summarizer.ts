@@ -1,6 +1,7 @@
 import { BaseActor } from './BaseActor'
 import { ActorType, type VibeTask, DatabaseEntryType } from '@/types/vibe'
 import { notaExtensionService } from '@/services/notaExtensionService'
+import { logger } from '@/services/logger'
 
 /**
  * Result structure for the summarizer
@@ -83,7 +84,7 @@ export class Summarizer extends BaseActor {
       )
     }
     
-    console.log('Summarizer: Generated summary and stored in database')
+    logger.log('Summarizer: Generated summary and stored in database')
     
     return summary
   }
@@ -139,7 +140,7 @@ export class Summarizer extends BaseActor {
           }
         }
       } catch (error) {
-        console.error(`Error gathering dependency result for task ${depId}:`, error)
+        logger.error(`Error gathering dependency result for task ${depId}:`, error)
       }
     }
     
@@ -275,7 +276,7 @@ ${this.config.customInstructions || 'Create summaries that balance comprehensive
           technicalSummary: parsed.technicalSummary || undefined
         };
       } catch (parseError) {
-        console.warn('Failed to parse JSON content:', parseError);
+        logger.warn('Failed to parse JSON content:', parseError);
         
         // Fallback: Return a minimal valid structure with the raw content
         return {
@@ -286,7 +287,7 @@ ${this.config.customInstructions || 'Create summaries that balance comprehensive
         };
       }
     } catch (error) {
-      console.error('Error in parseSummaryContent:', error);
+      logger.error('Error in parseSummaryContent:', error);
       
       // If parsing fails, return a simple structure with the raw content
       return {

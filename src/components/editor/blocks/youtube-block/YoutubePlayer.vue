@@ -29,6 +29,7 @@
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import Spinner from '@/components/LoadingSpinner.vue'
+import { logger } from '@/services/logger'
 
 interface Props {
   videoId: string
@@ -47,7 +48,7 @@ let loadingTimeout: number | null = null
 
 // Reset loading state when video ID changes and set a fallback timeout
 watch(() => props.videoId, (newId) => {
-  console.log('Video ID changed to:', newId)
+  logger.log('Video ID changed to:', newId)
   
   if (newId) {
     loading.value = true
@@ -60,7 +61,7 @@ watch(() => props.videoId, (newId) => {
     // Set a fallback timeout to hide the loading spinner after 5 seconds
     // in case the load event doesn't fire
     loadingTimeout = window.setTimeout(() => {
-      console.log('Loading timeout reached, forcing loading to end')
+      logger.log('Loading timeout reached, forcing loading to end')
       loading.value = false
     }, 5000)
   }
@@ -92,7 +93,7 @@ const embedUrl = computed(() => {
 })
 
 const handleVideoLoaded = () => {
-  console.log('Video iframe loaded')
+  logger.log('Video iframe loaded')
   if (loadingTimeout) {
     clearTimeout(loadingTimeout)
   }
@@ -108,7 +109,7 @@ onUnmounted(() => {
 
 // Debug
 onMounted(() => {
-  console.log('YoutubePlayer mounted with videoId:', props.videoId)
+  logger.log('YoutubePlayer mounted with videoId:', props.videoId)
 })
 </script>
 

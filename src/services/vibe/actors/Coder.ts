@@ -4,6 +4,7 @@ import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
 import { useJupyterStore } from '@/stores/jupyterStore'
 import { notaExtensionService } from '@/services/notaExtensionService'
 import type { JupyterServer, KernelSpec } from '@/types/jupyter'
+import { logger } from '@/services/logger'
 
 /**
  * Result structure for the coder
@@ -41,7 +42,7 @@ export class Coder extends BaseActor {
   public setJupyterConfig(server: JupyterServer, kernel: KernelSpec): void {
     this.configuredServer = server
     this.configuredKernel = kernel
-    console.log('Coder: Using configured Jupyter server and kernel:', 
+    logger.log('Coder: Using configured Jupyter server and kernel:', 
       `${server.ip}:${server.port}`, kernel.name)
   }
   
@@ -94,7 +95,7 @@ export class Coder extends BaseActor {
       )
       
       // No longer automatically insert code - user will do this manually
-      console.log('Coder: Generated code and stored in database')
+      logger.log('Coder: Generated code and stored in database')
       
       return codeResult
     }
@@ -180,7 +181,7 @@ export class Coder extends BaseActor {
       
       return codeResult
     } catch (error) {
-      console.error('Code execution error:', error)
+      logger.error('Code execution error:', error)
       
       // Store the error in the database
       await this.createEntry(
@@ -389,7 +390,7 @@ Return ONLY the improved code without explanations, markdown formatting, or surr
       if (this.configuredServer && this.configuredKernel) {
         kernel = this.configuredKernel
         serverConfig = this.configuredServer
-        console.log(`Using configured kernel: ${kernel.name}`)
+        logger.log(`Using configured kernel: ${kernel.name}`)
       } else {
         // Get available kernels from all servers
         const allKernels = Object.values(this.jupyterStore.kernels).flat()
@@ -473,7 +474,7 @@ Return ONLY the improved code without explanations, markdown formatting, or surr
           }
         }
       } catch (error) {
-        console.warn('Could not parse structured data from output:', error);
+        logger.warn('Could not parse structured data from output:', error);
       }
       
       // Parse and format the result
@@ -485,7 +486,7 @@ Return ONLY the improved code without explanations, markdown formatting, or surr
         data: data
       }
     } catch (error: unknown) {
-      console.error('Code execution error:', error)
+      logger.error('Code execution error:', error)
       throw new Error(`Failed to execute code: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
@@ -517,4 +518,4 @@ Return ONLY the improved code without explanations, markdown formatting, or surr
       return `Error formatting output: ${error instanceof Error ? error.message : String(error)}`
     }
   }
-} 
+}

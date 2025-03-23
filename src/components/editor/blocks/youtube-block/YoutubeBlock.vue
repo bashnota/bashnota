@@ -47,6 +47,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Edit } from 'lucide-vue-next'
+import { logger } from '@/services/logger'
 
 interface NodeAttrs {
   url: string
@@ -104,11 +105,11 @@ const applyUrl = () => {
     return
   }
   
-  console.log('Parsing URL:', trimmedInput)
+  logger.debug('Parsing URL:', trimmedInput)
   const result = parseYoutubeUrl(trimmedInput)
   
   if (result && result.videoId) {
-    console.log('Successfully parsed YouTube URL:', result)
+    logger.debug('Successfully parsed YouTube URL:', result)
     
     // Update the node attributes with the new video information
     props.updateAttributes({
@@ -122,12 +123,12 @@ const applyUrl = () => {
     
     // Ensure the UI updates after attribute change
     nextTick(() => {
-      console.log('Attributes updated, videoId is now:', props.node.attrs.videoId)
+      logger.debug('Attributes updated, videoId is now:', props.node.attrs.videoId)
       // Return focus to editor
       props.editor.commands.focus()
     })
   } else {
-    console.error('Failed to parse YouTube URL:', trimmedInput, 'Error:', parserError.value)
+    logger.error('Failed to parse YouTube URL:', trimmedInput, 'Error:', parserError.value)
     // Stay in editing mode to allow user to correct the URL
   }
 }
@@ -155,13 +156,13 @@ onMounted(() => {
   ]
   
   if (import.meta.env.DEV) {
-    console.log('==== Testing YouTube URL Parser ====')
+    logger.debug('==== Testing YouTube URL Parser ====')
     testUrls.forEach(url => {
       const result = parseYoutubeUrl(url)
-      console.log(`URL: ${url}`)
-      console.log(`Result: ${result ? `ID: ${result.videoId}, Time: ${result.startTime}` : 'Failed to parse'}`)
+      logger.debug(`URL: ${url}`)
+      logger.debug(`Result: ${result ? `ID: ${result.videoId}, Time: ${result.startTime}` : 'Failed to parse'}`)
     })
-    console.log('==== End Parser Test ====')
+    logger.debug('==== End Parser Test ====')
   }
 })
 </script>

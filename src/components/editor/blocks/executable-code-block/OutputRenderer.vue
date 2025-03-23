@@ -2,6 +2,7 @@
 import { ref, watch, onMounted, computed } from 'vue'
 import { Copy, Check, Download, Maximize, Minimize, Eye, EyeOff } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
+import { logger } from '@/services/logger'
 
 const props = defineProps<{
   content: string
@@ -43,7 +44,7 @@ const formatJson = (jsonString: string) => {
     const parsed = JSON.parse(jsonString)
     return JSON.stringify(parsed, null, 2)
   } catch (e) {
-    console.error('Error parsing JSON:', e)
+    logger.error('Error parsing JSON:', e)
     return jsonString
   }
 }
@@ -102,7 +103,7 @@ const copyOutput = async () => {
       isOutputCopied.value = false
     }, 2000)
   } catch (error) {
-    console.error('Failed to copy output:', error)
+    logger.error('Failed to copy output:', error)
   }
 }
 

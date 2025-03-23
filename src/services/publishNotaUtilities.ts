@@ -1,5 +1,6 @@
 import type { SubFigure } from '@/components/editor/blocks/subfigure-block/subfigure-extension'
 import { fetchAPI } from '@/services/axios'
+import { logger } from '@/services/logger'
 
 // Regular expression to identify data URLs
 const DATA_URL_REGEX = /data:image\/[^;]+;base64,[a-zA-Z0-9+/]+=*/g
@@ -24,7 +25,7 @@ export const uploadImage = async (dataUrl: string) => {
     const response = await fetchAPI.post('/image/upload', { dataUrl })
     return response.data.imageUrl
   } catch (error) {
-    console.error('Failed to upload image:', error)
+    logger.error('Failed to upload image:', error)
     throw error
   }
 }
@@ -50,7 +51,7 @@ export const processContent = async (content: string) => {
         const imageUrl = await uploadImage(dataUrl)
         urlMap.set(dataUrl, imageUrl)
       } catch (error) {
-        console.error('Error uploading image:', error)
+        logger.error('Error uploading image:', error)
         // Keep the original data URL if upload fails
         urlMap.set(dataUrl, dataUrl)
       }
@@ -111,7 +112,7 @@ async function processContentObject(obj: any) : Promise<any> {
             output: processedOutput,
           }
         } catch (error) {
-          console.error('Error processing code block output:', error)
+          logger.error('Error processing code block output:', error)
         }
       }
     }
@@ -130,7 +131,7 @@ async function processContentObject(obj: any) : Promise<any> {
           src: imageUrl,
         }
       } catch (error) {
-        console.error('Error processing image block:', error)
+        logger.error('Error processing image block:', error)
       }
     }
 
@@ -154,7 +155,7 @@ async function processContentObject(obj: any) : Promise<any> {
                 src: imageUrl,
               }
             } catch (error) {
-              console.error('Error processing subfigure image:', error)
+              logger.error('Error processing subfigure image:', error)
               // If upload fails, keep original data URL
               return subfigure
             }

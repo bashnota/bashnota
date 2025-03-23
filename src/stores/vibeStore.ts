@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { v4 as uuidv4 } from 'uuid'
 import { type ActorConfig, type VibeTask, type TaskBoard, ActorType, type DatabaseTable, type DatabaseEntry, DatabaseEntryType } from '@/types/vibe'
+import { logger } from '@/services/logger'
 
 /**
  * Store for managing Vibe tasks and boards
@@ -87,7 +88,7 @@ export const useVibeStore = defineStore('vibe', () => {
       }
     } | null
   }): TaskBoard {
-    console.log('Creating board with options:', options)
+    logger.log('Creating board with options:', options)
     
     const board: TaskBoard = {
       id: uuidv4(),
