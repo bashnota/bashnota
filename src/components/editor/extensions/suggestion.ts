@@ -64,7 +64,7 @@ export default {
         title: 'Heading 2',
         category: 'Basic Blocks',
         icon: Heading2,
-        keywords: ['h2', 'subtitle', 'heading2', 'heading 2'],
+        keywords: ['h2', 'heading2', 'heading 2'],
         command: ({ editor, range }: CommandArgs) => {
           editor.chain().focus().deleteRange(range).setHeading({ level: 2 }).run()
         },
@@ -182,15 +182,6 @@ export default {
       },
 
       // Images
-      {
-        title: 'Single Image',
-        category: 'Images',
-        icon: ImageIcon,
-        keywords: ['img', 'image', 'picture', 'photo'],
-        command: ({ editor, range }: CommandArgs) => {
-          editor.chain().focus().deleteRange(range).setImage({ src: '' }).run()
-        },
-      },
       {
         title: 'Figure with Subfigures',
         category: 'Images',

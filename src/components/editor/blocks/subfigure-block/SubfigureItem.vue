@@ -33,7 +33,8 @@
         <TrashIcon class="w-4 h-4" />
       </Button>
 
-      <div v-if="subfigure.src" class="mt-2">
+      <!-- Only show subfigure caption if not the only item -->
+      <div v-if="subfigure.src && !isOnlySubfigure" class="mt-2">
         <!-- Read-only subfigure caption -->
         <div v-if="isReadOnly" class="text-sm px-2 py-1">
           <span v-if="subfigure.caption">{{ subfigure.caption }}</span>
@@ -102,6 +103,7 @@ const props = defineProps<{
   unifiedSize: boolean
   isLocked: boolean
   isReadOnly: boolean
+  totalSubfigures?: number
 }>()
 
 const emit = defineEmits<{
@@ -120,6 +122,11 @@ const isPreviewOpen = ref(false)
 const imageStyle = computed(() => ({
   objectFit: props.objectFit || 'contain' as ObjectFitType
 }))
+
+// Determine if this is the only subfigure
+const isOnlySubfigure = computed(() => {
+  return props.totalSubfigures === 1
+})
 
 // Watch for external changes
 watch(

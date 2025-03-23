@@ -1,11 +1,4 @@
 // Export all block components and extensions
-import ImageExtension, {
-  ImageBlock,
-  ImageControls,
-  ImageDisplay,
-  ImageCaption,
-} from './image-block'
-
 import SubfigureExtension, {
   SubfigureBlock,
   SubfigureControls,
@@ -25,13 +18,6 @@ import Bibliography from './Bibliography.vue'
 
 // Re-export everything
 export {
-  // Image block components
-  ImageExtension,
-  ImageBlock,
-  ImageControls,
-  ImageDisplay,
-  ImageCaption,
-  
   // Subfigure block components
   SubfigureExtension,
   SubfigureBlock,
@@ -53,7 +39,6 @@ export {
 
 // Export a map of all extensions for easier registration
 export const blockExtensions = {
-  image: ImageExtension,
   subfigure: SubfigureExtension,
   math: MathExtension,
 }

@@ -23,9 +23,9 @@
         @unlock="unlockSubfigure"
       />
 
-      <!-- Main caption and label -->
+      <!-- Main caption and label - HIDE when single subfigure in read-only mode -->
       <SubfigureCaption
-        v-if="hasVisibleSubfigures || !isReadOnly"
+        v-if="(hasVisibleSubfigures && (attrs.subfigures.length > 1 || !isReadOnly)) || !isReadOnly"
         v-model="captionData"
         :is-read-only="isReadOnly"
         @unlock="unlockSubfigure"

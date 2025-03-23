@@ -17,6 +17,7 @@
       :unified-size="unifiedSize"
       :is-locked="isLocked"
       :is-read-only="isReadOnly"
+      :total-subfigures="subfigures.length"
       @update:subfigure="(updatedSubfig) => updateSubfigure(index, updatedSubfig)"
       @remove="() => removeSubfigure(index)"
       @unlock="$emit('unlock')"
