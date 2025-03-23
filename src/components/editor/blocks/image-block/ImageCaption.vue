@@ -26,18 +26,19 @@
       autofocus
     />
 
-    <!-- Caption section -->
-    <div v-if="isReadOnly && modelValue.caption" class="text-sm text-muted-foreground px-2 py-1">
-      {{ modelValue.caption }}
-    </div>
+    <!-- Caption section with KaTeX support -->
+    <div 
+      v-if="isReadOnly && modelValue.caption" 
+      class="text-sm text-muted-foreground px-2 py-1"
+      v-html="renderedCaption"
+    ></div>
 
     <div
       v-else-if="!isReadOnly && !isEditingCaption"
       class="text-sm text-muted-foreground hover:bg-muted/50 rounded px-2 py-1 cursor-text"
       @click="startEditingCaption"
-    >
-      {{ modelValue.caption || 'Click to add caption' }}
-    </div>
+      v-html="renderedCaption || 'Click to add caption'"
+    ></div>
 
     <Input
       v-else-if="!isReadOnly"
@@ -46,7 +47,7 @@
       @blur="finishEditingCaption"
       @keyup.enter="finishEditingCaption"
       @keyup.esc="cancelEditingCaption"
-      placeholder="Add caption..."
+      placeholder="Add caption... ($ for inline math, $$ for display math)"
       class="text-sm"
       :disabled="modelValue.isLocked"
       autofocus
@@ -55,8 +56,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
 import { Input } from '@/components/ui/input'
+import katex from 'katex'
+import 'katex/dist/katex.min.css'
 
 interface CaptionData {
   label: string
@@ -78,6 +81,41 @@ const localLabel = ref(props.modelValue.label || '')
 const localCaption = ref(props.modelValue.caption || '')
 const isEditingLabel = ref(false)
 const isEditingCaption = ref(false)
+
+// Render caption with KaTeX support
+const renderedCaption = computed(() => {
+  if (!localCaption.value) {
+    return ''
+  }
+  
+  let text = localCaption.value
+  try {
+    // Process display math: $$...$$
+    text = text.replace(/\$\$([^$]+)\$\$/g, (match, formula) => {
+      return katex.renderToString(formula, {
+        throwOnError: false,
+        displayMode: true
+      })
+    })
+    
+    // Process inline math: $...$
+    text = text.replace(/\$([^$\n]+)\$/g, (match, formula) => {
+      // Skip if it's part of display math (already processed)
+      if (match.startsWith('$$') || match.endsWith('$$')) {
+        return match
+      }
+      return katex.renderToString(formula, {
+        throwOnError: false,
+        displayMode: false
+      })
+    })
+    
+    return text
+  } catch (error) {
+    console.error('KaTeX parsing error:', error)
+    return text
+  }
+})
 
 // Watch for external changes
 watch(
