@@ -1,6 +1,11 @@
 <template>
   <Dialog :open="isOpen" @update:open="updateOpen">
     <DialogContent class="max-w-screen-lg p-0 overflow-hidden">
+      <DialogTitle class="sr-only">Image Preview</DialogTitle>
+      <DialogDescription class="sr-only">
+        Full-size preview of the image{{ imageCaption ? ': ' + imageCaption : '' }}
+      </DialogDescription>
+      
       <div class="relative">
         <img 
           :src="imageSrc" 
@@ -24,7 +29,7 @@
 </template>
 
 <script setup lang="ts">
-import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { XIcon } from 'lucide-vue-next'
 

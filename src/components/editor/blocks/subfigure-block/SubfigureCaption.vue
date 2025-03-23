@@ -1,30 +1,12 @@
 <template>
   <div class="flex flex-col gap-2 w-full mt-4">
-    <!-- Read-only label -->
-    <div v-if="isReadOnly && modelValue.label" class="font-medium text-base px-2 py-1">
-      {{ modelValue.label }}
+    <!-- Label (always non-editable) -->
+    <div class="font-medium text-base px-2 py-1">
+      <div class="flex items-center gap-1">
+        <LockIcon v-if="modelValue.isLocked" class="w-3 h-3 opacity-50" />
+        <span>{{ modelValue.label }}</span>
+      </div>
     </div>
-
-    <!-- Editable label -->
-    <div
-      v-else-if="!isReadOnly && !isEditingLabel"
-      class="font-medium text-base hover:bg-muted/50 rounded px-2 py-1 cursor-text"
-      @click="startEditingLabel"
-    >
-      {{ modelValue.label || 'Click to add figure label' }}
-    </div>
-    <Input
-      v-else-if="!isReadOnly"
-      :value="localLabel"
-      @input="handleLabelInput"
-      @blur="finishEditingLabel"
-      @keyup.enter="finishEditingLabel"
-      @keyup.esc="cancelEditingLabel"
-      placeholder="Figure label (e.g., Figure 1)"
-      class="font-medium"
-      :disabled="modelValue.isLocked"
-      autofocus
-    />
 
     <!-- Read-only caption with KaTeX support -->
     <div 
@@ -36,10 +18,16 @@
     <!-- Editable caption -->
     <div
       v-else-if="!isReadOnly && !isEditingCaption"
-      class="text-sm text-muted-foreground hover:bg-muted/50 rounded px-2 py-1 cursor-text"
+      class="text-sm text-muted-foreground rounded px-2 py-1"
+      :class="modelValue.isLocked ? 'cursor-lock' : 'hover:bg-muted/50 cursor-text'"
       @click="startEditingCaption"
-      v-html="renderedCaption || 'Click to add main caption'"
-    ></div>
+    >
+      <div class="flex items-center gap-1">
+        <LockIcon v-if="modelValue.isLocked" class="w-3 h-3 opacity-50" />
+        <span v-if="renderedCaption" v-html="renderedCaption"></span>
+        <span v-else>Click to add main caption</span>
+      </div>
+    </div>
     <Input
       v-else-if="!isReadOnly"
       :value="localCaption"
@@ -58,6 +46,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, computed } from 'vue'
 import { Input } from '@/components/ui/input'
+import { LockIcon } from 'lucide-vue-next'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 
@@ -78,10 +67,14 @@ const emit = defineEmits<{
 }>()
 
 // Local state
-const localLabel = ref(props.modelValue.label || '')
 const localCaption = ref(props.modelValue.caption || '')
-const isEditingLabel = ref(false)
 const isEditingCaption = ref(false)
+
+// Computed properties
+const isAutoLabel = computed(() => {
+  // Check if label matches the pattern "Figure X" where X is a number
+  return /^Figure \d+$/.test(props.modelValue.label);
+})
 
 // Render caption with KaTeX support
 const renderedCaption = computed(() => {
@@ -125,36 +118,9 @@ watch(
     if (newValue.caption !== localCaption.value) {
       localCaption.value = newValue.caption || ''
     }
-    if (newValue.label !== localLabel.value) {
-      localLabel.value = newValue.label || ''
-    }
   },
   { deep: true, immediate: true }
 )
-
-// Label methods
-const startEditingLabel = () => {
-  if (props.modelValue.isLocked) {
-    emit('unlock')
-    return
-  }
-  isEditingLabel.value = true
-}
-
-const finishEditingLabel = () => {
-  isEditingLabel.value = false
-  updateModelValue({ label: localLabel.value })
-}
-
-const cancelEditingLabel = () => {
-  isEditingLabel.value = false
-  localLabel.value = props.modelValue.label || ''
-}
-
-const handleLabelInput = (event: Event) => {
-  const target = event.target as HTMLInputElement
-  localLabel.value = target.value
-}
 
 // Caption methods
 const startEditingCaption = () => {
@@ -191,6 +157,11 @@ const updateModelValue = (data: Partial<CaptionData>) => {
 onMounted(() => {
   // Initialize with current values
   localCaption.value = props.modelValue.caption || ''
-  localLabel.value = props.modelValue.label || ''
 })
-</script> 
+</script>
+
+<style scoped>
+.cursor-lock {
+  cursor: not-allowed;
+}
+</style>
