@@ -8,9 +8,10 @@ import 'highlight.js/styles/github.css'
 import { useRouter } from 'vue-router'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import TableOfContents from './TableOfContents.vue'
+import JupyterServersSidebar from './JupyterServersSidebar.vue'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { ListIcon, BookIcon } from 'lucide-vue-next'
+import { ListIcon, BookIcon, ServerIcon } from 'lucide-vue-next'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
 import { getURLWithoutProtocol, toast } from '@/lib/utils'
 import VersionHistoryDialog from './VersionHistoryDialog.vue'
@@ -40,6 +41,7 @@ const citationStore = useCitationStore()
 const router = useRouter()
 const isSidebarOpen = ref(false)
 const isReferencesOpen = ref(false)
+const isJupyterServersOpen = ref(false)
 const autoSaveEnabled = ref(true)
 const showVersionHistory = ref(false)
 
@@ -573,39 +575,36 @@ defineExpose({
 </script>
 
 <template>
-  <div class="flex">
-    <!-- Sidebar -->
+  <div class="h-full w-full flex overflow-hidden">
+    <!-- Loading spinner -->
+    <LoadingSpinner v-if="isLoading" class="absolute inset-0 z-10" />
+
+    <!-- Table of Contents Sidebar -->
     <div
-      class="transition-all duration-300 ease-in-out sticky top-0 h-full"
-      :class="{
-        'w-72': isSidebarOpen,
-        'w-0': !isSidebarOpen,
-      }"
+      v-if="isSidebarOpen"
+      class="w-64 h-full border-r flex-shrink-0 flex flex-col bg-background"
     >
-      <div v-show="isSidebarOpen" :style="{ width: isSidebarOpen ? 'inherit' : '0' }">
-        <ScrollArea class="h-[calc(100vh-2rem)] px-6 py-4">
-          <TableOfContents :editor="editor" />
-        </ScrollArea>
-      </div>
+      <TableOfContents :editor="editor" />
     </div>
 
     <!-- References Sidebar -->
     <div
-      class="transition-all duration-300 ease-in-out sticky top-0 h-full"
-      :class="{
-        'w-72': isReferencesOpen,
-        'w-0': !isReferencesOpen,
-      }"
+      v-if="isReferencesOpen"
+      class="w-64 h-full border-r flex-shrink-0 flex flex-col bg-background"
     >
-      <div v-show="isReferencesOpen" :style="{ width: isReferencesOpen ? 'inherit' : '0' }">
-        <ScrollArea class="h-[calc(100vh-2rem)] px-6 py-4">
-          <ReferencesSidebar :editor="editor" :nota-id="props.notaId" />
-        </ScrollArea>
-      </div>
+      <ReferencesSidebar :editor="editor" :notaId="notaId" />
+    </div>
+
+    <!-- Jupyter Servers Sidebar -->
+    <div
+      v-if="isJupyterServersOpen"
+      class="w-64 h-full border-r flex-shrink-0 flex flex-col bg-background"
+    >
+      <JupyterServersSidebar :notaId="notaId" />
     </div>
 
     <!-- Main Editor Area -->
-    <div class="flex-1 flex flex-col min-w-0" :class="{ 'border-l': isSidebarOpen || isReferencesOpen }">
+    <div class="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
       <!-- Editor Toolbar -->
       <div class="border-b bg-background sticky top-0 z-10">
         <EditorToolbar v-if="editor" :editor="editor" class="px-4 py-2" />
@@ -619,7 +618,8 @@ defineExpose({
               variant="ghost"
               size="sm"
               class="flex items-center gap-2"
-              @click="isSidebarOpen = !isSidebarOpen; isReferencesOpen = false"
+              @click="isSidebarOpen = !isSidebarOpen; isReferencesOpen = false; isJupyterServersOpen = false"
+              :class="{ 'bg-muted': isSidebarOpen }"
             >
               <ListIcon class="h-4 w-4" />
               <span class="text-xs">Contents</span>
@@ -629,10 +629,22 @@ defineExpose({
               variant="ghost"
               size="sm"
               class="flex items-center gap-2"
-              @click="isReferencesOpen = !isReferencesOpen; isSidebarOpen = false"
+              @click="isReferencesOpen = !isReferencesOpen; isSidebarOpen = false; isJupyterServersOpen = false"
+              :class="{ 'bg-muted': isReferencesOpen }"
             >
               <BookIcon class="h-4 w-4" />
               <span class="text-xs">References</span>
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              class="flex items-center gap-2"
+              @click="isJupyterServersOpen = !isJupyterServersOpen; isSidebarOpen = false; isReferencesOpen = false"
+              :class="{ 'bg-muted': isJupyterServersOpen }"
+            >
+              <ServerIcon class="h-4 w-4" />
+              <span class="text-xs">Jupyter Servers</span>
             </Button>
           </div>
           
@@ -664,15 +676,7 @@ defineExpose({
       </div>
 
       <!-- Editor Content -->
-      <div class="flex-1 relative">
-        <!-- Loading State -->
-        <div
-          v-if="isLoading"
-          class="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm"
-        >
-          <LoadingSpinner class="w-8 h-8" />
-        </div>
-
+      <div class="flex-1 relative overflow-auto">
         <!-- Editor Content Area -->
         <div class="h-full overflow-hidden px-4 md:px-8 lg:px-12">
           <ScrollArea class="h-full">
@@ -684,14 +688,14 @@ defineExpose({
 
     <!-- Favorites Sidebar is now rendered outside the editor layout -->
     <FavoriteBlocksSidebar :editor="editor" />
-  </div>
 
-  <!-- Version History Dialog -->
-  <VersionHistoryDialog
-    :nota-id="props.notaId"
-    v-model:open="showVersionHistory"
-    @version-restored="refreshEditorContent"
-  />
+    <!-- Version History Dialog -->
+    <VersionHistoryDialog 
+      :nota-id="notaId"
+      v-model:open="showVersionHistory"
+      @version-restored="refreshEditorContent" 
+    />
+  </div>
 </template>
 
 <style>
