@@ -30,12 +30,6 @@ export interface KernelConfig {
 }
 
 export interface NotaConfig {
-  jupyterServers: Array<{
-    ip: string
-    port: string
-    token: string
-  }>
-  kernels: Record<string, KernelSpec[]>
   kernelPreferences: Record<string, KernelConfig>
   savedSessions: Array<{
     id: string
