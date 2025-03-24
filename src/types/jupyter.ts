@@ -2,6 +2,7 @@ export interface JupyterServer {
   ip: string
   port: string
   token: string
+  name?: string
 }
 
 export interface ExecutionResult {
