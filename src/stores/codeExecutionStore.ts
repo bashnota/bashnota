@@ -4,6 +4,7 @@ import { CodeExecutionService } from '../services/codeExecutionService'
 import type { CodeCell, KernelSession } from '@/types/codeExecution'
 import type { JupyterServer } from '@/types/jupyter'
 import { useNotaStore } from './nota'
+import { useJupyterStore } from './jupyterStore'
 import { getURLWithoutProtocol } from '@/lib/utils'
 import { logger } from '@/services/logger'
 
@@ -12,6 +13,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
   const kernelSessions = ref<Map<string, KernelSession>>(new Map())
   const executionService = new CodeExecutionService()
   const notaStore = useNotaStore()
+  const jupyterStore = useJupyterStore()
 
   // Getters
   const getCellById = computed(() => (id: string) => cells.value.get(id))
@@ -84,8 +86,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
     }
 
     const codeBlocks = findCodeBlocks(content)
-    const nota = notaStore.getCurrentNota(notaId)
-    const servers = nota?.config?.jupyterServers || []
+    const servers = jupyterStore.jupyterServers || []
 
     codeBlocks.forEach((block) => {
       const { attrs, content } = block

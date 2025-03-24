@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { useCodeExecution } from '@/composables/useCodeExecution'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
+import { useJupyterStore } from '@/stores/jupyterStore'
 import { CodeExecutionService } from '@/services/codeExecutionService'
 import { JupyterService } from '@/services/jupyterService'
 import type { KernelConfig, KernelSpec, JupyterServer } from '@/types/jupyter'
@@ -105,8 +106,8 @@ const isReadyToExecute = computed(() => {
 })
 
 const availableServers = computed<JupyterServer[]>(() => {
-  // Only use global Jupyter servers from the store
-  return store.getAllGlobalJupyterServers || [];
+  // Only use global Jupyter servers from jupyterStore
+  return jupyterStore.jupyterServers || [];
 })
 const availableSessions = ref<Array<{ id: string; name: string; kernel: { name: string; id: string } }>>([])
 const availableKernels = ref<Array<KernelSpec>>([])
@@ -121,6 +122,7 @@ const runningKernels = ref<Array<{
 // Stores
 const store = useNotaStore()
 const codeExecutionStore = useCodeExecutionStore()
+const jupyterStore = useJupyterStore()
 const executionService = new CodeExecutionService()
 const jupyterService = new JupyterService()
 
@@ -238,6 +240,9 @@ const selectRunningKernel = async (kernelId: string) => {
 onMounted(async () => {
   await nextTick()
   
+  // Ensure jupyterStore is loaded and refreshed
+  await refreshJupyterServers()
+  
   // Load saved preferences
   loadSavedPreferences()
   
@@ -248,6 +253,15 @@ onMounted(async () => {
     }
   }
 })
+
+// Add refresh method for servers
+const refreshJupyterServers = async () => {
+  // Make sure the jupyterStore has loaded its servers from local storage
+  jupyterStore.loadServers()
+  
+  // Force reactivity update in case servers were modified externally
+  await nextTick()
+}
 
 // Watchers
 watch(() => props.code, (newCode) => {
@@ -389,18 +403,26 @@ watch(selectedKernel, async (newKernel) => {
   }
 })
 
+// Watch for server open
+watch(isServerOpen, async (isOpen) => {
+  if (isOpen) {
+    // Refresh servers list when dropdown is opened
+    await refreshJupyterServers();
+  }
+});
+
 // Template helpers
 const handleServerChange = async (value: string) => {
   handleServerSelect(value)
   isServerOpen.value = false
   isKernelOpen.value = true // Automatically open kernel selector after server selection
   
-  // Save server preference
+  // Only store minimal server reference in kernel preferences
   store.updateNotaConfig(props.notaId, (config) => {
     if (!config.kernelPreferences) config.kernelPreferences = {}
     if (!config.kernelPreferences[props.id]) {
       config.kernelPreferences[props.id] = {
-        serverId: value,
+        serverId: value, // Store just the server ID reference, not the server details
         kernelName: selectedKernel.value,
         blockId: props.id,
         lastUsed: new Date().toISOString()
@@ -464,15 +486,21 @@ const createNewSession = async () => {
 
 const executeCode = async () => {
   if (executionInProgress.value) return
+  
+  // Ensure servers are loaded before execution
+  await refreshJupyterServers();
+  
   if (!selectedServer.value || selectedServer.value === 'none') {
+    isServerOpen.value = true; // Open server selector
     showConsoleMessage('Error', 'Please select a server first', 'error')
     return
   }
   if (!selectedKernel.value) {
+    isServerOpen.value = true; // Open kernel selector too
     showConsoleMessage('Error', 'Please select a kernel first', 'error')
     return
   }
-
+  
   executionInProgress.value = true
   try {
     // If no session is selected, create a new one
@@ -482,7 +510,7 @@ const executeCode = async () => {
         throw new Error('Failed to create session')
       }
     }
-
+    
     // Execute the code
     await codeExecutionStore.executeCell(props.id)
     if (cell.value?.output) {
