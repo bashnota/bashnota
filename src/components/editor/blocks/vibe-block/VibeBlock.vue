@@ -19,9 +19,12 @@
           v-if="!isActive"
           v-model="queryText"
           :showJupyterConfig="showJupyterConfig"
+          :showActorSelector="showActorSelector"
           :jupyterConfig="jupyterConfig"
           @toggle-jupyter="toggleJupyterConfig"
+          @toggle-actors="toggleActorSelector"
           @update-jupyter="updateJupyterConfig"
+          @update-actors="updateActorSettings"
           @submit="onButtonClick"
         />
 
@@ -173,11 +176,16 @@ const queryText = ref('')
 const loadingMessage = ref('')
 const isExpanded = ref(true)
 const showJupyterConfig = ref(false)
+const showActorSelector = ref(false)
 const jupyterConfig = ref({
   server: null,
   kernel: null
 })
 const selectedTaskForModal = ref(null)
+const actorSettings = ref({
+  enabledActors: [],
+  useCustomPrompt: false
+})
 
 // Set up composables
 const taskBoardId = computed(() => props.node.attrs.taskBoardId)
@@ -438,7 +446,18 @@ const onButtonClick = async (event) => {
   await activateVibe()
 }
 
-// Update activateVibe to use await with startRefreshInterval and store Jupyter config
+// Toggle actor selector
+const toggleActorSelector = () => {
+  showActorSelector.value = !showActorSelector.value
+}
+
+// Update actor settings
+const updateActorSettings = (settings) => {
+  actorSettings.value = settings
+  logger.log('Actor settings updated:', settings)
+}
+
+// Update activateVibe to include actor settings in task metadata
 const activateVibe = async () => {
   logger.log('activateVibe called with query:', JSON.stringify(queryText.value))
   
@@ -508,8 +527,14 @@ const activateVibe = async () => {
     // Create a composer task that will orchestrate the entire process
     loadingMessage.value = 'Setting up task orchestration...'
     
-    // Add Jupyter config information to the task metadata if available
-    const taskMetadata = jupyterInfo ? { jupyterConfig: jupyterInfo } : undefined
+    // Add Jupyter config and actor settings to the task metadata
+    const taskMetadata = {
+      ...(jupyterInfo ? { jupyterConfig: jupyterInfo } : {}),
+      enabledActors: actorSettings.value.enabledActors,
+      useCustomPrompt: actorSettings.value.useCustomPrompt
+    }
+    
+    logger.log('Creating composer task with metadata:', taskMetadata)
     
     const composerTask = await vibeStore.createTask(board.id, {
       title: 'Orchestrate tasks',

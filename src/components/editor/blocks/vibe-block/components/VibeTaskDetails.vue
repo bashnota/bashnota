@@ -40,7 +40,34 @@
             
             <div v-if="getResearchContent(task)" class="bg-card border rounded-md p-3">
               <h5 class="text-sm font-medium mb-2">Detailed Research</h5>
-              <div class="text-sm whitespace-pre-wrap">{{ getResearchContent(task) }}</div>
+              
+              <!-- Handle structured content with sections -->
+              <div v-if="typeof getResearchContent(task) === 'object' && getResearchContent(task).sections" class="space-y-3">
+                <div v-for="(section, idx) in getResearchContent(task).sections" :key="idx" class="border-t pt-2 mt-2 first:border-t-0 first:pt-0 first:mt-0">
+                  <h6 v-if="section.title" class="text-sm font-semibold mb-1">{{ section.title }}</h6>
+                  
+                  <!-- Section content could be string or object -->
+                  <div v-if="typeof section.content === 'string'" class="text-sm whitespace-pre-wrap">{{ section.content }}</div>
+                  
+                  <!-- Handle JSON content -->
+                  <pre v-else-if="typeof section.content === 'object'" class="text-xs bg-muted p-2 rounded overflow-x-auto">{{ JSON.stringify(section.content, null, 2) }}</pre>
+                </div>
+              </div>
+              
+              <!-- Default handling of content as string -->
+              <div v-else-if="typeof getResearchContent(task) === 'string'" class="text-sm whitespace-pre-wrap">{{ getResearchContent(task) }}</div>
+              
+              <!-- JSON fallback -->
+              <pre v-else class="text-xs bg-muted p-2 rounded overflow-x-auto">{{ JSON.stringify(getResearchContent(task), null, 2) }}</pre>
+            </div>
+            
+            <div v-if="task.result.references?.length" class="bg-card border rounded-md p-3">
+              <h5 class="text-sm font-medium mb-2">References</h5>
+              <ol class="list-decimal pl-5 text-sm space-y-1">
+                <li v-for="(ref, idx) in task.result.references" :key="idx">
+                  {{ ref }}
+                </li>
+              </ol>
             </div>
           </div>
           

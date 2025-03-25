@@ -1,8 +1,9 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { v4 as uuidv4 } from 'uuid'
-import { type ActorConfig, type VibeTask, type TaskBoard, ActorType, type DatabaseTable, type DatabaseEntry, DatabaseEntryType } from '@/types/vibe'
+import { type ActorConfig, type VibeTask, type TaskBoard, ActorType, type DatabaseTable, type DatabaseEntry, DatabaseEntryType, type CustomActor } from '@/types/vibe'
 import { logger } from '@/services/logger'
+import { vibeDB, type StoredActorConfig } from '@/services/vibeDB'
 
 /**
  * Store for managing Vibe tasks and boards
@@ -12,6 +13,7 @@ export const useVibeStore = defineStore('vibe', () => {
   const boards = ref<TaskBoard[]>([])
   const tables = ref<DatabaseTable[]>([])
   const entries = ref<DatabaseEntry[]>([])
+  const customActors = ref<CustomActor[]>([])
   const actorConfigs = ref<Record<ActorType, ActorConfig>>({
     [ActorType.CODER]: {
       enabled: true,
@@ -45,28 +47,109 @@ export const useVibeStore = defineStore('vibe', () => {
       maxTokens: 2000,
       customInstructions: 'Orchestrate and coordinate task execution efficiently.'
     },
-    [ActorType.SUMMARIZER]: {
+    [ActorType.WRITER]: {
       enabled: true,
       modelId: 'google/gemini-pro',
-      temperature: 0.2,
-      maxTokens: 4000,
-      customInstructions: 'Create concise, comprehensive summaries of complex information.'
+      temperature: 0.5,
+      maxTokens: 6000,
+      customInstructions: 'Create comprehensive markdown reports incorporating images and visualizations from other tasks. Format content professionally with subfigures where appropriate.'
     },
-    [ActorType.REVIEWER]: {
+    [ActorType.CUSTOM]: {
       enabled: true,
       modelId: 'google/gemini-pro',
-      temperature: 0.3,
-      maxTokens: 3000,
-      customInstructions: 'Provide thorough, constructive feedback and evaluations on content.'
-    },
-    [ActorType.VISUALIZER]: {
-      enabled: true,
-      modelId: 'google/gemini-pro',
-      temperature: 0.2,
-      maxTokens: 3000,
-      customInstructions: 'Create effective data visualizations and clear graphical representations.'
+      temperature: 0.5,
+      maxTokens: 4000
     }
   })
+  
+  // Initialize custom actors from database
+  const initialized = ref(false)
+  
+  /**
+   * Load actor configurations from the database
+   */
+  async function loadActorConfigs() {
+    try {
+      // First initialize default configs if they don't exist
+      await vibeDB.initializeDefaults(actorConfigs.value)
+      
+      // Load all actor configs
+      const storedConfigs = await vibeDB.actorConfigs.toArray()
+      const storedActors = await vibeDB.customActors.toArray()
+      
+      // Convert stored configs to the actorConfigs format
+      const newActorConfigs: Record<ActorType, ActorConfig> = { ...actorConfigs.value }
+      
+      for (const config of storedConfigs) {
+        if (config.id in ActorType) {
+          newActorConfigs[config.id as ActorType] = {
+            enabled: config.enabled,
+            modelId: config.modelId,
+            temperature: config.temperature,
+            maxTokens: config.maxTokens,
+            customInstructions: config.customInstructions
+          }
+        }
+      }
+      
+      // Update state
+      actorConfigs.value = newActorConfigs
+      customActors.value = storedActors
+      
+      initialized.value = true
+      logger.log('Actor configurations loaded from database')
+    } catch (error) {
+      logger.error('Error loading actor configurations:', error)
+    }
+  }
+  
+  /**
+   * Save the current actor configurations to the database
+   */
+  async function saveActorConfigs() {
+    try {
+      // Convert actorConfigs to StoredActorConfig format
+      const configsToStore: StoredActorConfig[] = Object.entries(actorConfigs.value)
+        .map(([actorType, config]) => ({
+          id: actorType,
+          name: actorType,
+          description: getActorDescription(actorType as ActorType),
+          isDefault: true,
+          updatedAt: new Date(),
+          ...config
+        }))
+      
+      // Update the database
+      await vibeDB.transaction('rw', vibeDB.actorConfigs, async () => {
+        for (const config of configsToStore) {
+          await vibeDB.actorConfigs.put(config)
+        }
+      })
+      
+      logger.log('Actor configurations saved to database')
+    } catch (error) {
+      logger.error('Error saving actor configurations:', error)
+    }
+  }
+  
+  /**
+   * Get a description for an actor type
+   * @param actorType The actor type
+   * @returns The actor description
+   */
+  function getActorDescription(actorType: ActorType): string {
+    const descriptions: Record<ActorType, string> = {
+      [ActorType.PLANNER]: 'Creates detailed task plans with logical dependencies and workflow sequencing',
+      [ActorType.RESEARCHER]: 'Specializes in gathering information, literature reviews, and comprehensive knowledge synthesis',
+      [ActorType.ANALYST]: 'Analyzes data, creates visualizations, and extracts insights from information',
+      [ActorType.CODER]: 'Generates code, implements algorithms, and provides technical solutions',
+      [ActorType.COMPOSER]: 'Orchestrates and coordinates execution across multiple tasks',
+      [ActorType.WRITER]: 'Creates comprehensive reports with markdown formatting and visualization integration',
+      [ActorType.CUSTOM]: 'User-defined custom actor with specialized instructions'
+    }
+    
+    return descriptions[actorType] || 'No description available'
+  }
 
   // Actions
   /**
@@ -209,10 +292,38 @@ export const useVibeStore = defineStore('vibe', () => {
    * @param actorType Actor type
    * @param config Updated configuration
    */
-  function updateActorConfig(actorType: ActorType, config: Partial<ActorConfig>): void {
+  async function updateActorConfig(actorType: ActorType, config: Partial<ActorConfig>): Promise<void> {
+    // Update in memory config
     actorConfigs.value[actorType] = {
       ...actorConfigs.value[actorType],
       ...config,
+    }
+    
+    // Update in database
+    try {
+      // Get existing config or create a new one
+      const existingConfig = await vibeDB.actorConfigs.get(actorType)
+      
+      if (existingConfig) {
+        // Update existing config
+        await vibeDB.actorConfigs.update(actorType, {
+          ...existingConfig,
+          ...config,
+          updatedAt: new Date()
+        })
+      } else {
+        // Create new config
+        await vibeDB.actorConfigs.add({
+          id: actorType,
+          name: actorType,
+          description: getActorDescription(actorType),
+          isDefault: true,
+          updatedAt: new Date(),
+          ...actorConfigs.value[actorType] // Include full config
+        })
+      }
+    } catch (error) {
+      logger.error(`Error updating actor ${actorType} in database:`, error)
     }
   }
   
@@ -383,6 +494,129 @@ export const useVibeStore = defineStore('vibe', () => {
     return true
   }
 
+  /**
+   * Add a custom actor
+   * @param name Actor name
+   * @param description Actor description
+   * @param config Actor configuration
+   * @returns The created custom actor
+   */
+  async function addCustomActor(name: string, description: string, config: ActorConfig): Promise<CustomActor> {
+    const actor: CustomActor = {
+      id: uuidv4(),
+      name,
+      description,
+      config: {
+        ...config,
+        enabled: config.enabled ?? true,
+        name,
+        description,
+        isCustom: true
+      },
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }
+
+    // Add to in-memory store
+    customActors.value.push(actor)
+    
+    // Add to database
+    try {
+      await vibeDB.customActors.add(actor)
+    } catch (error) {
+      logger.error('Error adding custom actor to database:', error)
+    }
+    
+    return actor
+  }
+
+  /**
+   * Update a custom actor
+   * @param id Actor ID
+   * @param updates Updates to apply
+   * @returns The updated actor or undefined if not found
+   */
+  async function updateCustomActor(id: string, updates: Partial<Omit<CustomActor, 'id' | 'createdAt'>>): Promise<CustomActor | undefined> {
+    // Update in memory
+    const index = customActors.value.findIndex(actor => actor.id === id)
+    if (index === -1) return undefined
+
+    const actor = customActors.value[index]
+    const updatedActor = {
+      ...actor,
+      ...updates,
+      config: {
+        ...actor.config,
+        ...(updates.config || {}),
+      },
+      updatedAt: new Date()
+    }
+
+    customActors.value[index] = updatedActor
+    
+    // Update in database
+    try {
+      await vibeDB.customActors.update(id, updatedActor)
+    } catch (error) {
+      logger.error(`Error updating custom actor ${id} in database:`, error)
+    }
+    
+    return updatedActor
+  }
+
+  /**
+   * Remove a custom actor
+   * @param id Actor ID
+   * @returns True if actor was removed, false otherwise
+   */
+  async function removeCustomActor(id: string): Promise<boolean> {
+    // Remove from memory
+    const initialLength = customActors.value.length
+    customActors.value = customActors.value.filter(actor => actor.id !== id)
+    const removed = customActors.value.length < initialLength
+    
+    // Remove from database
+    if (removed) {
+      try {
+        await vibeDB.customActors.delete(id)
+      } catch (error) {
+        logger.error(`Error removing custom actor ${id} from database:`, error)
+      }
+    }
+    
+    return removed
+  }
+
+  /**
+   * Get a custom actor by ID
+   * @param id Actor ID
+   * @returns The actor or undefined if not found
+   */
+  function getCustomActor(id: string): CustomActor | undefined {
+    return customActors.value.find(actor => actor.id === id)
+  }
+
+  /**
+   * Get all custom actors
+   * @returns Array of custom actors
+   */
+  function getCustomActors(): CustomActor[] {
+    return customActors.value
+  }
+
+  /**
+   * Get all enabled custom actors
+   * @returns Array of enabled custom actors
+   */
+  function getEnabledCustomActors(): CustomActor[] {
+    return customActors.value.filter(actor => actor.config.enabled)
+  }
+
+  // Initialize on store creation
+  if (!initialized.value) {
+    loadActorConfigs()
+  }
+
   return {
     boards,
     actorConfigs,
@@ -404,6 +638,16 @@ export const useVibeStore = defineStore('vibe', () => {
     getEntriesForTask,
     getEntry,
     updateEntry,
-    deleteEntry
+    deleteEntry,
+    customActors,
+    addCustomActor,
+    updateCustomActor,
+    removeCustomActor,
+    getCustomActor,
+    getCustomActors,
+    getEnabledCustomActors,
+    loadActorConfigs,
+    saveActorConfigs,
+    initialized
   }
 }) 

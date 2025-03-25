@@ -144,18 +144,12 @@ const getActorIcon = (actorType: ActorType) => {
   switch (actorType) {
     case ActorType.PLANNER:
       return Brain
-    case ActorType.SUMMARIZER:
-      return ListTodo
     case ActorType.CODER:
       return Code
     case ActorType.ANALYST:
       return BarChart
     case ActorType.RESEARCHER:
       return FileText
-    case ActorType.REVIEWER:
-      return CheckCheck
-    case ActorType.VISUALIZER:
-      return BarChart2
     case ActorType.COMPOSER:
       return ListTodo
     default:

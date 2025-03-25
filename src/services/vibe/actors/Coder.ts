@@ -2,7 +2,6 @@ import { BaseActor } from './BaseActor'
 import { ActorType, type VibeTask, DatabaseEntryType } from '@/types/vibe'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
 import { useJupyterStore } from '@/stores/jupyterStore'
-import { notaExtensionService } from '@/services/notaExtensionService'
 import type { JupyterServer, KernelSpec } from '@/types/jupyter'
 import { logger } from '@/services/logger'
 
@@ -64,43 +63,10 @@ export class Coder extends BaseActor {
       }
     )
     
-    // Check if Jupyter server is configured
-    const jupyterServers = this.configuredServer 
-      ? [this.configuredServer] 
-      : this.jupyterStore.jupyterServers
-      
-    if (!jupyterServers || jupyterServers.length === 0) {
-      // Create an entry about the missing server
-      await this.createEntry(
-        codeTable.id,
-        task.id,
-        DatabaseEntryType.TEXT,
-        'jupyter_server_missing',
-        'No Jupyter server is configured. Code will be generated but not executed.'
-      )
-      
-      // Generate code without execution
-      const codeResult = await this.generateCode(task.description)
-      
-      // Store the generated code in the database
-      await this.createEntry(
-        codeTable.id,
-        task.id,
-        DatabaseEntryType.CODE,
-        'generated_code',
-        {
-          language: codeResult.language,
-          code: codeResult.code
-        }
-      )
-      
-      // No longer automatically insert code - user will do this manually
-      logger.log('Coder: Generated code and stored in database')
-      
-      return codeResult
-    }
+    // Always attempt to use Jupyter for execution
+    const language = this.determineLanguage(task.description)
     
-    // Generate initial code based on the task description
+    // Generate code based on the task description
     let codeResult = await this.generateCode(task.description)
     
     // Store the generated code in the database
@@ -115,7 +81,33 @@ export class Coder extends BaseActor {
       }
     )
     
-    // Execute the generated code
+    // Check for Jupyter servers
+    const jupyterServers = this.configuredServer 
+      ? [this.configuredServer] 
+      : this.jupyterStore.jupyterServers
+      
+    if (!jupyterServers || jupyterServers.length === 0) {
+      // No Jupyter server available - create an entry about the missing server
+      await this.createEntry(
+        codeTable.id,
+        task.id,
+        DatabaseEntryType.TEXT,
+        'jupyter_server_missing',
+        'No Jupyter server is configured. Code was generated but could not be executed. Please configure a Jupyter server to execute code.'
+      )
+      
+      // Return the generated code without execution
+      return {
+        ...codeResult,
+        execution: {
+          output: 'No Jupyter server available for execution. Please configure a Jupyter server.',
+          error: 'Jupyter server not configured',
+          success: false
+        }
+      }
+    }
+    
+    // Attempt to execute the code
     try {
       // Execute the code
       const executionResult = await this.executeCode(codeResult.code, codeResult.language)
@@ -129,9 +121,51 @@ export class Coder extends BaseActor {
         executionResult
       )
       
-      // If execution succeeded but further refinement is needed
-      if (executionResult.success && task.description.toLowerCase().includes('iterative')) {
-        // Refine the code based on execution results
+      // If execution failed, make another attempt with refined code
+      if (!executionResult.success) {
+        // Refine the code based on execution error
+        const refinedCodeResult = await this.refineCode(
+          task.description,
+          codeResult.code,
+          codeResult.language,
+          executionResult
+        )
+        
+        // Store the refined code in the database
+        await this.createEntry(
+          codeTable.id,
+          task.id,
+          DatabaseEntryType.CODE,
+          'refined_code',
+          {
+            language: refinedCodeResult.language,
+            code: refinedCodeResult.code
+          }
+        )
+        
+        // Execute the refined code
+        const refinedExecutionResult = await this.executeCode(
+          refinedCodeResult.code,
+          refinedCodeResult.language
+        )
+        
+        // Store the refined execution result in the database
+        await this.createEntry(
+          codeTable.id,
+          task.id,
+          DatabaseEntryType.RESULT,
+          'refined_execution_result',
+          refinedExecutionResult
+        )
+        
+        // Update the code result with the refined version
+        codeResult = {
+          ...refinedCodeResult,
+          execution: refinedExecutionResult
+        }
+      } else if (task.description.toLowerCase().includes('iterative')) {
+        // For iterative improvement tasks that executed successfully on first try
+        // Refine the code for further improvements
         const refinedCodeResult = await this.refineCode(
           task.description,
           codeResult.code,
@@ -195,7 +229,7 @@ export class Coder extends BaseActor {
         }
       )
       
-      // Return the generated code even if execution fails
+      // Return the generated code with the error information
       return {
         ...codeResult,
         execution: {
@@ -227,6 +261,7 @@ REQUIREMENTS:
 3. Use appropriate error handling to gracefully manage potential issues
 4. Include only essential comments for complex logic that needs explanation
 5. Follow conventions and idioms specific to ${language}
+6. The code must run in a Jupyter notebook environment in a SINGLE CELL
 
 OUTPUT GUIDELINES:
 - If the task involves data visualization:
@@ -244,7 +279,7 @@ OUTPUT GUIDELINES:
   - Ensure numerical stability in calculations
   - Validate inputs to mathematical functions
 
-IMPORTANT: Write only the code, without any explanations, markdown formatting, or surrounding text. The code should be ready to copy and execute.
+IMPORTANT: Write only the code, without any explanations, markdown formatting, or surrounding text. The code should be ready to copy and execute in a Jupyter notebook.
 `
     
     const completion = await this.generateCompletion(prompt)
@@ -279,8 +314,10 @@ IMPORTANT: Write only the code, without any explanations, markdown formatting, o
     language: string,
     executionResult: any
   ): Promise<CodeResult> {
+    const hasError = !executionResult.success
+    
     const prompt = `
-You are an expert programmer specializing in debugging and optimizing ${language} code. Your task is to refine and improve the following code based on its execution results:
+You are an expert programmer specializing in debugging and optimizing ${language} code. ${hasError ? 'Your task is to fix the errors in the following code:' : 'Your task is to refine and improve the following code:'}
 
 ORIGINAL TASK:
 ${description}
@@ -290,32 +327,23 @@ ORIGINAL CODE:
 ${originalCode}
 \`\`\`
 
-EXECUTION RESULT:
-${executionResult.output}
+${hasError ? 'ERROR:' : 'EXECUTION RESULT:'}
+${hasError ? (executionResult.error || 'Unknown error occurred during execution') : executionResult.output}
 
-${executionResult.error ? `ERROR:\n${executionResult.error}\n` : ''}
+${hasError ? 'DEBUGGING GUIDELINES:' : 'REFINEMENT GUIDELINES:'}
+1. ${hasError ? 'Identify and fix all errors in the code' : 'Optimize the code for better performance and readability'}
+2. Ensure the code correctly addresses all aspects of the original task
+3. Make the code more robust with proper error handling
+4. ${hasError ? 'Fix the code so it runs successfully in a Jupyter notebook' : 'Enhance output formatting and visualization if applicable'}
+5. The fixed code must be complete and runnable in a single Jupyter cell
 
-REFINEMENT GUIDELINES:
-1. First, identify and fix any bugs, errors, or issues in the code
-2. Then, optimize the code for efficiency, readability, and maintainability
-3. Ensure the code correctly addresses all aspects of the original task
-4. Improve error handling to make the code more robust against unexpected inputs
-5. Enhance output formatting and visualization for better readability
-
-SPECIFIC IMPROVEMENTS TO MAKE:
-- If there were execution errors: Address the root cause of the errors, not just the symptoms
-- If performance is an issue: Optimize algorithms, data structures, or resource usage
-- If visualizations are involved: Enhance clarity, labels, and visual appeal
-- If mathematical calculations are present: Ensure correctness and consider numerical stability
-- If data processing is involved: Improve handling of edge cases and error conditions
-
-IMPORTANT FOR CODE QUALITY:
+IMPORTANT REQUIREMENTS:
+- The code must run in a Jupyter notebook environment in a SINGLE CELL
+- The code must be complete, not just the fixed portions
 - Follow ${language} best practices and idiomatic patterns
-- Use appropriate variable/function naming conventions
-- Structure the code logically with clear separation of concerns
-- Only add comments for complex logic that needs explanation
+- Include clear output/display statements so results are visible
 
-Return ONLY the improved code without explanations, markdown formatting, or surrounding text. The code should be ready to execute without further modifications.
+Return ONLY the improved code without explanations, markdown formatting, or surrounding text. The code should be ready to execute in a Jupyter notebook.
 `
     
     const completion = await this.generateCompletion(prompt)
@@ -344,27 +372,70 @@ Return ONLY the improved code without explanations, markdown formatting, or surr
   private determineLanguage(description: string): string {
     const lowercaseDesc = description.toLowerCase()
     
-    // Check for explicit language mentions
-    if (lowercaseDesc.includes('python')) return 'python'
-    if (lowercaseDesc.includes('javascript') || lowercaseDesc.includes('js')) return 'javascript'
-    if (lowercaseDesc.includes('typescript') || lowercaseDesc.includes('ts')) return 'typescript'
-    if (lowercaseDesc.includes(' r ') || lowercaseDesc.includes('language r') || 
-        lowercaseDesc.includes('using r')) return 'r'
-    if (lowercaseDesc.includes('sql')) return 'sql'
+    // Check for explicit language requests
+    if (lowercaseDesc.includes(' python') || 
+        lowercaseDesc.includes('in python') || 
+        lowercaseDesc.includes('using python') || 
+        lowercaseDesc.includes('with python')) return 'python'
     
-    // Check for visualization libraries that imply language
+    if (lowercaseDesc.includes(' javascript') || 
+        lowercaseDesc.includes('in javascript') || 
+        lowercaseDesc.includes(' js ') || 
+        lowercaseDesc.includes('using javascript') || 
+        lowercaseDesc.includes('with javascript')) return 'javascript'
+    
+    if (lowercaseDesc.includes(' typescript') || 
+        lowercaseDesc.includes('in typescript') || 
+        lowercaseDesc.includes(' ts ') || 
+        lowercaseDesc.includes('using typescript') || 
+        lowercaseDesc.includes('with typescript')) return 'typescript'
+    
+    if (lowercaseDesc.includes(' r ') || 
+        lowercaseDesc.includes('language r') || 
+        lowercaseDesc.includes('in r ') || 
+        lowercaseDesc.includes(' r programming') || 
+        lowercaseDesc.includes('using r ') || 
+        lowercaseDesc.includes('with r ')) return 'r'
+    
+    if (lowercaseDesc.includes(' sql') || 
+        lowercaseDesc.includes('in sql') || 
+        lowercaseDesc.includes('using sql') || 
+        lowercaseDesc.includes('with sql')) return 'sql'
+    
+    if (lowercaseDesc.includes(' julia') || 
+        lowercaseDesc.includes('in julia') || 
+        lowercaseDesc.includes('using julia') || 
+        lowercaseDesc.includes('with julia')) return 'julia'
+    
+    // Check for library/framework mentions that imply languages
     if (lowercaseDesc.includes('matplotlib') || 
         lowercaseDesc.includes('pandas') || 
         lowercaseDesc.includes('numpy') || 
+        lowercaseDesc.includes('sklearn') || 
+        lowercaseDesc.includes('scikit') || 
+        lowercaseDesc.includes('tensorflow') || 
+        lowercaseDesc.includes('torch') || 
+        lowercaseDesc.includes('keras') || 
+        lowercaseDesc.includes('scipy') || 
         lowercaseDesc.includes('seaborn')) return 'python'
     
     if (lowercaseDesc.includes('ggplot') || 
         lowercaseDesc.includes('dplyr') ||
-        lowercaseDesc.includes('tidyverse')) return 'r'
+        lowercaseDesc.includes('tidyverse') ||
+        lowercaseDesc.includes('shiny') ||
+        lowercaseDesc.includes('caret')) return 'r'
     
     if (lowercaseDesc.includes('d3.js') || 
         lowercaseDesc.includes('chart.js') ||
-        lowercaseDesc.includes('plotly.js')) return 'javascript'
+        lowercaseDesc.includes('plotly.js') ||
+        lowercaseDesc.includes('node.js') ||
+        lowercaseDesc.includes('react') ||
+        lowercaseDesc.includes('vue') ||
+        lowercaseDesc.includes('angular')) return 'javascript'
+    
+    if (lowercaseDesc.includes('data.table') ||
+        lowercaseDesc.includes('randomforest') ||
+        lowercaseDesc.includes('lubridate')) return 'r'
     
     // Default to Python if not specified
     return 'python'
@@ -405,6 +476,7 @@ Return ONLY the improved code without explanations, markdown formatting, or surr
         else if (language === 'r') kernelSpec = 'ir'
         else if (language === 'javascript' || language === 'typescript') kernelSpec = 'javascript'
         else if (language === 'sql') kernelSpec = 'sql'
+        else if (language === 'julia') kernelSpec = 'julia'
         
         // Find a matching kernel
         kernel = allKernels.find((k: any) => 
@@ -413,7 +485,19 @@ Return ONLY the improved code without explanations, markdown formatting, or surr
         )
         
         if (!kernel) {
-          throw new Error(`No kernel found for language: ${language}`)
+          // If no specific kernel found, try to use Python as fallback
+          kernel = allKernels.find((k: any) => 
+            k.name.toLowerCase().includes('python') || 
+            k.display_name.toLowerCase().includes('python')
+          )
+          
+          if (!kernel) {
+            // If still no kernel, just use the first available one
+            kernel = allKernels[0]
+            logger.warn(`No kernel found for ${language}, using ${kernel.name} as fallback`)
+          } else {
+            logger.warn(`No kernel found for ${language}, using Python kernel as fallback`)
+          }
         }
         
         // Create a server configuration from the first server
@@ -455,67 +539,64 @@ Return ONLY the improved code without explanations, markdown formatting, or surr
       }
       
       // Try to extract structured data from the output
-      let data: any = null;
+      let data: any = null
       try {
         // Look for JSON in the output with a more robust pattern
         // First attempt: Look for valid JSON objects or arrays
-        const jsonRegex = /(\{[\s\S]*?\}|\[[\s\S]*?\])/g;
-        const potentialMatches = [...output.matchAll(jsonRegex)];
+        const jsonRegex = /(\{[\s\S]*?\}|\[[\s\S]*?\])/g
+        const potentialMatches = [...output.matchAll(jsonRegex)]
         
         // Try each potential match until we find valid JSON
         for (const match of potentialMatches) {
           try {
-            const jsonText = match[0].trim();
-            data = JSON.parse(jsonText);
-            break; // If parsing succeeds, exit the loop
+            const jsonText = match[0].trim()
+            data = JSON.parse(jsonText)
+            break // If parsing succeeds, exit the loop
           } catch (parseError) {
             // Continue to the next potential match
-            continue;
+            continue
           }
         }
       } catch (error) {
-        logger.warn('Could not parse structured data from output:', error);
+        logger.warn('Could not parse structured data from output:', error)
+      }
+      
+      const success = !cell.hasError
+      const errorMessage = cell.hasError ? (cell.error?.message || 'Execution failed') : undefined
+      
+      // Provide useful error message when execution fails
+      if (!success) {
+        logger.error(`Code execution failed: ${errorMessage}`)
+        
+        // Create a styled error message with red coloring
+        output = `<div style="color: red; font-weight: bold;">
+Execution Failed: ${errorMessage || 'Unknown error'}
+</div>
+${output}`
       }
       
       // Parse and format the result
       return {
         output,
-        success: !cell.hasError,
-        error: cell.hasError ? (cell.error?.message || 'Execution failed') : undefined,
+        success,
+        error: errorMessage,
         visualizations: visualizations.length > 0 ? visualizations : undefined,
         data: data
       }
     } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
       logger.error('Code execution error:', error)
-      throw new Error(`Failed to execute code: ${error instanceof Error ? error.message : String(error)}`)
-    }
-  }
-  
-  /**
-   * Formats the execution output into a readable string
-   * @param result The execution result from the code execution store
-   * @returns Formatted output
-   */
-  private formatExecutionOutput(result: any): string {
-    if (!result) return 'No output'
-    
-    // For simple string results
-    if (typeof result === 'string') return result
-    
-    // For structured results
-    try {
-      if (Array.isArray(result)) {
-        return result.map(item => JSON.stringify(item)).join('\n')
-      }
       
-      if (typeof result === 'object') {
-        if (result.output) return result.output
-        return JSON.stringify(result, null, 2)
-      }
+      // Create styled error with red color
+      const styledError = `<div style="color: red; font-weight: bold;">
+Execution Failed: ${errorMessage}
+</div>`
       
-      return String(result)
-    } catch (error: unknown) {
-      return `Error formatting output: ${error instanceof Error ? error.message : String(error)}`
+      return {
+        output: styledError,
+        success: false,
+        error: errorMessage
+      }
     }
   }
 }
