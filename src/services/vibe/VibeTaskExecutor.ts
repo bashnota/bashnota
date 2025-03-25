@@ -1,18 +1,12 @@
 import { useVibeStore } from '@/stores/vibeStore'
 import { ActorType, type VibeTask } from '@/types/vibe'
-import { Planner } from './actors/Planner'
-import { Researcher } from './actors/Researcher'
-import { Analyst } from './actors/Analyst'
-import { Coder } from './actors/Coder'
-import { Composer } from './actors/Composer'
+import { Planner, Researcher, Analyst, Coder, Composer, Writer } from './actors'
 import { BaseActor } from './actors/BaseActor'
 import { type Editor } from '@tiptap/core'
 import { notaExtensionService } from '@/services/notaExtensionService'
 import type { JupyterServer, KernelSpec } from '@/types/jupyter'
-import { Summarizer } from './actors/Summarizer'
-import { Reviewer } from './actors/Reviewer'
-import { Visualizer } from './actors/Visualizer'
 import { logger } from '@/services/logger'
+import { CustomActor } from './actors/CustomActor'
 
 /**
  * Class for executing tasks in the correct order
@@ -34,6 +28,7 @@ export class VibeTaskExecutor {
   private maxExecutionTime = 10 * 60 * 1000  // Maximum execution time (10 minutes)
   private timeoutTimer: any = null   // Timer for execution timeout
   private executorLogger = logger.createPrefixedLogger('VibeTaskExecutor')
+  private currentTaskId?: string
   
   /**
    * Constructor
@@ -406,105 +401,113 @@ export class VibeTaskExecutor {
    * @returns Promise that resolves when the task is complete
    */
   public async executeTask(task: VibeTask): Promise<any> {
-    // Check if already disposed
-    if (this.isDisposed) {
-      this.executorLogger.warn(`VibeTaskExecutor has been disposed, skipping task ${task.id}`)
-      return
-    }
-    
-    // Skip already completed or failed tasks
-    if (task.status === 'completed' || task.status === 'failed') {
-      return task.result
-    }
-    
-    // Skip already running tasks
-    if (task.id in this.runningTasks) {
-      return this.runningTasks[task.id]
-    }
-    
     try {
-      // Check if all dependencies are complete
-      const board = await this.vibeStore.getBoard(this.boardId)
-      if (!board) {
-        this.executorLogger.warn(`Board ${this.boardId} not found when executing task ${task.id}, skipping`)
+      this.currentTaskId = task.id
+      // Check if already disposed
+      if (this.isDisposed) {
+        this.executorLogger.warn(`VibeTaskExecutor has been disposed, skipping task ${task.id}`)
         return
       }
       
-      if (task.dependencies && task.dependencies.length > 0) {
-        const dependencies = board.tasks.filter(t => 
-          task.dependencies?.includes(t.id)
-        )
+      // Skip already completed or failed tasks
+      if (task.status === 'completed' || task.status === 'failed') {
+        return task.result
+      }
+      
+      // Skip already running tasks
+      if (task.id in this.runningTasks) {
+        return this.runningTasks[task.id]
+      }
+      
+      try {
+        // Check if all dependencies are complete
+        const board = await this.vibeStore.getBoard(this.boardId)
+        if (!board) {
+          this.executorLogger.warn(`Board ${this.boardId} not found when executing task ${task.id}, skipping`)
+          return
+        }
         
-        const allDependenciesComplete = dependencies.every(
-          dep => dep.status === 'completed'
-        )
-        
-        if (!allDependenciesComplete) {
-          // Check if any dependencies failed
-          const failedDependencies = dependencies.filter(dep => dep.status === 'failed')
+        if (task.dependencies && task.dependencies.length > 0) {
+          const dependencies = board.tasks.filter(t => 
+            task.dependencies?.includes(t.id)
+          )
           
-          if (failedDependencies.length > 0) {
-            this.executorLogger.warn(`Cannot execute task ${task.id}: dependencies failed`)
-            // Mark this task as failed since its dependencies failed
-            await this.vibeStore.updateTask(this.boardId, task.id, {
-              status: 'failed',
-              error: 'Dependencies failed to complete'
-            })
+          const allDependenciesComplete = dependencies.every(
+            dep => dep.status === 'completed'
+          )
+          
+          if (!allDependenciesComplete) {
+            // Check if any dependencies failed
+            const failedDependencies = dependencies.filter(dep => dep.status === 'failed')
+            
+            if (failedDependencies.length > 0) {
+              this.executorLogger.warn(`Cannot execute task ${task.id}: dependencies failed`)
+              // Mark this task as failed since its dependencies failed
+              await this.vibeStore.updateTask(this.boardId, task.id, {
+                status: 'failed',
+                error: 'Dependencies failed to complete'
+              })
+              return
+            }
+            
+            // Otherwise, dependencies are still pending or in progress
+            this.executorLogger.log(`Cannot execute task ${task.id}: dependencies not complete yet`)
+            return
+          }
+        }
+        
+        this.executorLogger.log(`Executing task ${task.id}: ${task.title}`)
+        
+        // Get the actor for this task type
+        const actor = this.getActorForType(task.actorType, task.id)
+        
+        // Execute the task
+        try {
+          // Create a promise for the task execution
+          // Always pass the editor instance to ensure it's available to actors
+          // even if the notaExtensionService editor reference was lost
+          this.executorLogger.log(`Starting task ${task.id} (${task.actorType})`)
+          
+          // Get the current editor from the extension service or supply our own
+          const editorInstance = notaExtensionService.hasEditor() 
+            ? undefined  // If service already has an editor, don't provide a new one
+            : this.getEditorInstance() // Otherwise provide our instance
+          
+          const promise = actor.executeTask(task, editorInstance)
+          this.runningTasks[task.id] = promise
+          
+          // Wait for the task to complete
+          const result = await promise
+          
+          // If the executor was disposed during execution, don't update the task
+          if (this.isDisposed) {
+            this.executorLogger.warn(`VibeTaskExecutor was disposed during execution of task ${task.id}`)
             return
           }
           
-          // Otherwise, dependencies are still pending or in progress
-          this.executorLogger.log(`Cannot execute task ${task.id}: dependencies not complete yet`)
-          return
+          this.executorLogger.log(`Task ${task.id} completed`)
+          return result
+        } catch (error) {
+          // If not disposed, log the error and rethrow
+          if (!this.isDisposed) {
+            this.executorLogger.error(`Error executing task ${task.id}:`, error)
+            throw error
+          }
+        } finally {
+          // Remove the task from the running tasks list
+          delete this.runningTasks[task.id]
         }
-      }
-      
-      this.executorLogger.log(`Executing task ${task.id}: ${task.title}`)
-      
-      // Get the appropriate actor for the task
-      const actor = this.getActorForType(task.actorType)
-      
-      // Execute the task
-      try {
-        // Create a promise for the task execution
-        // Always pass the editor instance to ensure it's available to actors
-        // even if the notaExtensionService editor reference was lost
-        this.executorLogger.log(`Starting task ${task.id} (${task.actorType})`)
-        
-        // Get the current editor from the extension service or supply our own
-        const editorInstance = notaExtensionService.hasEditor() 
-          ? undefined  // If service already has an editor, don't provide a new one
-          : this.getEditorInstance() // Otherwise provide our instance
-        
-        const promise = actor.executeTask(task, editorInstance)
-        this.runningTasks[task.id] = promise
-        
-        // Wait for the task to complete
-        const result = await promise
-        
-        // If the executor was disposed during execution, don't update the task
-        if (this.isDisposed) {
-          this.executorLogger.warn(`VibeTaskExecutor was disposed during execution of task ${task.id}`)
-          return
-        }
-        
-        this.executorLogger.log(`Task ${task.id} completed`)
-        return result
       } catch (error) {
-        // If not disposed, log the error and rethrow
-        if (!this.isDisposed) {
-          this.executorLogger.error(`Error executing task ${task.id}:`, error)
-          throw error
-        }
-      } finally {
-        // Remove the task from the running tasks list
+        // Make sure to remove from running tasks on error
         delete this.runningTasks[task.id]
+        
+        this.executorLogger.error(`Error in executeTask for task ${task.id}:`, error)
+        throw error
+      } finally {
+        this.currentTaskId = undefined
       }
     } catch (error) {
-      // Make sure to remove from running tasks on error
-      delete this.runningTasks[task.id]
-      
-      this.executorLogger.error(`Error in executeTask for task ${task.id}:`, error)
+      this.executorLogger.error(`Error executing task ${task.id}:`, error)
       throw error
     }
   }
@@ -604,36 +607,70 @@ export class VibeTaskExecutor {
   }
   
   /**
-   * Get the appropriate actor for a task type
-   * @param actorType Actor type
-   * @returns Actor instance
+   * Get an actor for a specific actor type
+   * @param actorType Actor type to get
+   * @param taskId Task ID (for custom actors)
+   * @returns Actor for the given type
    */
-  private getActorForType(actorType: ActorType): BaseActor {
+  private getActorForType(actorType: ActorType, taskId?: string): BaseActor {
+    // Handle CUSTOM actor type differently
+    if (actorType === ActorType.CUSTOM) {
+      if (!taskId) {
+        throw new Error('Task ID is required for custom actors')
+      }
+      
+      // Find the board for this task
+      const board = this.vibeStore.getBoard(this.boardId)
+      if (!board) {
+        throw new Error(`Board ${this.boardId} not found when looking for custom actor`)
+      }
+      
+      const task = board.tasks.find(t => t.id === taskId)
+      if (!task) {
+        throw new Error(`Task ${taskId} not found when looking for custom actor`)
+      }
+      
+      // Get the custom actor ID from the task
+      const customActorId = task.customActorId
+      if (!customActorId) {
+        throw new Error(`Task ${taskId} does not specify a custom actor ID`)
+      }
+      
+      // Find the custom actor
+      const customActor = this.vibeStore.getCustomActor(customActorId)
+      if (!customActor) {
+        throw new Error(`Custom actor ${customActorId} not found`)
+      }
+      
+      // Check if the actor is enabled
+      if (!customActor.config.enabled) {
+        throw new Error(`Custom actor ${customActor.name} is disabled`)
+      }
+      
+      // Create a new instance of the CustomActor class
+      return new CustomActor(customActor)
+    }
+    
+    // Check if the actor type is enabled
+    const actorConfig = this.vibeStore.getActorConfig(actorType)
+    if (!actorConfig || !actorConfig.enabled) {
+      throw new Error(`Actor type ${actorType} is disabled`)
+    }
+    
+    // For built-in actor types, use the switch statement
     switch (actorType) {
+      case ActorType.PLANNER:
+        return new Planner()
       case ActorType.RESEARCHER:
         return new Researcher()
       case ActorType.ANALYST:
         return new Analyst()
-      case ActorType.CODER: {
-        const coder = new Coder()
-        
-        // Set Jupyter configuration if available
-        if (this.jupyterConfig.server && this.jupyterConfig.kernel) {
-          coder.setJupyterConfig(this.jupyterConfig.server, this.jupyterConfig.kernel)
-        }
-        
-        return coder
-      }
-      case ActorType.PLANNER:
-        return new Planner()
+      case ActorType.CODER:
+        return new Coder()
       case ActorType.COMPOSER:
         return new Composer()
-      case ActorType.SUMMARIZER:
-        return new Summarizer()
-      case ActorType.REVIEWER:
-        return new Reviewer()
-      case ActorType.VISUALIZER:
-        return new Visualizer()
+      case ActorType.WRITER:
+        return new Writer()
       default:
         throw new Error(`Unsupported actor type: ${actorType}`)
     }

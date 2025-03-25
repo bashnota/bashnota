@@ -5,9 +5,6 @@ import { Researcher } from './Researcher'
 import { Analyst } from './Analyst'
 import { Coder } from './Coder'
 import { DatabaseEntryType } from '@/types/vibe'
-import { Reviewer } from './Reviewer'
-import { Visualizer } from './Visualizer'
-import { Summarizer } from './Summarizer'
 import { logger } from '@/services/logger'
 
 // Maximum number of retry attempts for code execution
@@ -173,7 +170,8 @@ export class Composer extends BaseActor {
         description: plannedTask.description,
         actorType: plannedTask.actorType,
         dependencies: [], // We'll update these after all tasks are created
-        priority: this.mapStringToPriority(plannedTask.priority)
+        priority: this.mapStringToPriority(plannedTask.priority),
+        customActorId: plannedTask.customActorId // Add customActorId for CUSTOM actor tasks
       })
 
       // Store the task ID mapping
@@ -353,8 +351,8 @@ export class Composer extends BaseActor {
         // Sort by priority (if available) or by index
         isolatedTasks.sort((a, b) => {
           const priorityMap = { 'high': 0, 'medium': 1, 'low': 2 };
-          const aPriority = priorityMap[plan.tasks[a].priority] ?? 1;
-          const bPriority = priorityMap[plan.tasks[b].priority] ?? 1;
+          const aPriority = priorityMap[plan.tasks[a].priority.toLowerCase() as keyof typeof priorityMap] ?? 1;
+          const bPriority = priorityMap[plan.tasks[b].priority.toLowerCase() as keyof typeof priorityMap] ?? 1;
           
           if (aPriority !== bPriority) return aPriority - bPriority;
           return a - b;
@@ -468,12 +466,6 @@ export class Composer extends BaseActor {
         return new Coder()
       case ActorType.PLANNER:
         return new Planner()
-      case ActorType.REVIEWER:
-        return new Reviewer()
-      case ActorType.VISUALIZER:
-        return new Visualizer()
-      case ActorType.SUMMARIZER:
-        return new Summarizer()
       default:
         throw new Error(`Unsupported actor type: ${actorType}`)
     }

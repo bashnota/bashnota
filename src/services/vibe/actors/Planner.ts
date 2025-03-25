@@ -1,7 +1,44 @@
 import { BaseActor } from './BaseActor'
-import { ActorType, type VibeTask } from '@/types/vibe'
+import { ActorType, TaskPriority, type VibeTask } from '@/types/vibe'
 import { DatabaseEntryType } from '@/types/vibe'
 import { logger } from '@/services/logger'
+
+/**
+ * The response format that the Planner actor expects from the LLM
+ */
+interface PlannerResponse {
+  mainGoal: string
+  tasks: {
+    title: string
+    description: string
+    actorType: string
+    dependencies: (string | number)[]
+    priority: string
+    estimatedCompletion?: string
+    customActorId?: string
+  }[]
+}
+
+/**
+ * A task planned by the Planner actor
+ */
+interface PlannedTask {
+  title: string
+  description: string
+  actorType: ActorType
+  dependencies: string[]
+  priority: TaskPriority
+  estimatedCompletion?: string
+  customActorId?: string
+}
+
+/**
+ * A plan created by the Planner actor
+ */
+export interface TaskPlan {
+  mainGoal: string
+  tasks: PlannedTask[]
+}
 
 /**
  * Result from the Planner actor
@@ -9,26 +46,6 @@ import { logger } from '@/services/logger'
 export interface PlannerResult {
   plan: TaskPlan
   summary: string
-}
-
-/**
- * Task plan created by the Planner
- */
-export interface TaskPlan {
-  tasks: PlannedTask[]
-  mainGoal: string
-}
-
-/**
- * Task planned by the Planner
- */
-export interface PlannedTask {
-  title: string
-  description: string
-  actorType: ActorType
-  dependencies: string[] // IDs of tasks this task depends on
-  priority: 'high' | 'medium' | 'low'
-  estimatedCompletion: 'short' | 'medium' | 'long'
 }
 
 /**
@@ -58,13 +75,29 @@ export class Planner extends BaseActor {
     )
     
     // Create a prompt for the AI to generate a plan
-    const prompt = this.createPlanningPrompt(task.description)
+    const prompt = this.createPlanningPrompt(task)
     
     // Generate plan using AI
-    const planText = await this.generateCompletion(prompt)
+    const rawText = await this.generateCompletion(prompt)
     
     // Parse the plan from the generated text
-    const plan = this.parsePlanFromText(planText, task.boardId)
+    const plan = this.parsePlanFromText(rawText)
+    
+    // Filter for enabled actors if specified in the task metadata
+    if (task.metadata?.enabledActors && Array.isArray(task.metadata.enabledActors)) {
+      // Convert all actor types to uppercase for comparison
+      const enabledActors = task.metadata.enabledActors.map(actor => 
+        typeof actor === 'string' ? actor.toUpperCase() : actor
+      );
+      
+      // Filter tasks to only include enabled actors
+      plan.tasks = plan.tasks.filter(plannedTask => 
+        enabledActors.includes(plannedTask.actorType)
+      );
+      
+      // Log the filtered plan
+      logger.log(`Filtered plan to include only enabled actors: ${enabledActors.join(', ')}`);
+    }
     
     // Store the plan in the database
     this.createEntry(
@@ -100,298 +133,216 @@ export class Planner extends BaseActor {
 
   /**
    * Create a prompt for the AI to generate a plan
-   * @param query The user's query
+   * @param task The planning task
    * @returns The prompt for the AI
    */
-  private createPlanningPrompt(query: string): string {
-    return `You are a strategic Planning AI assistant that creates detailed, actionable work plans for complex tasks. You excel at breaking down large objectives into logical, manageable subtasks.
+  private createPlanningPrompt(task: VibeTask): string {
+    // Only use custom instructions if explicitly requested in task metadata
+    if (task.metadata?.useCustomPrompt === true && this.config.customInstructions) {
+      return this.config.customInstructions
+        .replace(/{task}/g, task.description)
+        .replace(/{taskDescription}/g, task.description);
+    }
     
-The user has requested help with the following task:
+    // Get enabled actors from task metadata or use all actors
+    let actorsList = '';
+    if (task.metadata?.enabledActors && Array.isArray(task.metadata.enabledActors)) {
+      // Get list of requested actors
+      const enabledActors = task.metadata.enabledActors.map(actor => 
+        typeof actor === 'string' ? actor.toUpperCase() : actor
+      );
+      
+      // Build actor descriptions only for enabled actors - excluding PLANNER
+      const actorDescriptions = [
+        { type: 'RESEARCHER', desc: 'Gathers in-depth information, performs literature reviews, and synthesizes knowledge from diverse sources' },
+        { type: 'ANALYST', desc: 'Performs data analysis, statistical evaluation, pattern recognition, and creates visualizations to draw insights' },
+        { type: 'CODER', desc: 'Writes efficient, well-structured code for various programming tasks, handles data processing, and creates technical solutions' },
+        { type: 'COMPOSER', desc: 'Coordinates and orchestrates the execution of complex workflows, ensuring proper task sequencing and collaboration' },
+        { type: 'WRITER', desc: 'Creates high-quality written content, including documentation, reports, articles, and creative material' },
+        { type: 'CUSTOM', desc: 'A specialized actor with custom instructions for domain-specific tasks' }
+      ].filter(actor => enabledActors.includes(actor.type));
+      
+      // Format the actors list
+      actorsList = actorDescriptions.map(actor => `- ${actor.type}: ${actor.desc}`).join('\n');
+    } else {
+      // Default to showing all actors except PLANNER
+      actorsList = `- RESEARCHER: Gathers in-depth information, performs literature reviews, and synthesizes knowledge from diverse sources
+- ANALYST: Performs data analysis, statistical evaluation, pattern recognition, and creates visualizations to draw insights
+- CODER: Writes efficient, well-structured code for various programming tasks, handles data processing, and creates technical solutions
+- COMPOSER: Coordinates and orchestrates the execution of complex workflows, ensuring proper task sequencing and collaboration
+- WRITER: Creates high-quality written content, including documentation, reports, articles, and creative material
+- CUSTOM: A specialized actor with custom instructions for domain-specific tasks`;
+    }
+    
+    // Default prompt with instructions for the planner
+    return `You are an expert project planner specialized in breaking down complex problems into logical, actionable steps. I need a detailed execution plan for the following task:
+  
+TASK:
+${task.description}
 
-"${query}"
+Your mission is to create a comprehensive, well-structured plan that will efficiently accomplish this task.
 
-Your mission is to create a comprehensive, executable plan to accomplish this task effectively. The plan should be optimized for:
-1. Completeness - ensuring all necessary steps are included
-2. Logical sequencing - tasks should be ordered in a sensible workflow
-3. Dependency management - clearly identifying which tasks depend on others
-4. Appropriate task assignment - matching tasks to the right specialist actor
+AVAILABLE ACTORS:
+The plan will be executed by these specialized AI actors, each with unique capabilities:
+${actorsList}
 
-AVAILABLE ACTOR TYPES:
-- RESEARCHER: Specializes in information gathering, literature reviews, data collection, and knowledge synthesis. Best for tasks requiring deep domain knowledge, fact-finding, and comprehensive research.
+PLANNING REQUIREMENTS:
 
-- ANALYST: Specializes in data analysis, visualization, statistical modeling, and insights generation. Best for tasks involving data processing, pattern recognition, drawing conclusions from information, and creating visual representations of data. Strong with mathematical formulations and equations.
+1. Analyze the task thoroughly to understand its components, challenges, and objectives
+2. Break down the task into logical, sequenced steps with appropriate dependencies
+3. Assign each step to the most suitable actor based on their specialized capabilities
+4. Consider both parallel execution (independent tasks) and sequential dependencies where necessary
+5. Balance task distribution across actors to maximize efficiency
+6. Include sufficient context and details in each task description so actors can work independently
+7. Consider potential challenges and include steps to address them
+8. Avoid unnecessary steps like testing, validation, or documentation unless explicitly requested
+9. Structure the plan to build toward the final outcome incrementally
 
-- CODER: Specializes in code generation, debugging, and technical implementation. Best for tasks requiring programming, algorithm development, data manipulation through code, and practical software solutions.
+TASK DESIGN PRINCIPLES:
 
-- REVIEWER: Specializes in critical evaluation, quality assessment, and feedback provision. Best for tasks requiring thorough review of content, identifying gaps or errors, and providing constructive feedback on improvements.
+- Tasks should be atomic and focused on a single objective
+- Task descriptions should be detailed and action-oriented (what to do, how to do it, and expected outcome)
+- Dependencies should be clearly identified and logically sound
+- Tasks should include all necessary context required by the actor
+- Prioritize tasks appropriately based on importance and urgency
+- For coding tasks, consolidate related functionality into single tasks rather than splitting across multiple CODER actors unnecessarily
+- For coding tasks, clearly specify programming language, primary functionality, and technical requirements
+- For research tasks, specify what information to gather and how it should be structured
+- For analytical tasks, clarify what insights should be derived from which data
 
-- VISUALIZER: Specializes in creating visual representations of data and concepts. Best for tasks requiring clear data visualization, diagram creation, graphical illustrations, and visual storytelling.
+IMPORTANT: 
+- Do not include any PLANNER tasks in your plan - only use the actors listed above
+- Do not create tasks for testing or validating other actors' work
+- Focus on direct implementation and completion rather than quality assurance
+- For coding implementations, prefer fewer, more comprehensive tasks over many small fragmented tasks
+- Avoid creating separate CODER tasks that could logically be combined into a single implementation
 
-- SUMMARIZER: Specializes in condensing complex information into concise, comprehensive summaries. Best for tasks requiring synthesis of research findings, creating executive summaries, and distilling key points from extensive content.
+I need your response in the following JSON format:
 
-PLAN STRUCTURE REQUIREMENTS:
-For each task in your plan, provide:
-- A descriptive title (2-6 words) that clearly communicates the task's purpose
-- A detailed description (2-4 sentences) explaining exactly what needs to be done, including:
-  * Specific goals of the task
-  * Key methods or approaches to use
-  * Expected outputs or deliverables
-  * Any special considerations or constraints
-- The most appropriate actor type (RESEARCHER, ANALYST, CODER, REVIEWER, VISUALIZER, or SUMMARIZER)
-- Dependencies (which tasks must be completed before this one can start)
-- Priority level (high, medium, or low) based on task importance and impact
-- Estimated completion time (short: <30 min, medium: 30-60 min, long: >60 min)
-
-THE PLAN SHOULD:
-- Start with initial information gathering or setup tasks that have no dependencies
-- Build in a logical progression toward the final goal
-- Include validation or quality check steps where appropriate
-- Consider parallel execution paths where tasks don't depend on each other
-- Break complex operations into multiple smaller, focused tasks
-- Ensure each task has clear, measurable outcomes
-
-Respond with a structured JSON format exactly as follows:
+\`\`\`json
 {
-  "mainGoal": "Clear statement of the main objective",
+  "mainGoal": "Clear, comprehensive statement of the main objective",
   "tasks": [
     {
-      "title": "Descriptive Task Title",
-      "description": "Detailed task description explaining what needs to be done, methods to use, and expected outputs",
-      "actorType": "RESEARCHER|ANALYST|CODER|REVIEWER|VISUALIZER|SUMMARIZER",
-      "dependencies": [], // Empty array for tasks with no dependencies, or array of task indices (0-based) for dependent tasks
-      "priority": "high|medium|low",
+      "title": "Concise, descriptive task title",
+      "description": "Detailed explanation with all necessary context and specific instructions",
+      "actorType": "ACTOR_TYPE",
+      "dependencies": ["0", "1"], 
+      "priority": "high|medium|low|critical",
       "estimatedCompletion": "short|medium|long"
-    },
-    // Additional tasks...
+    }
   ]
 }
+\`\`\`
 
-The plan should be highly specific to the requested task and reflect the most efficient approach to accomplish the goal. Avoid generic tasks that would apply to any project. Make sure tasks are concrete, actionable, and appropriate for the actor types available.`
+For CUSTOM actors, use the format "CUSTOM:actorId" as the actorType, where actorId is the identifier of the custom actor.
+
+Remember to:
+- Ensure task dependencies create a logical workflow without circular dependencies
+- Balance depth and breadth in your plan
+- Focus on outcomes and deliverables for each task
+- Make each task description specific enough to be executed without additional context
+- Do not include PLANNER as an actorType for any task
+- Return ONLY valid JSON that matches the exact format requested above`
   }
 
   /**
-   * Parse a task plan from the generated text
-   * @param planText The text generated by the AI
-   * @param boardId The board ID to associate tasks with
-   * @returns The parsed task plan
+   * Parse a plan from the AI-generated text
+   * @param planText Plan text from the AI
+   * @returns The parsed plan
    */
-  private parsePlanFromText(planText: string, boardId: string): TaskPlan {
+  private parsePlanFromText(planText: string): TaskPlan {
     try {
-      // Extract JSON from the response using a more robust approach
-      // First, try to find any JSON-like objects with multiple matching strategies
-      let jsonPlan: any = null;
-      let matched = false;
-      
-      // Strategy 1: Look for JSON objects with a relaxed pattern that might span multiple lines
-      const jsonRegex = /(\{[\s\S]*?\})/g;
-      const potentialMatches = [...planText.matchAll(jsonRegex)];
-      
-      // Try each potential match
-      for (const match of potentialMatches) {
-        try {
-          const trimmedMatch = match[0].trim();
-          const parsedJson = JSON.parse(trimmedMatch);
-          
-          // Basic validation of the structure
-          if (parsedJson && typeof parsedJson === 'object' && 
-              (parsedJson.mainGoal || parsedJson.tasks || parsedJson.tasks?.length > 0)) {
-            jsonPlan = parsedJson;
-            matched = true;
-            logger.log("Matched with strategy 1:", jsonPlan);
-            break;
-          }
-        } catch (e) {
-          // Continue to the next match if parsing fails
-          continue;
-        }
+      // Find the JSON in the text - it might be surrounded by other content
+      const jsonMatch = planText.match(/\{[\s\S]*\}/m)
+      if (!jsonMatch) {
+        throw new Error('No JSON object found in response')
       }
       
-      // Strategy 2: Try to find the largest potential JSON block 
-      // that starts with { and ends with } if strategy 1 failed
-      if (!matched) {
-        const fullMatch = planText.match(/\{[\s\S]*\}/);
-        if (fullMatch) {
-          try {
-            const trimmedMatch = fullMatch[0].trim();
-            jsonPlan = JSON.parse(trimmedMatch);
-            matched = true;
-            logger.log("Matched with strategy 2:", jsonPlan);
-          } catch (e) {
-            // If parsing fails, try to fix common JSON issues
-            try {
-              // Replace non-standard quotes
-              let fixedJson = fullMatch[0].replace(/[""]/g, '"');
-              
-              // Try to fix unquoted property names
-              fixedJson = fixedJson.replace(/(\w+)\s*:/g, '"$1":');
-              
-              // Try to fix single quotes for strings
-              fixedJson = fixedJson.replace(/'([^']*)'/g, '"$1"');
-              
-              jsonPlan = JSON.parse(fixedJson);
-              matched = true;
-              logger.log("Matched with strategy 2 (fixed):", jsonPlan);
-            } catch (e2) {
-              // Still failed, continue to next strategy
-            }
-          }
-        }
+      const jsonText = jsonMatch[0]
+      const planData = JSON.parse(jsonText) as PlannerResponse
+      
+      // Validate the structure of the response
+      if (!planData.mainGoal || !planData.tasks || !Array.isArray(planData.tasks)) {
+        throw new Error('Invalid plan structure')
       }
       
-      // Strategy 3: Fallback to extracting key information manually using regex if all else fails
-      if (!matched) {
-        logger.log("Using fallback extraction strategy");
-        // Try to find the main goal
-        const mainGoalMatch = planText.match(/main\s*goal\s*:?\s*["']?(.*?)["']?(?:,|\n|$)/i);
-        const mainGoal = mainGoalMatch ? mainGoalMatch[1].trim() : "Generated plan";
-        
-        // Try to extract tasks
-        const taskPattern = /task\s*\d+|title\s*:\s*["']?(.*?)["']?(?:,|\n|$)/gi;
-        const taskMatches = [...planText.matchAll(taskPattern)];
-        
-        const tasks = [];
-        if (taskMatches.length > 0) {
-          for (let i = 0; i < Math.min(taskMatches.length, 5); i++) {
-            tasks.push({
-              title: taskMatches[i][1] || `Task ${i+1}`,
-              description: `Extracted task ${i+1}`,
-              actorType: ActorType.RESEARCHER, // Default to researcher
-              dependencies: [],
-              priority: 'medium',
-              estimatedCompletion: 'medium'
-            });
-          }
-        } else {
-          // Create at least one default task
-          tasks.push({
-            title: "Research task",
-            description: "Research the topic and gather information",
-            actorType: ActorType.RESEARCHER,
-            dependencies: [],
-            priority: 'medium',
-            estimatedCompletion: 'medium'
-          });
+      // Validate and transform the tasks
+      const validTasks = planData.tasks.map((task, index) => {
+        // Validate required fields
+        if (!task.title || !task.description || !task.actorType) {
+          throw new Error(`Task ${index} is missing required fields`)
         }
         
-        jsonPlan = {
-          mainGoal: mainGoal,
-          tasks: tasks
-        };
+        // Normalize dependencies to ensure they are strings
+        const dependencies = (task.dependencies || []).map(dep => String(dep))
         
-        logger.log("Created fallback plan:", jsonPlan);
-      }
-      
-      // Create a minimal valid plan structure if we've still failed
-      if (!jsonPlan || typeof jsonPlan !== 'object') {
-        logger.log("Creating minimal valid plan as last resort");
-        jsonPlan = {
-          mainGoal: "Complete the requested task",
-          tasks: [
-            {
-              title: "Research task",
-              description: "Research the topic thoroughly",
-              actorType: "RESEARCHER",
-              dependencies: [],
-              priority: "medium",
-              estimatedCompletion: "medium"
-            },
-            {
-              title: "Analyze findings",
-              description: "Analyze the research findings",
-              actorType: "ANALYST",
-              dependencies: [0],
-              priority: "medium",
-              estimatedCompletion: "medium"
-            }
-          ]
-        };
-      }
-      
-      // Ensure mainGoal exists
-      if (!jsonPlan.mainGoal) {
-        jsonPlan.mainGoal = "Complete the task";
-      }
-      
-      // Ensure tasks array exists
-      if (!jsonPlan.tasks || !Array.isArray(jsonPlan.tasks) || jsonPlan.tasks.length === 0) {
-        jsonPlan.tasks = [
-          {
-            title: "Research task",
-            description: "Research the topic thoroughly",
-            actorType: "RESEARCHER",
-            dependencies: [],
-            priority: "medium",
-            estimatedCompletion: "medium"
-          }
-        ];
-      }
-
-      // Process the tasks to ensure they have the correct actor types
-      const processedTasks = jsonPlan.tasks.map((task: any, index: number) => {
-        // Validate and provide defaults for required fields
-        const title = task.title || `Task ${index + 1}`;
-        const description = task.description || `Perform task ${index + 1}`;
+        // Check if it's a custom actor and extract customActorId
+        let customActorId: string | undefined
+        let actorType = task.actorType as ActorType
         
-        // Convert actor type string to enum with fallback
-        let actorType = ActorType.RESEARCHER; // Default
-        const actorTypeStr = (task.actorType || '').toUpperCase();
-        
-        if (actorTypeStr === 'RESEARCHER') {
-          actorType = ActorType.RESEARCHER;
-        } else if (actorTypeStr === 'ANALYST') {
-          actorType = ActorType.ANALYST;
-        } else if (actorTypeStr === 'CODER') {
-          actorType = ActorType.CODER;
-        } else if (actorTypeStr === 'REVIEWER') {
-          actorType = ActorType.REVIEWER;
-        } else if (actorTypeStr === 'VISUALIZER') {
-          actorType = ActorType.VISUALIZER;
-        } else if (actorTypeStr === 'SUMMARIZER') {
-          actorType = ActorType.SUMMARIZER;
-        }
-        
-        // Validate dependencies
-        let dependencies: string[] = [];
-        if (task.dependencies) {
-          // Ensure dependencies are valid
-          if (Array.isArray(task.dependencies)) {
-            // Convert numeric dependencies to strings
-            dependencies = task.dependencies
-              .filter((dep: any) => dep !== undefined && dep !== null)
-              .map((dep: any) => dep.toString());
+        if (typeof actorType === 'string' && actorType.startsWith('CUSTOM:')) {
+          const parts = actorType.split(':')
+          if (parts.length >= 2) {
+            customActorId = parts[1]
+            actorType = ActorType.CUSTOM
           }
         }
-
+        
+        // Ensure priority is a valid TaskPriority
+        const priority = Object.values(TaskPriority).includes(task.priority as TaskPriority)
+          ? task.priority as TaskPriority
+          : TaskPriority.MEDIUM
+        
+        // Create a planned task with validated fields
         return {
-          title: title,
-          description: description,
-          actorType: actorType,
-          dependencies: dependencies,
-          priority: task.priority || 'medium',
-          estimatedCompletion: task.estimatedCompletion || 'medium'
-        };
-      });
-
+          title: task.title,
+          description: task.description,
+          actorType,
+          dependencies,
+          priority,
+          estimatedCompletion: task.estimatedCompletion,
+          customActorId
+        } as PlannedTask
+      })
+      
       return {
-        mainGoal: jsonPlan.mainGoal,
-        tasks: processedTasks
-      };
-    } catch (error: unknown) {
-      logger.error('Error parsing plan:', error);
-      // Even if parsing fails completely, return a basic valid plan
-      return {
-        mainGoal: "Explore the topic",
-        tasks: [
-          {
-            title: "Research the topic",
-            description: "Gather information about the topic",
-            actorType: ActorType.RESEARCHER,
-            dependencies: [],
-            priority: 'medium',
-            estimatedCompletion: 'medium'
-          }
-        ]
-      };
+        mainGoal: planData.mainGoal,
+        tasks: validTasks
+      }
+    } catch (error) {
+      logger.error('Error parsing plan:', error)
+      return this.extractPlanFromText(planText)
     }
   }
-} 
+
+  /**
+   * Attempt to extract a plan from text if JSON parsing fails
+   * @param text The text to extract a plan from
+   * @returns A fallback plan with basic tasks
+   */
+  private extractPlanFromText(text: string): TaskPlan {
+    logger.debug('Using fallback plan extraction from text')
+    
+    // Simple fallback implementation for now - this could be improved
+    return {
+      mainGoal: "Complete the requested task",
+      tasks: [
+        {
+          title: "Research task",
+          description: "Research information related to the task",
+          actorType: ActorType.RESEARCHER,
+          dependencies: [],
+          priority: TaskPriority.HIGH,
+        },
+        {
+          title: "Analyze findings",
+          description: "Analyze the research findings and draw conclusions",
+          actorType: ActorType.ANALYST,
+          dependencies: ["0"],  // Depend on first task
+          priority: TaskPriority.MEDIUM,
+        }
+      ]
+    }
+  }
+}

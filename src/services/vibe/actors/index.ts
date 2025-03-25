@@ -2,9 +2,8 @@ import { Planner } from './Planner'
 import { Researcher } from './Researcher'
 import { Analyst } from './Analyst'
 import { Coder } from './Coder'
-import { Summarizer } from './Summarizer'
-import { Reviewer } from './Reviewer'
-import { Visualizer } from './Visualizer'
+import { Composer } from './Composer'
+import { Writer } from './Writer'
 import { ActorType } from '@/types/vibe'
 import { logger } from '@/services/logger'
 
@@ -19,16 +18,10 @@ export function createActor(type: ActorType) {
       return new Analyst()
     case ActorType.CODER:
       return new Coder()
-    case ActorType.SUMMARIZER:
-      return new Summarizer()
-    case ActorType.REVIEWER:
-      return new Reviewer()
-    case ActorType.VISUALIZER:
-      return new Visualizer()
     case ActorType.COMPOSER:
-      // Temporarily use Planner as a fallback for Composer
-      logger.warn('Composer actor not implemented, using Planner as fallback')
-      return new Planner()
+      return new Composer()
+    case ActorType.WRITER:
+      return new Writer()
     default:
       throw new Error(`Unknown actor type: ${type}`)
   }
@@ -41,6 +34,4 @@ export * from './Researcher'
 export * from './Analyst'
 export * from './Coder'
 export * from './Composer'
-export * from './Reviewer'
-export * from './Visualizer'
-export * from './Summarizer' 
+export * from './Writer'

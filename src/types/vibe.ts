@@ -6,10 +6,9 @@ export enum ActorType {
   RESEARCHER = 'RESEARCHER',
   ANALYST = 'ANALYST',
   CODER = 'CODER',
-  SUMMARIZER = 'SUMMARIZER',
-  REVIEWER = 'REVIEWER',
-  VISUALIZER = 'VISUALIZER',
-  COMPOSER = 'COMPOSER'
+  COMPOSER = 'COMPOSER',
+  WRITER = 'WRITER',
+  CUSTOM = 'CUSTOM'
 }
 
 /**
@@ -44,6 +43,8 @@ export interface VibeTask {
   createdAt: Date
   startedAt?: Date
   completedAt?: Date
+  metadata?: Record<string, any>
+  customActorId?: string
 }
 
 /**
@@ -55,6 +56,9 @@ export interface ActorConfig {
   temperature?: number
   maxTokens?: number
   customInstructions?: string
+  name?: string
+  description?: string
+  isCustom?: boolean
 }
 
 /**
@@ -117,6 +121,18 @@ export interface DatabaseTable {
   description: string
   schema: Record<string, string>
   entries: DatabaseEntry[]
+  createdAt: Date
+  updatedAt: Date
+}
+
+/**
+ * Custom actor definition
+ */
+export interface CustomActor {
+  id: string
+  name: string
+  description: string
+  config: ActorConfig
   createdAt: Date
   updatedAt: Date
 } 

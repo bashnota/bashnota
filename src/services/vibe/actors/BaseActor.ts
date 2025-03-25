@@ -5,6 +5,7 @@ import { useAISettingsStore } from '@/stores/aiSettingsStore'
 import { notaExtensionService } from '@/services/notaExtensionService'
 import { type Editor } from '@tiptap/core'
 import { logger } from '@/services/logger'
+import { vibeDB } from '@/services/vibeDB'
 
 /**
  * Base class for all Vibe actors
@@ -95,6 +96,9 @@ export abstract class BaseActor {
       throw new Error(`Actor ${this.actorType} is disabled`)
     }
     
+    // Load the latest config from the vibeStore
+    await this.loadActorConfig();
+    
     // Keep track of whether we set the editor in this method
     const setEditorInMethod = !!editor && !notaExtensionService.hasEditor();
     
@@ -146,6 +150,65 @@ export abstract class BaseActor {
         this.actorLogger.debug(`Clearing editor instance after task ${task.id}`)
         notaExtensionService.clearEditor()
       }
+    }
+  }
+  
+  /**
+   * Load the actor configuration from the vibeStore and database
+   */
+  private async loadActorConfig(): Promise<void> {
+    try {
+      // First, get config from vibeStore
+      const storeConfig = this.vibeStore.getActorConfig(this.actorType);
+      if (storeConfig) {
+        this.config = { ...this.config, ...storeConfig };
+      }
+      
+      // Then, try to get the latest config from the database
+      try {
+        const dbConfig = await vibeDB.actorConfigs.get(this.actorType);
+        if (dbConfig) {
+          // Update config with the database values, preserving any memory-only properties
+          this.config = { ...this.config, ...dbConfig };
+          this.actorLogger.debug(`Loaded config for ${this.actorType} from database`);
+        }
+      } catch (dbError) {
+        this.actorLogger.warn(`Could not load config for ${this.actorType} from database:`, dbError);
+      }
+    } catch (error) {
+      this.actorLogger.error(`Error loading config for ${this.actorType}:`, error);
+    }
+  }
+  
+  /**
+   * Update the actor's custom instructions
+   * @param instructions The new instructions
+   * @returns Whether the update was successful
+   */
+  public async updateInstructions(instructions: string): Promise<boolean> {
+    try {
+      // Update the instructions in memory
+      this.config.customInstructions = instructions;
+      
+      // Update the actor in the database
+      await vibeDB.actorConfigs.update(this.actorType, {
+        customInstructions: instructions,
+        updatedAt: new Date()
+      });
+      
+      // Also update in the vibeStore
+      const storeConfig = this.vibeStore.getActorConfig(this.actorType);
+      if (storeConfig) {
+        storeConfig.customInstructions = instructions;
+        // Update the config in the store
+        this.vibeStore.updateActorConfig(this.actorType, storeConfig);
+      }
+      
+      this.actorLogger.debug(`Updated instructions for actor ${this.actorType}`);
+      return true;
+    } catch (error) {
+      this.actorLogger.error(`Error updating instructions for actor ${this.actorType}:`, error);
+      return false;
     }
   }
   

@@ -55,24 +55,6 @@ const actorTypes = computed(() => [
     label: 'Coder',
     icon: Code,
     description: 'Generates, executes, and refines code for programming tasks and data processing.'
-  },
-  {
-    value: ActorType.SUMMARIZER,
-    label: 'Summarizer',
-    icon: FileText,
-    description: 'Distills complex information into concise, clear summaries and key points.'
-  },
-  {
-    value: ActorType.REVIEWER,
-    label: 'Reviewer',
-    icon: CheckCheck,
-    description: 'Provides thorough, constructive feedback and evaluations on content.'
-  },
-  {
-    value: ActorType.VISUALIZER,
-    label: 'Visualizer',
-    icon: BarChart,
-    description: 'Creates effective data visualizations, charts, and diagrams for better understanding.'
   }
 ])
 
