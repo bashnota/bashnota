@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { type ActorConfig, type VibeTask, type TaskBoard, ActorType, type DatabaseTable, type DatabaseEntry, DatabaseEntryType, type CustomActor } from '@/types/vibe'
 import { logger } from '@/services/logger'
 import { vibeDB, type StoredActorConfig } from '@/services/vibeDB'
+import { defaultActorConfigs, actorDescriptions } from '@/config/actorDefaults'
 
 /**
  * Store for managing Vibe tasks and boards
@@ -14,55 +15,7 @@ export const useVibeStore = defineStore('vibe', () => {
   const tables = ref<DatabaseTable[]>([])
   const entries = ref<DatabaseEntry[]>([])
   const customActors = ref<CustomActor[]>([])
-  const actorConfigs = ref<Record<ActorType, ActorConfig>>({
-    [ActorType.CODER]: {
-      enabled: true,
-      modelId: 'google/gemini-pro',
-      temperature: 0.1,
-      maxTokens: 4000,
-    },
-    [ActorType.RESEARCHER]: {
-      enabled: true,
-      modelId: 'google/gemini-pro',
-      temperature: 0.3,
-      maxTokens: 8000,
-    },
-    [ActorType.ANALYST]: {
-      enabled: true,
-      modelId: 'google/gemini-pro',
-      temperature: 0.2,
-      maxTokens: 4000,
-    },
-    [ActorType.PLANNER]: {
-      enabled: true,
-      modelId: 'google/gemini-pro',
-      temperature: 0.2,
-      maxTokens: 4000,
-      customInstructions: 'Create detailed, logical plans with clear dependencies between tasks.'
-    },
-    [ActorType.COMPOSER]: {
-      enabled: true,
-      modelId: 'google/gemini-pro',
-      temperature: 0.1,
-      maxTokens: 2000,
-      customInstructions: 'Orchestrate and coordinate task execution efficiently.'
-    },
-    [ActorType.WRITER]: {
-      enabled: true,
-      modelId: 'google/gemini-pro',
-      temperature: 0.5,
-      maxTokens: 6000,
-      customInstructions: 'Create comprehensive markdown reports incorporating images and visualizations from other tasks. Format content professionally with subfigures where appropriate.'
-    },
-    [ActorType.CUSTOM]: {
-      enabled: true,
-      modelId: 'google/gemini-pro',
-      temperature: 0.5,
-      maxTokens: 4000
-    }
-  })
-  
-  // Initialize custom actors from database
+  const actorConfigs = ref<Record<ActorType, ActorConfig>>(defaultActorConfigs)
   const initialized = ref(false)
   
   /**
@@ -71,14 +24,14 @@ export const useVibeStore = defineStore('vibe', () => {
   async function loadActorConfigs() {
     try {
       // First initialize default configs if they don't exist
-      await vibeDB.initializeDefaults(actorConfigs.value)
+      await vibeDB.initializeDefaults()
       
       // Load all actor configs
       const storedConfigs = await vibeDB.actorConfigs.toArray()
       const storedActors = await vibeDB.customActors.toArray()
       
       // Convert stored configs to the actorConfigs format
-      const newActorConfigs: Record<ActorType, ActorConfig> = { ...actorConfigs.value }
+      const newActorConfigs: Record<ActorType, ActorConfig> = { ...defaultActorConfigs }
       
       for (const config of storedConfigs) {
         if (config.id in ActorType) {
@@ -98,8 +51,27 @@ export const useVibeStore = defineStore('vibe', () => {
       
       initialized.value = true
       logger.log('Actor configurations loaded from database')
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Error loading actor configurations:', error)
+      throw error
+    }
+  }
+  
+  /**
+   * Restore all actors to their default values
+   */
+  async function restoreToDefaults() {
+    try {
+      // Restore defaults in the database
+      await vibeDB.restoreToDefaults()
+      
+      // Reload configurations
+      await loadActorConfigs()
+      
+      logger.log('All actors restored to default values')
+    } catch (error) {
+      logger.error('Error restoring actors to defaults:', error)
+      throw error
     }
   }
   
@@ -113,7 +85,7 @@ export const useVibeStore = defineStore('vibe', () => {
         .map(([actorType, config]) => ({
           id: actorType,
           name: actorType,
-          description: getActorDescription(actorType as ActorType),
+          description: actorDescriptions[actorType as ActorType] || '',
           isDefault: true,
           updatedAt: new Date(),
           ...config
@@ -129,6 +101,7 @@ export const useVibeStore = defineStore('vibe', () => {
       logger.log('Actor configurations saved to database')
     } catch (error) {
       logger.error('Error saving actor configurations:', error)
+      throw error
     }
   }
   
@@ -648,6 +621,7 @@ export const useVibeStore = defineStore('vibe', () => {
     getEnabledCustomActors,
     loadActorConfigs,
     saveActorConfigs,
+    restoreToDefaults,
     initialized
   }
 }) 
