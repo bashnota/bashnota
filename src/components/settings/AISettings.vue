@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SparklesIcon, KeyIcon, Save, Trash2Icon, CpuIcon, RefreshCcwIcon } from 'lucide-vue-next'
 import WebLLMSettings from '@/components/settings/WebLLMSettings.vue'
 import { aiService } from '@/services/aiService'
+import SearchableSelect from '@/components/ui/searchable-select.vue'
 
 const aiSettings = useAISettingsStore()
 const apiKeys = ref<Record<string, string>>({...aiSettings.settings.apiKeys})
@@ -260,23 +261,18 @@ const handlePaste = (providerId: string, event: ClipboardEvent) => {
                     Refresh Models
                   </Button>
                 </div>
-                <Select v-model="selectedGeminiModel">
-                  <SelectTrigger id="gemini-model">
-                    <SelectValue placeholder="Select Gemini model" />
-                  </SelectTrigger>
-                  <SelectContent class="max-h-[200px] overflow-auto">
-                    <SelectItem 
-                      v-for="model in geminiModels" 
-                      :key="model.id" 
-                      :value="model.id"
-                    >
-                      <div>
-                        <div>{{ model.name }}</div>
-                        <div class="text-xs text-gray-500">{{ model.description }}</div>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  v-model="selectedGeminiModel"
+                  :options="geminiModels.map(model => ({
+                    value: model.id,
+                    label: model.name,
+                    description: model.description
+                  }))"
+                  placeholder="Select Gemini model"
+                  max-height="300px"
+                  search-placeholder="Search Gemini models..."
+                  :disabled="loadingGeminiModels"
+                />
                 <p class="text-xs text-gray-500">
                   Select the specific Gemini model to use for AI text generation.
                   <span v-if="geminiModels.length > 0">

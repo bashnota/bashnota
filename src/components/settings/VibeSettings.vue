@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch, reactive, watchEffect } from 'vue'
 import { useVibeStore } from '@/stores/vibeStore'
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -19,6 +19,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input'
 import { v4 as uuidv4 } from 'uuid'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+import SearchableSelect from '@/components/ui/searchable-select.vue'
 
 const vibeStore = useVibeStore()
 const aiSettings = useAISettingsStore()
@@ -858,23 +860,18 @@ function getActorName(actorType: string): string {
                     <div class="space-y-4">
                       <div class="space-y-2">
                         <Label for="model-id">Model</Label>
-                        <Select 
+                        <SearchableSelect
                           v-model="selectedActorConfig.modelId"
-                          @update:model-value="setModelId"
-                        >
-                          <SelectTrigger id="model-id">
-                            <SelectValue placeholder="Select model" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem 
-                              v-for="model in availableModels" 
-                              :key="model.id" 
-                              :value="model.id"
-                            >
-                              {{ model.name }}
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
+                          :options="availableModels.map(model => ({
+                            value: model.id,
+                            label: model.name,
+                            description: model.description
+                          }))"
+                          placeholder="Select model"
+                          max-height="300px"
+                          search-placeholder="Search models..."
+                          :disabled="loadingModels"
+                        />
                       </div>
                       
                       <div class="space-y-2">
