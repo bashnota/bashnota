@@ -505,31 +505,63 @@ export class AIService {
   }
 
   async getAvailableWebLLMModels(): Promise<WebLLMModelInfo[]> {
-    // Get the list of models from WebLLM
-    const modelRecords = webllm.prebuiltAppConfig.model_list;
-    
-    // Transform the model records into a more user-friendly format
-    return modelRecords.map(model => {
-      // Extract model size from the ID (e.g., "Llama-3.1-8B-Instruct" -> "8B")
-      const sizeMatch = model.model_id.match(/(\d+\.?\d*[BM])/);
-      const size = sizeMatch ? sizeMatch[0] : 'Unknown';
+    try {
+      // Get the list of models from WebLLM
+      const modelRecords = webllm.prebuiltAppConfig.model_list;
       
-      // Format the model name for display
-      const name = model.model_id
-        .replace(/-/g, ' ')
-        .replace(/q4f32_\d+/, '')
-        .replace(/MLC$/, '')
-        .trim();
-      
-      return {
-        id: model.model_id,
-        name: name,
-        size: size,
-        description: `${name} (${size})`,
-        // Estimate download size based on model size
-        downloadSize: this.estimateDownloadSize(size)
-      };
-    });
+      // Transform the model records into a more user-friendly format
+      return modelRecords.map(model => {
+        // Extract model size from the ID (e.g., "Llama-3.1-8B-Instruct" -> "8B")
+        // Handle both standard format and Gemma format (e.g., "gemma-3-1b-it" -> "1B")
+        const sizeMatch = model.model_id.match(/(?:(\d+\.?\d*)[BM])|(?:gemma-\d+-(\d+)b)/);
+        const size = sizeMatch ? 
+          (sizeMatch[1] ? `${sizeMatch[1]}B` : `${sizeMatch[2]}B`) : 
+          'Unknown';
+        
+        // Extract quantization info (e.g., "q4f32_1" -> "4-bit")
+        const quantMatch = model.model_id.match(/q(\d+)f(\d+)/);
+        const quantization = quantMatch ? `${quantMatch[1]}-bit` : 'Unknown';
+        
+        // Format the model name for display
+        const name = model.model_id
+          .replace(/-/g, ' ')
+          .replace(/q\d+f\d+_\d+/, '')
+          .replace(/MLC$/, '')
+          .replace(/gemma-(\d+)-(\d+)b/, 'Gemma $1 $2B') // Updated to handle Gemma 3
+          .trim();
+        
+        // Determine if it's an instruction model
+        const isInstruct = model.model_id.includes('-Instruct') || model.model_id.includes('-it');
+        
+        return {
+          id: model.model_id,
+          name: name,
+          size: size,
+          description: `${name} (${size}, ${quantization})${isInstruct ? ' - Instruction-tuned' : ''}`,
+          // Estimate download size based on model size
+          downloadSize: this.estimateDownloadSize(size)
+        };
+      });
+    } catch (error) {
+      logger.error('Error getting available WebLLM models:', error);
+      // Return a default list of models if we can't get them from WebLLM
+      return [
+        {
+          id: 'Llama-2-7b-chat-hf-q4f32_1',
+          name: 'Llama 2 7B Chat',
+          size: '7B',
+          description: 'Llama 2 7B Chat (7B, 4-bit) - Instruction-tuned',
+          downloadSize: '~4GB'
+        },
+        {
+          id: 'Llama-2-13b-chat-hf-q4f32_1',
+          name: 'Llama 2 13B Chat',
+          size: '13B',
+          description: 'Llama 2 13B Chat (13B, 4-bit) - Instruction-tuned',
+          downloadSize: '~7GB'
+        }
+      ];
+    }
   }
   
   // Helper method to estimate download size

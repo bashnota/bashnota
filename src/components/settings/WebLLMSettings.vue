@@ -24,6 +24,7 @@ import {
 import { aiService } from '@/services/aiService'
 import type { WebLLMModelInfo } from '@/services/aiService'
 import { logger } from '@/services/logger'
+import SearchableSelect from '@/components/ui/searchable-select.vue'
 
 // Create a simple Progress component since it might not exist
 const Progress = defineComponent({
@@ -249,61 +250,30 @@ watch(() => aiService.getModelLoadingState().isLoading, (newIsLoading) => {
         <div class="space-y-6">
           <div class="space-y-2">
             <Label for="model-select">Select a Model</Label>
-            <Select v-model="selectedModelId" :disabled="isModelLoading">
-              <SelectTrigger id="model-select">
-                <SelectValue :placeholder="selectedModel?.name || 'Select a model'" />
-              </SelectTrigger>
-              <SelectContent>
-                <div class="p-2">
-                  <h4 class="text-xs font-semibold text-muted-foreground mb-1">Small Models (Faster)</h4>
-                  <SelectItem 
-                    v-for="model in smallModels" 
-                    :key="model.id" 
-                    :value="model.id"
-                    class="mb-1"
-                  >
-                    <div class="flex items-center justify-between w-full">
-                      <span>{{ model.name }}</span>
-                      <Badge variant="outline" class="ml-2">{{ model.size }}</Badge>
-                    </div>
-                  </SelectItem>
-                </div>
-                
-                <Separator class="my-2" />
-                
-                <div class="p-2">
-                  <h4 class="text-xs font-semibold text-muted-foreground mb-1">Medium Models (Balanced)</h4>
-                  <SelectItem 
-                    v-for="model in mediumModels" 
-                    :key="model.id" 
-                    :value="model.id"
-                    class="mb-1"
-                  >
-                    <div class="flex items-center justify-between w-full">
-                      <span>{{ model.name }}</span>
-                      <Badge variant="outline" class="ml-2">{{ model.size }}</Badge>
-                    </div>
-                  </SelectItem>
-                </div>
-                
-                <Separator class="my-2" v-if="largeModels.length > 0" />
-                
-                <div class="p-2" v-if="largeModels.length > 0">
-                  <h4 class="text-xs font-semibold text-muted-foreground mb-1">Large Models (Better Quality)</h4>
-                  <SelectItem 
-                    v-for="model in largeModels" 
-                    :key="model.id" 
-                    :value="model.id"
-                    class="mb-1"
-                  >
-                    <div class="flex items-center justify-between w-full">
-                      <span>{{ model.name }}</span>
-                      <Badge variant="outline" class="ml-2">{{ model.size }}</Badge>
-                    </div>
-                  </SelectItem>
-                </div>
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              v-model="selectedModelId"
+              :options="[
+                ...smallModels.map(model => ({
+                  value: model.id,
+                  label: model.name,
+                  description: `Small Model (${model.size}) - Faster inference`
+                })),
+                ...mediumModels.map(model => ({
+                  value: model.id,
+                  label: model.name,
+                  description: `Medium Model (${model.size}) - Balanced performance`
+                })),
+                ...largeModels.map(model => ({
+                  value: model.id,
+                  label: model.name,
+                  description: `Large Model (${model.size}) - Better quality`
+                }))
+              ]"
+              placeholder="Select a model"
+              max-height="400px"
+              search-placeholder="Search models..."
+              :disabled="isModelLoading"
+            />
           </div>
           
           <!-- Model Details -->
