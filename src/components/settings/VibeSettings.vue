@@ -779,7 +779,7 @@ function getActorName(actorType: string): string {
                   >
                     <span v-if="vibeStore.getActorConfig(type as ActorType)?.enabled" class="mr-2 h-2 w-2 rounded-full bg-green-500"></span>
                     <span v-else class="mr-2 h-2 w-2 rounded-full bg-gray-300 dark:bg-gray-600"></span>
-                    {{ actorDescriptions[type as ActorType] }}
+                    {{ type }}
                   </button>
   
                   <!-- Custom Actors -->
@@ -947,7 +947,7 @@ function getActorName(actorType: string): string {
                   >
                     <span v-if="vibeStore.getActorConfig(type as ActorType)?.enabled" class="mr-2 h-2 w-2 rounded-full bg-green-500"></span>
                     <span v-else class="mr-2 h-2 w-2 rounded-full bg-gray-300 dark:bg-gray-600"></span>
-                    {{ actorDescriptions[type as ActorType] }}
+                    {{ type }}
                   </button>
 
                   <!-- Custom Actors -->
