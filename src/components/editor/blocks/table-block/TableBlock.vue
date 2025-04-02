@@ -15,6 +15,7 @@ import LayoutSwitcher, { type TableLayout } from './components/layouts/LayoutSwi
 import BaseLayout from './components/layouts/BaseLayout.vue'
 import ChartLayout from './components/layouts/ChartLayout.vue'
 import KanbanLayout from './components/layouts/KanbanLayout.vue'
+import CalendarLayout from './components/layouts/CalendarLayout.vue'
 
 // Import types
 import type { ColumnType } from './composables/useTableOperations'
@@ -209,6 +210,16 @@ watch(operationStatus, (newStatus) => {
           <template v-else-if="currentLayout === 'kanban'">
             <KanbanLayout
               :table-data="tableData"
+              :is-active="currentLayout === 'kanban'"
+              @update:tableData="tableData = $event"
+            />
+          </template>
+
+          <!-- Calendar Layout -->
+          <template v-else-if="currentLayout === 'calendar'">
+            <CalendarLayout
+              :table-data="tableData"
+              :is-active="currentLayout === 'calendar'"
               @update:tableData="tableData = $event"
             />
           </template>

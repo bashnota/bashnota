@@ -23,6 +23,27 @@ function generateUUID() {
   }
 }
 
+// Update the helper function to include time
+const formatDateForTable = (date: Date | string): string => {
+  if (typeof date === 'string') {
+    // If it's already in the correct format, return as is
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(date)) {
+      return date
+    }
+    // If it's a date string, convert to Date object
+    date = new Date(date)
+  }
+  
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  const seconds = String(date.getSeconds()).padStart(2, '0')
+  
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`
+}
+
 export function useTableOperations(tableData: Ref<TableData>) {
   const isAddingColumn = ref(false)
   const newColumnTitle = ref('')
@@ -145,6 +166,15 @@ export function useTableOperations(tableData: Ref<TableData>) {
         return
       }
       
+      // Get the column type
+      const column = tableData.value.columns.find((col: { id: string }) => col.id === columnId)
+      
+      // Format the value based on column type
+      let formattedValue = value
+      if (column?.type === 'date' && value) {
+        formattedValue = formatDateForTable(value)
+      }
+      
       // Create a new rows array
       const updatedRows = [...tableData.value.rows]
       
@@ -153,7 +183,7 @@ export function useTableOperations(tableData: Ref<TableData>) {
         ...updatedRows[rowIndex],
         cells: {
           ...updatedRows[rowIndex].cells,
-          [columnId]: value
+          [columnId]: formattedValue
         }
       }
       

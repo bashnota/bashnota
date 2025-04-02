@@ -38,6 +38,30 @@ const handleColumnTypeUpdate = (columnId: string, type: ColumnType) => {
   emit('updateColumnType', columnId, type)
   emit('toggleTypeDropdown', null) // Close dropdown after selection
 }
+
+const formatDateForInput = (dateString: string) => {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day}T${hours}:${minutes}`
+}
+
+const formatDateForDisplay = (dateString: string) => {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  return date.toLocaleString('default', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  })
+}
 </script>
 
 <template>
@@ -110,12 +134,17 @@ const handleColumnTypeUpdate = (columnId: string, type: ColumnType) => {
               />
             </template>
             <template v-else-if="column.type === 'date'">
-              <Input
-                type="date"
-                :value="row.cells[column.id]"
-                @input="(e: Event) => handleCellUpdate(row.id, column.id, e)"
-                class="h-8"
-              />
+              <div class="flex flex-col gap-1">
+                <Input
+                  type="datetime-local"
+                  :value="formatDateForInput(row.cells[column.id])"
+                  @input="(e: Event) => handleCellUpdate(row.id, column.id, e)"
+                  class="h-8"
+                />
+                <span class="text-xs text-muted-foreground">
+                  {{ formatDateForDisplay(row.cells[column.id]) }}
+                </span>
+              </div>
             </template>
             <template v-else>
               <Input
