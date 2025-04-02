@@ -11,6 +11,10 @@ import { useTableOperations } from './composables/useTableOperations'
 import TableHeader from './components/TableHeader.vue'
 import AddColumnDialog from './components/AddColumnDialog.vue'
 import TableContent from './components/TableContent.vue'
+import LayoutSwitcher, { type TableLayout } from './components/layouts/LayoutSwitcher.vue'
+import BaseLayout from './components/layouts/BaseLayout.vue'
+import ChartLayout from './components/layouts/ChartLayout.vue'
+import KanbanLayout from './components/layouts/KanbanLayout.vue'
 
 // Import types
 import type { ColumnType } from './composables/useTableOperations'
@@ -52,6 +56,7 @@ const {
 
 const lastOperation = ref<string>('')
 const operationStatus = ref<'success' | 'error' | ''>('')
+const currentLayout = ref<TableLayout>('table')
 
 // Load table data on component mount
 onMounted(async () => {
@@ -153,7 +158,15 @@ watch(operationStatus, (newStatus) => {
           @save-name="handleSaveName"
           @add-column="toggleAddColumnDialog"
           @add-row="handleAddRow"
-        />
+        >
+          <template #right>
+            <LayoutSwitcher
+              :current-layout="currentLayout"
+              @update:layout="currentLayout = $event"
+              class="ml-4"
+            />
+          </template>
+        </TableHeader>
 
         <!-- Add Column Dialog -->
         <AddColumnDialog
@@ -162,16 +175,46 @@ watch(operationStatus, (newStatus) => {
           @add="handleAddColumn"
         />
 
-        <!-- Table Content -->
-        <TableContent
+        <!-- Layout Content -->
+        <BaseLayout
           :table-data="tableData"
-          :active-type-dropdown="activeTypeDropdown"
-          @toggle-type-dropdown="toggleTypeDropdown"
-          @update-column-type="updateColumnType"
-          @delete-column="deleteColumn"
-          @delete-row="deleteRow"
-          @update-cell="updateCell"
-        />
+          :is-loading="isLoading"
+          :is-saving="isSaving"
+          :error="error"
+          @update:tableData="tableData = $event"
+          @save="saveTableData"
+        >
+          <!-- Table Layout -->
+          <template v-if="currentLayout === 'table'">
+            <TableContent
+              :table-data="tableData"
+              :active-type-dropdown="activeTypeDropdown"
+              @toggle-type-dropdown="toggleTypeDropdown"
+              @update-column-type="updateColumnType"
+              @delete-column="deleteColumn"
+              @delete-row="deleteRow"
+              @update-cell="updateCell"
+            />
+          </template>
+
+          <!-- Chart Layout -->
+          <template v-else-if="currentLayout === 'chart'">
+            <ChartLayout
+              :table-data="tableData"
+              @update:tableData="tableData = $event"
+            />
+          </template>
+
+          <!-- Kanban Layout -->
+          <template v-else-if="currentLayout === 'kanban'">
+            <KanbanLayout
+              :table-data="tableData"
+              @update:tableData="tableData = $event"
+            />
+          </template>
+
+          <!-- Other layouts will be added here -->
+        </BaseLayout>
         
         <!-- Saving Indicator -->
         <div v-if="isSaving" class="p-2 border-t">
