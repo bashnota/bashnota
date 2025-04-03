@@ -58,10 +58,15 @@ const daysInWeek = computed(() => {
 const getEventsForDay = (date: Date) => {
   if (!startDateColumn.value || !endDateColumn.value) return []
   
+  const startOfDay = new Date(date)
+  startOfDay.setHours(0, 0, 0, 0)
+  const endOfDay = new Date(startOfDay)
+  endOfDay.setHours(23, 59, 59, 999)
+
   return events.value.filter(row => {
     const startDate = new Date(row.cells[startDateColumn.value!.id])
     const endDate = new Date(row.cells[endDateColumn.value!.id])
-    return date >= startDate && date <= endDate
+    return startDate <= endOfDay && endDate >= startOfDay
   })
 }
 
@@ -83,7 +88,17 @@ const isToday = (date: Date) => {
     date.getFullYear() === today.getFullYear()
 }
 
-// Add these functions after the existing ones
+// Format time for display
+const formatTime = (dateString: string) => {
+  const date = new Date(dateString)
+  return date.toLocaleTimeString('default', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  })
+}
+
+// Get event color based on category
 const getEventColor = (category: string) => {
   switch (category?.toLowerCase()) {
     case 'meeting':
@@ -97,15 +112,6 @@ const getEventColor = (category: string) => {
     default:
       return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100'
   }
-}
-
-const formatTime = (dateString: string) => {
-  const date = new Date(dateString)
-  return date.toLocaleTimeString('default', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true
-  })
 }
 </script>
 
@@ -125,7 +131,7 @@ const formatTime = (dateString: string) => {
     <div
       v-for="day in daysInWeek"
       :key="day.toISOString()"
-      class="min-h-[200px] bg-background p-2 cursor-pointer relative"
+      class="min-h-[120px] bg-background p-2 cursor-pointer relative"
       :class="{
         'bg-primary/5': isToday(day),
         'hover:bg-muted/50': true

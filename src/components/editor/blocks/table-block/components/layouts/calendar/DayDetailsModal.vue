@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Plus } from 'lucide-vue-next'
+import { Plus, Pencil, Trash2 } from 'lucide-vue-next'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { TableData } from '@/components/editor/extensions/TableExtension'
 
 const props = defineProps<{
@@ -15,6 +16,8 @@ const emit = defineEmits<{
   (e: 'close'): void
   (e: 'create-event', date: Date): void
   (e: 'edit-event', event: any): void
+  (e: 'update-event', event: any): void
+  (e: 'delete-event', event: any): void
 }>()
 
 // Format date for display
@@ -101,13 +104,73 @@ const groupedEvents = computed(() => {
 
   return groups
 })
+
+// Add these constants for categories
+const categories = [
+  { value: 'meeting', label: 'Meeting' },
+  { value: 'task', label: 'Task' },
+  { value: 'event', label: 'Event' },
+  { value: 'reminder', label: 'Reminder' }
+]
+
+const priorities = [
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' }
+]
+
+const statuses = [
+  { value: 'scheduled', label: 'Scheduled' },
+  { value: 'in-progress', label: 'In Progress' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'cancelled', label: 'Cancelled' }
+]
+
+// Add these type definitions at the top of the script
+type Event = {
+  id: string
+  cells: {
+    title: string
+    description: string
+    startDate: string
+    endDate: string
+    category: string
+    priority: string
+    status: string
+  }
+}
+
+// Update the handleCategoryUpdate function
+const handleCategoryUpdate = (event: Event, field: 'category' | 'priority' | 'status', value: string) => {
+  const updatedEvent = {
+    ...event,
+    cells: {
+      ...event.cells,
+      [field]: value
+    }
+  }
+  emit('update-event', updatedEvent)
+}
+
+// Add function to handle event deletion
+const handleDeleteEvent = (event: any, e: MouseEvent) => {
+  e.stopPropagation()
+  emit('delete-event', event)
+}
 </script>
 
 <template>
-  <Dialog :open="isOpen" @update:open="(open) => !open && emit('close')">
+  <Dialog :open="isOpen" @update:open="(open) => {
+    if (!open) {
+      emit('close')
+    }
+  }">
     <DialogContent class="max-w-2xl max-h-[80vh] flex flex-col">
       <DialogHeader>
         <DialogTitle>{{ formattedDate }}</DialogTitle>
+        <DialogDescription>
+          View and manage events for {{ formattedDate }}
+        </DialogDescription>
       </DialogHeader>
 
       <div class="flex flex-col gap-6 flex-1 overflow-hidden">
@@ -128,11 +191,28 @@ const groupedEvents = computed(() => {
                   :key="event.id"
                   class="p-4 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
                   :class="getEventColor(event.cells.category)"
-                  @click="emit('edit-event', event)"
                 >
                   <div class="flex items-start justify-between">
                     <div class="space-y-1">
-                      <h4 class="font-medium">{{ event.cells.title }}</h4>
+                      <div class="flex items-center gap-2">
+                        <h4 class="font-medium">{{ event.cells.title }}</h4>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          class="h-6 w-6"
+                          @click.stop="emit('edit-event', event)"
+                        >
+                          <Pencil class="h-3 w-3" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          class="h-6 w-6 text-destructive hover:text-destructive"
+                          @click.stop="handleDeleteEvent(event, $event)"
+                        >
+                          <Trash2 class="h-3 w-3" />
+                        </Button>
+                      </div>
                       <p class="text-sm opacity-80">{{ event.cells.description }}</p>
                     </div>
                     <div class="text-sm whitespace-nowrap">
@@ -140,15 +220,45 @@ const groupedEvents = computed(() => {
                     </div>
                   </div>
                   <div class="mt-3 flex items-center gap-2 text-sm">
-                    <span class="px-2 py-1 rounded-full bg-background/50">
-                      {{ event.cells.category }}
-                    </span>
-                    <span class="px-2 py-1 rounded-full bg-background/50">
-                      {{ event.cells.priority }}
-                    </span>
-                    <span class="px-2 py-1 rounded-full bg-background/50">
-                      {{ event.cells.status }}
-                    </span>
+                    <Select 
+                      :model-value="event.cells.category" 
+                      @update:model-value="(value: string) => handleCategoryUpdate(event, 'category', value)"
+                    >
+                      <SelectTrigger class="h-7 w-[100px]">
+                        <SelectValue :placeholder="event.cells.category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem v-for="category in categories" :key="category.value" :value="category.value">
+                          {{ category.label }}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select 
+                      :model-value="event.cells.priority" 
+                      @update:model-value="(value: string) => handleCategoryUpdate(event, 'priority', value)"
+                    >
+                      <SelectTrigger class="h-7 w-[100px]">
+                        <SelectValue :placeholder="event.cells.priority" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem v-for="priority in priorities" :key="priority.value" :value="priority.value">
+                          {{ priority.label }}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select 
+                      :model-value="event.cells.status" 
+                      @update:model-value="(value: string) => handleCategoryUpdate(event, 'status', value)"
+                    >
+                      <SelectTrigger class="h-7 w-[100px]">
+                        <SelectValue :placeholder="event.cells.status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem v-for="status in statuses" :key="status.value" :value="status.value">
+                          {{ status.label }}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>

@@ -229,6 +229,74 @@ const viewModeLabel = computed(() => {
       return currentDate.value.toLocaleDateString('default', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
   }
 })
+
+// Update the handleUpdateEvent function
+const handleUpdateEvent = (updatedEvent: any) => {
+  const newTableData = { ...props.tableData }
+  const rowIndex = newTableData.rows.findIndex(row => row.id === updatedEvent.id)
+  
+  if (rowIndex !== -1) {
+    // Ensure dates are properly formatted
+    const formattedEvent = {
+      ...updatedEvent,
+      cells: {
+        ...updatedEvent.cells,
+        startDate: formatDateForTable(new Date(updatedEvent.cells.startDate)),
+        endDate: formatDateForTable(new Date(updatedEvent.cells.endDate))
+      }
+    }
+    newTableData.rows[rowIndex] = formattedEvent
+    emit('update:tableData', newTableData)
+  }
+}
+
+// Add this function after handleUpdateEvent
+const handleDeleteEvent = (eventToDelete: any) => {
+  const rowIndex = props.tableData.rows.findIndex(row => row.id === eventToDelete.id)
+  if (rowIndex !== -1) {
+    const newTableData = { ...props.tableData }
+    newTableData.rows.splice(rowIndex, 1)
+    emit('update:tableData', newTableData)
+  }
+}
+
+// Add these functions before the template
+const getEventsForDay = (date: Date) => {
+  const startOfDay = new Date(date)
+  startOfDay.setHours(0, 0, 0, 0)
+  const endOfDay = new Date(startOfDay)
+  endOfDay.setHours(23, 59, 59, 999)
+
+  return props.tableData.rows.filter(row => {
+    const startDate = new Date(row.cells.startDate)
+    const endDate = new Date(row.cells.endDate)
+    return startDate <= endOfDay && endDate >= startOfDay
+  })
+}
+
+const formatTime = (dateString: string) => {
+  const date = new Date(dateString)
+  return date.toLocaleTimeString('default', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  })
+}
+
+const getEventColor = (category: string) => {
+  switch (category?.toLowerCase()) {
+    case 'meeting':
+      return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100'
+    case 'task':
+      return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
+    case 'event':
+      return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100'
+    case 'reminder':
+      return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100'
+    default:
+      return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100'
+  }
+}
 </script>
 
 <template>
@@ -341,6 +409,36 @@ const viewModeLabel = computed(() => {
       @close="handleCloseDayDetails"
       @create-event="handleCreateEventFromDay"
       @edit-event="handleEditEventFromDay"
+      @update-event="handleUpdateEvent"
+      @delete-event="handleDeleteEvent"
     />
   </div>
-</template> 
+</template>
+
+<style scoped>
+/* Add these styles */
+.calendar-grid {
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.calendar-grid-week {
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.calendar-grid-month {
+  grid-template-columns: repeat(7, 1fr);
+}
+
+/* Make event text more compact */
+.text-xs {
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+/* Ensure events don't overflow */
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+</style> 

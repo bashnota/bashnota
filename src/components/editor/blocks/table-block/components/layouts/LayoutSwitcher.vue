@@ -30,7 +30,6 @@ const layouts = [
   { id: 'chart', label: 'Chart', icon: BarChart },
   { id: 'calendar', label: 'Calendar', icon: Calendar },
   { id: 'kanban', label: 'Kanban', icon: LayoutGrid },
-  { id: 'timeline', label: 'Timeline', icon: GanttChart },
 ] as const
 
 const selectedLayout = ref(props.currentLayout)
