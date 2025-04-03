@@ -64,8 +64,38 @@ onMounted(async () => {
   await loadTableData()
 })
 
+// Handle adding a new row at a specific position
+const handleAddRow = async (position: 'before' | 'after', rowId: string) => {
+  lastOperation.value = `Adding new row ${position} row ${rowId}`
+  
+  try {
+    addRow(position, rowId)
+    
+    // Force save the table data
+    const saveResult = await saveTableData()
+    operationStatus.value = saveResult ? 'success' : 'error'
+  } catch (error) {
+    operationStatus.value = 'error'
+  }
+}
+
+// Handle adding a new column at a specific position
+const handleAddColumn = async (position: 'before' | 'after', columnId: string) => {
+  lastOperation.value = `Adding new column ${position} column ${columnId}`
+  
+  try {
+    addColumn(position, columnId)
+    
+    // Force save the table data
+    const saveResult = await saveTableData()
+    operationStatus.value = saveResult ? 'success' : 'error'
+  } catch (error) {
+    operationStatus.value = 'error'
+  }
+}
+
 // Handle adding a new column from the dialog
-const handleAddColumn = async (title: string, type: ColumnType) => {
+const handleAddColumnFromDialog = async (title: string, type: ColumnType) => {
   lastOperation.value = `Adding column: ${title} (${type})`
   
   try {
@@ -78,11 +108,27 @@ const handleAddColumn = async (title: string, type: ColumnType) => {
     newColumnTitle.value = title
     newColumnType.value = type
     
-    // Call the addColumn function
+    // Call the addColumn function without parameters (will add at the end)
     addColumn()
     
     // Close the dialog
     isAddingColumn.value = false
+    
+    // Force save the table data
+    const saveResult = await saveTableData()
+    operationStatus.value = saveResult ? 'success' : 'error'
+  } catch (error) {
+    operationStatus.value = 'error'
+  }
+}
+
+// Handle adding a new row from the header
+const handleAddRowFromHeader = async () => {
+  lastOperation.value = 'Adding new row'
+  
+  try {
+    // Add row at the end
+    addRow('after', tableData.value.rows[tableData.value.rows.length - 1]?.id || '')
     
     // Force save the table data
     const saveResult = await saveTableData()
@@ -98,21 +144,6 @@ const handleSaveName = async (name: string) => {
   
   try {
     updateTableName(name)
-    
-    // Force save the table data
-    const saveResult = await saveTableData()
-    operationStatus.value = saveResult ? 'success' : 'error'
-  } catch (error) {
-    operationStatus.value = 'error'
-  }
-}
-
-// Handle adding a new row
-const handleAddRow = async () => {
-  lastOperation.value = 'Adding new row'
-  
-  try {
-    addRow()
     
     // Force save the table data
     const saveResult = await saveTableData()
@@ -158,7 +189,7 @@ watch(operationStatus, (newStatus) => {
           @start-editing-name="startEditingName"
           @save-name="handleSaveName"
           @add-column="toggleAddColumnDialog"
-          @add-row="handleAddRow"
+          @add-row="handleAddRowFromHeader"
         >
           <template #right>
             <LayoutSwitcher
@@ -173,7 +204,7 @@ watch(operationStatus, (newStatus) => {
         <AddColumnDialog
           :is-visible="isAddingColumn"
           @close="isAddingColumn = false"
-          @add="handleAddColumn"
+          @add="handleAddColumnFromDialog"
         />
 
         <!-- Layout Content -->
@@ -195,6 +226,8 @@ watch(operationStatus, (newStatus) => {
               @delete-column="deleteColumn"
               @delete-row="deleteRow"
               @update-cell="updateCell"
+              @add-row="handleAddRow"
+              @add-column="handleAddColumn"
             />
           </template>
 

@@ -77,43 +77,75 @@ export function useTableOperations(tableData: Ref<TableData>) {
     updateTableName(tableName.value)
   }
 
-  // Add a new column
-  const addColumn = () => {
-    // Validate input
-    if (!newColumnTitle.value || !newColumnTitle.value.trim()) {
-      throw new Error('Column title cannot be empty')
-    }
-
+  // Add a new column at a specific position
+  const addColumn = (position?: 'before' | 'after', referenceColumnId?: string) => {
     try {
       // Generate a new column ID
       const newColumnId = generateUUID()
       
-      // Create a new column
+      // Create a new column with default values
       const newColumn = {
         id: newColumnId,
-        title: newColumnTitle.value.trim(),
+        title: newColumnTitle.value.trim() || `Column ${tableData.value.columns.length + 1}`,
         type: newColumnType.value,
       }
       
-      // Create a new columns array with the new column
-      const updatedColumns = [...tableData.value.columns, newColumn]
-      
-      // Update all rows to include the new column with empty values
-      const updatedRows = tableData.value.rows.map(row => {
-        return {
-          ...row,
-          cells: {
-            ...row.cells,
-            [newColumnId]: ''
-          }
+      // If position and referenceColumnId are provided, insert at specific position
+      if (position && referenceColumnId) {
+        // Find the index of the reference column
+        const referenceIndex = tableData.value.columns.findIndex(col => col.id === referenceColumnId)
+        if (referenceIndex === -1) {
+          throw new Error('Reference column not found')
         }
-      })
-      
-      // Update the table data with the new columns and rows
-      tableData.value = {
-        ...tableData.value,
-        columns: updatedColumns,
-        rows: updatedRows
+        
+        // Calculate the insertion index
+        const insertIndex = position === 'before' ? referenceIndex : referenceIndex + 1
+        
+        // Create a new columns array with the new column at the specified position
+        const updatedColumns = [
+          ...tableData.value.columns.slice(0, insertIndex),
+          newColumn,
+          ...tableData.value.columns.slice(insertIndex)
+        ]
+        
+        // Update all rows to include the new column with empty values
+        const updatedRows = tableData.value.rows.map(row => {
+          return {
+            ...row,
+            cells: {
+              ...row.cells,
+              [newColumnId]: ''
+            }
+          }
+        })
+        
+        // Update the table data with the new columns and rows
+        tableData.value = {
+          ...tableData.value,
+          columns: updatedColumns,
+          rows: updatedRows
+        }
+      } else {
+        // Add column at the end (original behavior)
+        const updatedColumns = [...tableData.value.columns, newColumn]
+        
+        // Update all rows to include the new column with empty values
+        const updatedRows = tableData.value.rows.map(row => {
+          return {
+            ...row,
+            cells: {
+              ...row.cells,
+              [newColumnId]: ''
+            }
+          }
+        })
+        
+        // Update the table data with the new columns and rows
+        tableData.value = {
+          ...tableData.value,
+          columns: updatedColumns,
+          rows: updatedRows
+        }
       }
 
       // Reset the form
@@ -125,8 +157,8 @@ export function useTableOperations(tableData: Ref<TableData>) {
     }
   }
 
-  // Add a new row
-  const addRow = () => {
+  // Add a new row at a specific position
+  const addRow = (position?: 'before' | 'after', referenceRowId?: string) => {
     try {
       const newRowId = generateUUID()
       
@@ -145,13 +177,38 @@ export function useTableOperations(tableData: Ref<TableData>) {
         cells
       }
       
-      // Create a new rows array with the new row
-      const updatedRows = [...tableData.value.rows, newRow]
-      
-      // Update the table data with the new rows
-      tableData.value = {
-        ...tableData.value,
-        rows: updatedRows
+      // If position and referenceRowId are provided, insert at specific position
+      if (position && referenceRowId) {
+        // Find the index of the reference row
+        const referenceIndex = tableData.value.rows.findIndex(row => row.id === referenceRowId)
+        if (referenceIndex === -1) {
+          throw new Error('Reference row not found')
+        }
+        
+        // Calculate the insertion index
+        const insertIndex = position === 'before' ? referenceIndex : referenceIndex + 1
+        
+        // Create a new rows array with the new row at the specified position
+        const updatedRows = [
+          ...tableData.value.rows.slice(0, insertIndex),
+          newRow,
+          ...tableData.value.rows.slice(insertIndex)
+        ]
+        
+        // Update the table data with the new rows
+        tableData.value = {
+          ...tableData.value,
+          rows: updatedRows
+        }
+      } else {
+        // Add row at the end (original behavior)
+        const updatedRows = [...tableData.value.rows, newRow]
+        
+        // Update the table data with the new rows
+        tableData.value = {
+          ...tableData.value,
+          rows: updatedRows
+        }
       }
     } catch (error) {
       throw error
