@@ -3,14 +3,17 @@ import { VueNodeViewRenderer } from '@tiptap/vue-3'
 import TableBlock from '@/components/editor/blocks/table-block/TableBlock.vue'
 import { v4 as uuidv4 } from 'uuid'
 
+export interface TableColumn {
+  id: string
+  title: string
+  type: 'text' | 'number' | 'select' | 'date'
+  options?: string[]
+}
+
 export interface TableData {
   id: string
   name: string
-  columns: Array<{
-    id: string
-    title: string
-    type: 'text' | 'number' | 'select' | 'date'
-  }>
+  columns: TableColumn[]
   rows: Array<{
     id: string
     cells: Record<string, any>

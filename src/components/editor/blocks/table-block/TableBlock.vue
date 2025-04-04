@@ -2,6 +2,7 @@
 import { onMounted, watch, ref } from 'vue'
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import type { TableData } from '@/components/editor/extensions/TableExtension'
 
 // Import composables
 import { useTableData } from './composables/useTableData'
@@ -11,6 +12,11 @@ import { useTableOperations } from './composables/useTableOperations'
 import TableHeader from './components/TableHeader.vue'
 import AddColumnDialog from './components/AddColumnDialog.vue'
 import TableContent from './components/TableContent.vue'
+import LayoutSwitcher, { type TableLayout } from './components/layouts/LayoutSwitcher.vue'
+import BaseLayout from './components/layouts/BaseLayout.vue'
+import ChartLayout from './components/layouts/ChartLayout.vue'
+import KanbanLayout from './components/layouts/KanbanLayout.vue'
+import CalendarLayout from './components/layouts/CalendarLayout.vue'
 
 // Import types
 import type { ColumnType } from './composables/useTableOperations'
@@ -52,14 +58,45 @@ const {
 
 const lastOperation = ref<string>('')
 const operationStatus = ref<'success' | 'error' | ''>('')
+const currentLayout = ref<TableLayout>('table')
 
 // Load table data on component mount
 onMounted(async () => {
   await loadTableData()
 })
 
+// Handle adding a new row at a specific position
+const handleAddRow = async (position: 'before' | 'after', rowId: string) => {
+  lastOperation.value = `Adding new row ${position} row ${rowId}`
+  
+  try {
+    addRow(position, rowId)
+    
+    // Force save the table data
+    const saveResult = await saveTableData()
+    operationStatus.value = saveResult ? 'success' : 'error'
+  } catch (error) {
+    operationStatus.value = 'error'
+  }
+}
+
+// Handle adding a new column at a specific position
+const handleAddColumn = async (position: 'before' | 'after', columnId: string) => {
+  lastOperation.value = `Adding new column ${position} column ${columnId}`
+  
+  try {
+    addColumn(position, columnId)
+    
+    // Force save the table data
+    const saveResult = await saveTableData()
+    operationStatus.value = saveResult ? 'success' : 'error'
+  } catch (error) {
+    operationStatus.value = 'error'
+  }
+}
+
 // Handle adding a new column from the dialog
-const handleAddColumn = async (title: string, type: ColumnType) => {
+const handleAddColumnFromDialog = async (title: string, type: ColumnType) => {
   lastOperation.value = `Adding column: ${title} (${type})`
   
   try {
@@ -72,11 +109,27 @@ const handleAddColumn = async (title: string, type: ColumnType) => {
     newColumnTitle.value = title
     newColumnType.value = type
     
-    // Call the addColumn function
+    // Call the addColumn function without parameters (will add at the end)
     addColumn()
     
     // Close the dialog
     isAddingColumn.value = false
+    
+    // Force save the table data
+    const saveResult = await saveTableData()
+    operationStatus.value = saveResult ? 'success' : 'error'
+  } catch (error) {
+    operationStatus.value = 'error'
+  }
+}
+
+// Handle adding a new row from the header
+const handleAddRowFromHeader = async () => {
+  lastOperation.value = 'Adding new row'
+  
+  try {
+    // Add row at the end
+    addRow('after', tableData.value.rows[tableData.value.rows.length - 1]?.id || '')
     
     // Force save the table data
     const saveResult = await saveTableData()
@@ -101,21 +154,6 @@ const handleSaveName = async (name: string) => {
   }
 }
 
-// Handle adding a new row
-const handleAddRow = async () => {
-  lastOperation.value = 'Adding new row'
-  
-  try {
-    addRow()
-    
-    // Force save the table data
-    const saveResult = await saveTableData()
-    operationStatus.value = saveResult ? 'success' : 'error'
-  } catch (error) {
-    operationStatus.value = 'error'
-  }
-}
-
 // Toggle the add column dialog
 const toggleAddColumnDialog = () => {
   isAddingColumn.value = !isAddingColumn.value
@@ -129,6 +167,67 @@ watch(operationStatus, (newStatus) => {
     }, 3000)
   }
 })
+
+const emit = defineEmits<{
+  (e: 'update:tableData', data: TableData): void
+  (e: 'save'): void
+}>()
+
+// Add this function after handleSaveName
+const handleColumnTitleUpdate = async (columnId: string, title: string) => {
+  lastOperation.value = `Updating column title to: ${title}`
+  
+  try {
+    // Find the column index
+    const columnIndex = tableData.value.columns.findIndex(col => col.id === columnId)
+    if (columnIndex === -1) return
+    
+    // Create a new columns array with the updated title
+    const updatedColumns = [...tableData.value.columns]
+    updatedColumns[columnIndex] = {
+      ...updatedColumns[columnIndex],
+      title
+    }
+    
+    // Update the table data
+    tableData.value = {
+      ...tableData.value,
+      columns: updatedColumns
+    }
+    
+    // Force save the table data
+    const saveResult = await saveTableData()
+    operationStatus.value = saveResult ? 'success' : 'error'
+  } catch (error) {
+    operationStatus.value = 'error'
+  }
+}
+
+// Add this function after handleColumnTitleUpdate
+const handleReorderRows = async (fromRowId: string, toRowId: string) => {
+  lastOperation.value = `Reordering rows from ${fromRowId} to ${toRowId}`
+  
+  try {
+    const fromIndex = tableData.value.rows.findIndex(row => row.id === fromRowId)
+    const toIndex = tableData.value.rows.findIndex(row => row.id === toRowId)
+    
+    if (fromIndex === -1 || toIndex === -1) return
+    
+    const newRows = [...tableData.value.rows]
+    const [movedRow] = newRows.splice(fromIndex, 1)
+    newRows.splice(toIndex, 0, movedRow)
+    
+    tableData.value = {
+      ...tableData.value,
+      rows: newRows
+    }
+    
+    const saveResult = await saveTableData()
+    operationStatus.value = saveResult ? 'success' : 'error'
+  } catch (error) {
+    operationStatus.value = 'error'
+  }
+}
 </script>
 
 <template>
@@ -152,26 +251,79 @@ watch(operationStatus, (newStatus) => {
           @start-editing-name="startEditingName"
           @save-name="handleSaveName"
           @add-column="toggleAddColumnDialog"
-          @add-row="handleAddRow"
-        />
+          @add-row="handleAddRowFromHeader"
+        >
+          <template #right>
+            <LayoutSwitcher
+              :current-layout="currentLayout"
+              @update:layout="currentLayout = $event"
+              class="ml-4"
+            />
+          </template>
+        </TableHeader>
 
         <!-- Add Column Dialog -->
         <AddColumnDialog
           :is-visible="isAddingColumn"
           @close="isAddingColumn = false"
-          @add="handleAddColumn"
+          @add="handleAddColumnFromDialog"
         />
 
-        <!-- Table Content -->
-        <TableContent
+        <!-- Layout Content -->
+        <BaseLayout
           :table-data="tableData"
-          :active-type-dropdown="activeTypeDropdown"
-          @toggle-type-dropdown="toggleTypeDropdown"
-          @update-column-type="updateColumnType"
-          @delete-column="deleteColumn"
-          @delete-row="deleteRow"
-          @update-cell="updateCell"
-        />
+          :is-loading="isLoading"
+          :is-saving="isSaving"
+          :error="error"
+          @update:tableData="tableData = $event"
+          @save="saveTableData"
+        >
+          <!-- Table Layout -->
+          <template v-if="currentLayout === 'table'">
+            <TableContent
+              :table-data="tableData"
+              :active-type-dropdown="activeTypeDropdown"
+              @toggle-type-dropdown="toggleTypeDropdown"
+              @update-column-type="updateColumnType"
+              @delete-column="deleteColumn"
+              @delete-row="deleteRow"
+              @update-cell="updateCell"
+              @add-row="handleAddRow"
+              @add-column="handleAddColumn"
+              @reorder-rows="handleReorderRows"
+              @update-column-title="handleColumnTitleUpdate"
+            />
+          </template>
+
+          <!-- Chart Layout -->
+          <template v-else-if="currentLayout === 'chart'">
+            <ChartLayout
+              :table-data="tableData"
+              @update:tableData="tableData = $event"
+            />
+          </template>
+
+          <!-- Kanban Layout -->
+          <template v-else-if="currentLayout === 'kanban'">
+            <KanbanLayout
+              :table-data="tableData"
+              :is-active="currentLayout === 'kanban'"
+              @update:tableData="tableData = $event"
+            />
+          </template>
+
+          <!-- Calendar Layout -->
+          <template v-else-if="currentLayout === 'calendar'">
+            <CalendarLayout
+              :table-data="tableData"
+              :is-active="currentLayout === 'calendar'"
+              @update:tableData="tableData = $event"
+            />
+          </template>
+
+
+          <!-- Other layouts will be added here -->
+        </BaseLayout>
         
         <!-- Saving Indicator -->
         <div v-if="isSaving" class="p-2 border-t">

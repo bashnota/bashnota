@@ -70,6 +70,7 @@ const saveName = () => {
           <Plus class="h-4 w-4 mr-2" />
           Add Row
         </Button>
+        <slot name="right" />
       </div>
     </div>
   </div>

@@ -1,10 +1,10 @@
-import { Type, Hash, ListChecks, Calendar } from 'lucide-vue-next'
+import { Text, Hash, List, Calendar } from 'lucide-vue-next'
 import type { ColumnType } from '../composables/useTableOperations'
 
 export const COLUMN_TYPES = [
-  { value: 'text' as ColumnType, label: 'Text', icon: Type },
+  { value: 'text' as ColumnType, label: 'Text', icon: Text },
   { value: 'number' as ColumnType, label: 'Number', icon: Hash },
-  { value: 'select' as ColumnType, label: 'Select', icon: ListChecks },
+  { value: 'select' as ColumnType, label: 'Select', icon: List },
   { value: 'date' as ColumnType, label: 'Date', icon: Calendar },
 ] as const
 
