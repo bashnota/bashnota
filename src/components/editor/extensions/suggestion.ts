@@ -19,7 +19,6 @@ import {
   Heading3,
   DatabaseIcon,
   FunctionSquare,
-  ImageIcon,
   ImagesIcon,
   ChartScatter,
   VideoIcon,
@@ -439,23 +438,6 @@ function createAdvancedCommands(): CommandItem[] {
   A[Client] --> B[Load Balancer]
   B --> C[Server1]
   B --> D[Server2]`
-          })
-          .run();
-      },
-    },
-    {
-      title: 'Scatter Plot',
-      category: 'Advanced',
-      icon: ChartScatter,
-      keywords: ['scatter', 'plot', 'chart', 'graph'],
-      command: ({ editor, range }: CommandArgs) => {
-        editor
-          .chain()
-          .focus()
-          .deleteRange(range)
-          .setScatterPlot({
-            title: 'Scatter Plot',
-            apiUrl: '',
           })
           .run();
       },

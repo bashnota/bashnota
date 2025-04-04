@@ -99,23 +99,6 @@ export class NotaExtensionService {
   }
 
   /**
-   * Insert a scatter plot
-   * @param title The plot title
-   * @param data The scatter plot data
-   * @returns Success status
-   */
-  public insertScatterPlot(title: string, data: any): boolean {
-    this.ensureEditor()
-    return this.editor!.commands.insertContent({
-      type: 'scatterPlot',
-      attrs: {
-        title,
-        apiData: data,
-      },
-    })
-  }
-
-  /**
    * Insert a table with the specified dimensions
    * @param rows Number of rows
    * @param cols Number of columns
