@@ -25,6 +25,7 @@ export const MarkdownExtension = Extension.create({
           handleDOMEvents: {
             dblclick: (view, event) => {
               const pos = view.posAtDOM(event.target as Node, 0)
+              if (pos < 0) return false
               const node = view.state.doc.nodeAt(pos)
               if (node?.isText) {
                 isEditing = true
