@@ -2,6 +2,7 @@
 import { onMounted, watch, ref } from 'vue'
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import type { TableData } from '@/components/editor/extensions/TableExtension'
 
 // Import composables
 import { useTableData } from './composables/useTableData'
@@ -166,6 +167,67 @@ watch(operationStatus, (newStatus) => {
     }, 3000)
   }
 })
+
+const emit = defineEmits<{
+  (e: 'update:tableData', data: TableData): void
+  (e: 'save'): void
+}>()
+
+// Add this function after handleSaveName
+const handleColumnTitleUpdate = async (columnId: string, title: string) => {
+  lastOperation.value = `Updating column title to: ${title}`
+  
+  try {
+    // Find the column index
+    const columnIndex = tableData.value.columns.findIndex(col => col.id === columnId)
+    if (columnIndex === -1) return
+    
+    // Create a new columns array with the updated title
+    const updatedColumns = [...tableData.value.columns]
+    updatedColumns[columnIndex] = {
+      ...updatedColumns[columnIndex],
+      title
+    }
+    
+    // Update the table data
+    tableData.value = {
+      ...tableData.value,
+      columns: updatedColumns
+    }
+    
+    // Force save the table data
+    const saveResult = await saveTableData()
+    operationStatus.value = saveResult ? 'success' : 'error'
+  } catch (error) {
+    operationStatus.value = 'error'
+  }
+}
+
+// Add this function after handleColumnTitleUpdate
+const handleReorderRows = async (fromRowId: string, toRowId: string) => {
+  lastOperation.value = `Reordering rows from ${fromRowId} to ${toRowId}`
+  
+  try {
+    const fromIndex = tableData.value.rows.findIndex(row => row.id === fromRowId)
+    const toIndex = tableData.value.rows.findIndex(row => row.id === toRowId)
+    
+    if (fromIndex === -1 || toIndex === -1) return
+    
+    const newRows = [...tableData.value.rows]
+    const [movedRow] = newRows.splice(fromIndex, 1)
+    newRows.splice(toIndex, 0, movedRow)
+    
+    tableData.value = {
+      ...tableData.value,
+      rows: newRows
+    }
+    
+    const saveResult = await saveTableData()
+    operationStatus.value = saveResult ? 'success' : 'error'
+  } catch (error) {
+    operationStatus.value = 'error'
+  }
+}
 </script>
 
 <template>
@@ -228,6 +290,8 @@ watch(operationStatus, (newStatus) => {
               @update-cell="updateCell"
               @add-row="handleAddRow"
               @add-column="handleAddColumn"
+              @reorder-rows="handleReorderRows"
+              @update-column-title="handleColumnTitleUpdate"
             />
           </template>
 

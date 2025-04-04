@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, nextTick } from 'vue'
 import { Input } from '@/components/ui/input'
 import {
   DropdownMenu,
@@ -8,8 +8,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
-import { ChevronDown } from 'lucide-vue-next'
+import { ChevronDown, Calendar as CalendarIcon } from 'lucide-vue-next'
+import Calendar from '@/components/ui/calendar.vue'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import type { TableData } from '@/components/editor/extensions/TableExtension'
+import { cn } from '@/lib/utils'
 
 const props = defineProps<{
   rowId: string
@@ -30,6 +33,8 @@ const emit = defineEmits<{
 
 const isDropdownOpen = ref(false)
 const newOption = ref('')
+const dateInput = ref<HTMLInputElement | null>(null)
+const isCalendarOpen = ref(false)
 
 const uniqueValues = computed(() => {
   if (!props.tableData || !props.columnId) return []
@@ -95,29 +100,58 @@ const alignmentClass = computed(() => {
     default: return 'text-left'
   }
 })
+
+// Add computed property for date icon
+const showDateIcon = computed(() => {
+  return props.type === 'date' && !props.isEditing
+})
+
+const handleTimeInput = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const [hours, minutes] = target.value.split(':')
+  const currentDate = props.value ? new Date(props.value) : new Date()
+  currentDate.setHours(parseInt(hours), parseInt(minutes))
+  emit('update', currentDate.toISOString())
+}
+
+const handleDateSelect = (date: Date | undefined) => {
+  if (date) {
+    const currentDate = props.value ? new Date(props.value) : new Date()
+    date.setHours(currentDate.getHours(), currentDate.getMinutes())
+    emit('update', date.toISOString())
+  }
+}
+
+const handleCellClick = () => {
+  if (props.type === 'select') {
+    emit('startEditing')
+  } else if (props.type === 'date') {
+    isCalendarOpen.value = true
+  }
+}
 </script>
 
 <template>
-  <div class="relative">
-    <template v-if="isEditing">
+  <div class="relative h-8">
+    <template v-if="isEditing && type !== 'date'">
       <Input
         v-if="type !== 'select'"
-        :type="type === 'number' ? 'number' : type === 'date' ? 'datetime-local' : 'text'"
-        :value="type === 'date' ? formatDateForInput(value) : value"
+        :type="type === 'number' ? 'number' : 'text'"
+        :value="value"
         @input="handleInput"
         @blur="$emit('stopEditing')"
         @keydown="handleKeyDown"
-        class="h-8 w-full absolute inset-0"
+        class="h-8 w-full absolute inset-0 px-2"
         autofocus
       />
       <DropdownMenu v-else v-model:open="isDropdownOpen">
         <DropdownMenuTrigger asChild>
           <Button
             variant="outline"
-            class="h-8 w-full justify-between absolute inset-0"
+            class="h-8 w-full justify-between absolute inset-0 px-2"
           >
-            {{ value || 'Select an option' }}
-            <ChevronDown class="h-4 w-4" />
+            <span class="truncate">{{ value || 'Select an option' }}</span>
+            <ChevronDown class="h-4 w-4 shrink-0" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent class="w-full">
@@ -141,16 +175,45 @@ const alignmentClass = computed(() => {
     </template>
     <template v-else>
       <div 
-        class="min-h-[2rem] flex items-center px-2"
+        class="h-8 flex items-center px-2 group"
         :class="alignmentClass"
-        @click="type === 'select' ? $emit('startEditing') : null"
-        @dblclick="type !== 'select' ? $emit('startEditing') : null"
+        @click="handleCellClick"
+        @dblclick="handleCellClick"
       >
         <template v-if="type === 'date'">
-          {{ formatDateForDisplay(value) }}
+          <Popover v-model:open="isCalendarOpen">
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-4 w-4 p-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-transparent"
+              >
+                <CalendarIcon class="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent class="w-auto p-0" align="start">
+              <div class="flex flex-col gap-2 p-3">
+                <Calendar
+                  mode="single"
+                  :selected="value ? new Date(value) : undefined"
+                  @select="handleDateSelect"
+                  :initial-focus="true"
+                />
+                <div class="flex items-center gap-2">
+                  <Input
+                    type="time"
+                    :value="value ? new Date(value).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }) : ''"
+                    @input="handleTimeInput"
+                    class="w-24"
+                  />
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+          <span class="truncate ml-2">{{ formatDateForDisplay(value) }}</span>
         </template>
         <template v-else>
-          {{ value }}
+          <span class="truncate">{{ value }}</span>
         </template>
       </div>
     </template>
@@ -160,5 +223,185 @@ const alignmentClass = computed(() => {
 <style scoped>
 .relative {
   @apply h-8;
+}
+
+/* Add styles for cell content */
+.truncate {
+  @apply overflow-hidden text-ellipsis whitespace-nowrap;
+}
+
+/* Add styles for input focus */
+input:focus {
+  @apply outline-none ring-2 ring-primary ring-offset-2;
+}
+
+/* Add styles for cell hover */
+div:hover {
+  @apply bg-muted/20;
+}
+
+/* Add styles for cell editing */
+div.editing {
+  @apply bg-muted/30;
+}
+
+/* Add styles for cell alignment */
+.text-left {
+  @apply justify-start;
+}
+
+.text-center {
+  @apply justify-center;
+}
+
+.text-right {
+  @apply justify-end;
+}
+
+/* Add styles for empty cells */
+div:empty::before {
+  content: 'Click to edit';
+  @apply text-muted-foreground text-sm;
+}
+
+/* Add styles for date cells */
+.date-cell {
+  @apply flex items-center gap-2 cursor-pointer;
+}
+
+.date-cell:hover .calendar-icon {
+  @apply opacity-100;
+}
+
+/* Add styles for calendar button */
+.calendar-button {
+  @apply opacity-0 group-hover:opacity-100 transition-opacity duration-200;
+}
+
+.calendar-button:hover {
+  @apply bg-transparent;
+}
+
+/* Add styles for date value */
+.date-value {
+  @apply ml-2;
+}
+
+/* Add styles for select cells */
+.select-cell {
+  @apply flex items-center justify-between;
+}
+
+/* Add styles for number cells */
+.number-cell {
+  @apply font-mono;
+}
+
+/* Add styles for text cells */
+.text-cell {
+  @apply font-sans;
+}
+
+/* Add styles for date input */
+input[type="datetime-local"] {
+  @apply cursor-pointer;
+}
+
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  @apply cursor-pointer;
+}
+
+/* Add styles for calendar popover */
+:deep(.calendar) {
+  @apply p-3;
+}
+
+:deep(.calendar-day) {
+  @apply h-9 w-9 p-0 font-normal aria-selected:opacity-100;
+}
+
+:deep(.calendar-day-selected) {
+  @apply bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground;
+}
+
+:deep(.calendar-day-today) {
+  @apply bg-accent text-accent-foreground;
+}
+
+:deep(.calendar-day-outside) {
+  @apply text-muted-foreground opacity-50;
+}
+
+:deep(.calendar-day-disabled) {
+  @apply text-muted-foreground opacity-50;
+}
+
+:deep(.calendar-day-range-middle) {
+  @apply bg-accent text-accent-foreground;
+}
+
+:deep(.calendar-day-range-end) {
+  @apply bg-primary text-primary-foreground;
+}
+
+:deep(.calendar-day-range-start) {
+  @apply bg-primary text-primary-foreground;
+}
+
+:deep(.calendar-day-selected) {
+  @apply bg-primary text-primary-foreground;
+}
+
+:deep(.calendar-day-selected:hover) {
+  @apply bg-primary text-primary-foreground;
+}
+
+:deep(.calendar-day-selected:focus) {
+  @apply bg-primary text-primary-foreground;
+}
+
+:deep(.calendar-day-selected:active) {
+  @apply bg-primary text-primary-foreground;
+}
+
+:deep(.calendar-day-selected:disabled) {
+  @apply bg-primary text-primary-foreground opacity-50;
+}
+
+:deep(.calendar-day-selected[aria-disabled="true"]) {
+  @apply bg-primary text-primary-foreground opacity-50;
+}
+
+:deep(.calendar-day-selected[aria-selected="true"]) {
+  @apply bg-primary text-primary-foreground;
+}
+
+:deep(.calendar-day-selected[aria-selected="true"]:hover) {
+  @apply bg-primary text-primary-foreground;
+}
+
+:deep(.calendar-day-selected[aria-selected="true"]:focus) {
+  @apply bg-primary text-primary-foreground;
+}
+
+:deep(.calendar-day-selected[aria-selected="true"]:active) {
+  @apply bg-primary text-primary-foreground;
+}
+
+:deep(.calendar-day-selected[aria-selected="true"]:disabled) {
+  @apply bg-primary text-primary-foreground opacity-50;
+}
+
+:deep(.calendar-day-selected[aria-selected="true"][aria-disabled="true"]) {
+  @apply bg-primary text-primary-foreground opacity-50;
+}
+
+/* Add styles for time input */
+input[type="time"] {
+  @apply h-8 px-2 py-1 rounded-md border border-input bg-background text-sm;
+}
+
+input[type="time"]::-webkit-calendar-picker-indicator {
+  @apply cursor-pointer;
 }
 </style> 

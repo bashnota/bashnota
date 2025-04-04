@@ -1,7 +1,19 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { MoreVertical, Plus, Trash2 } from 'lucide-vue-next'
+import { computed, ref, nextTick } from 'vue'
+import { 
+  MoreVertical, 
+  Plus, 
+  Trash2,
+  ChevronUp,
+  ChevronDown,
+  ChevronsUpDown,
+  Text,
+  Hash,
+  Calendar,
+  List
+} from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,7 +40,11 @@ const emit = defineEmits<{
   (e: 'deleteColumn'): void
   (e: 'toggleSort'): void
   (e: 'startResizing', event: MouseEvent): void
+  (e: 'updateColumnTitle', title: string): void
 }>()
+
+const isEditingTitle = ref(false)
+const localTitle = ref(props.column.title)
 
 const dropdownPosition = computed(() => {
   const th = document.querySelector(`th[data-column-id="${props.column.id}"]`)
@@ -39,6 +55,57 @@ const dropdownPosition = computed(() => {
     top: rect.bottom + window.scrollY,
     left: rect.left + window.scrollX
   }
+})
+
+const startEditingTitle = () => {
+  isEditingTitle.value = true
+  localTitle.value = props.column.title
+  
+  // Focus the input after a small delay to ensure it's rendered
+  nextTick(() => {
+    const input = document.querySelector(`input[data-column-id="${props.column.id}"]`) as HTMLInputElement
+    if (input) {
+      input.focus()
+      input.select()
+    }
+  })
+}
+
+const saveTitle = () => {
+  if (localTitle.value.trim()) {
+    emit('updateColumnTitle', localTitle.value.trim())
+  }
+  isEditingTitle.value = false
+}
+
+const handleTitleInput = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  localTitle.value = target.value
+}
+
+const handleTitleKeyDown = (event: KeyboardEvent) => {
+  if (event.key === 'Enter') {
+    event.preventDefault()
+    saveTitle()
+  } else if (event.key === 'Escape') {
+    event.preventDefault()
+    isEditingTitle.value = false
+    localTitle.value = props.column.title
+  }
+}
+
+const titleClasses = computed(() => ({
+  'font-medium': true,
+  'cursor-pointer': !isEditingTitle.value,
+  'hover:text-primary': !isEditingTitle.value,
+  'text-muted-foreground': !props.column.title
+}))
+
+const getSortIcon = computed(() => {
+  if (props.sortState.columnId === props.column.id) {
+    return props.sortState.direction === 'asc' ? ChevronUp : ChevronDown
+  }
+  return ChevronsUpDown
 })
 </script>
 
@@ -61,7 +128,23 @@ const dropdownPosition = computed(() => {
             class="h-4 w-4"
           />
         </Button>
-        <span class="font-medium">{{ column.title }}</span>
+        <Input
+          v-if="isEditingTitle"
+          :value="localTitle"
+          @input="handleTitleInput"
+          @blur="saveTitle"
+          @keydown="handleTitleKeyDown"
+          class="h-6 text-sm font-medium"
+          :data-column-id="column.id"
+          autofocus
+        />
+        <span
+          v-else
+          :class="titleClasses"
+          @click="startEditingTitle"
+        >
+          {{ column.title || 'Untitled Column' }}
+        </span>
         <Button
           variant="ghost"
           size="sm"
@@ -69,11 +152,7 @@ const dropdownPosition = computed(() => {
           @click="emit('toggleSort')"
         >
           <component
-            :is="sortState.columnId === column.id
-              ? sortState.direction === 'asc'
-                ? 'ChevronUp'
-                : 'ChevronDown'
-              : 'ChevronsUpDown'"
+            :is="getSortIcon"
             class="h-4 w-4"
           />
         </Button>
@@ -142,5 +221,41 @@ const dropdownPosition = computed(() => {
 <style scoped>
 .cursor-col-resize {
   cursor: col-resize;
+}
+
+/* Add styles for icon visibility */
+.table-block-table-element th button {
+  @apply opacity-100;
+}
+
+.table-block-table-element th button:hover {
+  @apply opacity-100;
+}
+
+/* Add styles for sort button */
+.table-block-table-element th .sort-button {
+  @apply opacity-100;
+}
+
+.table-block-table-element th .sort-button:hover {
+  @apply opacity-100;
+}
+
+/* Add styles for column type button */
+.table-block-table-element th .type-button {
+  @apply opacity-100;
+}
+
+.table-block-table-element th .type-button:hover {
+  @apply opacity-100;
+}
+
+/* Add styles for column actions */
+.table-block-table-element th .column-actions {
+  @apply opacity-100;
+}
+
+.table-block-table-element th .column-actions:hover {
+  @apply opacity-100;
 }
 </style> 

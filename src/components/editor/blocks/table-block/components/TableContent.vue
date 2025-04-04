@@ -38,6 +38,7 @@ const emit = defineEmits<{
   (e: 'addRow', position: 'before' | 'after', rowId: string): void
   (e: 'addColumn', position: 'before' | 'after', columnId: string): void
   (e: 'reorderRows', fromRowId: string, toRowId: string): void
+  (e: 'updateColumnTitle', columnId: string, title: string): void
 }>()
 
 // State for editing and focus
@@ -459,6 +460,11 @@ const getColumnWidth = (columnId: string) => {
 const handleColumnWidthUpdate = (columnId: string, width: number) => {
   columnWidths.value[columnId] = width
 }
+
+// Add this function after handleColumnWidthUpdate
+const handleColumnTitleUpdate = (columnId: string, title: string) => {
+  emit('updateColumnTitle', columnId, title)
+}
 </script>
 
 <template>
@@ -480,6 +486,7 @@ const handleColumnWidthUpdate = (columnId: string, width: number) => {
             @delete-column="emit('deleteColumn', column.id)"
             @toggle-sort="() => sortState.columnId === column.id ? sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc' : sortState = { columnId: column.id, direction: 'asc' }"
             @start-resizing="(e) => handleColumnWidthUpdate(column.id, (e.target as HTMLElement)?.offsetWidth || 0)"
+            @update-column-title="(title) => handleColumnTitleUpdate(column.id, title)"
           />
           <TableHead class="w-[100px] border-l-0"></TableHead>
         </TableRow>
@@ -612,5 +619,152 @@ const handleColumnWidthUpdate = (columnId: string, width: number) => {
 /* Add styles for input container */
 .table-block-table-element td .relative {
   @apply h-8;
+}
+
+/* Add styles for selected cells */
+.table-block-table-element td.selected {
+  @apply bg-primary/10;
+}
+
+/* Add styles for focused cell */
+.table-block-table-element td.focused {
+  @apply ring-2 ring-primary ring-offset-2;
+}
+
+/* Add styles for column header hover */
+.table-block-table-element th:hover {
+  @apply bg-muted/70;
+}
+
+/* Add styles for column type button */
+.table-block-table-element th .type-button {
+  @apply opacity-0 group-hover:opacity-100 transition-opacity duration-200;
+}
+
+/* Add styles for column actions */
+.table-block-table-element th .column-actions {
+  @apply opacity-0 group-hover:opacity-100 transition-opacity duration-200;
+}
+
+/* Add styles for sort button */
+.table-block-table-element th .sort-button {
+  @apply opacity-0 group-hover:opacity-100 transition-opacity duration-200;
+}
+
+/* Add styles for resize handle */
+.table-block-table-element th .resize-handle {
+  @apply opacity-0 group-hover:opacity-100 transition-opacity duration-200;
+}
+
+/* Add styles for empty cells */
+.table-block-table-element td:empty::before {
+  content: 'Click to edit';
+  @apply text-muted-foreground text-sm;
+}
+
+/* Add styles for loading state */
+.table-block-table-element.loading {
+  @apply opacity-50 pointer-events-none;
+}
+
+/* Add styles for error state */
+.table-block-table-element.error {
+  @apply border-red-500;
+}
+
+/* Add styles for success state */
+.table-block-table-element.success {
+  @apply border-green-500;
+}
+
+/* Add styles for warning state */
+.table-block-table-element.warning {
+  @apply border-yellow-500;
+}
+
+/* Add styles for info state */
+.table-block-table-element.info {
+  @apply border-blue-500;
+}
+
+/* Add styles for disabled state */
+.table-block-table-element.disabled {
+  @apply opacity-50 pointer-events-none;
+}
+
+/* Add styles for readonly state */
+.table-block-table-element.readonly {
+  @apply pointer-events-none;
+}
+
+/* Add styles for compact mode */
+.table-block-table-element.compact {
+  @apply text-sm;
+}
+
+.table-block-table-element.compact th,
+.table-block-table-element.compact td {
+  @apply py-1;
+}
+
+/* Add styles for large mode */
+.table-block-table-element.large {
+  @apply text-lg;
+}
+
+.table-block-table-element.large th,
+.table-block-table-element.large td {
+  @apply py-3;
+}
+
+/* Add styles for striped rows */
+.table-block-table-element.striped tr:nth-child(even) {
+  @apply bg-muted/20;
+}
+
+/* Add styles for hover rows */
+.table-block-table-element.hover tr:hover {
+  @apply bg-muted/40;
+}
+
+/* Add styles for bordered mode */
+.table-block-table-element.bordered {
+  @apply border border-border;
+}
+
+/* Add styles for borderless mode */
+.table-block-table-element.borderless {
+  @apply border-0;
+}
+
+/* Add styles for rounded corners */
+.table-block-table-element.rounded {
+  @apply rounded-lg overflow-hidden;
+}
+
+/* Add styles for shadow */
+.table-block-table-element.shadow {
+  @apply shadow-md;
+}
+
+/* Add styles for dark mode */
+.dark .table-block-table-element th {
+  @apply bg-muted/30;
+}
+
+.dark .table-block-table-element tr:hover {
+  @apply bg-muted/20;
+}
+
+.dark .table-block-table-element td.selected {
+  @apply bg-primary/20;
+}
+
+.dark .table-block-table-element td.focused {
+  @apply ring-primary/50;
+}
+
+.dark .table-block-table-element th:hover {
+  @apply bg-muted/40;
 }
 </style> 
