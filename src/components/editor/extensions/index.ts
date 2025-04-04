@@ -23,7 +23,6 @@ import { TableExtension } from './TableExtension'
 import { MathExtension } from './MathExtension'
 import { MarkdownExtension } from './MarkdownExtension'
 import { Mermaid } from './mermaid'
-import { ScatterPlot } from './scatter-plot'
 import { Youtube } from './youtube'
 import { SubfigureExtension } from '../blocks'
 import GlobalDragHandle from './DragHandlePlugin'
@@ -102,7 +101,6 @@ export function getEditorExtensions() {
         class: 'mermaid-block',
       },
     }),
-    ScatterPlot,
     Youtube,
     SubfigureExtension,
     TaskList,
@@ -160,7 +158,6 @@ export function getViewerExtensions() {
         class: 'mermaid-block',
       },
     }),
-    ScatterPlot,
     Youtube,
     SubfigureExtension,
     TaskList,

@@ -28,7 +28,6 @@ const defaultBlockShortcuts: Shortcut[] = [
   { id: 'insert-math', key: 'Ctrl+Shift+Alt+M', description: 'Insert math block' },
   { id: 'insert-mermaid', key: 'Ctrl+Shift+Alt+D', description: 'Insert Mermaid diagram' },
   { id: 'insert-youtube', key: 'Ctrl+Shift+Alt+Y', description: 'Insert YouTube video' },
-  { id: 'insert-scatter', key: 'Ctrl+Shift+Alt+S', description: 'Insert scatter plot' },
   { id: 'insert-subfigures', key: 'Ctrl+Shift+Alt+F', description: 'Insert subfigures' },
   { id: 'insert-hr', key: 'Ctrl+Shift+Alt+H', description: 'Insert horizontal rule' },
   { id: 'insert-blockquote', key: 'Ctrl+Shift+Alt+Q', description: 'Insert blockquote' },

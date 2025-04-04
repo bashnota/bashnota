@@ -10,7 +10,7 @@ export interface AnalysisResult {
   summary: string
   insights: string[]
   visualizations: {
-    type: 'table' | 'scatter' | 'mermaid' | 'math'
+    type: 'table' | 'mermaid' | 'math'
     title: string
     data: any
   }[]
@@ -202,7 +202,6 @@ Create a comprehensive analysis with the following:
 
 For visualizations, you can create:
 - Tables: Structured data in rows and columns with clear headers and formatting
-- Scatter plots: For showing relationships between variables with optional trend lines
 - Mermaid diagrams: For flowcharts, sequences, or relationship diagrams
 - Mathematical visualizations: For formulas and mathematical relationships
 
@@ -238,16 +237,6 @@ Return the content in the following structure:
           ["Value1", "Value2", "..."],
           ["Value1", "Value2", "..."]
         ]
-      }
-    },
-    {
-      "type": "scatter",
-      "title": "Descriptive title for the scatter plot",
-      "description": "What the scatter plot reveals about the data",
-      "data": {
-        "x": [x1, x2, ...],
-        "y": [y1, y2, ...],
-        "labels": ["Point1", "Point2", "..."] // Optional
       }
     },
     {
@@ -381,9 +370,6 @@ ${this.config.customInstructions || 'Ensure your analysis is thorough, insightfu
             case 'table':
               this.insertTableVisualization(viz.data)
               break
-            case 'scatter':
-              this.insertScatterVisualization(viz.title, viz.data)
-              break
             case 'mermaid':
               this.insertMermaidVisualization(viz.data)
               break
@@ -426,18 +412,6 @@ ${this.config.customInstructions || 'Ensure your analysis is thorough, insightfu
     }
   }
   
-  /**
-   * Inserts a scatter plot visualization
-   * @param title The plot title
-   * @param data The scatter plot data (x and y values)
-   */
-  private insertScatterVisualization(title: string, data: any): void {
-    try {
-      notaExtensionService.insertScatterPlot(title, data)
-    } catch (error) {
-      logger.error('Error inserting scatter plot visualization:', error)
-    }
-  }
   
   /**
    * Inserts a mermaid diagram

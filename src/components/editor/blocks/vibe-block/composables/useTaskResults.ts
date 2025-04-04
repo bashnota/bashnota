@@ -550,9 +550,7 @@ export function useTaskResults(editor: Ref<any>, getPos: () => number | undefine
       case 'table':
         insertTableVisualization(viz, insertContentAfterBlock)
         break
-      case 'scatter':
-        insertScatterVisualization(viz, insertContentAfterBlock)
-        break
+    
       case 'mermaid':
         insertContentAfterBlock({
           type: 'mermaid',
@@ -699,91 +697,6 @@ export function useTaskResults(editor: Ref<any>, getPos: () => number | undefine
           text: 'Error rendering table visualization' 
         }] 
       })
-    }
-  }
-
-  /**
-   * Insert a scatter plot visualization
-   */
-  function insertScatterVisualization(viz: any, insertContentAfterBlock: (content: any) => void) {
-    try {
-      // Ensure data is an array of points for the scatter plot
-      const scatterData = typeof viz.data === 'string' ? JSON.parse(viz.data) : viz.data
-      
-      // Helper function to validate a data point
-      const isValidPoint = (point: any) => {
-        // Check if point has both x and y as numbers
-        const hasValidX = point.x !== undefined && !isNaN(parseFloat(point.x));
-        const hasValidY = point.y !== undefined && !isNaN(parseFloat(point.y));
-        
-        return hasValidX && hasValidY;
-      };
-      
-      let formattedData: any[] = [];
-      
-      if (Array.isArray(scatterData)) {
-        // Filter out invalid points and ensure x and y are numbers
-        formattedData = scatterData
-          .filter((point: any) => isValidPoint(point))
-          .map((point: any) => ({
-            x: parseFloat(point.x),
-            y: parseFloat(point.y),
-            label: point.label || 'Data'
-          }));
-      } else if (scatterData.data && Array.isArray(scatterData.data)) {
-        // Filter out invalid points from data property and ensure x and y are numbers
-        formattedData = scatterData.data
-          .filter((point: any) => isValidPoint(point))
-          .map((point: any) => ({
-            x: parseFloat(point.x),
-            y: parseFloat(point.y),
-            label: point.label || 'Data'
-          }));
-      } else if (typeof scatterData === 'object') {
-        // Convert object keys to data points if possible, filtering out NaN values
-        formattedData = Object.entries(scatterData)
-          .map(([key, value]) => {
-            const x = parseFloat(key);
-            const y = parseFloat(value as any);
-            
-            return {
-              x,
-              y, 
-              label: 'Data'
-            };
-          })
-          .filter(point => !isNaN(point.x) && !isNaN(point.y));
-      }
-      
-      // If we have valid data points after filtering, insert the scatter plot
-      if (formattedData.length > 0) {
-        insertContentAfterBlock({
-          type: 'scatterPlot',
-          attrs: {
-            title: viz.title,
-            // Store the actual data array in apiData rather than stringifying to data
-            apiData: formattedData
-          }
-        });
-      } else {
-        // No valid points found, insert a message instead
-        insertContentAfterBlock({ 
-          type: 'paragraph', 
-          content: [{ 
-            type: 'text', 
-            text: 'Unable to display scatter plot: no valid data points found' 
-          }] 
-        });
-      }
-    } catch (error) {
-      logger.error('Error creating scatter plot:', error);
-      insertContentAfterBlock({ 
-        type: 'paragraph', 
-        content: [{ 
-          type: 'text', 
-          text: 'Error rendering scatter plot visualization' 
-        }] 
-      });
     }
   }
 
