@@ -18,6 +18,7 @@ import Document from '@tiptap/extension-document'
 
 // Import custom extensions
 import { PageLink } from './PageLinkExtension'
+import { NotaLink } from './NotaLinkExtension'
 import { ExecutableCodeBlockExtension } from './ExecutableCodeBlockExtension'
 import { TableExtension } from './TableExtension'
 import { MathExtension } from './MathExtension'
@@ -72,6 +73,7 @@ export function getEditorExtensions() {
       },
     }),
     PageLink,
+    NotaLink,
     Table.configure({
       allowTableNodeSelection: true,
       resizable: true,
@@ -168,5 +170,7 @@ export function getViewerExtensions() {
     Blockquote,
     HorizontalRule,
     CitationExtension,
+    PageLink,
+    NotaLink,
   ]
 }

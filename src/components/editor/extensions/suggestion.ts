@@ -29,10 +29,12 @@ import {
   PenTool,
   SparklesIcon,
   BookIcon,
-  FileText
+  FileText,
+  Link
 } from 'lucide-vue-next'
 import { toast } from '@/lib/utils'
 import { logger } from '@/services/logger'
+import NotaLinkDialog from '@/components/editor/NotaLinkDialog.vue'
 
 /**
  * Type definitions for improved type safety
@@ -969,6 +971,69 @@ export default {
       ...createBasicCommands(),
       ...createAdvancedCommands(),
       createSubNotaCommand(),
+      {
+        title: 'Link to Nota',
+        category: 'Links',
+        icon: Link,
+        keywords: ['nota', 'link', 'reference', 'connect'],
+        description: 'Link to another nota',
+        command: ({ editor, range }: CommandArgs) => {
+          // Get the current selection
+          const { from, to } = range
+          const selectedText = editor.state.doc.textBetween(from, to, ' ')
+
+          // Create a popup for selecting notas
+          const popup = new PopupManager()
+          const instance = popup.createPopup(
+            NotaLinkDialog,
+            {
+              modelValue: true,
+              onSelect: (nota: { id: string; title: string; preview: string }) => {
+                editor
+                  .chain()
+                  .focus()
+                  .deleteRange({ from, to })
+                  .insertContent({
+                    type: 'notaLink',
+                    attrs: {
+                      notaId: nota.id,
+                      title: nota.title,
+                      preview: nota.preview
+                    }
+                  })
+                  .run()
+                popup.hide()
+              },
+              onUpdate: (value: boolean) => {
+                if (!value) {
+                  popup.hide()
+                }
+              }
+            },
+            editor,
+            getCursorCoords(editor, range)
+          )
+
+          // Prevent command list from handling keyboard events while dialog is open
+          const originalOnKeyDown = instance.onKeyDown
+          instance.onKeyDown = (props: { event: KeyboardEvent }) => {
+            // If dialog is open, prevent command list from handling keyboard events
+            if (instance.isOpen) {
+              return true
+            }
+            return originalOnKeyDown?.(props)
+          }
+
+          // Cleanup on editor blur
+          const blurHandler = () => {
+            popup.hide()
+          }
+          editor.view.dom.addEventListener('blur', blurHandler)
+          popup.onCleanup(() => {
+            editor.view.dom.removeEventListener('blur', blurHandler)
+          })
+        }
+      }
     ];
     
     // Return all items if no query
