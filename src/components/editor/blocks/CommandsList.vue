@@ -163,6 +163,10 @@ defineExpose({
   @apply text-transparent !important;
 }
 
+.tippy-box {
+  @apply text-inherit !important;
+}
+
 .tippy-box[data-theme~='command-palette'] {
   @apply bg-transparent border-none shadow-none;
 }
