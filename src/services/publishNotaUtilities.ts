@@ -68,33 +68,45 @@ export const processContent = async (content: string) => {
 }
 
 /**
- * Process a nota content object by replacing all data URLs with hosted URLs
- * This function works with the existing structure without modifying extensions
- * @param {Object} content - The nota content object
+ * Process a nota content object by replacing all data URLs with hosted URLs and removing restricted links
+ * @param {Object|string} content - The nota content object or string
+ * @param {Object} options - Processing options
  * @returns {Promise<Object>} - The processed content object
  */
-export const processNotaContent = async (content: string) => {
+export const processNotaContent = async (
+  content: string | object,
+  options?: {
+    publishedSubPages?: string[]
+  },
+) => {
   if (!content) return null
 
   // Parse the content if it's a string
   const contentObj = typeof content === 'string' ? JSON.parse(content) : content
 
   // Process the content recursively
-  return await processContentObject(contentObj)
+  return await processContentObject(contentObj, options)
 }
 
 /**
- * Recursively process a content object to replace data URLs
- * This works with the TipTap document structure without modifying extensions
+ * Recursively process a content object to replace data URLs and handle page links
  * @param {Object} obj - The content object
+ * @param {Object} options - Processing options
  * @returns {Promise<Object>} - The processed content object
  */
-async function processContentObject(obj: any) : Promise<any> {
+async function processContentObject(
+  obj: any,
+  options?: {
+    publishedSubPages?: string[]
+  },
+): Promise<any> {
   if (!obj) return obj
 
   // If it's an array, process each item
   if (Array.isArray(obj)) {
-    return await Promise.all(obj.map((item) => processContentObject(item)))
+    // Process each item and filter out any null results (removed restricted links)
+    const processed = await Promise.all(obj.map((item) => processContentObject(item, options)))
+    return processed.filter((item) => item !== null)
   }
 
   // If it's an object, process its properties
@@ -174,13 +186,13 @@ async function processContentObject(obj: any) : Promise<any> {
 
     // Process children content arrays
     if (obj.content && Array.isArray(obj.content)) {
-      result.content = await processContentObject(obj.content)
+      result.content = await processContentObject(obj.content, options)
     }
 
     // Process other properties recursively
     for (const key in obj) {
       if (key !== 'content' && typeof obj[key] === 'object' && obj[key] !== null) {
-        result[key] = await processContentObject(obj[key])
+        result[key] = await processContentObject(obj[key], options)
       } else if (
         key !== 'content' &&
         typeof obj[key] === 'string' &&

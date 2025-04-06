@@ -9,7 +9,7 @@ const router = express.Router()
 const db = admin.firestore()
 const publishedNotasCollection = 'publishedNotas'
 
-// Get all published notas for the current user
+// Get all published notas for the current user (excluding sub-pages)
 router.get('/published', authorizeRequest, async (req: Request, res: Response) => {
   try {
     // @ts-ignore
@@ -19,6 +19,7 @@ router.get('/published', authorizeRequest, async (req: Request, res: Response) =
       .collection(publishedNotasCollection)
       .where('authorId', '==', user.uid)
       .where('isPublic', '==', true)
+      .where('isSubPage', '==', false) // Only get main pages, not sub-pages
       .get()
 
     const publishedNotas: PublishedNota[] = []
@@ -52,6 +53,21 @@ router.get('/published/:id', async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'This nota is not public' })
     }
 
+    // Get published sub-pages of this nota if any exist
+    const subPagesSnapshot = await db
+      .collection(publishedNotasCollection)
+      .where('parentId', '==', notaId)
+      .where('isPublic', '==', true)
+      .get()
+
+    const publishedSubPages: string[] = []
+    subPagesSnapshot.forEach((doc) => {
+      publishedSubPages.push(doc.id)
+    })
+
+    // Add the list of published sub-pages to the response
+    publishedNota.publishedSubPages = publishedSubPages
+
     return res.json(publishedNota)
   } catch (error) {
     console.error('Failed to fetch published nota:', error)
@@ -68,6 +84,7 @@ router.get('/user/:userId', async (req: Request, res: Response) => {
       .collection(publishedNotasCollection)
       .where('authorId', '==', userId)
       .where('isPublic', '==', true)
+      .where('isSubPage', '==', false) // Only get main pages, not sub-pages
       .get()
 
     const publishedNotas: PublishedNota[] = []
@@ -97,12 +114,16 @@ router.post('/publish/:id', authorizeRequest, async (req: Request, res: Response
       return res.status(400).json({ errors: validation.errors })
     }
 
-    // Use the simplified content processor to sanitize content
-    // const contentProcessor = new NotaContentProcessor()
-    // const processedContent = contentProcessor.process(notaData.content)
-
-    // TODO: Activate content processor
-    const processedContent = JSON.parse(notaData.content)
+    // Parse the content properly (content must be a string)
+    let processedContent
+    try {
+      processedContent = JSON.parse(notaData.content)
+    } catch (error) {
+      console.error('Error parsing content:', error)
+      return res
+        .status(400)
+        .json({ error: 'Invalid content format. Content must be a JSON string.' })
+    }
 
     // Check if the nota already exists
     const docRef = db.collection(publishedNotasCollection).doc(notaId)
@@ -125,6 +146,11 @@ router.post('/publish/:id', authorizeRequest, async (req: Request, res: Response
         updatedAt: new Date().toISOString(),
       }
 
+      // Update sub-pages list if provided
+      if (Array.isArray(notaData.publishedSubPages)) {
+        updatedNota.publishedSubPages = notaData.publishedSubPages
+      }
+
       // Use set with merge option to update only specified fields
       await docRef.set(updatedNota, { merge: true })
 
@@ -144,6 +170,11 @@ router.post('/publish/:id', authorizeRequest, async (req: Request, res: Response
         authorId: user.uid,
         authorName: user.displayName || 'Anonymous',
         isPublic: true,
+        isSubPage: notaData.isSubPage || false, // Flag to indicate sub-page status
+        parentId: notaData.parentId || null, // Store parent ID for sub-pages
+        publishedSubPages: Array.isArray(notaData.publishedSubPages)
+          ? notaData.publishedSubPages
+          : [], // Published sub-pages
       }
 
       // Use set with merge:false to create a new document
@@ -178,13 +209,64 @@ router.delete('/publish/:id', authorizeRequest, async (req: Request, res: Respon
       return res.status(403).json({ error: "You don't have permission to unpublish this nota" })
     }
 
-    // Delete from Firestore
-    await docRef.delete()
+    // Get sub-pages information
+    let publishedSubPageIds: string[] = []
+
+    // Get sub-pages from the publishedSubPages array if it exists
+    if (existingNota.publishedSubPages && existingNota.publishedSubPages.length > 0) {
+      publishedSubPageIds = existingNota.publishedSubPages
+    }
+
+    // Also look for any sub-pages by parentId for backward compatibility
+    const subPagesSnapshot = await db
+      .collection(publishedNotasCollection)
+      .where('parentId', '==', notaId)
+      .where('authorId', '==', user.uid) // Ensure user owns these too
+      .get()
+
+    // Add these IDs to the list (avoid duplicates)
+    subPagesSnapshot.forEach((doc) => {
+      if (!publishedSubPageIds.includes(doc.id)) {
+        publishedSubPageIds.push(doc.id)
+      }
+    })
+
+    // Now unpublish the nota and its sub-pages
+    if (publishedSubPageIds.length > 0) {
+      // Use a batch write to delete all sub-pages
+      const batch = db.batch()
+
+      // Add the main nota to the batch
+      batch.delete(docRef)
+
+      // Add all sub-pages to the batch
+      for (const subPageId of publishedSubPageIds) {
+        try {
+          const subPageRef = db.collection(publishedNotasCollection).doc(subPageId)
+          const subPageSnap = await subPageRef.get()
+
+          // Only delete if it exists and belongs to the same user
+          if (subPageSnap.exists && subPageSnap.data()?.authorId === user.uid) {
+            batch.delete(subPageRef)
+          }
+        } catch (err) {
+          console.error(`Error processing sub-page ${subPageId}:`, err)
+          // Continue with other sub-pages even if one fails
+        }
+      }
+
+      // Commit the batch
+      await batch.commit()
+    } else {
+      // Just delete the main nota
+      await docRef.delete()
+    }
 
     return res.json({
       success: true,
       id: notaId,
       message: 'Nota unpublished successfully',
+      unpublishedSubPages: publishedSubPageIds,
     })
   } catch (error) {
     console.error('Failed to unpublish nota:', error)
@@ -196,8 +278,11 @@ router.delete('/publish/:id', authorizeRequest, async (req: Request, res: Respon
 const validatePublishNota = (data: any) => {
   const rules = {
     title: ['required', 'string'],
-    content: ['string'],
+    content: ['required', 'string'],
     updatedAt: ['string'],
+    isSubPage: ['boolean'],
+    parentId: ['string'],
+    publishedSubPages: ['array'],
   }
 
   const validation = new Validator(data, rules)

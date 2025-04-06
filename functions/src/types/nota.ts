@@ -7,4 +7,7 @@ export interface PublishedNota {
   authorId: string
   authorName: string
   isPublic: boolean
+  isSubPage?: boolean
+  parentId?: string | null
+  publishedSubPages?: string[]
 }

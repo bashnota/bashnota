@@ -145,6 +145,7 @@ export function getViewerExtensions() {
         class: 'nota-link',
       },
     }),
+    PageLink,
     Table.configure({
       resizable: false,
     }),

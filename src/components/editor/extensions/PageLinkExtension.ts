@@ -30,8 +30,33 @@ export const PageLink = Node.create({
   renderHTML({ HTMLAttributes }) {
     return [
       'a',
-      mergeAttributes({ 'data-type': 'page-link', class: 'nota-link' }, HTMLAttributes),
+      mergeAttributes(
+        {
+          'data-type': 'page-link',
+          class: 'nota-link',
+        },
+        HTMLAttributes,
+      ),
       `📄 ${HTMLAttributes.title}`,
     ]
   },
 })
+
+// Helper function to convert page link URLs from /nota/ to /p/ for published content
+export function convertPublicPageLinks(doc: Document) {
+  if (!doc) return
+
+  // Get all page links in the document
+  const pageLinks = doc.querySelectorAll('a[data-type="page-link"]')
+
+  // @ts-ignore
+  pageLinks.forEach((link: HTMLAnchorElement) => {
+    const href = link.getAttribute('href')
+    if (href?.startsWith('/nota/')) {
+      const linkedNotaId = href.replace('/nota/', '')
+
+      // Update URLs to point to the public version
+      link.setAttribute('href', `/p/${linkedNotaId}`)
+    }
+  })
+}

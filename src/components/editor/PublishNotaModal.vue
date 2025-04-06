@@ -13,8 +13,9 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/lib/utils'
-import { Copy, Share2, Globe, EyeOff, Loader2, RefreshCw } from 'lucide-vue-next'
+import { Copy, Share2, Globe, EyeOff, Loader2, RefreshCw, FolderTree } from 'lucide-vue-next'
 import { Switch } from '@/components/ui/switch'
+import { Checkbox } from '@/components/ui/checkbox'
 import { logger } from '@/services/logger'
 
 const props = defineProps<{
@@ -32,6 +33,9 @@ const isPublishing = ref(false)
 const isUnpublishing = ref(false)
 const linkCopied = ref(false)
 const isAuthenticated = computed(() => authStore.isAuthenticated)
+const includeSubPages = ref(false)
+const hasSubPages = ref(false)
+const subPagesCount = ref(0)
 
 const isPublished = computed(() => {
   return notaStore.isPublished(props.notaId)
@@ -45,10 +49,23 @@ const handleClose = () => {
   emit('update:open', false)
 }
 
+// Check if nota has sub-pages
+const checkForSubPages = async () => {
+  try {
+    const subPages = await notaStore.getSubPages(props.notaId)
+    hasSubPages.value = subPages.length > 0
+    subPagesCount.value = subPages.length
+  } catch (error) {
+    logger.error('Error checking for sub-pages:', error)
+    hasSubPages.value = false
+    subPagesCount.value = 0
+  }
+}
+
 const publishNota = async () => {
   try {
     isPublishing.value = true
-    await notaStore.publishNota(props.notaId)
+    await notaStore.publishNota(props.notaId, includeSubPages.value)
     toast('Nota published successfully')
   } catch (error) {
     logger.error('Error publishing nota:', error)
@@ -95,6 +112,7 @@ const copyLink = () => {
 onMounted(async () => {
   if (isAuthenticated.value) {
     await notaStore.loadPublishedNotas()
+    await checkForSubPages()
   }
 })
 
@@ -108,6 +126,7 @@ watch(
       // Refresh published status when dialog opens
       if (isAuthenticated.value) {
         notaStore.loadPublishedNotas()
+        checkForSubPages()
       }
     }
   },
@@ -143,9 +162,9 @@ watch(
             <div class="flex items-center gap-2">
               <Globe v-if="isPublished" class="h-4 w-4 text-green-500" />
               <EyeOff v-else class="h-4 w-4 text-muted-foreground" />
-              <span class="text-sm font-medium">{{
-                isPublished ? 'Published' : 'Not Published'
-              }}</span>
+              <span class="text-sm font-medium">
+                {{ isPublished ? 'Published' : 'Not Published' }}
+              </span>
             </div>
             <p class="text-xs text-muted-foreground">
               {{
@@ -162,6 +181,66 @@ watch(
               :disabled="isPublishing || isUnpublishing"
             />
             <Loader2 v-if="isPublishing || isUnpublishing" class="h-4 w-4 animate-spin" />
+          </div>
+        </div>
+
+        <!-- Sub-pages options - Only show when publishing, not when already published -->
+        <div
+          v-if="isAuthenticated && hasSubPages && !isPublished"
+          class="p-4 border rounded-md bg-muted/40"
+        >
+          <div class="flex items-start gap-3">
+            <FolderTree class="h-5 w-5 text-muted-foreground mt-0.5" />
+            <div class="space-y-2 flex-1">
+              <div>
+                <h3 class="text-sm font-medium">Sub-Pages</h3>
+                <p class="text-xs text-muted-foreground">
+                  This nota contains {{ subPagesCount }} sub-page{{
+                    subPagesCount !== 1 ? 's' : ''
+                  }}
+                </p>
+              </div>
+
+              <div class="flex items-center space-x-2">
+                <Checkbox
+                  id="includeSubPages"
+                  v-model:checked="includeSubPages"
+                  :disabled="isPublishing || isUnpublishing"
+                />
+                <label
+                  for="includeSubPages"
+                  class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Include sub-pages
+                </label>
+              </div>
+              <p class="text-xs text-muted-foreground">
+                {{
+                  includeSubPages
+                    ? 'Sub-pages will be published and available in the published version'
+                    : 'Sub-pages will not be published and links to them will be removed'
+                }}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Information about sub-pages for already published notes -->
+        <div
+          v-if="isAuthenticated && hasSubPages && isPublished"
+          class="p-4 border rounded-md bg-muted/40"
+        >
+          <div class="flex items-start gap-3">
+            <FolderTree class="h-5 w-5 text-muted-foreground mt-0.5" />
+            <div class="space-y-2 flex-1">
+              <div>
+                <h3 class="text-sm font-medium">Note about Sub-Pages</h3>
+                <p class="text-xs text-muted-foreground">
+                  When you unpublish this nota, all its published sub-pages will be unpublished as
+                  well.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 

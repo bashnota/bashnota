@@ -439,21 +439,108 @@ export const useNotaStore = defineStore('nota', {
       }
     },
 
-    async publishNota(id: string) {
+    async getSubPages(notaId: string): Promise<Nota[]> {
+      try {
+        // Filter direct children from in-memory store if available
+        const subPages = this.items.filter((item) => item.parentId === notaId)
+
+        // If no items found in store, try fetching from database
+        if (subPages.length === 0) {
+          const dbSubPages = await db.notas.where('parentId').equals(notaId).toArray()
+
+          return dbSubPages.map(deserializeNota)
+        }
+
+        return subPages
+      } catch (error) {
+        logger.error('Failed to get sub-pages:', error)
+        return []
+      }
+    },
+
+    async getPublishedSubPages(notaId: string): Promise<string[]> {
+      try {
+        // Get all sub-pages
+        const subPages = await this.getSubPages(notaId)
+
+        // Filter out only published ones by checking publishedNotas
+        const publishedIds: string[] = []
+
+        for (const subPage of subPages) {
+          if (this.isPublished(subPage.id)) {
+            publishedIds.push(subPage.id)
+          }
+        }
+
+        return publishedIds
+      } catch (error) {
+        logger.error('Failed to get published sub-pages:', error)
+        return []
+      }
+    },
+
+    async getAllDescendants(notaId: string): Promise<Nota[]> {
+      const result: Nota[] = []
+      const subPages = await this.getSubPages(notaId)
+
+      // Add immediate sub-pages
+      result.push(...subPages)
+
+      // Recursively add sub-pages of sub-pages
+      for (const subPage of subPages) {
+        const descendants = await this.getAllDescendants(subPage.id)
+        result.push(...descendants)
+      }
+
+      return result
+    },
+
+    async publishNota(id: string, includeSubPages = false): Promise<PublishedNota> {
       try {
         const nota = this.getCurrentNota(id)
         if (!nota || !nota.content) throw new Error('Nota not found')
 
-        toast(`Processing images for "${nota.title}"...`)
+        toast(`Processing content for "${nota.title}"...`)
 
-        // Process all images in the content object recursively
-        const processedContent = await processNotaContent(nota.content)
+        // Get the list of published sub-pages if we're including them
+        const publishedSubPageIds: string[] = []
+
+        // Only publish sub-pages if includeSubPages is true
+        if (includeSubPages) {
+          const subPages = await this.getSubPages(id)
+          if (subPages.length > 0) {
+            toast(`Publishing ${subPages.length} sub-page(s)...`)
+
+            // Publish all sub-pages first
+            for (const subPage of subPages) {
+              try {
+                // Recursively publish each sub-page
+                await this.publishNota(subPage.id, includeSubPages)
+                // Add to the list of published sub-pages
+                publishedSubPageIds.push(subPage.id)
+              } catch (error) {
+                logger.error(`Failed to publish sub-page "${subPage.title}":`, error)
+                // Continue with other sub-pages even if one fails
+              }
+            }
+          }
+        }
+
+        // Process the content with the list of published sub-pages
+        // This will replace data URLs with hosted images AND handle page links
+        // according to the published sub-pages list
+        const processedContent = await processNotaContent(nota.content, {
+          publishedSubPages: publishedSubPageIds,
+        })
 
         // Prepare nota data for publishing with processed content
         const publishData = {
           title: nota.title,
           content: JSON.stringify(processedContent),
           updatedAt: nota.updatedAt instanceof Date ? nota.updatedAt.toISOString() : nota.updatedAt,
+          parentId: nota.parentId,
+          isSubPage: !!nota.parentId,
+          publishedSubPages: publishedSubPageIds,
         }
 
         // Call the API to publish the nota
@@ -484,21 +571,52 @@ export const useNotaStore = defineStore('nota', {
       }
     },
 
-    async unpublishNota(id: string) {
+    async unpublishNota(id: string): Promise<boolean> {
       try {
         const nota = this.getCurrentNota(id)
         if (!nota) throw new Error('Nota not found')
 
-        // Call the API to unpublish the nota
+        // Get info about any published sub-pages
+        let publishedSubPageIds: string[] = []
+
+        // Get published nota to check for published sub-pages
+        const publishedNota = await this.getPublishedNota(id).catch(() => null)
+
+        if (publishedNota && publishedNota.publishedSubPages) {
+          publishedSubPageIds = publishedNota.publishedSubPages
+        }
+
+        // Also check for any published sub-pages directly
+        const subPages = await this.getSubPages(id)
+
+        for (const subPage of subPages) {
+          if (this.isPublished(subPage.id) && !publishedSubPageIds.includes(subPage.id)) {
+            publishedSubPageIds.push(subPage.id)
+          }
+        }
+
+        // Call the API to unpublish the nota and all sub-pages
         await fetchAPI.delete(`/nota/publish/${id}`)
 
-        // Update local state
+        // Update local state for the main nota
         this.publishedNotas = this.publishedNotas.filter((notaId) => notaId !== id)
-
-        // Update nota status
         nota.isPublished = false
         nota.publishedAt = null
         await this.saveItem(nota)
+
+        // Update local state for all sub-pages
+        if (publishedSubPageIds.length > 0) {
+          for (const subPageId of publishedSubPageIds) {
+            // Only update if it was published
+            const subPage = this.getCurrentNota(subPageId)
+            if (subPage) {
+              this.publishedNotas = this.publishedNotas.filter((notaId) => notaId !== subPageId)
+              subPage.isPublished = false
+              subPage.publishedAt = null
+              await this.saveItem(subPage)
+            }
+          }
+        }
 
         toast(`Nota "${nota.title}" unpublished successfully`)
 

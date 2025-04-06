@@ -179,3 +179,21 @@ onMounted(() => {
     </div>
   </div>
 </template>
+
+<style>
+/* Simple styles for page links */
+a[data-type='page-link'] {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1em 0.3em;
+  border-radius: 0.25em;
+  background-color: rgba(0, 0, 0, 0.03);
+  text-decoration: none;
+  color: inherit;
+  transition: background-color 0.2s;
+}
+
+a[data-type='page-link']:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+</style>
