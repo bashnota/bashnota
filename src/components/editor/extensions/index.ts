@@ -169,5 +169,6 @@ export function getViewerExtensions() {
     Blockquote,
     HorizontalRule,
     CitationExtension,
+    BibliographyExtension,
   ]
 }
