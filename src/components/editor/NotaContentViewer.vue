@@ -8,6 +8,13 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import { getViewerExtensions } from './extensions'
 import TableOfContents from './TableOfContents.vue'
 import { logger } from '@/services/logger'
+import { useCitationStore } from '@/stores/citationStore'
+import { useNotaStore } from '@/stores/nota'
+import { useRouter } from 'vue-router'
+import { Editor } from '@tiptap/core'
+import type { EditorOptions } from '@tiptap/core'
+import { Node as ProseMirrorNode } from 'prosemirror-model'
+import { EditorView } from 'prosemirror-view'
 
 // Import shared CSS
 import '@/assets/editor-styles.css'
@@ -17,10 +24,28 @@ import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
 const props = defineProps<{
   content: string | null
   readonly?: boolean
+  citations?: any[] // Add citations prop
 }>()
 
 const codeExecutionStore = useCodeExecutionStore()
+const citationStore = useCitationStore()
+const notaStore = useNotaStore()
 const isSidebarOpen = ref(false)
+
+// Initialize citations if provided
+const initializeCitations = () => {
+  if (props.citations) {
+    // Get the current nota ID from the route
+    const currentRoute = useRouter().currentRoute.value
+    const notaId = currentRoute.params.id as string
+    
+    // Set public citations
+    citationStore.setPublicCitations(props.citations || [])
+  }
+}
+
+// Initialize citations before creating the editor
+initializeCitations()
 
 const registerCodeCells = (content: any) => {
   // Find all executable code blocks in the content
@@ -59,11 +84,71 @@ const editor = useEditor({
   content: props.content ? JSON.parse(props.content) : null,
   extensions: getViewerExtensions(),
   editable: false, // Read-only mode
-  onCreate({ editor }) {
+  onCreate({ editor }: { editor: Editor }) {
     registerCodeCells(editor.getJSON())
     isLoading.value = false
   },
-})
+  nodeViews: {
+    citation: (node: ProseMirrorNode, view: EditorView, getPos: () => number, decorations: any) => {
+      return {
+        dom: document.createElement('span'),
+        update: (node: ProseMirrorNode) => {
+          return true
+        },
+        destroy: () => {},
+        selectNode: () => {},
+        deselectNode: () => {},
+        stopEvent: () => false,
+        ignoreMutation: () => true,
+        render: () => {
+          return {
+            dom: document.createElement('span'),
+            update: (node: ProseMirrorNode) => {
+              return true
+            },
+            destroy: () => {},
+            selectNode: () => {},
+            deselectNode: () => {},
+            stopEvent: () => false,
+            ignoreMutation: () => true,
+            props: {
+              citations: props.citations
+            }
+          }
+        }
+      }
+    },
+    bibliography: (node: ProseMirrorNode, view: EditorView, getPos: () => number, decorations: any) => {
+      return {
+        dom: document.createElement('div'),
+        update: (node: ProseMirrorNode) => {
+          return true
+        },
+        destroy: () => {},
+        selectNode: () => {},
+        deselectNode: () => {},
+        stopEvent: () => false,
+        ignoreMutation: () => true,
+        render: () => {
+          return {
+            dom: document.createElement('div'),
+            update: (node: ProseMirrorNode) => {
+              return true
+            },
+            destroy: () => {},
+            selectNode: () => {},
+            deselectNode: () => {},
+            stopEvent: () => false,
+            ignoreMutation: () => true,
+            props: {
+              citations: props.citations
+            }
+          }
+        }
+      }
+    }
+  }
+} as unknown as EditorOptions)
 
 // Check if there are any headings in the document
 const hasHeadings = computed(() => {
@@ -87,6 +172,15 @@ const hasHeadings = computed(() => {
 
   return findHeadings(json)
 })
+
+// Watch for citations changes
+watch(
+  () => props.citations,
+  () => {
+    initializeCitations()
+  },
+  { deep: true }
+)
 
 // Update content when props change
 watch(

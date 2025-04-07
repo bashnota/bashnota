@@ -24,6 +24,10 @@ const props = defineProps({
     type: Object,
     required: true,
   },
+  citations: {
+    type: Array as () => CitationEntry[],
+    default: () => []
+  }
 })
 
 const router = useRouter()
@@ -37,6 +41,11 @@ const notaId = computed(() => {
 
 // Get all citations for the current nota
 const citations = computed(() => {
+  // If citations are passed as props (public view), use those
+  if (props.citations && props.citations.length > 0) {
+    return props.citations
+  }
+  // Otherwise use the citation store
   return citationStore.getCitationsByNotaId(notaId.value)
 })
 

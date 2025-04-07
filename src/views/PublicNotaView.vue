@@ -155,7 +155,7 @@ const shareNota = () => {
       <hr class="border-t border-gray-200" />
 
       <!-- Content area - No need to pass publishedSubPages since links are already prepared -->
-      <NotaContentViewer :content="nota.content" readonly />
+      <NotaContentViewer :content="nota.content" :citations="nota.citations" readonly />
     </div>
   </div>
 </template>

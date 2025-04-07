@@ -564,6 +564,7 @@ export const useNotaStore = defineStore('nota', {
           parentId: nota.parentId,
           isSubPage: !!nota.parentId,
           publishedSubPages: publishedSubPageIds,
+          citations: nota.citations // Include citations in published data
         }
 
         // Call the API to publish the nota

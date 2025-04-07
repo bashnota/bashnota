@@ -5,6 +5,7 @@ import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import { Link, ExternalLink, Edit, Copy, ClipboardCheck, X } from 'lucide-vue-next'
+import type { CitationEntry } from '@/types/nota'
 
 const props = defineProps({
   node: {
@@ -19,6 +20,10 @@ const props = defineProps({
     type: Object,
     required: true,
   },
+  citations: {
+    type: Array as () => CitationEntry[],
+    default: () => []
+  }
 })
 
 const router = useRouter()
@@ -35,6 +40,11 @@ const notaId = computed(() => {
 
 // Get the full citation details
 const citation = computed(() => {
+  // If citations are passed as props (public view), use those
+  if (props.citations && props.citations.length > 0) {
+    return props.citations.find(c => c.key === citationKey.value) || null
+  }
+  // Otherwise use the citation store
   return citationStore.getCitationByKey(citationKey.value, notaId.value)
 })
 
