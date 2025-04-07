@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Search, SortAsc, SortDesc, Filter, Copy, FileText, ChevronDown, ChevronUp } from 'lucide-vue-next'
 import { toast } from '@/lib/utils'
 import { logger } from '@/services/logger'
+import type { CitationEntry } from '@/types/nota'
 
 const props = defineProps({
   node: {
@@ -36,7 +37,7 @@ const notaId = computed(() => {
 
 // Get all citations for the current nota
 const citations = computed(() => {
-  return citationStore.getCitationsByNotaId(notaId.value) || []
+  return citationStore.getCitationsByNotaId(notaId.value)
 })
 
 // Styles for bibliography
@@ -142,7 +143,7 @@ const sortedCitations = computed(() => {
 
 // Get the citation number as it appears in the document
 const getCitationNumber = (citationKey: string) => {
-  const allCitations = citationStore.getCitationsByNotaId(notaId.value) || []
+  const allCitations = citationStore.getCitationsByNotaId(notaId.value)
   const index = allCitations.findIndex(c => c.key === citationKey)
   return index >= 0 ? index + 1 : null
 }
@@ -229,35 +230,11 @@ const searchQuery = ref('')
 const typeFilter = ref('all')
 const yearFilter = ref<string>('all')
 const sortDirection = ref<'asc' | 'desc'>('asc')
-const sortField = ref<'author' | 'year' | 'title' | 'number'>('author')
-
-// Interfaces
-interface Citation {
-  id: string
-  key: string
-  title: string
-  authors: string[]
-  year: string
-  type?: string
-  journal?: string
-  volume?: string
-  number?: string
-  pages?: string
-  publisher?: string
-  url?: string
-  doi?: string
-  notaId: string
-  createdAt: Date
-}
+const sortField = ref<'authors' | 'year' | 'title' | 'key'>('authors')
 
 // Available citation types
 const citationTypes = computed(() => {
-  const types = new Set<string>()
-  citations.value.forEach(citation => {
-    const anyCitation = citation as any
-    if (anyCitation.type) types.add(anyCitation.type)
-  })
-  return Array.from(types)
+  return []
 })
 
 // Available years
@@ -286,7 +263,7 @@ const filteredAndSortedCitations = computed(() => {
   if (!citations.value.length) return []
   
   // First filter
-  let filtered = citations.value.filter((citation: Citation) => {
+  let filtered = citations.value.filter((citation: CitationEntry) => {
     // Text search
     let textMatch = true
     if (searchQuery.value && searchQuery.value.trim() !== '') {
@@ -298,58 +275,35 @@ const filteredAndSortedCitations = computed(() => {
       )
     }
     
-    // Type filter
-    const anyAssertion = citation as any
-    const typeMatch = typeFilter.value === 'all' || anyAssertion.type === typeFilter.value
-    
     // Year filter
     const yearMatch = yearFilter.value === 'all' || citation.year === yearFilter.value
     
-    return textMatch && typeMatch && yearMatch
+    return textMatch && yearMatch
   })
   
   // Then sort
-  switch (sortField.value) {
-    case 'author':
-      filtered = filtered.sort((a, b) => {
-        const aName = a.authors[0]?.split(' ').pop() || ''
-        const bName = b.authors[0]?.split(' ').pop() || ''
-        return sortDirection.value === 'asc' ? 
-          aName.localeCompare(bName) : 
-          bName.localeCompare(aName)
-      })
-      break
+  return filtered.sort((a, b) => {
+    if (sortField.value === 'authors') {
+      const aName = a.authors[0]?.split(' ').pop() || ''
+      const bName = b.authors[0]?.split(' ').pop() || ''
+      return sortDirection.value === 'asc' 
+        ? aName.localeCompare(bName)
+        : bName.localeCompare(aName)
+    }
     
-    case 'year':
-      filtered = filtered.sort((a, b) => {
-        const aYear = parseInt(a.year || '0')
-        const bYear = parseInt(b.year || '0')
-        return sortDirection.value === 'asc' ? 
-          aYear - bYear : 
-          bYear - aYear
-      })
-      break
+    if (sortField.value === 'year') {
+      return sortDirection.value === 'asc'
+        ? parseInt(a.year) - parseInt(b.year)
+        : parseInt(b.year) - parseInt(a.year)
+    }
     
-    case 'title':
-      filtered = filtered.sort((a, b) => {
-        return sortDirection.value === 'asc' ? 
-          (a.title || '').localeCompare(b.title || '') : 
-          (b.title || '').localeCompare(a.title || '')
-      })
-      break
+    const aValue = a[sortField.value]
+    const bValue = b[sortField.value]
     
-    case 'number':
-      filtered = filtered.sort((a, b) => {
-        const aNum = getCitationNumber(a.key) || 0
-        const bNum = getCitationNumber(b.key) || 0
-        return sortDirection.value === 'asc' ? 
-          aNum - bNum : 
-          bNum - aNum
-      })
-      break
-  }
-  
-  return filtered
+    return sortDirection.value === 'asc'
+      ? String(aValue).localeCompare(String(bValue))
+      : String(bValue).localeCompare(String(aValue))
+  })
 })
 
 // Toggle sort direction
@@ -358,7 +312,7 @@ const toggleSortDirection = () => {
 }
 
 // Set sort field
-const setSortField = (field: 'author' | 'year' | 'title' | 'number') => {
+const setSortField = (field: 'authors' | 'year' | 'title' | 'key') => {
   if (sortField.value === field) {
     toggleSortDirection()
   } else {
@@ -400,7 +354,7 @@ const clearFilters = () => {
   searchQuery.value = ''
   typeFilter.value = 'all'
   yearFilter.value = 'all'
-  sortField.value = 'author'
+  sortField.value = 'authors'
   sortDirection.value = 'asc'
 }
 
@@ -421,14 +375,14 @@ const handleTypeChange = (newType: string) => {
 }
 
 // Method to copy a single citation
-const copySingleCitation = (citation: Citation, index: number) => {
+const copySingleCitation = (citation: CitationEntry, index: number) => {
   const citationText = formatCitation(citation, style.value, index).text
   navigator.clipboard.writeText(citationText)
   toast('Citation copied to clipboard')
 }
 
 // Method to export a single citation
-const exportSingleCitation = (citation: Citation, index: number) => {
+const exportSingleCitation = (citation: CitationEntry, index: number) => {
   const citationText = formatCitation(citation, style.value, index).text
   const blob = new Blob([citationText], { type: 'text/plain' })
   const url = URL.createObjectURL(blob)
@@ -544,12 +498,12 @@ const toggleReferences = () => {
         <div class="w-[3rem]">#</div>
         <div 
           class="flex-1 flex items-center cursor-pointer" 
-          @click="setSortField('author')"
-          :class="{ 'text-primary': sortField === 'author' }"
+          @click="setSortField('authors')"
+          :class="{ 'text-primary': sortField === 'authors' }"
         >
           Author
-          <SortAsc v-if="sortField === 'author' && sortDirection === 'asc'" class="ml-1 h-3 w-3" />
-          <SortDesc v-if="sortField === 'author' && sortDirection === 'desc'" class="ml-1 h-3 w-3" />
+          <SortAsc v-if="sortField === 'authors' && sortDirection === 'asc'" class="ml-1 h-3 w-3" />
+          <SortDesc v-if="sortField === 'authors' && sortDirection === 'desc'" class="ml-1 h-3 w-3" />
         </div>
         <div 
           class="w-20 flex items-center cursor-pointer" 
@@ -589,7 +543,6 @@ const toggleReferences = () => {
               <span class="bibliography-text">{{ formatCitation(citation, style, index).text }}</span>
               
               <div class="mt-1 flex gap-2 items-center text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-                <span v-if="(citation as any).type" class="bg-muted py-0.5 px-1.5 rounded-sm">{{ (citation as any).type }}</span>
                 <span v-if="citation.doi" class="underline">
                   <a :href="`https://doi.org/${citation.doi}`" target="_blank" class="hover:text-primary">DOI</a>
                 </span>

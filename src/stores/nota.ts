@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { db } from '@/db'
-import { type Nota, type NotaVersion, type PublishedNota } from '@/types/nota'
+import { type Nota, type NotaVersion, type PublishedNota, type CitationEntry } from '@/types/nota'
 import type { NotaConfig } from '@/types/jupyter'
 import { nanoid } from 'nanoid'
 import { toast } from '@/lib/utils'
@@ -34,6 +34,25 @@ const serializeNota = (nota: Partial<Nota> & { id: string }): any => {
     }))
   }
 
+  // Properly serialize citations array if it exists
+  if (nota.citations && Array.isArray(nota.citations)) {
+    serialized.citations = nota.citations.map((citation) => ({
+      id: citation.id,
+      key: citation.key,
+      title: citation.title,
+      authors: Array.isArray(citation.authors) ? [...citation.authors] : [],
+      year: citation.year,
+      journal: citation.journal,
+      volume: citation.volume,
+      number: citation.number,
+      pages: citation.pages,
+      publisher: citation.publisher,
+      url: citation.url,
+      doi: citation.doi,
+      createdAt: citation.createdAt instanceof Date ? citation.createdAt.toISOString() : citation.createdAt,
+    }))
+  }
+
   return serialized
 }
 
@@ -44,6 +63,10 @@ const deserializeNota = (nota: any): Nota => ({
   updatedAt: nota.updatedAt ? new Date(nota.updatedAt) : new Date(),
   config: nota.config ? JSON.parse(JSON.stringify(nota.config)) : undefined,
   versions: Array.isArray(nota.versions) ? [...nota.versions] : [],
+  citations: Array.isArray(nota.citations) ? nota.citations.map((citation: CitationEntry) => ({
+    ...citation,
+    createdAt: citation.createdAt ? new Date(citation.createdAt) : new Date(),
+  })) : [],
 })
 
 export const useNotaStore = defineStore('nota', {
@@ -685,5 +708,14 @@ export const useNotaStore = defineStore('nota', {
         return []
       }
     },
+
+    updateNota(id: string, updates: Partial<Nota>) {
+      const index = this.items.findIndex(item => item.id === id)
+      if (index !== -1) {
+        const updatedNota = { ...this.items[index], ...updates }
+        this.items[index] = updatedNota
+        this.saveItem(updatedNota)
+      }
+    }
   },
 })
