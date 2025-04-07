@@ -29,9 +29,11 @@ export interface ResearchResult {
  */
 export class Researcher extends BaseActor {
   private citationStore = useCitationStore()
+  private currentNotaId: string
   
-  constructor() {
+  constructor(notaId: string) {
     super(ActorType.RESEARCHER)
+    this.currentNotaId = notaId
   }
   
   /**
@@ -153,7 +155,7 @@ export class Researcher extends BaseActor {
    */
   private async generateReport(description: string, dependencyResults: any[]): Promise<ResearchResult> {
     // Get available citations from the citation store
-    const availableCitations = Array.from(this.citationStore.citations.values())
+    const availableCitations = this.citationStore.getCitationsByNotaId(this.currentNotaId)
     
     // Create a prompt for the AI to generate the report
     const prompt = this.createReportPrompt(description, dependencyResults, availableCitations)

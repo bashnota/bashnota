@@ -456,10 +456,10 @@ export class Composer extends BaseActor {
    * @param actorType The actor type
    * @returns The actor instance
    */
-  private getActorForType(actorType: ActorType): BaseActor {
+  private getActorForType(actorType: ActorType, task: VibeTask): BaseActor {
     switch (actorType) {
       case ActorType.RESEARCHER:
-        return new Researcher()
+        return new Researcher(task.id)
       case ActorType.ANALYST:
         return new Analyst()
       case ActorType.CODER:
@@ -493,7 +493,7 @@ export class Composer extends BaseActor {
 
     // For non-coder tasks, execute normally
     if (task.actorType !== ActorType.CODER) {
-      const actor = this.getActorForType(task.actorType);
+      const actor = this.getActorForType(task.actorType, task);
       return actor.executeTask(task);
     }
 

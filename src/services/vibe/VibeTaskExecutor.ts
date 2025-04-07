@@ -459,7 +459,7 @@ export class VibeTaskExecutor {
         this.executorLogger.log(`Executing task ${task.id}: ${task.title}`)
         
         // Get the actor for this task type
-        const actor = this.getActorForType(task.actorType, task.id)
+        const actor = this.getActorForType(task.actorType, task)
         
         // Execute the task
         try {
@@ -609,13 +609,13 @@ export class VibeTaskExecutor {
   /**
    * Get an actor for a specific actor type
    * @param actorType Actor type to get
-   * @param taskId Task ID (for custom actors)
+   * @param task Task to get the actor for
    * @returns Actor for the given type
    */
-  private getActorForType(actorType: ActorType, taskId?: string): BaseActor {
+  private getActorForType(actorType: ActorType, task: VibeTask): BaseActor {
     // Handle CUSTOM actor type differently
     if (actorType === ActorType.CUSTOM) {
-      if (!taskId) {
+      if (!task.id) {
         throw new Error('Task ID is required for custom actors')
       }
       
@@ -625,15 +625,15 @@ export class VibeTaskExecutor {
         throw new Error(`Board ${this.boardId} not found when looking for custom actor`)
       }
       
-      const task = board.tasks.find(t => t.id === taskId)
-      if (!task) {
-        throw new Error(`Task ${taskId} not found when looking for custom actor`)
+      const customTask = board.tasks.find(t => t.id === task.id)
+      if (!customTask) {
+        throw new Error(`Task ${task.id} not found when looking for custom actor`)
       }
       
       // Get the custom actor ID from the task
-      const customActorId = task.customActorId
+      const customActorId = customTask.customActorId
       if (!customActorId) {
-        throw new Error(`Task ${taskId} does not specify a custom actor ID`)
+        throw new Error(`Task ${task.id} does not specify a custom actor ID`)
       }
       
       // Find the custom actor
@@ -662,7 +662,7 @@ export class VibeTaskExecutor {
       case ActorType.PLANNER:
         return new Planner()
       case ActorType.RESEARCHER:
-        return new Researcher()
+        return new Researcher(task.id)
       case ActorType.ANALYST:
         return new Analyst()
       case ActorType.CODER:

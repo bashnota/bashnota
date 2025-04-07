@@ -8,12 +8,12 @@ import { ActorType } from '@/types/vibe'
 import { logger } from '@/services/logger'
 
 // Factory function to create actors by type
-export function createActor(type: ActorType) {
+export function createActor(type: ActorType, notaId: string) {
   switch (type) {
     case ActorType.PLANNER:
       return new Planner()
     case ActorType.RESEARCHER:
-      return new Researcher()
+      return new Researcher(notaId)
     case ActorType.ANALYST:
       return new Analyst()
     case ActorType.CODER:
