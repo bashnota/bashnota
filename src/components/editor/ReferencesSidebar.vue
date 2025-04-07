@@ -9,7 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useCitationStore, type CitationEntry } from '@/stores/citationStore'
+import { useCitationStore } from '@/stores/citationStore'
+import type { CitationEntry } from '@/types/nota'
 import type { Editor } from '@tiptap/vue-3'
 import { toast } from '@/lib/utils'
 import { logger } from '@/services/logger'
@@ -146,7 +147,7 @@ const saveCitation = async () => {
     
     if (isEditing.value && currentCitation.value) {
       // Update existing citation
-      citationStore.updateCitation(currentCitation.value.id, {
+      citationStore.updateCitation(props.notaId, currentCitation.value.id, {
         key: formData.value.key,
         title: formData.value.title,
         authors: authorsArray,
@@ -162,7 +163,7 @@ const saveCitation = async () => {
       toast('Citation updated')
     } else {
       // Add new citation
-      citationStore.addCitation({
+      citationStore.addCitation(props.notaId, {
         key: formData.value.key,
         title: formData.value.title,
         authors: authorsArray,
@@ -173,8 +174,7 @@ const saveCitation = async () => {
         pages: formData.value.pages || undefined,
         publisher: formData.value.publisher || undefined,
         url: formData.value.url || undefined,
-        doi: formData.value.doi || undefined,
-        notaId: props.notaId
+        doi: formData.value.doi || undefined
       })
       toast('Citation added')
     }
@@ -191,7 +191,7 @@ const saveCitation = async () => {
 
 const deleteCitation = (citation: CitationEntry) => {
   if (confirm(`Are you sure you want to delete the citation "${citation.title}"?`)) {
-    citationStore.deleteCitation(citation.id)
+    citationStore.deleteCitation(props.notaId, citation.id)
     toast('Citation deleted')
   }
 }
@@ -333,10 +333,9 @@ const parseBibTeX = (bibtex: string) => {
         
         // Add directly to citation store
         try {
-          citationStore.addCitation({
+          citationStore.addCitation(props.notaId, {
             ...parsedEntry,
-            authors: parsedEntry.authors.split(' and ').map((a: string) => a.trim()),
-            notaId: props.notaId
+            authors: parsedEntry.authors.split(' and ').map((a: string) => a.trim())
           })
           importedCount++
         } catch (error) {

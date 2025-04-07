@@ -13,6 +13,7 @@ export interface Nota {
   versions?: NotaVersion[]
   isPublished?: boolean
   publishedAt?: string | null
+  citations?: CitationEntry[]
 }
 
 export interface NotaVersion {
@@ -43,4 +44,21 @@ export interface PublishedNota {
   isSubPage?: boolean
   parentId?: string | null
   publishedSubPages?: string[]
+  citations?: CitationEntry[]
+}
+
+export interface CitationEntry {
+  id: string
+  key: string
+  title: string
+  authors: string[]
+  year: string
+  journal?: string
+  volume?: string
+  number?: string
+  pages?: string
+  publisher?: string
+  url?: string
+  doi?: string
+  createdAt: Date | string
 }

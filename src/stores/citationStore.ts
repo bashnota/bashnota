@@ -1,47 +1,17 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { logger } from '@/services/logger'
-
-export interface CitationEntry {
-  id: string
-  key: string
-  title: string
-  authors: string[]
-  year: string
-  journal?: string
-  volume?: string
-  number?: string
-  pages?: string
-  publisher?: string
-  url?: string
-  doi?: string
-  notaId: string
-  createdAt: Date
-}
+import { useNotaStore } from './nota'
+import type { CitationEntry } from '@/types/nota'
 
 export const useCitationStore = defineStore('citation', () => {
-  const citations = ref<Map<string, CitationEntry>>(new Map())
+  const notaStore = useNotaStore()
   
-  // Load citations from localStorage
-  const loadCitations = () => {
-    const savedCitations = localStorage.getItem('citations')
-    if (savedCitations) {
-      try {
-        const parsed = JSON.parse(savedCitations)
-        citations.value = new Map(parsed)
-      } catch (error) {
-        logger.error('Failed to parse saved citations', error)
-      }
-    }
-  }
-
-  // Save citations to localStorage
-  const saveCitations = () => {
-    localStorage.setItem('citations', JSON.stringify(Array.from(citations.value.entries())))
-  }
-
   // Add a new citation
-  const addCitation = (citation: Omit<CitationEntry, 'id' | 'createdAt'>) => {
+  const addCitation = (notaId: string, citation: Omit<CitationEntry, 'id' | 'createdAt'>) => {
+    const nota = notaStore.getCurrentNota(notaId)
+    if (!nota) return null
+
     const id = crypto.randomUUID()
     const newCitation: CitationEntry = {
       ...citation,
@@ -49,55 +19,57 @@ export const useCitationStore = defineStore('citation', () => {
       createdAt: new Date()
     }
     
-    citations.value.set(id, newCitation)
-    saveCitations()
+    const updatedCitations = [...(nota.citations || []), newCitation]
+    notaStore.updateNota(notaId, { citations: updatedCitations })
     return newCitation
   }
 
   // Update an existing citation
-  const updateCitation = (id: string, updates: Partial<CitationEntry>) => {
-    const citation = citations.value.get(id)
-    if (citation) {
-      const updatedCitation = { ...citation, ...updates }
-      citations.value.set(id, updatedCitation)
-      saveCitations()
-      return updatedCitation
-    }
-    return null
+  const updateCitation = (notaId: string, citationId: string, updates: Partial<CitationEntry>) => {
+    const nota = notaStore.getCurrentNota(notaId)
+    if (!nota) return null
+
+    const citations = nota.citations || []
+    const citationIndex = citations.findIndex(c => c.id === citationId)
+    if (citationIndex === -1) return null
+
+    const updatedCitation = { ...citations[citationIndex], ...updates }
+    const updatedCitations = [...citations]
+    updatedCitations[citationIndex] = updatedCitation
+
+    notaStore.updateNota(notaId, { citations: updatedCitations })
+    return updatedCitation
   }
 
   // Delete a citation
-  const deleteCitation = (id: string) => {
-    const result = citations.value.delete(id)
-    if (result) {
-      saveCitations()
-    }
-    return result
+  const deleteCitation = (notaId: string, citationId: string) => {
+    const nota = notaStore.getCurrentNota(notaId)
+    if (!nota) return false
+
+    const citations = nota.citations || []
+    const updatedCitations = citations.filter(c => c.id !== citationId)
+    
+    notaStore.updateNota(notaId, { citations: updatedCitations })
+    return true
   }
 
   // Get all citations for a specific nota
   const getCitationsByNotaId = computed(() => (notaId: string) => {
-    return Array.from(citations.value.values()).filter(citation => citation.notaId === notaId)
+    const nota = notaStore.getCurrentNota(notaId)
+    return nota?.citations || []
   })
 
   // Get a citation by its key
   const getCitationByKey = computed(() => (key: string, notaId: string) => {
-    return Array.from(citations.value.values()).find(
-      citation => citation.key === key && citation.notaId === notaId
-    )
+    const nota = notaStore.getCurrentNota(notaId)
+    return nota?.citations?.find(citation => citation.key === key) || null
   })
 
-  // Initialize by loading from localStorage
-  loadCitations()
-
   return {
-    citations,
     addCitation,
     updateCitation,
     deleteCitation,
     getCitationsByNotaId,
-    getCitationByKey,
-    loadCitations,
-    saveCitations
+    getCitationByKey
   }
 }) 

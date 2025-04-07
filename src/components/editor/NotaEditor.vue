@@ -563,7 +563,7 @@ const updateCitationNumbers = () => {
 }
 
 // Watch for changes in citations and update numbers
-watch(() => Array.from(citationStore.citations.values()), () => {
+watch(() => citationStore.getCitationsByNotaId(props.notaId), () => {
   updateCitationNumbers()
 }, { deep: true })
 
