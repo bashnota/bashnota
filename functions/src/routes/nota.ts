@@ -175,6 +175,7 @@ router.post('/publish/:id', authorizeRequest, async (req: Request, res: Response
         publishedSubPages: Array.isArray(notaData.publishedSubPages)
           ? notaData.publishedSubPages
           : [], // Published sub-pages
+        citations: Array.isArray(notaData.citations) ? notaData.citations : [] // Include citations
       }
 
       // Use set with merge:false to create a new document
@@ -283,6 +284,7 @@ const validatePublishNota = (data: any) => {
     isSubPage: ['boolean'],
     parentId: ['string'],
     publishedSubPages: ['array'],
+    citations: ['array']
   }
 
   const validation = new Validator(data, rules)
