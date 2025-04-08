@@ -119,8 +119,11 @@ const editor = useEditor({
       }
     },
     bibliography: (node: ProseMirrorNode, view: EditorView, getPos: () => number, decorations: any) => {
+      const dom = document.createElement('div')
+      dom.className = 'bibliography-wrapper'
+      
       return {
-        dom: document.createElement('div'),
+        dom,
         update: (node: ProseMirrorNode) => {
           return true
         },
@@ -131,7 +134,7 @@ const editor = useEditor({
         ignoreMutation: () => true,
         render: () => {
           return {
-            dom: document.createElement('div'),
+            dom,
             update: (node: ProseMirrorNode) => {
               return true
             },
@@ -141,6 +144,9 @@ const editor = useEditor({
             stopEvent: () => false,
             ignoreMutation: () => true,
             props: {
+              node,
+              updateAttributes: () => {},
+              editor: editor.value,
               citations: props.citations
             }
           }

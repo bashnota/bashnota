@@ -169,6 +169,10 @@ export function getViewerExtensions() {
     Blockquote,
     HorizontalRule,
     CitationExtension,
-    BibliographyExtension,
+    BibliographyExtension.configure({
+      HTMLAttributes: {
+        class: 'bibliography-block',
+      },
+    }),
   ]
 }
