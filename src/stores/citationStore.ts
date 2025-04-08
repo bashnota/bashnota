@@ -6,6 +6,7 @@ import type { CitationEntry } from '@/types/nota'
 
 export const useCitationStore = defineStore('citation', () => {
   const notaStore = useNotaStore()
+  const publicCitations = ref<CitationEntry[]>([])
   
   // Add a new citation
   const addCitation = (notaId: string, citation: Omit<CitationEntry, 'id' | 'createdAt'>) => {
@@ -53,14 +54,29 @@ export const useCitationStore = defineStore('citation', () => {
     return true
   }
 
+  // Set public citations
+  const setPublicCitations = (citations: CitationEntry[]) => {
+    publicCitations.value = citations
+  }
+
   // Get all citations for a specific nota
   const getCitationsByNotaId = computed(() => (notaId: string) => {
+    // If we have public citations, use those
+    if (publicCitations.value.length > 0) {
+      return publicCitations.value
+    }
+    // Otherwise get from nota store
     const nota = notaStore.getCurrentNota(notaId)
     return nota?.citations || []
   })
 
   // Get a citation by its key
   const getCitationByKey = computed(() => (key: string, notaId: string) => {
+    // If we have public citations, search there first
+    if (publicCitations.value.length > 0) {
+      return publicCitations.value.find(citation => citation.key === key) || null
+    }
+    // Otherwise get from nota store
     const nota = notaStore.getCurrentNota(notaId)
     return nota?.citations?.find(citation => citation.key === key) || null
   })
@@ -70,6 +86,7 @@ export const useCitationStore = defineStore('citation', () => {
     updateCitation,
     deleteCitation,
     getCitationsByNotaId,
-    getCitationByKey
+    getCitationByKey,
+    setPublicCitations
   }
 }) 
