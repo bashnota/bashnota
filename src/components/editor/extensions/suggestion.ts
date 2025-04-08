@@ -420,7 +420,7 @@ function createAdvancedCommands(): CommandItem[] {
       keywords: ['db', 'database', 'data', 'table'],
       command: ({ editor, range }: CommandArgs) => {
         const notaId = router.currentRoute.value.params.id as string;
-        editor.chain().focus().deleteRange(range).insertDataTable(notaId).run();
+        editor.chain().focus().deleteRange(range).insertNotaTable(notaId).run();
       },
     },
     {

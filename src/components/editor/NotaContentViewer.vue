@@ -98,24 +98,56 @@ const editor = useEditor({
         destroy: () => {},
         selectNode: () => {},
         deselectNode: () => {},
-        stopEvent: () => false,
-        ignoreMutation: () => true,
-        render: () => {
-          return {
-            dom: document.createElement('span'),
-            update: (node: ProseMirrorNode) => {
-              return true
-            },
-            destroy: () => {},
-            selectNode: () => {},
-            deselectNode: () => {},
-            stopEvent: () => false,
-            ignoreMutation: () => true,
-            props: {
-              citations: props.citations
-            }
-          }
-        }
+      }
+    },
+    notaTable: (node: ProseMirrorNode, view: EditorView, getPos: () => number, decorations: any) => {
+      // Create a container for the table
+      const container = document.createElement('div')
+      container.className = 'data-table'
+
+      // Get the table data from the node attributes
+      const tableData = node.attrs.tableData
+
+      if (tableData) {
+        // Create a table element
+        const table = document.createElement('table')
+        table.className = 'data-table-content'
+
+        // Create the header row
+        const thead = document.createElement('thead')
+        const headerRow = document.createElement('tr')
+        tableData.columns.forEach((column: any) => {
+          const th = document.createElement('th')
+          th.textContent = column.title
+          headerRow.appendChild(th)
+        })
+        thead.appendChild(headerRow)
+        table.appendChild(thead)
+
+        // Create the body
+        const tbody = document.createElement('tbody')
+        tableData.rows.forEach((row: any) => {
+          const tr = document.createElement('tr')
+          tableData.columns.forEach((column: any) => {
+            const td = document.createElement('td')
+            td.textContent = row.cells[column.id] || ''
+            tr.appendChild(td)
+          })
+          tbody.appendChild(tr)
+        })
+        table.appendChild(tbody)
+
+        container.appendChild(table)
+      }
+
+      return {
+        dom: container,
+        update: (node: ProseMirrorNode) => {
+          return true
+        },
+        destroy: () => {},
+        selectNode: () => {},
+        deselectNode: () => {},
       }
     },
     bibliography: (node: ProseMirrorNode, view: EditorView, getPos: () => number, decorations: any) => {

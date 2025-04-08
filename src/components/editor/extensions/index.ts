@@ -152,6 +152,11 @@ export function getViewerExtensions() {
     TableRow,
     TableCell,
     TableHeader,
+    TableExtension.configure({
+      HTMLAttributes: {
+        class: 'data-table',
+      },
+    }),
     MathExtension,
     MarkdownExtension,
     Mermaid.configure({
