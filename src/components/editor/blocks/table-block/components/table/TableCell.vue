@@ -127,6 +127,9 @@ const handleCellClick = () => {
     emit('startEditing')
   } else if (props.type === 'date') {
     isCalendarOpen.value = true
+  } else {
+    // For all other cell types, start editing
+    emit('startEditing')
   }
 }
 </script>
@@ -156,12 +159,22 @@ const handleCellClick = () => {
         </DropdownMenuTrigger>
         <DropdownMenuContent class="w-full">
           <div class="p-2">
-            <Input
-              v-model="newOption"
-              placeholder="Add new option"
-              class="mb-2"
-              @keydown.enter="handleNewOption"
-            />
+            <div class="flex gap-2">
+              <Input
+                :value="newOption"
+                @input="(e: Event) => newOption = (e.target as HTMLInputElement).value"
+                placeholder="Add new option"
+                class="mb-2"
+                @keydown.enter="handleNewOption"
+              />
+              <Button 
+                size="sm" 
+                @click="handleNewOption"
+                :disabled="!newOption.trim()"
+              >
+                Add
+              </Button>
+            </div>
           </div>
           <DropdownMenuItem
             v-for="option in uniqueValues"
