@@ -21,7 +21,7 @@ export interface TableData {
 }
 
 export const TableExtension = Node.create({
-  name: 'dataTable',
+  name: 'notaTable',
   group: 'block',
   atom: true,
   draggable: true,
@@ -30,12 +30,14 @@ export const TableExtension = Node.create({
 
   addAttributes() {
     return {
-      tableId: {
-        default: null,
-      },
-      notaId: {
-        default: null,
-      },
+      tableData: {
+        default: {
+          id: '',
+          name: 'Untitled',
+          columns: [],
+          rows: []
+        }
+      }
     }
   },
 
@@ -62,17 +64,35 @@ export const TableExtension = Node.create({
 
   addCommands() {
     return {
-      insertDataTable:
+      insertNotaTable:
         (notaId: string) =>
         ({ chain }) => {
           const tableId = uuidv4()
+          const columnId = uuidv4()
 
           return chain()
             .insertContent({
               type: this.name,
               attrs: {
-                tableId,
-                notaId,
+                tableData: {
+                  id: tableId,
+                  name: 'Untitled',
+                  columns: [
+                    {
+                      id: columnId,
+                      title: 'Title',
+                      type: 'text',
+                    },
+                  ],
+                  rows: [
+                    {
+                      id: uuidv4(),
+                      cells: {
+                        [columnId]: '',
+                      },
+                    },
+                  ],
+                }
               },
             })
             .run()

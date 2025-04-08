@@ -59,10 +59,16 @@ export function useTableOperations(tableData: Ref<TableData>) {
 
   // Update table name
   const updateTableName = (name: string) => {
-    tableName.value = name
-    tableData.value = {
-      ...tableData.value,
-      name
+    try {
+      tableName.value = name
+      if (tableData.value) {
+        tableData.value = {
+          ...tableData.value,
+          name: name || 'Untitled'
+        }
+      }
+    } catch (error) {
+      console.error('Error updating table name:', error)
     }
   }
 

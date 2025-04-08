@@ -33,7 +33,7 @@ const defaultBlockShortcuts: Shortcut[] = [
   { id: 'insert-blockquote', key: 'Ctrl+Shift+Alt+Q', description: 'Insert blockquote' },
   { id: 'insert-tasklist', key: 'Ctrl+Shift+Alt+K', description: 'Insert task list' },
   { id: 'insert-drawio', key: 'Ctrl+Shift+Alt+G', description: 'Insert Draw.io diagram' },
-  { id: 'insert-datatable', key: 'Ctrl+Shift+Alt+B', description: 'Insert data table' },
+  { id: 'insert-notatable', key: 'Ctrl+Shift+Alt+B', description: 'Insert nota table' },
   { id: 'insert-ai-block', key: 'Ctrl+Shift+Alt+A', description: 'Insert inline AI generation block' },
 ]
 

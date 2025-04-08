@@ -328,7 +328,7 @@ const handleKeyboardShortcuts = (event: KeyboardEvent) => {
     g: () => editor.value!.chain().focus().insertDrawIo().run(),
     b: () => {
       if (currentNota.value?.id) {
-        editor.value!.chain().focus().insertDataTable(currentNota.value.id).run()
+        editor.value!.chain().focus().insertNotaTable(currentNota.value.id).run()
       }
     },
     a: () => editor.value!.chain().focus().insertInlineAIGeneration().run(),

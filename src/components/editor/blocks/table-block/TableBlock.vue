@@ -3,9 +3,10 @@ import { onMounted, watch, ref } from 'vue'
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import type { TableData } from '@/components/editor/extensions/TableExtension'
+import type { NodeViewProps } from '@tiptap/vue-3'
+import { logger } from '@/services/logger'
 
 // Import composables
-import { useTableData } from './composables/useTableData'
 import { useTableOperations } from './composables/useTableOperations'
 
 // Import components
@@ -21,20 +22,19 @@ import CalendarLayout from './components/layouts/CalendarLayout.vue'
 // Import types
 import type { ColumnType } from './composables/useTableOperations'
 
-const props = defineProps<{
+const props = defineProps<NodeViewProps & {
   node: {
     attrs: {
-      tableId: string
-      notaId: string
+      tableData: TableData
     }
   }
 }>()
 
-// Initialize table data using composable
-const { tableData, isLoading, isSaving, error, loadTableData, saveTableData } = useTableData(
-  props.node.attrs.tableId,
-  props.node.attrs.notaId
-)
+// Initialize table data using node attributes
+const tableData = ref<TableData>(props.node.attrs.tableData)
+const isLoading = ref(false)
+const isSaving = ref(false)
+const error = ref<Error | null>(null)
 
 // Initialize table operations using composable
 const {
@@ -60,10 +60,67 @@ const lastOperation = ref<string>('')
 const operationStatus = ref<'success' | 'error' | ''>('')
 const currentLayout = ref<TableLayout>('table')
 
-// Load table data on component mount
-onMounted(async () => {
-  await loadTableData()
-})
+// Create a prefixed logger for TableBlock
+const tableLogger = {
+  log: (...args: any[]) => logger.log('[TableBlock]', ...args),
+  error: (...args: any[]) => logger.error('[TableBlock]', ...args),
+  info: (...args: any[]) => logger.info('[TableBlock]', ...args),
+  warn: (...args: any[]) => logger.warn('[TableBlock]', ...args)
+}
+
+// Add a function to update node attributes when table data changes
+const updateNodeAttributes = () => {
+  if (props.node?.attrs) {
+    // Create a clean copy of the table data
+    const cleanTableData = {
+      id: tableData.value.id,
+      name: tableData.value.name || 'Untitled',
+      columns: tableData.value.columns.map(col => ({
+        id: col.id,
+        title: col.title || '',
+        type: col.type
+      })),
+      rows: tableData.value.rows.map(row => ({
+        id: row.id,
+        cells: { ...row.cells }
+      }))
+    };
+    
+    // Update node attributes with clean data
+    props.node.attrs.tableData = cleanTableData;
+    
+    // Use updateAttributes if available (preferred method)
+    if (props.updateAttributes) {
+      props.updateAttributes({
+        tableData: cleanTableData
+      });
+    }
+    // Fallback to direct transaction if updateAttributes isn't available
+    else if (props.editor && typeof props.getPos === 'function') {
+      const pos = props.getPos();
+      if (typeof pos === 'number') {
+        props.editor.commands.command(({ tr }) => {
+          tr.setNodeMarkup(pos, undefined, {
+            tableData: cleanTableData
+          });
+          return true;
+        });
+      }
+    }
+    
+    tableLogger.log('Table data updated:', cleanTableData);
+  }
+};
+
+// Listen for table data changes
+watch(() => tableData.value, () => {
+  updateNodeAttributes();
+}, { deep: true });
+
+// Force update node attributes on component mount
+onMounted(() => {
+  updateNodeAttributes();
+});
 
 // Handle adding a new row at a specific position
 const handleAddRow = async (position: 'before' | 'after', rowId: string) => {
@@ -71,12 +128,10 @@ const handleAddRow = async (position: 'before' | 'after', rowId: string) => {
   
   try {
     addRow(position, rowId)
-    
-    // Force save the table data
-    const saveResult = await saveTableData()
-    operationStatus.value = saveResult ? 'success' : 'error'
+    operationStatus.value = 'success'
   } catch (error) {
     operationStatus.value = 'error'
+    tableLogger.error('Error in addRow:', error);
   }
 }
 
@@ -86,12 +141,10 @@ const handleAddColumn = async (position: 'before' | 'after', columnId: string) =
   
   try {
     addColumn(position, columnId)
-    
-    // Force save the table data
-    const saveResult = await saveTableData()
-    operationStatus.value = saveResult ? 'success' : 'error'
+    operationStatus.value = 'success'
   } catch (error) {
     operationStatus.value = 'error'
+    tableLogger.error('Error in addColumn:', error);
   }
 }
 
@@ -115,11 +168,10 @@ const handleAddColumnFromDialog = async (title: string, type: ColumnType) => {
     // Close the dialog
     isAddingColumn.value = false
     
-    // Force save the table data
-    const saveResult = await saveTableData()
-    operationStatus.value = saveResult ? 'success' : 'error'
+    operationStatus.value = 'success'
   } catch (error) {
     operationStatus.value = 'error'
+    tableLogger.error('Error in addColumnFromDialog:', error);
   }
 }
 
@@ -130,27 +182,23 @@ const handleAddRowFromHeader = async () => {
   try {
     // Add row at the end
     addRow('after', tableData.value.rows[tableData.value.rows.length - 1]?.id || '')
-    
-    // Force save the table data
-    const saveResult = await saveTableData()
-    operationStatus.value = saveResult ? 'success' : 'error'
+    operationStatus.value = 'success'
   } catch (error) {
     operationStatus.value = 'error'
+    tableLogger.error('Error in addRowFromHeader:', error);
   }
 }
 
 // Handle table name update
-const handleSaveName = async (name: string) => {
+const handleUpdateTableName = async (name: string) => {
   lastOperation.value = `Updating table name to: ${name}`
   
   try {
     updateTableName(name)
-    
-    // Force save the table data
-    const saveResult = await saveTableData()
-    operationStatus.value = saveResult ? 'success' : 'error'
+    operationStatus.value = 'success'
   } catch (error) {
     operationStatus.value = 'error'
+    tableLogger.error('Error in updateTableName:', error);
   }
 }
 
@@ -170,7 +218,6 @@ watch(operationStatus, (newStatus) => {
 
 const emit = defineEmits<{
   (e: 'update:tableData', data: TableData): void
-  (e: 'save'): void
 }>()
 
 // Add this function after handleSaveName
@@ -195,11 +242,10 @@ const handleColumnTitleUpdate = async (columnId: string, title: string) => {
       columns: updatedColumns
     }
     
-    // Force save the table data
-    const saveResult = await saveTableData()
-    operationStatus.value = saveResult ? 'success' : 'error'
+    operationStatus.value = 'success'
   } catch (error) {
     operationStatus.value = 'error'
+    tableLogger.error('Error in columnTitleUpdate:', error);
   }
 }
 
@@ -222,10 +268,10 @@ const handleReorderRows = async (fromRowId: string, toRowId: string) => {
       rows: newRows
     }
     
-    const saveResult = await saveTableData()
-    operationStatus.value = saveResult ? 'success' : 'error'
+    operationStatus.value = 'success'
   } catch (error) {
     operationStatus.value = 'error'
+    tableLogger.error('Error in reorderRows:', error);
   }
 }
 </script>
@@ -249,7 +295,7 @@ const handleReorderRows = async (fromRowId: string, toRowId: string) => {
           :table-name="tableName"
           :is-editing-name="isEditingName"
           @start-editing-name="startEditingName"
-          @save-name="handleSaveName"
+          @save-name="handleUpdateTableName"
           @add-column="toggleAddColumnDialog"
           @add-row="handleAddRowFromHeader"
         >
@@ -276,7 +322,6 @@ const handleReorderRows = async (fromRowId: string, toRowId: string) => {
           :is-saving="isSaving"
           :error="error"
           @update:tableData="tableData = $event"
-          @save="saveTableData"
         >
           <!-- Table Layout -->
           <template v-if="currentLayout === 'table'">
