@@ -2,6 +2,7 @@
 import { RouterView } from 'vue-router'
 import AppSidebar from './components/layout/AppSidebar.vue'
 import BreadcrumbNav from './components/layout/BreadcrumbNav.vue'
+import AppTabs from './components/layout/AppTabs.vue'
 import AuthHeader from './components/auth/AuthHeader.vue'
 import { ref, onMounted, watch } from 'vue'
 import { Button } from '@/components/ui/button'
@@ -127,6 +128,9 @@ const handleMouseMove = (event: MouseEvent) => {
           <AuthHeader />
         </div>
       </div>
+
+      <!-- Tabs Navigation -->
+      <AppTabs />
 
       <!-- Router View -->
       <div class="flex-1 overflow-auto">

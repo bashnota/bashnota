@@ -4,6 +4,7 @@ import NotaConfigModal from '@/components/editor/blocks/nota-config/NotaConfigMo
 import { ref, onMounted, watch, nextTick } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { useJupyterStore } from '@/stores/jupyterStore'
+import { useTabsStore } from '@/stores/tabsStore'
 import { computed } from 'vue'
 import { 
   Share2,
@@ -33,6 +34,7 @@ const props = defineProps<{
 
 const store = useNotaStore()
 const jupyterStore = useJupyterStore()
+const tabsStore = useTabsStore()
 const codeExecutionStore = useCodeExecutionStore()
 const isExecutingAll = ref(false)
 const isReady = ref(false)
@@ -56,6 +58,17 @@ watch(
   },
 )
 
+// Add watch to sync tab title with nota title
+watch(
+  () => nota.value?.title,
+  (newTitle) => {
+    if (nota.value && newTitle) {
+      tabsStore.updateTab(props.id, { title: newTitle })
+    }
+  },
+  { immediate: true }
+)
+
 onMounted(async () => {
   // Ensure the nota is loaded before showing the editor
   const loadedNota = await store.loadNota(props.id)
@@ -64,6 +77,16 @@ onMounted(async () => {
     await store.saveItem(loadedNota)
   }
   isReady.value = true
+  
+  // Register this nota with the tab system
+  tabsStore.openTab({
+    id: props.id,
+    title: loadedNota?.title || 'Untitled',
+    route: {
+      name: 'nota',
+      params: { id: props.id }
+    }
+  })
 
   // Check if this is a root nota and has no Jupyter servers configured
   if (nota.value && !nota.value.parentId) {
@@ -100,6 +123,9 @@ const toggleShareDialog = () => {
 // Save status handlers
 const handleSaving = (saving: boolean) => {
   isSaving.value = saving
+  // Update the tab's dirty state
+  tabsStore.updateTab(props.id, { isDirty: saving })
+  
   if (!saving) {
     showSaved.value = true
     setTimeout(() => {
