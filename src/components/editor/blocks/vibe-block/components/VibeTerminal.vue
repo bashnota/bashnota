@@ -5,44 +5,50 @@
     :class="terminalClasses"
     :style="(applyVisibilityStyles() as any)"
     @click="handleClick"
+    role="region"
+    aria-label="Vibe Terminal"
   >
     <!-- Mode toggle buttons -->
-    <div class="terminal-mode-toggles">
+    <div class="terminal-mode-toggles" role="toolbar" aria-label="Terminal display modes">
       <button 
         class="mode-toggle-btn" 
         :class="{ active: displayMode === 'bottom' }"
         @click.stop="setDisplayMode('bottom')"
         title="Bottom Mode"
+        :aria-pressed="displayMode === 'bottom'"
       >
-        <span class="sr-only">Bottom Mode</span>
         <ArrowDown class="w-4 h-4" />
+        <span class="sr-only">Bottom Mode</span>
       </button>
       <button 
         class="mode-toggle-btn" 
         :class="{ active: displayMode === 'side' }"
         @click.stop="setDisplayMode('side')"
         title="Side Mode"
+        :aria-pressed="displayMode === 'side'"
       >
-        <span class="sr-only">Side Mode</span>
         <PanelRight class="w-4 h-4" />
+        <span class="sr-only">Side Mode</span>
       </button>
       <button 
         class="mode-toggle-btn" 
         :class="{ active: displayMode === 'right-nav' }"
         @click.stop="setDisplayMode('right-nav')"
         title="Right Nav Mode"
+        :aria-pressed="displayMode === 'right-nav'"
       >
-        <span class="sr-only">Right Nav Mode</span>
         <Sidebar class="w-4 h-4" />
+        <span class="sr-only">Right Nav Mode</span>
       </button>
       <button 
         class="mode-toggle-btn" 
         :class="{ active: displayMode === 'fullscreen' }"
         @click.stop="toggleFullscreen"
         title="Fullscreen Mode"
+        :aria-pressed="isFullscreen"
       >
-        <span class="sr-only">Fullscreen Mode</span>
         <Maximize class="w-4 h-4" />
+        <span class="sr-only">Fullscreen Mode</span>
       </button>
     </div>
     
@@ -51,8 +57,8 @@
       class="terminal-close-btn" 
       @click.stop="closeTerminal"
       title="Close terminal"
+      aria-label="Close terminal"
     >
-      <span class="sr-only">Close</span>
       <X class="w-4 h-4" />
     </button>
 
@@ -102,7 +108,7 @@
 
       <!-- Active terminal content -->
       <div v-else class="terminal-active-content">
-        <!-- Loading state -->
+        <!-- Loading state with improved animation -->
         <VibeLoadingState
           v-if="terminalLoading"
           :message="props.loadingMessage || 'Processing your request...'"
@@ -163,7 +169,7 @@
     <!-- Task details modal -->
     <VibeTaskDetails
       :task="selectedTaskForModal"
-      :canInsertResult="checkCanInsertResult"
+      :canInsertResult="canInsertResult"
       @update:task="selectedTaskForModal = $event"
       @insert-result="insertTaskResult"
     />
@@ -267,10 +273,19 @@ const selectedTaskForModal = ref<VibeTask | null>(null)
 const refreshInterval = ref<NodeJS.Timeout | null>(null)
 const savedBoards = ref<TaskBoard[]>([])
 const queryInput = ref('')
-const terminalLoading = ref(false)
-const terminalError = ref('')
+const terminalLoading = ref(!!props.isLoading)
+const terminalError = ref(props.error || '')
 const showDeleteDialog = ref(false)
 const terminalContentRef = ref<HTMLElement | null>(null)
+
+// Sync terminal loading and error state with props
+watch(() => props.isLoading, (newIsLoading) => {
+  terminalLoading.value = newIsLoading
+})
+
+watch(() => props.error, (newError) => {
+  terminalError.value = newError
+})
 
 // Terminal width state from service
 const terminalWidth = computed(() => vibeUIService.state.value.width)
@@ -321,7 +336,8 @@ const taskHasOutput = computed(() => {
     currentTask.value.result.output.trim().length > 0
 })
 
-const canInsertResult = computed(() => {
+// Rename to avoid conflict with the function from useTaskManagement
+const canInsertCurrentTaskResult = computed(() => {
   return taskHasOutput.value && props.editor !== null
 })
 
@@ -366,7 +382,8 @@ const {
   toggleTableExpansion,
   insertTaskResult,
   showTaskDetailsModal,
-  refreshTasks
+  refreshTasks,
+  canInsertResult
 } = useTaskManagement(vibeStore, props, tasks, expandedTaskIds, selectedTaskId, databaseTables, expandedTableIds, selectedTaskForModal, toast)
 
 // Task execution methods
@@ -493,37 +510,81 @@ watch(() => props.boardId, (newBoardId) => {
   }
 })
 
+// Optimized event handler creation
+function createOptimizedEventHandler(handler: Function) {
+  return (event: Event) => {
+    // Use requestAnimationFrame for visual updates
+    requestAnimationFrame(() => {
+      handler(event)
+    })
+  }
+}
+
 // Watch for collapsed state changes
 watch(isCollapsed, (newCollapsedState) => {
-  // Apply padding to document body when collapsed to prevent content from hiding behind terminal
-  if (newCollapsedState) {
-    // Only add padding if not in fullscreen mode
-    if (!isFullscreen.value) {
-      // Add class to body to adjust layout
-      document.body.classList.add('vibe-terminal-collapsed-active')
+  // Use requestAnimationFrame for DOM updates
+  requestAnimationFrame(() => {
+    // Apply padding to document body when collapsed to prevent content from hiding behind terminal
+    if (newCollapsedState) {
+      // Only add padding if not in fullscreen mode
+      if (!isFullscreen.value) {
+        // Add class to body to adjust layout
+        document.body.classList.add('vibe-terminal-collapsed-active')
+      }
+    } else {
+      // Remove class when expanded
+      document.body.classList.remove('vibe-terminal-collapsed-active')
     }
-  } else {
-    // Remove class when expanded
-    document.body.classList.remove('vibe-terminal-collapsed-active')
-  }
+  })
 })
 
 // Watch for fullscreen mode
 watch(isFullscreen, (newFullscreenState) => {
-  if (newFullscreenState) {
-    // Remove other classes
-    document.body.classList.remove('vibe-terminal-collapsed-active')
-    // Add fullscreen class
-    document.body.classList.add('vibe-terminal-fullscreen-active')
-  } else {
-    // Remove fullscreen class
-    document.body.classList.remove('vibe-terminal-fullscreen-active')
-    // If still collapsed, restore appropriate class
-    if (isCollapsed.value) {
-      document.body.classList.add('vibe-terminal-collapsed-active')
+  // Use requestAnimationFrame for DOM updates
+  requestAnimationFrame(() => {
+    if (newFullscreenState) {
+      // Remove other classes
+      document.body.classList.remove('vibe-terminal-collapsed-active')
+      // Add fullscreen class
+      document.body.classList.add('vibe-terminal-fullscreen-active')
+    } else {
+      // Remove fullscreen class
+      document.body.classList.remove('vibe-terminal-fullscreen-active')
+      // If still collapsed, restore appropriate class
+      if (isCollapsed.value) {
+        document.body.classList.add('vibe-terminal-collapsed-active')
+      }
     }
-  }
+  })
 })
+
+// Enhanced scrolling for terminal content
+function initSmoothScrolling() {
+  if (!terminalContentRef.value) return
+  
+  const content = terminalContentRef.value
+  let isScrolling = false
+  let scrollTimeout: NodeJS.Timeout | null = null
+  
+  content.addEventListener('scroll', () => {
+    if (!isScrolling) {
+      // Add class while scrolling
+      content.classList.add('is-scrolling')
+      isScrolling = true
+    }
+    
+    // Clear previous timeout
+    if (scrollTimeout) {
+      clearTimeout(scrollTimeout)
+    }
+    
+    // Set timeout to remove scrolling class
+    scrollTimeout = setTimeout(() => {
+      content.classList.remove('is-scrolling')
+      isScrolling = false
+    }, 150)
+  })
+}
 
 // Add styles to document when component is mounted
 onMounted(() => {
@@ -539,8 +600,28 @@ onMounted(() => {
     body.vibe-terminal-fullscreen-active {
       overflow: hidden !important; /* Prevent scrolling in fullscreen mode */
     }
+    
+    /* Loading animation improvements */
+    @keyframes pulse-opacity {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 0.4; }
+    }
+    
+    .vibe-terminal .loading-pulse {
+      animation: pulse-opacity 1.5s ease-in-out infinite;
+    }
   `
   document.head.appendChild(style)
+  
+  // Initialize smooth scrolling
+  nextTick(() => {
+    initSmoothScrolling()
+  })
+  
+  // Use passive event listeners for scroll events
+  if (terminalContentRef.value) {
+    terminalContentRef.value.addEventListener('scroll', () => {}, { passive: true })
+  }
   
   // Load saved boards
   loadSavedBoards()
@@ -563,6 +644,11 @@ onMounted(() => {
   // Ensure terminal starts collapsed
   isExpanded.value = false
   isFullscreen.value = false
+  
+  // Check if terminal should be visible initially
+  if (terminalRef.value && !vibeUIService.state.value.isVisible) {
+    terminalRef.value.style.display = 'none';
+  }
 })
 
 // Clean up when component is unmounted
@@ -579,6 +665,13 @@ onUnmounted(() => {
   // Remove event listeners
   document.removeEventListener('mousemove', handleResize)
   document.removeEventListener('mouseup', stopResize)
+  
+  // Reset UI service state if needed
+  try {
+    vibeUIService.state.value.isVisible = false
+  } catch (error) {
+    console.error('Could not reset terminal visibility state', error)
+  }
 })
 
 // Handle click method for terminal panel
@@ -605,21 +698,31 @@ function clearAllTasks() {
   }
 }
 
-// Add this function after computed properties section
-function checkCanInsertResult() {
-  return taskHasOutput.value && props.editor !== null
-}
-
 // Close terminal function
 function closeTerminal(event: MouseEvent) {
   event.stopPropagation()
-  emit('close')
   
   // Hide terminal immediately
-  if (typeof props.visible !== 'undefined') {
-    // If we have a visible prop, ensure it's properly closed
-    isExpanded.value = false
-    isFullscreen.value = false
+  isExpanded.value = false
+  isFullscreen.value = false
+  
+  // Set terminal as fully collapsed
+  if (terminalRef.value) {
+    terminalRef.value.style.display = 'none';
+  }
+  
+  // Remove any terminal-related body classes
+  document.body.classList.remove('vibe-terminal-collapsed-active')
+  document.body.classList.remove('vibe-terminal-fullscreen-active')
+  
+  // Emit close event for parent components to handle
+  emit('close')
+  
+  // If using Vibe store, update visibility state
+  try {
+    vibeUIService.state.value.isVisible = false;
+  } catch (error) {
+    console.error('Could not update terminal visibility state', error);
   }
 }
 
@@ -646,25 +749,40 @@ function startResize(direction: 'horizontal' | 'vertical', event: MouseEvent) {
   document.body.style.userSelect = 'none'
 }
 
-function handleResize(event: MouseEvent) {
-  if (!isResizing.value || !terminalRef.value) return
+// Handle resize with debounce
+const handleResize = (() => {
+  let debounceTimer: NodeJS.Timeout | null = null
   
-  if (resizeDirection.value === 'horizontal') {
-    // For side mode, adjust width
-    if (displayMode.value === 'side') {
-      const newWidth = initialWidth.value - (event.clientX - initialX.value)
-      width.value = Math.max(300, Math.min(window.innerWidth * 0.8, newWidth))
-      terminalRef.value.style.width = `${width.value}px`
+  return (event: MouseEvent) => {
+    if (!isResizing.value || !terminalRef.value) return
+    
+    // Clear existing timer
+    if (debounceTimer) clearTimeout(debounceTimer)
+    
+    // Immediate visual feedback
+    if (resizeDirection.value === 'horizontal') {
+      if (displayMode.value === 'side') {
+        const newWidth = initialWidth.value - (event.clientX - initialX.value)
+        width.value = Math.max(300, Math.min(window.innerWidth * 0.8, newWidth))
+        terminalRef.value.style.width = `${width.value}px`
+      }
+    } else if (resizeDirection.value === 'vertical') {
+      if (displayMode.value === 'bottom') {
+        const newHeight = initialHeight.value - (event.clientY - initialY.value)
+        height.value = Math.max(200, Math.min(window.innerHeight * 0.8, newHeight))
+        terminalRef.value.style.height = `${height.value}px`
+      }
     }
-  } else if (resizeDirection.value === 'vertical') {
-    // For bottom mode, adjust height
-    if (displayMode.value === 'bottom') {
-      const newHeight = initialHeight.value - (event.clientY - initialY.value)
-      height.value = Math.max(200, Math.min(window.innerHeight * 0.8, newHeight))
-      terminalRef.value.style.height = `${height.value}px`
-    }
+    
+    // Debounce the state saving
+    debounceTimer = setTimeout(() => {
+      // Save dimensions to vibeUIService if needed
+      if (displayMode.value === 'side' && width.value) {
+        vibeUIService.state.value.width = width.value
+      }
+    }, 100)
   }
-}
+})()
 
 function stopResize() {
   isResizing.value = false
@@ -691,11 +809,12 @@ function stopResize() {
 .vibe-terminal {
   background-color: hsl(var(--background)) !important;
   border-top: 1px solid hsl(var(--border));
-  transition: width 0.3s ease, height 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
+  transition: width 0.3s ease, height 0.3s ease, opacity 0.3s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.2);
   overflow: hidden; /* Hide overflow content when collapsed */
   display: flex; /* Use flex for better layout control */
   flex-direction: column;
+  will-change: transform, width, height, opacity;
 }
 
 /* Mode specific styling */
@@ -802,6 +921,7 @@ function stopResize() {
   flex: 1;
   display: flex;
   flex-direction: column;
+  will-change: opacity, max-height;
 }
 
 /* Expanded content styling */
@@ -855,37 +975,43 @@ function stopResize() {
 .vibe-terminal .terminal-content::-webkit-scrollbar-thumb {
   background-color: hsl(var(--border));
   border-radius: 4px;
+  transition: background-color 0.2s ease;
 }
 
-.vibe-terminal .terminal-content::-webkit-scrollbar-thumb:hover {
+.vibe-terminal .terminal-content::-webkit-scrollbar-thumb:hover,
+.vibe-terminal .terminal-content.is-scrolling::-webkit-scrollbar-thumb {
   background-color: hsl(var(--muted-foreground));
 }
 
 /* Close button styling */
 .terminal-close-btn {
   position: absolute;
-  right: 40px; /* Moved to the left a bit to avoid overlap with other controls */
+  right: 10px;
   top: 8px;
-  z-index: 61; /* Ensure it's above other elements */
+  z-index: 61;
   background: none;
   border: 1px solid hsl(var(--border));
   color: hsl(var(--destructive));
-  font-size: 1.25rem;
-  line-height: 1;
   cursor: pointer;
   padding: 0;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
 }
 
 .terminal-close-btn:hover {
   background-color: hsla(var(--destructive), 0.1);
   color: hsl(var(--destructive));
   box-shadow: 0 0 0 1px hsla(var(--destructive), 0.3);
+}
+
+.terminal-close-btn:focus-visible {
+  outline: 2px solid hsl(var(--destructive) / 0.5);
+  outline-offset: 2px;
 }
 
 .sr-only {
@@ -898,5 +1024,20 @@ function stopResize() {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border-width: 0;
+}
+
+/* Mode specific styling for right-nav mode */
+.vibe-terminal.mode-right-nav {
+  border-left: 1px solid hsl(var(--border));
+  border-top: none;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.2);
+  border-radius: 8px 0 0 8px;
+  margin-top: 60px;
+  max-width: 350px;
+}
+
+/* Make the right-nav mode content more compact */
+.vibe-terminal.mode-right-nav .terminal-content {
+  padding: 0.25rem 0.5rem;
 }
 </style> 

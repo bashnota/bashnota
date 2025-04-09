@@ -21,7 +21,7 @@ export interface TerminalConfig {
 export function useTerminalExpansion(config?: TerminalConfig) {
   const isExpanded = ref(!config?.defaultCollapsed)
   const isFullscreen = ref(false)
-  const displayMode = ref<TerminalMode>(config?.defaultMode || 'bottom')
+  const displayMode = ref<TerminalMode>(config?.defaultMode || 'right-nav')
   
   // Computed value for collapsed based on expanded and fullscreen states
   const isCollapsed = computed(() => !isExpanded.value && !isFullscreen.value)
