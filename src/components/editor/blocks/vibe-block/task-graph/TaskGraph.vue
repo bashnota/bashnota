@@ -206,7 +206,8 @@ onMounted(() => {
 <style scoped>
 .task-graph-container {
   width: 100%;
-  height: 520px;
+  height: 100%;
+  min-height: 400px;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -220,13 +221,14 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
+  padding: 10px 12px;
   border-bottom: 1px solid #e2e8f0;
   background-color: white;
+  z-index: 5;
 }
 
 .graph-title {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   color: #0f172a;
   margin: 0;
@@ -234,20 +236,20 @@ onMounted(() => {
 
 .graph-controls {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 .control-button {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 6px 12px;
+  gap: 4px;
+  padding: 4px 8px;
   background-color: white;
   border: 1px solid #e2e8f0;
   border-radius: 4px;
   color: #475569;
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -263,13 +265,13 @@ onMounted(() => {
 
 .task-graph, .task-graph-loading, .task-graph-empty, .task-graph-error {
   flex: 1;
-  min-height: 450px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
   padding: 20px;
+  min-height: 300px;
 }
 
 .task-graph {
@@ -284,21 +286,24 @@ onMounted(() => {
 :deep(.vue-flow) {
   width: 100% !important;
   height: 100% !important;
+  overflow: hidden;
 }
 
 :deep(.vue-flow__minimap) {
-  bottom: 20px;
-  right: 20px;
+  bottom: 15px;
+  right: 15px;
   border-radius: 6px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
   border: 1px solid #e2e8f0;
   overflow: hidden;
+  z-index: 5;
 }
 
 :deep(.vue-flow__controls) {
-  bottom: 20px;
-  left: 20px;
+  bottom: 15px;
+  left: 15px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  z-index: 5;
 }
 
 :deep(.vue-flow__controls-button) {
@@ -376,16 +381,58 @@ onMounted(() => {
   100% { transform: scale(1); }
 }
 
+/* Dark mode adjustments */
+:global(.dark) .task-graph-container {
+  background-color: #0f172a;
+  border-color: #1e293b;
+}
+
+:global(.dark) .task-graph-header {
+  background-color: #1e293b;
+  border-color: #334155;
+}
+
+:global(.dark) .graph-title {
+  color: #e2e8f0;
+}
+
+:global(.dark) .control-button {
+  background-color: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+:global(.dark) .control-button:hover {
+  background-color: #334155;
+}
+
+:global(.dark) :deep(.vue-flow__minimap) {
+  border-color: #334155;
+  background-color: rgba(30, 41, 59, 0.8);
+}
+
+:global(.dark) :deep(.vue-flow__controls-button) {
+  background-color: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+:global(.dark) :deep(.vue-flow__controls-button:hover) {
+  background-color: #334155;
+}
+
 /* Add responsive adjustments */
 @media (max-width: 768px) {
   .task-graph-container {
-    height: 400px;
+    min-height: 350px;
+    max-height: 400px;
   }
   
   .task-graph-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 10px;
+    gap: 8px;
+    padding: 8px;
   }
   
   .graph-controls {
@@ -394,8 +441,8 @@ onMounted(() => {
   }
   
   :deep(.vue-flow__minimap) {
-    width: 150px;
-    height: 100px;
+    width: 140px;
+    height: 90px;
   }
 }
 </style> 

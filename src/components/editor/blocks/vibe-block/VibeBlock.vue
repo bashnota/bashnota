@@ -65,6 +65,7 @@
             @insert-result="insertTaskResult"
             @view-details="showTaskDetailsModal"
             @load-database="loadDatabaseTables"
+            @start-execution="manuallyStartExecution"
           >
             <template #database-content>
               <VibeDatabaseView
@@ -140,6 +141,7 @@
         @insert-result="insertTaskResult"
         @view-details="showTaskDetailsModal"
         @load-database="loadDatabaseTables"
+        @start-execution="manuallyStartExecution"
       >
         <template #database-content>
           <VibeDatabaseView
@@ -166,6 +168,7 @@ import {
   AlertCircle, 
   RefreshCw
 } from 'lucide-vue-next'
+import { VibeTaskExecutor } from '@/services/vibe/VibeTaskExecutor'
 
 // Import UI components
 import { Button } from '@/components/ui/button'
@@ -418,13 +421,66 @@ function resetVibe() {
 watch(() => props.node.attrs.taskBoardId, async (newVal) => {
   if (newVal) {
     await loadTasksAndDatabase()
+    
+    // Ensure tasks are being executed
+    setTimeout(() => {
+      checkTaskExecution()
+    }, 5000) // Check after 5 seconds
   }
 })
+
+// Add a function to check task execution status and restart if needed
+function checkTaskExecution() {
+  logger.log('Checking task execution status')
+  
+  // If we have tasks but no task executor, try to restart execution
+  if (boardTasks.value.length > 0 && (!taskExecutor.value || !Object.keys(taskExecutor.value.runningTasks || {}).length)) {
+    logger.warn('Found tasks but no active executor or running tasks, restarting execution')
+    
+    // Start or restart the task executor
+    startRefreshInterval(loadTasksAndDatabase).then(() => {
+      if (taskExecutor.value) {
+        logger.log('Task executor restarted, executing tasks')
+        taskExecutor.value.executeAllTasks().catch((error) => {
+          logger.error('Error executing tasks after restart:', error)
+        })
+      }
+    }).catch((error) => {
+      logger.error('Error restarting task executor:', error)
+    })
+  }
+}
+
+// Check if API key is configured
+function checkApiConfiguration() {
+  try {
+    // Check if we have a valid API key for the preferred provider
+    const apiKey = aiSettingsStore.getApiKey(aiSettingsStore.preferredProvider?.id)
+    
+    if (!apiKey) {
+      logger.warn('No API key configured for the preferred provider')
+      toast({
+        variant: 'warning',
+        title: 'API Key Missing',
+        description: `Configure an API key for ${aiSettingsStore.preferredProvider?.name || 'your AI provider'} to use Vibe agents.`
+      })
+      return false
+    }
+    
+    return true
+  } catch (error) {
+    logger.error('Error checking API configuration:', error)
+    return false
+  }
+}
 
 // Update the onMounted hook with more logging
 onMounted(async () => {
   logger.log('VibeBlock mounted with props:', props.node.attrs)
   logger.log('queryText initial value:', queryText.value)
+  
+  // Check API configuration
+  checkApiConfiguration()
   
   // Initialize queryText from props if available
   if (props.node.attrs.query) {
@@ -529,6 +585,7 @@ const updateActorSettings = (settings) => {
 // Update activateVibe to include actor settings in task metadata
 const activateVibe = async () => {
   logger.log('activateVibe called with query:', JSON.stringify(queryText.value))
+  logger.log('Current actor settings:', JSON.stringify(actorSettings.value))
   
   if (!vibeStore) {
     logger.error('VibeStore is not available')
@@ -536,6 +593,17 @@ const activateVibe = async () => {
       variant: 'destructive',
       title: 'Error',
       description: 'Store not available'
+    })
+    return
+  }
+  
+  // Check API configuration first
+  if (!checkApiConfiguration()) {
+    logger.error('Missing API configuration')
+    toast({
+      variant: 'destructive',
+      title: 'API Configuration Required',
+      description: 'Please configure your API key in settings first'
     })
     return
   }
@@ -596,6 +664,25 @@ const activateVibe = async () => {
     // Create a composer task that will orchestrate the entire process
     loadingMessage.value = 'Setting up task orchestration...'
     
+    // Check if enabledActors is empty and initialize with default actors if needed
+    if (!actorSettings.value.enabledActors || actorSettings.value.enabledActors.length === 0) {
+      logger.warn('No enabled actors found, initializing with defaults')
+      actorSettings.value.enabledActors = [
+        ActorType.COMPOSER,
+        ActorType.PLANNER,
+        ActorType.RESEARCHER,
+        ActorType.ANALYST,
+        ActorType.CODER,
+        ActorType.WRITER
+      ]
+    }
+    
+    // Ensure the COMPOSER is in the enabled actors list
+    if (!actorSettings.value.enabledActors.includes(ActorType.COMPOSER)) {
+      logger.warn('Adding COMPOSER to enabled actors list')
+      actorSettings.value.enabledActors.push(ActorType.COMPOSER)
+    }
+    
     // Add Jupyter config and actor settings to the task metadata
     const taskMetadata = {
       ...(jupyterInfo ? { jupyterConfig: jupyterInfo } : {}),
@@ -610,8 +697,22 @@ const activateVibe = async () => {
       description: query,
       actorType: ActorType.COMPOSER,
       dependencies: [],
+      priority: 'high',
       metadata: taskMetadata
     })
+    
+    logger.log('Composer task created:', composerTask)
+    
+    // Create a planner task directly as well to ensure work begins
+    const plannerTask = await vibeStore.createTask(board.id, {
+      title: 'Create execution plan',
+      description: query,
+      actorType: ActorType.PLANNER,
+      dependencies: [],
+      priority: 'high'
+    })
+    
+    logger.log('Planner task created:', plannerTask)
     
     // Update block attributes with board ID
     logger.log('Updating node attributes with board ID:', board.id)
@@ -626,7 +727,22 @@ const activateVibe = async () => {
     })
     
     // Start refresh interval to update tasks
+    logger.log('Starting refresh interval for task updates')
     await startRefreshInterval(loadTasksAndDatabase)
+    
+    // Manually trigger task executor to ensure it starts
+    if (taskExecutor.value) {
+      logger.log('Manually triggering task executor')
+      try {
+        taskExecutor.value.executeAllTasks().catch((error) => {
+          logger.error('Error executing tasks:', error)
+        })
+      } catch (error) {
+        logger.error('Error manually triggering task executor:', error)
+      }
+    } else {
+      logger.error('Task executor not available after initialization')
+    }
   } catch (error) {
     logger.error('Error in activateVibe:', error)
     props.updateAttributes({
@@ -639,6 +755,109 @@ const activateVibe = async () => {
       description: error instanceof Error ? error.message : 'Failed to create Vibe board'
     })
     loadingMessage.value = ''
+  }
+}
+
+// Add a new function to manually start task execution
+const manuallyStartExecution = async () => {
+  logger.log('Manually starting task execution')
+  
+  // Check API configuration first
+  if (!checkApiConfiguration()) {
+    logger.error('Missing API configuration')
+    toast({
+      variant: 'destructive',
+      title: 'API Configuration Required',
+      description: 'Please configure your API key in settings first'
+    })
+    return
+  }
+  
+  // Show loading state
+  props.updateAttributes({
+    isLoading: true,
+    error: ''
+  })
+  
+  loadingMessage.value = 'Starting task execution...'
+  
+  try {
+    // First, clean up any existing task executor
+    if (taskExecutor.value) {
+      logger.log('Disposing existing task executor')
+      taskExecutor.value.dispose()
+      taskExecutor.value = null
+    }
+    
+    // Reload tasks to ensure we have the latest state
+    await loadTasksAndDatabase()
+    
+    // Create a new task executor
+    if (taskBoardId.value) {
+      const board = await vibeStore.getBoard(taskBoardId.value)
+      if (!board) {
+        throw new Error(`Board ${taskBoardId.value} not found`)
+      }
+      
+      logger.log(`Board has ${board.tasks.length} tasks, creating new task executor`)
+      
+      // Check if we have a composer task, and create one if needed
+      const composerTask = board.tasks.find(task => task.actorType === ActorType.COMPOSER)
+      if (!composerTask) {
+        logger.warn('No composer task found, creating one')
+        
+        await vibeStore.createTask(taskBoardId.value, {
+          title: 'Orchestrate tasks',
+          description: 'Manual execution',
+          actorType: ActorType.COMPOSER,
+          dependencies: [],
+          priority: 'high',
+          metadata: {
+            enabledActors: [
+              ActorType.COMPOSER,
+              ActorType.PLANNER,
+              ActorType.RESEARCHER,
+              ActorType.ANALYST,
+              ActorType.CODER,
+              ActorType.WRITER
+            ]
+          }
+        })
+        
+        // Reload tasks to include the new composer task
+        await loadTasksAndDatabase()
+      }
+      
+      // Create a new task executor
+      taskExecutor.value = new VibeTaskExecutor(
+        taskBoardId.value,
+        props.editor,
+        jupyterConfig.value
+      )
+      
+      // Start executing tasks
+      logger.log('Starting task execution')
+      await taskExecutor.value.executeAllTasks()
+      
+      toast({
+        title: 'Execution Started',
+        description: 'Task execution has been started manually'
+      })
+    } else {
+      throw new Error('No active board ID found')
+    }
+  } catch (error) {
+    logger.error('Error manually starting execution:', error)
+    toast({
+      variant: 'destructive',
+      title: 'Error',
+      description: error instanceof Error ? error.message : 'Failed to start execution'
+    })
+  } finally {
+    // Set loading to false
+    props.updateAttributes({
+      isLoading: false
+    })
   }
 }
 </script>

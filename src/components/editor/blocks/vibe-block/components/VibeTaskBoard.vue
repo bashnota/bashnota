@@ -30,16 +30,28 @@
           </Button>
         </Tooltip>
         
-        <Tooltip v-if="hasStuckTasks" content="Reset stuck or failed tasks">
+        <Tooltip content="Reset task execution">
           <Button 
             @click="$emit('reset')" 
             variant="outline" 
             size="sm"
-            class="text-destructive"
-            aria-label="Reset stuck tasks"
+            :class="{'text-destructive': hasStuckTasks}"
+            aria-label="Reset task execution"
           >
             <Undo2 class="h-4 w-4 mr-1" />
-            Reset
+            Reset Execution
+          </Button>
+        </Tooltip>
+        
+        <Tooltip content="Manually start task execution">
+          <Button 
+            @click="$emit('start-execution')" 
+            variant="default" 
+            size="sm"
+            aria-label="Start task execution"
+          >
+            <Play class="h-4 w-4 mr-1" />
+            Start Execution
           </Button>
         </Tooltip>
       </div>
@@ -74,7 +86,7 @@
     </div>
     
     <!-- Tabs for task board UI -->
-    <Tabs v-else class="w-full" defaultValue="tasks">
+    <Tabs v-else class="w-full vibe-task-tabs" defaultValue="tasks">
       <TabsList class="w-full grid grid-cols-3">
         <TabsTrigger value="tasks" class="flex items-center justify-center" aria-label="View tasks">
           <ListChecks class="h-4 w-4 mr-2" />
@@ -91,7 +103,7 @@
       </TabsList>
 
       <!-- Tasks Panel -->
-      <TabsContent value="tasks" class="p-0 border-0 mt-3">
+      <TabsContent value="tasks" class="p-0 border-0 mt-3 task-content-panel">
         <VibeTaskList 
           :tasks="tasks"
           :expandedTaskIds="expandedTaskIds"
@@ -107,7 +119,7 @@
       <!-- Database Panel -->
       <TabsContent 
         value="database" 
-        class="p-0 border-0 mt-3"
+        class="p-0 border-0 mt-3 task-content-panel"
         @select="$emit('load-database')"
       >
         <slot name="database-content">
@@ -123,7 +135,7 @@
       </TabsContent>
       
       <!-- Graph Panel -->
-      <TabsContent value="graph" class="p-0 border-0 mt-3">
+      <TabsContent value="graph" class="p-0 border-0 mt-3 task-content-panel graph-panel">
         <slot name="graph-content">
           <TaskGraph 
             :tasks="tasks" 
@@ -135,7 +147,7 @@
         <!-- Task details panel when a node is selected -->
         <div 
           v-if="selectedTaskId && selectedTask" 
-          class="mt-4 border p-4 rounded-md transition-all duration-300"
+          class="mt-4 border p-4 rounded-md transition-all duration-300 task-details-panel"
           :class="{
             'bg-green-50/30 border-green-200': selectedTask.status === 'completed',
             'bg-red-50/30 border-red-200': selectedTask.status === 'failed',
@@ -202,7 +214,8 @@ import {
   Network, 
   ClipboardCopy, 
   Maximize2, 
-  ServerCog 
+  ServerCog, 
+  Play 
 } from 'lucide-vue-next'
 import { ActorType } from '@/types/vibe'
 import VibeTaskList from './VibeTaskList.vue'
@@ -236,14 +249,15 @@ const props = defineProps({
 })
 
 const emit = defineEmits([
-  'refresh', 
-  'reset', 
   'toggle-task', 
   'select-dependency', 
-  'select-task',
+  'select-task', 
+  'refresh', 
+  'reset', 
   'insert-result', 
-  'view-details',
-  'load-database'
+  'view-details', 
+  'load-database',
+  'start-execution'
 ])
 
 // Computed properties
@@ -255,7 +269,7 @@ const failedTasks = computed(() =>
   props.tasks.filter(task => task.status === 'failed')
 )
 
-const hasInProgressTasks = computed(() =>
+const hasInProgressTasks = computed(() => 
   props.tasks.some(task => task.status === 'in_progress')
 )
 
@@ -321,5 +335,51 @@ function getStatusVariant(status) {
 
 :global(.dark) .border-blue-200 {
   border-color: rgba(0, 119, 255, 0.4) !important;
+}
+
+/* Layout improvements */
+.vibe-task-tabs {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.task-content-panel {
+  display: flex;
+  flex-direction: column;
+  height: calc(100% - 40px); /* Accounting for tab header height */
+  overflow: hidden;
+}
+
+.graph-panel {
+  min-height: 500px;
+}
+
+.task-details-panel {
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 16px;
+  scrollbar-width: thin;
+  background-color: var(--background);
+}
+
+.task-details-panel::-webkit-scrollbar {
+  width: 5px;
+}
+
+.task-details-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.task-details-panel::-webkit-scrollbar-thumb {
+  background-color: rgba(100, 116, 139, 0.2);
+  border-radius: 3px;
+}
+
+/* Media queries for responsive layout */
+@media (max-width: 768px) {
+  .graph-panel {
+    min-height: 400px;
+  }
 }
 </style> 

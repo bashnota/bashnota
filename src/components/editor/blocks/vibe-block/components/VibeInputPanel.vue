@@ -141,6 +141,21 @@
         </Badge>
       </div>
     </div>
+    
+    <!-- Active Agents Display -->
+    <div v-if="selectedActors.length > 0" class="mt-3 text-xs text-muted-foreground">
+      <div class="flex flex-wrap gap-1 items-center">
+        <span>Active agents:</span>
+        <Badge 
+          v-for="actorType in selectedActors" 
+          :key="actorType" 
+          variant="outline" 
+          class="text-xs py-0 px-1 h-5"
+        >
+          {{ getActorName(actorType) }}
+        </Badge>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -151,7 +166,7 @@ import { Tooltip } from '@/components/ui/tooltip'
 import { Zap, ServerCog, X, Users } from 'lucide-vue-next'
 import JupyterConfigPanel from '../JupyterConfigPanel.vue'
 import { logger } from '@/services/logger'
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { ActorType } from '@/types/vibe'
 
 const props = defineProps({
@@ -198,8 +213,20 @@ const availableActors = [
 // Selected actors (default to all)
 const selectedActors = ref(availableActors.map(actor => actor.type))
 
-// Custom prompt toggle
+// Initialize useCustomPrompt based on preference
 const useCustomPrompt = ref(false)
+
+// On mounted, emit the initial actor settings
+onMounted(() => {
+  logger.log('VibeInputPanel mounted, initializing actor settings')
+  logger.log('Initial enabled actors:', selectedActors.value)
+  
+  // Emit initial actor settings
+  emit('update-actors', {
+    enabledActors: selectedActors.value,
+    useCustomPrompt: useCustomPrompt.value
+  })
+})
 
 // Toggle an actor's selection
 function toggleActor(actorType) {
@@ -209,12 +236,20 @@ function toggleActor(actorType) {
   } else {
     selectedActors.value.splice(index, 1)
   }
+  
+  logger.log('Actor toggled, current selection:', selectedActors.value)
 }
 
 // Get actor description
 function getActorDescription(actorType) {
   const actor = availableActors.find(a => a.type === actorType)
   return actor ? actor.description : ''
+}
+
+// Get actor name for display
+function getActorName(actorType) {
+  const actor = availableActors.find(a => a.type === actorType)
+  return actor ? actor.name : actorType
 }
 
 // Watch for changes to actor selection or custom prompt

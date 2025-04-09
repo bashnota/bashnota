@@ -1,0 +1,446 @@
+/* Core Vibe Terminal Styles */
+.vibe-terminal {
+  background-color: hsl(var(--background)) !important;
+  border-top: 1px solid hsl(var(--border));
+  z-index: 5;
+  position: relative;
+  height: auto;
+  transition: width 0.2s ease;
+}
+
+/* Saved boards list styles */
+.saved-boards-list {
+  max-height: 300px;
+  overflow-y: auto;
+  width: 100%;
+}
+
+.saved-board-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.25rem;
+  margin-bottom: 0.25rem;
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.saved-board-item:hover {
+  background-color: hsl(var(--accent));
+}
+
+/* Resize handle */
+.vibe-terminal .resize-handle {
+  position: absolute;
+  top: 0;
+  left: -5px;
+  width: 10px;
+  height: 100%;
+  cursor: ew-resize;
+  z-index: 60;
+}
+
+.vibe-terminal.collapsed {
+  height: 40px;
+  min-height: 40px;
+  width: 100% !important; /* Override inline width when collapsed */
+  transition: height 0.3s ease;
+}
+
+.vibe-terminal:not(.collapsed) {
+  transition: height 0.3s ease;
+  height: auto;
+  min-height: 40px;
+}
+
+/* Prevent unwanted collapse */
+.vibe-terminal.prevent-collapse {
+  height: auto !important;
+  min-height: 300px !important;
+  transition: none !important;
+}
+
+.vibe-terminal .terminal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid hsl(var(--border));
+  background-color: hsl(var(--background));
+}
+
+.vibe-terminal .terminal-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.vibe-terminal .terminal-status {
+  font-size: 0.75rem;
+}
+
+.vibe-terminal .collapse-icon {
+  transition: transform 0.2s ease;
+}
+
+.vibe-terminal .terminal-content {
+  max-height: 50vh;
+  overflow-y: auto;
+  background-color: hsl(var(--background));
+  transition: max-height 0.3s ease, opacity 0.3s ease;
+  opacity: 1;
+  position: relative;
+  z-index: 10;
+}
+
+/* Transition for showing/hiding terminal content */
+.vibe-terminal.collapsed .terminal-content {
+  opacity: 0;
+  max-height: 0;
+  overflow: hidden;
+  pointer-events: none;
+  /* PRESERVE z-index even when collapsed */
+  z-index: 30 !important;
+  position: relative !important;
+}
+
+/* Additional fix for tables in collapsed state */
+.vibe-terminal.collapsed table,
+.vibe-terminal.collapsed .vibe-database-view,
+.vibe-terminal.collapsed .database-table,
+.vibe-terminal.collapsed .vibe-task-board,
+.vibe-terminal.collapsed .vibe-task-item {
+  /* Important: keep these styles even when collapsed */
+  position: relative !important;
+  z-index: 35 !important;
+}
+
+/* Make terminal content elements visible */
+.vibe-terminal .terminal-content > * {
+  position: relative;
+  z-index: 20;
+  background-color: hsl(var(--background));
+}
+
+.vibe-terminal .terminal-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+}
+
+.vibe-terminal .terminal-active-content {
+  padding: 0.5rem;
+}
+
+.vibe-terminal .terminal-error {
+  padding: 0.5rem;
+}
+
+/* Fix transparency for all vibe elements */
+.vibe-terminal,
+.vibe-block-terminal,
+.vibe-task-list,
+.vibe-task-board,
+.vibe-task-item {
+  backdrop-filter: none !important;
+}
+
+/* Explicit styling for shadcn components to ensure solid backgrounds */
+.vibe-terminal .card,
+.vibe-terminal .card-content,
+.vibe-terminal .tabs-content,
+.vibe-terminal .tabs-list,
+.vibe-terminal .tabs-trigger {
+  background-color: hsl(var(--card)) !important;
+  backdrop-filter: none !important;
+}
+
+/* Additional shadcn-specific fixes */
+.vibe-terminal [class*="shadcn-"] {
+  background-color: hsl(var(--card)) !important;
+  backdrop-filter: none !important;
+}
+
+/* Ensure list items and task items have solid backgrounds */
+.vibe-terminal .vibe-task-list-item,
+.vibe-terminal li,
+.vibe-terminal ul,
+.vibe-terminal .collapse-content {
+  background-color: hsl(var(--card)) !important;
+  backdrop-filter: none !important;
+}
+
+/* Fix for form elements */
+.vibe-terminal button,
+.vibe-terminal input,
+.vibe-terminal textarea,
+.vibe-terminal select {
+  background-color: hsl(var(--background)) !important;
+  backdrop-filter: none !important;
+}
+
+/* Additional fixes for shadcn components */
+.vibe-terminal [data-state='active'] {
+  background-color: hsl(var(--background)) !important;
+}
+
+.vibe-terminal .alert,
+.vibe-terminal .button,
+.vibe-terminal .input,
+.vibe-terminal .dropdown,
+.vibe-terminal .scroll-area {
+  background-color: hsl(var(--background)) !important;
+}
+
+/* Dark mode support */
+:global(.dark) .vibe-terminal {
+  background-color: hsl(var(--background)) !important;
+  border-top: 1px solid hsl(var(--border));
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+}
+
+:global(.dark) .vibe-terminal button,
+:global(.dark) .vibe-terminal input,
+:global(.dark) .vibe-terminal textarea,
+:global(.dark) .vibe-terminal select {
+  background-color: hsl(var(--muted)) !important;
+}
+
+/* Ensure proper form element styling in dark mode */
+:global(.dark) .vibe-input-panel input[type="checkbox"] {
+  background-color: hsl(var(--muted)) !important;
+  opacity: 1 !important;
+}
+
+/* Make sure card components are properly styled in dark mode */
+:global(.dark) .vibe-terminal .card,
+:global(.dark) .vibe-terminal .card-content {
+  background-color: hsl(var(--card)) !important;
+}
+
+/* Additional fix for lists in dark mode */
+:global(.dark) .vibe-terminal li,
+:global(.dark) .vibe-terminal ul,
+:global(.dark) .vibe-terminal .collapse-content {
+  background-color: hsl(var(--card)) !important;
+}
+
+/* Force visibility helper class */
+.force-visible {
+  opacity: 1 !important;
+  max-height: 50vh !important;
+  overflow-y: auto !important;
+  pointer-events: auto !important;
+  z-index: 50 !important;
+}
+
+/* Ensure terminal components are visible */
+.vibe-terminal .terminal-active-content,
+.vibe-terminal .terminal-empty-state,
+.vibe-terminal .vibe-task-board,
+.vibe-terminal .vibe-query-input {
+  position: relative;
+  z-index: 25;
+  background-color: hsl(var(--background));
+}
+
+/* Fix transparency for any potential overlays */
+.vibe-terminal::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: transparent;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Fix z-index issue with background */
+.vibe-terminal:not(.collapsed) {
+  background-color: transparent !important;
+}
+
+.vibe-terminal:not(.collapsed)::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: hsl(var(--background));
+  z-index: 5;
+}
+
+/* Ensure terminal header stays on top */
+.vibe-terminal .terminal-header {
+  position: relative;
+  z-index: 20;
+}
+
+/* Fix white background issue for expanded content */
+.vibe-terminal .terminal-content.force-visible {
+  background-color: hsl(var(--background)) !important;
+  opacity: 1 !important;
+  max-height: 50vh !important;
+  overflow-y: auto !important;
+  z-index: 30 !important;
+  pointer-events: auto !important;
+  position: relative !important;
+}
+
+/* Full screen expansion mode */
+.vibe-terminal.fullscreen {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  z-index: 9999 !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+  transition: all 0.3s ease !important;
+  overflow: hidden !important;
+  background-color: hsl(var(--background)) !important;
+}
+
+/* Ensure content is fully visible in fullscreen mode */
+.vibe-terminal.fullscreen .terminal-content {
+  max-height: calc(100vh - 40px) !important; /* Subtract header height */
+  height: calc(100vh - 40px) !important;
+  width: 100% !important;
+  opacity: 1 !important;
+  overflow-y: auto !important;
+  z-index: 9000 !important;
+  position: relative !important;
+}
+
+/* Ensure all child elements in fullscreen have proper z-index */
+.vibe-terminal.fullscreen .terminal-content > * {
+  position: relative !important;
+  z-index: 9100 !important;
+  opacity: 1 !important;
+}
+
+/* Make sure nested elements are visible */
+.vibe-terminal.fullscreen .vibe-task-board,
+.vibe-terminal.fullscreen .vibe-query-input,
+.vibe-terminal.fullscreen .vibe-task-item,
+.vibe-terminal.fullscreen .terminal-active-content,
+.vibe-terminal.fullscreen .terminal-empty-state {
+  position: relative !important;
+  z-index: 9200 !important;
+  opacity: 1 !important;
+}
+
+/* Adjust header in fullscreen mode */
+.vibe-terminal.fullscreen .terminal-header {
+  border-radius: 0 !important;
+  border-top: none !important;
+  z-index: 9500 !important;
+  position: relative !important;
+}
+
+/* Make sure any nested form controls are accessible */
+.vibe-terminal.fullscreen button,
+.vibe-terminal.fullscreen input,
+.vibe-terminal.fullscreen select,
+.vibe-terminal.fullscreen textarea {
+  position: relative !important;
+  z-index: 9300 !important;
+}
+
+/* Ensure body doesn't scroll when in fullscreen */
+body.vibe-terminal-fullscreen-active {
+  overflow: hidden !important;
+}
+
+/* Make sure tables and their content are visible in fullscreen mode */
+.vibe-terminal.fullscreen .vibe-database-view,
+.vibe-terminal.fullscreen .database-table,
+.vibe-terminal.fullscreen .database-content,
+.vibe-terminal.fullscreen table,
+.vibe-terminal.fullscreen thead,
+.vibe-terminal.fullscreen tbody,
+.vibe-terminal.fullscreen tr,
+.vibe-terminal.fullscreen th,
+.vibe-terminal.fullscreen td {
+  position: relative !important;
+  z-index: 9300 !important;
+  opacity: 1 !important;
+  background-color: hsl(var(--background)) !important;
+}
+
+/* Ensure task details are visible */
+.vibe-terminal.fullscreen .task-details,
+.vibe-terminal.fullscreen .task-content,
+.vibe-terminal.fullscreen .task-actions,
+.vibe-terminal.fullscreen .code-block,
+.vibe-terminal.fullscreen pre,
+.vibe-terminal.fullscreen code {
+  position: relative !important;
+  z-index: 9250 !important;
+  opacity: 1 !important;
+}
+
+/* Fix for any modal or dropdown that appears in fullscreen */
+.vibe-terminal.fullscreen .modal,
+.vibe-terminal.fullscreen .dropdown,
+.vibe-terminal.fullscreen [data-state="open"],
+.vibe-terminal.fullscreen [role="tooltip"],
+.vibe-terminal.fullscreen [role="dialog"] {
+  position: relative !important;
+  z-index: 9950 !important;
+  opacity: 1 !important;
+}
+
+/* Special class to preserve styles during toggle */
+.preserving-styles {
+  transition: none !important;
+  position: relative !important;
+  z-index: 30 !important;
+}
+
+/* Fix specifically for table content */
+.vibe-terminal table,
+.vibe-terminal .vibe-database-view,
+.vibe-terminal .database-table,
+.vibe-terminal .database-content {
+  position: relative !important;
+  z-index: 35 !important;
+  opacity: 1 !important;
+}
+
+/* Make sure internal table cells stay visible */
+.vibe-terminal th,
+.vibe-terminal td,
+.vibe-terminal tr,
+.vibe-terminal tbody,
+.vibe-terminal thead {
+  position: relative !important;
+  z-index: 36 !important;
+  opacity: 1 !important;
+}
+
+/* Override any potential style removal */
+.vibe-terminal:not(.collapsed) .terminal-content {
+  opacity: 1 !important;
+  max-height: 50vh !important;
+  overflow: auto !important;
+  z-index: 30 !important;
+  position: relative !important;
+} 

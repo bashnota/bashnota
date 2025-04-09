@@ -20,12 +20,13 @@ export function useTaskExecutor(
   const taskExecutor = ref<any>(null)
   const refreshInterval = ref<NodeJS.Timeout | null>(null)
   const loadingMessage = ref('')
+  const executorLogger = logger.createPrefixedLogger('useTaskExecutor')
 
   /**
    * Start the refresh interval to periodically check task status
    */
   async function startRefreshInterval(loadTasks: () => Promise<void>) {
-    logger.log('Starting refresh interval')
+    executorLogger.log('Starting refresh interval')
     // Clear any existing interval
     if (refreshInterval.value) {
       clearInterval(refreshInterval.value)
@@ -33,7 +34,7 @@ export function useTaskExecutor(
     
     // Clean up any existing task executor
     if (taskExecutor.value) {
-      logger.log('Disposing existing task executor')
+      executorLogger.log('Disposing existing task executor')
       taskExecutor.value.dispose()
       taskExecutor.value = null
     }
@@ -48,12 +49,16 @@ export function useTaskExecutor(
         const board = await vibeStore.getBoard(boardId.value)
         
         if (!board) {
-          logger.error(`Board ${boardId.value} not found`)
+          executorLogger.error(`Board ${boardId.value} not found`)
           updateAttributes({
             error: `Board not found. It may have been deleted or never created.`
           })
           return
         }
+        
+        executorLogger.log(`Creating task executor for board ${boardId.value}`)
+        executorLogger.log(`Board has ${board.tasks.length} tasks`)
+        executorLogger.log(`Jupyter config:`, jupyterConfig.value)
         
         // Create a task executor for this board with Jupyter configuration
         taskExecutor.value = new VibeTaskExecutor(
@@ -63,34 +68,43 @@ export function useTaskExecutor(
         )
         
         // Execute tasks asynchronously
-        taskExecutor.value.executeAllTasks().catch((error: Error) => {
-          logger.error('Error executing tasks:', error)
-          // Only update error if it's not already set
-          if (!updateAttributes) return
-          updateAttributes({
-            error: `Error executing tasks: ${error.message}`
-          })
-        })
+        executorLogger.log('Executing all tasks')
+        setTimeout(() => {
+          if (taskExecutor.value) {
+            taskExecutor.value.executeAllTasks().catch((error: Error) => {
+              executorLogger.error('Error executing tasks:', error)
+              // Only update error if it's not already set
+              if (!updateAttributes) return
+              updateAttributes({
+                error: `Error executing tasks: ${error.message}`
+              })
+            })
+          } else {
+            executorLogger.error('Task executor was null when trying to execute tasks')
+          }
+        }, 1000) // Add a small delay to ensure the UI is updated first
       } catch (error: any) {
-        logger.error('Error in startRefreshInterval:', error)
+        executorLogger.error('Error in startRefreshInterval:', error)
         updateAttributes({
           error: `Error starting task execution: ${error.message}`
         })
         return
       }
+    } else {
+      executorLogger.warn('No boardId available, cannot create task executor')
     }
     
     // Set up polling to refresh task status
     refreshInterval.value = setInterval(() => {
       loadTasks()
-    }, 5000) // Check every 5 seconds
+    }, 3000) // Check every 3 seconds for more responsive updates
   }
 
   /**
    * Clean up resources when component is unmounted
    */
   function cleanupExecutor() {
-    logger.log('Cleaning up task executor')
+    executorLogger.log('Cleaning up task executor')
     if (refreshInterval.value) {
       clearInterval(refreshInterval.value)
       refreshInterval.value = null
@@ -98,7 +112,7 @@ export function useTaskExecutor(
     
     // Clean up task executor if it exists
     if (taskExecutor.value) {
-      logger.log('Disposing task executor')
+      executorLogger.log('Disposing task executor')
       taskExecutor.value.dispose()
       taskExecutor.value = null
     }
@@ -109,25 +123,34 @@ export function useTaskExecutor(
    */
   async function resetTaskExecution(resetInProgressTasks: () => Promise<void>, refreshTasks: () => Promise<void>) {
     try {
-      logger.log('Attempting to reset task execution')
+      executorLogger.log('Attempting to reset task execution')
       
       if (!taskExecutor.value) {
-        logger.warn('No task executor available to reset')
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'Cannot reset execution - no active executor'
-        })
-        return
+        executorLogger.warn('No task executor available to reset')
+        
+        // Try to recreate the executor if board ID is available
+        if (boardId.value) {
+          executorLogger.log('Attempting to recreate task executor')
+          taskExecutor.value = new VibeTaskExecutor(
+            boardId.value, 
+            editor.value,
+            jupyterConfig.value
+          )
+        } else {
+          toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'Cannot reset execution - no active executor'
+          })
+          return
+        }
       }
-      
-      // Reset the task executor state
-      taskExecutor.value.resetState()
       
       // Reset any in_progress tasks back to pending
       await resetInProgressTasks()
       
       // Restart task execution
+      executorLogger.log('Restarting task execution')
       await taskExecutor.value.executeAllTasks()
       
       // Refresh the task list
@@ -138,7 +161,7 @@ export function useTaskExecutor(
         description: 'Task execution has been reset and will continue'
       })
     } catch (error: any) {
-      logger.error('Error resetting task execution:', error)
+      executorLogger.error('Error resetting task execution:', error)
       toast({
         variant: 'destructive',
         title: 'Error',

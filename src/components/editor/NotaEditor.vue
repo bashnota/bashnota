@@ -11,17 +11,17 @@ import TableOfContents from './TableOfContents.vue'
 import JupyterServersSidebar from './JupyterServersSidebar.vue'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { ListIcon, BookIcon, ServerIcon } from 'lucide-vue-next'
+import { ListIcon, BookIcon, ServerIcon, Terminal, RefreshCw, MinusCircle, Maximize2, Minimize2 } from 'lucide-vue-next'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
 import { getURLWithoutProtocol, toast } from '@/lib/utils'
 import VersionHistoryDialog from './VersionHistoryDialog.vue'
-import FavoriteBlocksSidebar from './FavoriteBlocksSidebar.vue'
 import ReferencesSidebar from './ReferencesSidebar.vue'
 import { getEditorExtensions } from './extensions'
 import { useEquationCounter, EQUATION_COUNTER_KEY } from '@/composables/useEquationCounter'
 import { useCitationStore } from '@/stores/citationStore'
 import { logger } from '@/services/logger'
-import VibeTerminal from './VibeTerminal.vue'
+import VibeTerminal from './blocks/vibe-block/components/VibeTerminal.vue'
+import { vibeUIService } from '@/services/vibe/VibeUIService'
 
 // Import shared CSS
 import '@/assets/editor-styles.css'
@@ -47,7 +47,40 @@ const autoSaveEnabled = ref(true)
 const showVersionHistory = ref(false)
 const isLoading = ref(true)
 const editorContainer = ref(null)
-const isTerminalVisible = ref(false)
+
+// Replace direct state with references to vibeUIService 
+const isTerminalVisible = computed({
+  get: () => vibeUIService.state.value.isVisible,
+  set: (value: boolean) => vibeUIService.setVisibility(value)
+})
+const terminalWindowMode = computed({
+  get: () => vibeUIService.state.value.windowMode,
+  set: (value: boolean) => {
+    if (value !== vibeUIService.state.value.windowMode) {
+      vibeUIService.toggleWindowMode()
+    }
+  }
+})
+const terminalLoading = computed({
+  get: () => vibeUIService.state.value.loading,
+  set: (value: boolean) => vibeUIService.setLoading(value)
+})
+const terminalError = computed({
+  get: () => vibeUIService.state.value.error,
+  set: (value: string) => vibeUIService.setError(value)
+})
+const activeTaskId = computed({
+  get: () => vibeUIService.state.value.activeTaskId,
+  set: (value: string | null) => vibeUIService.setActiveTask(value)
+})
+
+// Add state for the current Vibe board
+const vibeCurrentBoardId = ref('')
+
+// Handle creation of a new board
+const handleBoardCreated = (boardId: string) => {
+  vibeCurrentBoardId.value = boardId
+}
 
 const currentNota = computed(() => {
   return notaStore.getCurrentNota(props.notaId)
@@ -363,6 +396,12 @@ const handleKeyboardShortcuts = (event: KeyboardEvent) => {
   if (insertionMap[key]) {
     insertionMap[key]()
   }
+
+  // For Ctrl+` (backtick)
+  if (event.ctrlKey && event.key === '`') {
+    event.preventDefault()
+    vibeUIService.toggleVisibility()
+  }
 }
 
 onMounted(() => {
@@ -569,25 +608,90 @@ watch(() => citationStore.getCitationsByNotaId(props.notaId), () => {
   updateCitationNumbers()
 }, { deep: true })
 
-// Handle vibe terminal toggle
-const handleVibeTerminalToggle = (isVisible: boolean) => {
-  isTerminalVisible.value = isVisible
+const refreshTerminal = async () => {
+  vibeUIService.setLoading(true)
+  vibeUIService.setError('')
+  
+  try {
+    // If we don't have a board ID yet, nothing to refresh
+    if (!vibeCurrentBoardId.value) {
+      return
+    }
+    
+    await vibeUIService.refreshVibe(vibeCurrentBoardId.value)
+  } catch (error: unknown) {
+    const errorMessage = typeof error === 'string' 
+      ? error 
+      : error instanceof Error ? error.message : 'An unknown error occurred'
+    vibeUIService.setError(errorMessage)
+    logger.error('Vibe refresh error:', error);
+  } finally {
+    vibeUIService.setLoading(false)
+  }
 }
 
-// Handle vibe terminal resize
-const handleVibeTerminalResize = (resizeData: { height: number, isMaximized: boolean }) => {
-  const { height, isMaximized } = resizeData
-  const container = editorContainer.value as HTMLElement | null
+const handleTerminalMinimize = () => {
+  vibeUIService.setVisibility(false)
+}
+
+const handleWindowModeToggle = () => {
+  const windowMode = vibeUIService.toggleWindowMode()
   
-  if (container) {
-    const editorContent = container.querySelector('.editor-content') as HTMLElement
-    if (editorContent) {
-      // Apply new height to editor content based on terminal height
-      editorContent.style.height = isMaximized 
-        ? `calc(100vh - ${height + 120}px)` // Extra space for header
-        : `calc(100vh - ${height + 50}px)`
+  if (windowMode) {
+    // Create a popup window with the vibe UI
+    const vibeWindow = window.open('', 'VibeTerminal', 'width=800,height=600');
+    if (vibeWindow) {
+      // Transfer state to the new window
+      vibeWindow.document.title = 'Vibe';
+    } else {
+      toast('Popup blocked. Please allow popups for this site.');
+      vibeUIService.toggleWindowMode(); // Toggle back if popup was blocked
     }
   }
+}
+
+// Watch for vibe UI state changes to update the editor
+watch(() => vibeUIService.state.value.isVisible, (visible) => {
+  if (visible) refreshTerminal();
+})
+
+// Add reset width functionality
+const resetVibeWidth = () => {
+  vibeUIService.resetWidth()
+}
+
+// Watch for editor initialization to set up Vibe command listeners
+watch(() => editor.value, (newEditor, oldEditor) => {
+  if (newEditor) {
+    // Add vibe command listener
+    newEditor.on('vibe:command', (details) => {
+      // Show the vibe terminal
+      isTerminalVisible.value = true
+      
+      // Create a new board if we don't have one yet
+      if (!vibeCurrentBoardId.value) {
+        // We'll let the terminal component create a board when it mounts
+        // The @board-created event will update our vibeCurrentBoardId
+      } else {
+        // Then trigger refresh to ensure we have the latest data
+        refreshTerminal()
+      }
+    })
+  }
+  
+  // Clean up old listener if needed
+  if (oldEditor) {
+    oldEditor.off('vibe:command')
+  }
+}, { immediate: true })
+
+// Add a method to reset the vibe board
+const resetVibeBoard = () => {
+  vibeCurrentBoardId.value = '' // Clear the current board
+  vibeUIService.setError('') // Clear any errors
+  vibeUIService.setLoading(false) // Clear loading state
+  
+  // Could add additional reset functionality here if needed
 }
 
 defineExpose({
@@ -597,134 +701,208 @@ defineExpose({
 </script>
 
 <template>
-  <div class="h-full w-full flex overflow-hidden" :class="{'editor-with-terminal': isTerminalVisible}">
-    <!-- Loading spinner -->
-    <LoadingSpinner v-if="isLoading" class="absolute inset-0 z-10" />
+  <div class="flex flex-col h-[calc(100vh-120px)]">
+    <!-- Version history dialog -->
+    <VersionHistoryDialog
+      v-if="showVersionHistory"
+      :nota-id="notaId"
+      :open="showVersionHistory"
+      @update:open="showVersionHistory = false"
+      @version-restored="refreshEditorContent"
+    />
 
-    <!-- Table of Contents Sidebar -->
-    <div
-      v-if="isSidebarOpen"
-      class="w-64 h-full border-r flex-shrink-0 flex flex-col bg-background"
-    >
-      <TableOfContents :editor="editor" />
-    </div>
-
-    <!-- References Sidebar -->
-    <div
-      v-if="isReferencesOpen"
-      class="w-64 h-full border-r flex-shrink-0 flex flex-col bg-background"
-    >
-      <ReferencesSidebar :editor="editor" :notaId="notaId" />
-    </div>
-
-    <!-- Jupyter Servers Sidebar -->
-    <div
-      v-if="isJupyterServersOpen"
-      class="w-64 h-full border-r flex-shrink-0 flex flex-col bg-background"
-    >
-      <JupyterServersSidebar :notaId="notaId" />
-    </div>
+    <!-- Editor Toolbar -->
+    <EditorToolbar
+      :editor="editor || null"
+      @save-version="saveVersion"
+      @show-history="showVersionHistory = true"
+      :is-saving-version="isSavingVersion"
+      :word-count="wordCount"
+      :toggle-terminal="() => isTerminalVisible = !isTerminalVisible"
+      :is-terminal-visible="isTerminalVisible"
+    />
 
     <!-- Main Editor Area -->
-    <div class="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-      <!-- Editor Toolbar -->
-      <div class="border-b bg-background sticky top-0 z-10">
-        <EditorToolbar v-if="editor" :editor="editor" class="px-4 py-2" />
-
-        <!-- Editor Info Bar -->
+    <div class="flex-1 flex min-h-0 overflow-hidden relative">
+      <!-- Sidebar -->
+      <div
+        class="transition-all duration-300 ease-in-out h-full"
+        :class="{
+          'w-64': isSidebarOpen,
+          'w-0': !isSidebarOpen,
+        }"
+      >
         <div
-          class="flex items-center justify-between px-4 py-2 text-sm text-muted-foreground border-t"
+          v-show="isSidebarOpen"
+          class="border-r h-full"
+          :style="{ width: isSidebarOpen ? '100%' : '0' }"
         >
-          <div class="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              class="flex items-center gap-2"
-              @click="isSidebarOpen = !isSidebarOpen; isReferencesOpen = false; isJupyterServersOpen = false"
-              :class="{ 'bg-muted': isSidebarOpen }"
-            >
-              <ListIcon class="h-4 w-4" />
-              <span class="text-xs">Contents</span>
-            </Button>
-            
-            <Button
-              variant="ghost"
-              size="sm"
-              class="flex items-center gap-2"
-              @click="isReferencesOpen = !isReferencesOpen; isSidebarOpen = false; isJupyterServersOpen = false"
-              :class="{ 'bg-muted': isReferencesOpen }"
-            >
-              <BookIcon class="h-4 w-4" />
-              <span class="text-xs">References</span>
-            </Button>
-            
-            <Button
-              variant="ghost"
-              size="sm"
-              class="flex items-center gap-2"
-              @click="isJupyterServersOpen = !isJupyterServersOpen; isSidebarOpen = false; isReferencesOpen = false"
-              :class="{ 'bg-muted': isJupyterServersOpen }"
-            >
-              <ServerIcon class="h-4 w-4" />
-              <span class="text-xs">Jupyter Servers</span>
-            </Button>
-          </div>
-          
-          <div class="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              @click="saveVersion"
-              :disabled="isSavingVersion"
-              class="flex items-center gap-1"
-            >
-              <span
-                v-if="isSavingVersion"
-                class="inline-block h-3 w-3 animate-spin rounded-full border-2 border-solid border-current border-r-transparent"
-              ></span>
-              <span>Save Version</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              @click="showVersionHistory = true"
-              class="flex items-center gap-1"
-            >
-              <span>History</span>
-            </Button>
-            <span>{{ wordCount }} words</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Editor Content -->
-      <div class="flex-1 relative overflow-auto" ref="editorContainer">
-        <!-- Editor Content Area -->
-        <div class="h-full overflow-hidden px-4 md:px-8 lg:px-12 editor-content">
           <ScrollArea class="h-full">
-            <editor-content :editor="editor" class="max-w-4xl mx-auto py-8" />
+            <TableOfContents :editor="editor" />
           </ScrollArea>
         </div>
       </div>
+
+      <!-- References Sidebar -->
+      <div
+        class="transition-all duration-300 ease-in-out h-full"
+        :class="{
+          'w-[350px]': isReferencesOpen,
+          'w-0': !isReferencesOpen,
+        }"
+      >
+        <div
+          v-show="isReferencesOpen"
+          class="border-r h-full"
+          :style="{ width: isReferencesOpen ? '100%' : '0' }"
+        >
+          <ScrollArea class="h-full">
+            <ReferencesSidebar v-if="editor" :editor="editor" :notaId="notaId" />
+          </ScrollArea>
+        </div>
+      </div>
+
+      <!-- Jupyter Servers Sidebar -->
+      <div
+        class="transition-all duration-300 ease-in-out h-full"
+        :class="{
+          'w-[350px]': isJupyterServersOpen,
+          'w-0': !isJupyterServersOpen,
+        }"
+      >
+        <div
+          v-show="isJupyterServersOpen"
+          class="border-r h-full"
+          :style="{ width: isJupyterServersOpen ? '100%' : '0' }"
+        >
+          <ScrollArea class="h-full">
+            <JupyterServersSidebar v-if="editor" :notaId="notaId" />
+          </ScrollArea>
+        </div>
+      </div>
+
+      <!-- Main Editor Wrapper -->
+      <div 
+        class="flex-1 flex flex-col min-w-0 overflow-hidden"
+        :class="{ 'editor-with-vibe': isTerminalVisible }"
+      >
+        <div class="bg-background border-b flex items-center justify-between px-4 py-2 text-sm text-muted-foreground">
+          <div class="flex items-center gap-2">
+            <!-- Toggle TOC -->
+            <Button variant="ghost" size="sm" @click="isSidebarOpen = !isSidebarOpen" class="flex items-center gap-2">
+              <ListIcon class="h-4 w-4" />
+              <span class="text-xs">{{ isSidebarOpen ? 'Hide' : 'Show' }} Contents</span>
+            </Button>
+
+            <!-- Toggle References -->
+            <Button
+              variant="ghost"
+              size="sm"
+              @click="() => {
+                isReferencesOpen = !isReferencesOpen
+                if (isReferencesOpen) {
+                  isSidebarOpen = false
+                  isJupyterServersOpen = false
+                }
+              }"
+              class="flex items-center gap-2"
+            >
+              <BookIcon class="h-4 w-4" />
+              <span class="text-xs">{{ isReferencesOpen ? 'Hide' : 'Show' }} References</span>
+            </Button>
+
+            <!-- Toggle Jupyter Servers -->
+            <Button
+              variant="ghost"
+              size="sm"
+              @click="() => {
+                isJupyterServersOpen = !isJupyterServersOpen
+                if (isJupyterServersOpen) {
+                  isSidebarOpen = false
+                  isReferencesOpen = false
+                }
+              }"
+              class="flex items-center gap-2"
+            >
+              <ServerIcon class="h-4 w-4" />
+              <span class="text-xs">{{ isJupyterServersOpen ? 'Hide' : 'Show' }} Jupyter</span>
+            </Button>
+            
+            <!-- Toggle Vibe -->
+            <Button
+              variant="ghost"
+              size="sm"
+              @click="isTerminalVisible = !isTerminalVisible"
+              class="flex items-center gap-2"
+            >
+              <Terminal class="h-4 w-4" />
+              <span class="text-xs">{{ isTerminalVisible ? 'Hide' : 'Show' }} Vibe</span>
+            </Button>
+          </div>
+        </div>
+
+        <!-- Loading state -->
+        <div v-if="isLoading" class="flex-1 flex items-center justify-center">
+          <LoadingSpinner class="w-8 h-8" />
+        </div>
+
+        <!-- Editor content -->
+        <div
+          v-else
+          ref="editorContainer"
+          class="flex-1 overflow-auto"
+          style="overflow-anchor: none; scrollbar-gutter: stable"
+        >
+          <div class="px-6 md:px-8 lg:px-12 py-6 mx-auto max-w-none">
+            <div class="editor-container max-w-3xl mx-auto">
+              <EditorContent v-if="editor" :editor="editor" />
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Vibe Component -->
+      <VibeTerminal 
+        v-if="isTerminalVisible" 
+        :editor="editor || null"
+        :boardId="vibeCurrentBoardId"
+        :isWindowMode="terminalWindowMode"
+        :isLoading="terminalLoading"
+        :error="terminalError"
+        @update:collapsed="(collapsed: boolean) => { if (!collapsed) isTerminalVisible = true }"
+        @toggle-window-mode="handleWindowModeToggle"
+        @error="(error: Error | string) => terminalError = typeof error === 'string' ? error : error.message"
+        @board-created="handleBoardCreated"
+        @refresh="refreshTerminal"
+        @reset="resetVibeBoard"
+      >
+        <template #footer>
+          <div class="flex items-center justify-between border-t border-border px-4 py-2">
+            <div class="flex items-center gap-2">
+              <Button variant="ghost" size="sm" @click="refreshTerminal">
+                <RefreshCw class="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
+              <Button variant="ghost" size="sm" @click="resetVibeWidth" class="ml-1">
+                <Minimize2 class="h-4 w-4 mr-1" />
+                Reset Width
+              </Button>
+            </div>
+            <div class="flex gap-2">
+              <Button variant="ghost" size="sm" @click="handleTerminalMinimize">
+                <MinusCircle class="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="sm" @click="handleWindowModeToggle">
+                <Maximize2 class="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          <div class="text-xs text-muted-foreground ml-2">
+            <kbd class="px-1 py-0.5 rounded bg-muted border border-border">Ctrl+`</kbd> Toggle
+          </div>
+        </template>
+      </VibeTerminal>
     </div>
-
-    <!-- Favorites Sidebar is now rendered outside the editor layout -->
-    <FavoriteBlocksSidebar :editor="editor" />
-
-    <!-- Version History Dialog -->
-    <VersionHistoryDialog 
-      :nota-id="notaId"
-      v-model:open="showVersionHistory"
-      @version-restored="refreshEditorContent" 
-    />
-
-    <!-- Vibe Terminal -->
-    <VibeTerminal 
-      v-if="editor" 
-      :editor="editor" 
-      @toggle="handleVibeTerminalToggle"
-      @resize="handleVibeTerminalResize"
-    />
   </div>
 </template>
 
@@ -734,95 +912,53 @@ defineExpose({
   @apply min-h-[calc(100vh-10rem)];
 }
 
-/* Styles for editor with terminal */
-.editor-with-terminal .editor-content {
+/* Styles for editor with vibe */
+.editor-with-vibe .editor-content {
   transition: height 0.2s ease-out;
   background-color: hsl(var(--background));
 }
 
-.editor-with-terminal :deep(.ProseMirror) {
-  min-height: unset; /* Allow the editor to be smaller when terminal is open */
+.editor-with-vibe :deep(.ProseMirror) {
+  min-height: unset; /* Allow the editor to be smaller when vibe is open */
 }
 
-/* Ensure the editor area has a solid background when terminal is open */
-.editor-with-terminal .flex-1.relative.overflow-auto {
+/* Ensure the editor area has a solid background when vibe is open */
+.editor-with-vibe .flex-1.relative.overflow-auto {
   background-color: hsl(var(--background));
 }
 
-/* Global styles to prevent transparency in terminal elements */
-:global(.vibe-terminal) {
-  background-color: hsl(var(--background)) !important;
-  border-top: 1px solid hsl(var(--border));
-}
-
-:global(.vibe-block-terminal) {
-  background-color: hsl(var(--background)) !important;
-}
-
-/* Ensure all terminal elements have solid backgrounds */
-:global(.vibe-terminal *),
-:global(.vibe-block-terminal *) {
-  backdrop-filter: none !important;
-}
-
-/* Force solid backgrounds on various UI elements */
-:global(.vibe-terminal .card),
-:global(.vibe-terminal .card-content),
-:global(.vibe-terminal .tabs-content),
-:global(.vibe-terminal .tabs-list),
-:global(.vibe-terminal .tabs-trigger) {
-  background-color: hsl(var(--card)) !important;
-}
-
-/* Ensure form elements have solid backgrounds */
-:global(.vibe-terminal button),
-:global(.vibe-terminal input),
-:global(.vibe-terminal textarea),
-:global(.vibe-terminal select) {
-  background-color: hsl(var(--background)) !important;
-  backdrop-filter: none !important;
-}
-
-/* Specific overrides for shadcn components */
-:global(.vibe-terminal [data-state='active']) {
-  background-color: hsl(var(--background)) !important;
-}
-
-:global(.vibe-terminal .alert),
-:global(.vibe-terminal .button),
-:global(.vibe-terminal .input),
-:global(.vibe-terminal .dropdown) {
-  background-color: hsl(var(--background)) !important;
-}
-
-/* Dark mode support */
-:global(.dark) .editor-with-terminal .editor-content,
-:global(.dark) .editor-with-terminal .flex-1.relative.overflow-auto {
+/* Dark mode support for editor */
+:global(.dark) .editor-with-vibe .editor-content,
+:global(.dark) .editor-with-vibe .flex-1.relative.overflow-auto {
   background-color: hsl(var(--background));
 }
 
-:global(.dark) .vibe-terminal {
-  background-color: hsl(var(--background)) !important;
-  border-top: 1px solid hsl(var(--border));
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+/* Add styles for vibe integration in editor */
+.editor-with-vibe {
+  padding-right: 40px; /* Add padding when vibe is collapsed */
 }
 
-:global(.dark) .vibe-terminal button,
-:global(.dark) .vibe-terminal input,
-:global(.dark) .vibe-terminal textarea,
-:global(.dark) .vibe-terminal select {
-  background-color: hsl(var(--muted)) !important;
+/* Vibe toggle button in the toolbar */
+.vibe-toggle-btn {
+  position: relative;
 }
 
-/* Ensure proper form element styling in dark mode */
-:global(.dark) .vibe-input-panel input[type="checkbox"] {
-  background-color: hsl(var(--muted)) !important;
-  opacity: 1 !important;
+.vibe-toggle-btn .badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  font-size: 0.65rem;
+  height: 16px;
+  min-width: 16px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-/* Make sure card components are properly styled in dark mode */
-:global(.dark) .vibe-terminal .card,
-:global(.dark) .vibe-terminal .card-content {
-  background-color: hsl(var(--card)) !important;
+/* Adjust editor with vibe styles to account for variable width */
+.editor-with-vibe {
+  width: calc(100% - v-bind('vibeUIService.state.value.width') - 10px);
+  transition: width 0.2s ease;
 }
 </style>

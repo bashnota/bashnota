@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, onMounted } from 'vue'
 import { v4 as uuidv4 } from 'uuid'
-import { type ActorConfig, type VibeTask, type TaskBoard, ActorType, type DatabaseTable, type DatabaseEntry, DatabaseEntryType, type CustomActor } from '@/types/vibe'
+import { ActorType, TaskPriority, DatabaseEntryType } from '@/types/vibe'
+import type { TaskStatus, ActorConfig, VibeTask, TaskBoard, DatabaseTable, DatabaseEntry, CustomActor } from '@/types/vibe'
 import { logger } from '@/services/logger'
 import { vibeDB, type StoredActorConfig } from '@/services/vibeDB'
 import { defaultActorConfigs, actorDescriptions } from '@/config/actorDefaults'
@@ -17,6 +18,20 @@ export const useVibeStore = defineStore('vibe', () => {
   const customActors = ref<CustomActor[]>([])
   const actorConfigs = ref<Record<ActorType, ActorConfig>>(defaultActorConfigs)
   const initialized = ref(false)
+  
+  /**
+   * Save the current state to localStorage
+   */
+  async function saveToLocalStorage() {
+    try {
+      localStorage.setItem('vibe-boards', JSON.stringify(boards.value))
+      localStorage.setItem('vibe-tables', JSON.stringify(tables.value))
+      localStorage.setItem('vibe-entries', JSON.stringify(entries.value))
+      logger.log('Vibe state saved to localStorage')
+    } catch (error) {
+      logger.error('Failed to save vibe state to localStorage:', error)
+    }
+  }
   
   /**
    * Load actor configurations from the database
@@ -159,12 +174,37 @@ export const useVibeStore = defineStore('vibe', () => {
   }
   
   /**
-   * Get a board by ID
-   * @param boardId Board ID
-   * @returns The board or undefined if not found
+   * Get a board by id
+   * @param id The id of the board to get
+   * @returns The board with the given id
    */
-  function getBoard(boardId: string): TaskBoard | undefined {
-    return boards.value.find(board => board.id === boardId)
+  function getBoard(id: string): TaskBoard | null {
+    if (!id) {
+      console.error('[VibeStore] Cannot get board with undefined id')
+      return null
+    }
+
+    const board = boards.value.find(board => board.id === id)
+    
+    if (board) {
+      // Validate that all tasks have the correct boardId
+      const fixedTasks = board.tasks.map(task => {
+        if (task.boardId !== id) {
+          console.warn(`[VibeStore] Task ${task.id} has incorrect boardId ${task.boardId}, fixing to ${id}`)
+          return { ...task, boardId: id }
+        }
+        return task
+      })
+      
+      // If any tasks were fixed, update the board
+      if (fixedTasks.some((task, index) => task.boardId !== board.tasks[index].boardId)) {
+        board.tasks = fixedTasks
+        // Save changes to localStorage asynchronously
+        saveToLocalStorage()
+      }
+    }
+    
+    return board || null
   }
   
   /**
@@ -173,38 +213,66 @@ export const useVibeStore = defineStore('vibe', () => {
    * @param task Task data
    * @returns The created task
    */
-  function createTask(
-    boardId: string, 
-    task: Omit<VibeTask, 'id' | 'boardId' | 'status' | 'createdAt'>
-  ): VibeTask {
+  async function createTask(boardId: string, task: Partial<VibeTask>): Promise<string> {
+    logger.log('createTask', { boardId, task })
     const board = getBoard(boardId)
     if (!board) {
+      logger.error('Board not found', { boardId })
       throw new Error(`Board ${boardId} not found`)
     }
-    
+
     const newTask: VibeTask = {
-      id: uuidv4(),
-      boardId,
-      status: 'pending',
+      id: task.id || uuidv4(),
+      title: task.title || 'New Task',
+      description: task.description || '',
+      boardId: boardId,
+      status: (task.status as TaskStatus) || 'pending',
+      actorType: task.actorType || ActorType.CODER,
+      priority: task.priority || TaskPriority.MEDIUM,
+      dependencies: task.dependencies || [],
       createdAt: new Date(),
-      ...task,
+      metadata: task.metadata || {}
     }
-    
+
     board.tasks.push(newTask)
-    return newTask
+    
+    // Ensure task is persisted immediately
+    await saveToLocalStorage()
+    
+    return newTask.id
   }
   
   /**
    * Get a task from a board
-   * @param boardId Board ID
-   * @param taskId Task ID
-   * @returns The task or undefined if not found
+   * @param boardId The id of the board
+   * @param taskId The id of the task
+   * @returns The task or null if not found
    */
-  function getTaskFromBoard(boardId: string, taskId: string): VibeTask | undefined {
-    const board = getBoard(boardId)
-    if (!board) return undefined
+  function getTaskFromBoard(boardId: string, taskId: string): VibeTask | null {
+    if (!boardId || !taskId) {
+      console.error('[VibeStore] Cannot get task with undefined board or task id')
+      return null
+    }
     
-    return board.tasks.find(task => task.id === taskId)
+    const board = getBoard(boardId)
+    if (!board) {
+      console.error(`[VibeStore] Board ${boardId} not found`)
+      return null
+    }
+    
+    const task = board.tasks.find(task => task.id === taskId)
+    if (task) {
+      // Ensure the task has the correct boardId
+      if (task.boardId !== boardId) {
+        console.warn(`[VibeStore] Task ${task.id} has incorrect boardId ${task.boardId}, fixing to ${boardId}`)
+        task.boardId = boardId
+        // Save changes to localStorage asynchronously
+        saveToLocalStorage()
+      }
+      return task
+    }
+    
+    return null
   }
   
   /**
@@ -214,24 +282,41 @@ export const useVibeStore = defineStore('vibe', () => {
    * @param updates Updates to apply to the task
    * @returns The updated task
    */
-  function updateTask(
-    boardId: string,
-    taskId: string,
-    updates: Partial<VibeTask>
-  ): VibeTask | undefined {
-    const board = getBoard(boardId)
-    if (!board) return undefined
-    
-    const taskIndex = board.tasks.findIndex(task => task.id === taskId)
-    if (taskIndex === -1) return undefined
-    
-    // Apply updates
-    board.tasks[taskIndex] = {
-      ...board.tasks[taskIndex],
-      ...updates,
+  async function updateTask(boardId: string, taskId: string, updates: Partial<VibeTask>) {
+    try {
+      logger.log(`Updating task ${taskId} in board ${boardId}:`, updates)
+      
+      // Find the board index
+      const boardIndex = boards.value.findIndex(b => b.id === boardId)
+      if (boardIndex === -1) {
+        logger.error(`Board ${boardId} not found when updating task ${taskId}`)
+        throw new Error(`Board ${boardId} not found`)
+      }
+
+      // Find the task index
+      const taskIndex = boards.value[boardIndex].tasks.findIndex(t => t.id === taskId)
+      if (taskIndex === -1) {
+        logger.error(`Task ${taskId} not found in board ${boardId}`)
+        throw new Error(`Task ${taskId} not found in board ${boardId}`)
+      }
+
+      // Update the task
+      const taskToUpdate = boards.value[boardIndex].tasks[taskIndex]
+      const updatedTask = {
+        ...taskToUpdate,
+        ...updates
+      }
+
+      // Replace the task in the board
+      boards.value[boardIndex].tasks[taskIndex] = updatedTask
+      logger.log(`Task ${taskId} updated successfully`)
+      
+      await saveToLocalStorage()
+      return updatedTask
+    } catch (error) {
+      logger.error('Error updating task:', error)
+      throw error
     }
-    
-    return board.tasks[taskIndex]
   }
   
   /**
@@ -585,24 +670,77 @@ export const useVibeStore = defineStore('vibe', () => {
     return customActors.value.filter(actor => actor.config.enabled)
   }
 
+  /**
+   * Delete a board and all its associated tasks and tables
+   * @param boardId Board ID to delete
+   * @returns True if the board was deleted
+   */
+  function deleteBoard(boardId: string): boolean {
+    try {
+      logger.log(`Deleting board ${boardId}`)
+      
+      // Find the board
+      const boardIndex = boards.value.findIndex(board => board.id === boardId)
+      if (boardIndex === -1) {
+        logger.warn(`Board ${boardId} not found, cannot delete`)
+        return false
+      }
+      
+      // Delete all tasks from this board
+      const boardTasks = boards.value[boardIndex].tasks
+      for (const task of boardTasks) {
+        deleteTask(boardId, task.id)
+      }
+      
+      // Delete database tables for this board
+      const boardTables = tables.value.filter(table => table.boardId === boardId)
+      for (const table of boardTables) {
+        // Remove entries for this table
+        entries.value = entries.value.filter(entry => entry.tableId !== table.id)
+      }
+      
+      // Remove the tables
+      tables.value = tables.value.filter(table => table.boardId !== boardId)
+      
+      // Delete the board itself
+      boards.value.splice(boardIndex, 1)
+      
+      // Save changes
+      saveToLocalStorage()
+      
+      logger.log(`Board ${boardId} deleted successfully`)
+      return true
+    } catch (error) {
+      logger.error(`Error deleting board ${boardId}:`, error)
+      return false
+    }
+  }
+
   // Initialize on store creation
   if (!initialized.value) {
     loadActorConfigs()
   }
 
+  // Return store
   return {
+    // State
     boards,
+    tables,
+    entries,
     actorConfigs,
+    customActors,
+    
+    // Actions
     createBoard,
     getBoard,
+    deleteBoard,
     createTask,
     getTaskFromBoard,
     updateTask,
     deleteTask,
     getActorConfig,
     updateActorConfig,
-    tables,
-    entries,
+    getActorDescription,
     createTable,
     getTablesForBoard,
     getTable,
@@ -612,7 +750,6 @@ export const useVibeStore = defineStore('vibe', () => {
     getEntry,
     updateEntry,
     deleteEntry,
-    customActors,
     addCustomActor,
     updateCustomActor,
     removeCustomActor,
@@ -622,6 +759,7 @@ export const useVibeStore = defineStore('vibe', () => {
     loadActorConfigs,
     saveActorConfigs,
     restoreToDefaults,
-    initialized
+    initialized,
+    saveToLocalStorage
   }
 }) 

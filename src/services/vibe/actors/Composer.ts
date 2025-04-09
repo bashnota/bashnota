@@ -39,11 +39,54 @@ export class Composer extends BaseActor {
   }
 
   /**
+   * Validate a task to ensure it has all required properties
+   * @param task The task to validate
+   * @param boardId The current board ID for reference
+   * @throws Error if the task is invalid
+   */
+  private validateTask(task: VibeTask, boardId: string): void {
+    if (!task) {
+      throw new Error('Task is null or undefined');
+    }
+    
+    if (!task.id) {
+      throw new Error('Task is missing ID');
+    }
+    
+    // Ensure boardId is set correctly
+    if (!task.boardId) {
+      logger.log(`Task ${task.id} is missing boardId, setting to current board ${boardId}`);
+      task.boardId = boardId;
+    } else if (task.boardId !== boardId) {
+      logger.warn(`Task ${task.id} has incorrect boardId ${task.boardId}, should be ${boardId}`);
+      task.boardId = boardId;
+    }
+    
+    // Check other essential properties
+    if (!task.title) {
+      logger.warn(`Task ${task.id} is missing title, using default`);
+      task.title = 'Untitled Task';
+    }
+    
+    if (!task.actorType) {
+      throw new Error(`Task ${task.id} is missing actorType`);
+    }
+    
+    // Ensure dependencies is an array
+    if (!task.dependencies) {
+      task.dependencies = [];
+    }
+  }
+
+  /**
    * Execute the Composer actor
    * @param task The composition task
    * @returns The composition result
    */
   protected async execute(task: VibeTask): Promise<ComposerResult> {
+    // Validate the task
+    this.validateTask(task, task.boardId);
+    
     // Create a tasks database table
     const tasksTable = this.createTable(
       task.boardId,
@@ -72,8 +115,12 @@ export class Composer extends BaseActor {
       description: task.description,
       actorType: ActorType.PLANNER,
       dependencies: [],
+      boardId: task.boardId, // Explicitly set boardId
       priority: TaskPriority.HIGH
     })
+
+    // Validate the created planner task
+    this.validateTask(plannerTask, task.boardId);
 
     // Add to database
     taskDatabase.tasks[plannerTask.id] = plannerTask
