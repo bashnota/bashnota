@@ -110,14 +110,19 @@ export class Composer extends BaseActor {
     }
 
     // First, create a planning task
-    const plannerTask = await this.vibeStore.createTask(task.boardId, {
+    const plannerTaskId = await this.vibeStore.createTask(task.boardId, {
       title: 'Create execution plan',
       description: task.description,
       actorType: ActorType.PLANNER,
       dependencies: [],
-      boardId: task.boardId, // Explicitly set boardId
       priority: TaskPriority.HIGH
     })
+    
+    // Get the complete task object using the ID
+    const plannerTask = this.vibeStore.getTaskFromBoard(task.boardId, plannerTaskId);
+    if (!plannerTask) {
+      throw new Error(`Failed to retrieve planner task with ID ${plannerTaskId}`);
+    }
 
     // Validate the created planner task
     this.validateTask(plannerTask, task.boardId);
@@ -212,7 +217,7 @@ export class Composer extends BaseActor {
       const plannedTask = plan.tasks[i]
       
       // Create the task
-      const newTask = await this.vibeStore.createTask(boardId, {
+      const newTaskId = await this.vibeStore.createTask(boardId, {
         title: plannedTask.title,
         description: plannedTask.description,
         actorType: plannedTask.actorType,
@@ -221,21 +226,27 @@ export class Composer extends BaseActor {
         customActorId: plannedTask.customActorId // Add customActorId for CUSTOM actor tasks
       })
 
+      // Get the complete task object
+      const newTask = this.vibeStore.getTaskFromBoard(boardId, newTaskId);
+      if (!newTask) {
+        throw new Error(`Failed to retrieve task with ID ${newTaskId}`);
+      }
+
       // Store the task ID mapping
-      taskIdMap[i] = newTask.id
+      taskIdMap[i] = newTaskId
       
       // Add to database
-      taskDatabase.tasks[newTask.id] = newTask
+      taskDatabase.tasks[newTaskId] = newTask
       createdTasks.push(newTask)
       
       // Store the task in the database table
       this.createEntry(
         tasksTableId,
-        newTask.id,
+        newTaskId,
         DatabaseEntryType.DATA,
-        `task_${newTask.id}`,
+        `task_${newTaskId}`,
         {
-          taskId: newTask.id,
+          taskId: newTaskId,
           title: plannedTask.title,
           actorType: plannedTask.actorType,
           priority: plannedTask.priority,

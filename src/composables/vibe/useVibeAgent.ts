@@ -160,7 +160,6 @@ export function useVibeAgent(
       actorType: ActorType.COMPOSER,
       dependencies: [],
       priority: TaskPriority.HIGH,
-      boardId: boardId, // Explicitly add boardId
       metadata: { enabledActors }
     });
     logger.log('Composer task created with ID:', composerTaskId);
@@ -170,7 +169,6 @@ export function useVibeAgent(
       description: query,
       actorType: ActorType.PLANNER,
       dependencies: [],
-      boardId: boardId, // Explicitly add boardId
       priority: TaskPriority.HIGH
     });
     logger.log('Planner task created with ID:', plannerTaskId);
@@ -382,7 +380,6 @@ export function useVibeAgent(
         actorType: ActorType.COMPOSER,
         dependencies: [],
         priority: TaskPriority.HIGH,
-        boardId: props.boardId,
         metadata: {
           enabledActors: [
             ActorType.COMPOSER,
@@ -400,7 +397,6 @@ export function useVibeAgent(
         description: board.title || 'Restarted Vibe Session',
         actorType: ActorType.PLANNER,
         dependencies: [],
-        boardId: props.boardId,
         priority: TaskPriority.HIGH
       })
       

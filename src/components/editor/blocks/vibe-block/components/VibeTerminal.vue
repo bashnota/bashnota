@@ -83,6 +83,9 @@
       @toggle-expand="toggleExpand"
       @toggle-fullscreen="toggleFullscreen"
       @clear-terminal="clearAllTasks()"
+      @stop-execution="stopExecution"
+      @restart-agent="restartAgent"
+      @delete-agent="confirmDeleteAgent"
     />
 
     <!-- Terminal Content - Use CSS for visibility instead of v-show -->

@@ -288,7 +288,6 @@ class VibeUIService {
             description: board.title || 'Manual execution',
             actorType: ActorType.PLANNER,
             dependencies: [],
-            boardId: board.id, // Explicitly set boardId
             priority: TaskPriority.HIGH
           });
           
@@ -310,7 +309,6 @@ class VibeUIService {
             description: board.title || 'Manual execution',
             actorType: ActorType.COMPOSER,
             dependencies: [],
-            boardId: board.id, // Explicitly set boardId
             priority: TaskPriority.HIGH,
             metadata: {
               enabledActors: [
