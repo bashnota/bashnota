@@ -52,6 +52,21 @@ export function useTaskGraph(options: UseTaskGraphOptions = {}) {
         return
       }
   
+      // Check if Vue Flow container exists and has dimensions
+      const container = document.querySelector(`.vue-flow[data-id="${flowId}"]`)
+      if (!container) {
+        logger.warn(`Vue Flow container with ID ${flowId} not found`)
+        // Don't clear elements yet, wait for container to be available
+        return
+      }
+      
+      const { width, height } = container.getBoundingClientRect()
+      if (width === 0 || height === 0) {
+        logger.warn(`Vue Flow container has invalid dimensions: ${width}x${height}`)
+        // Don't proceed if container has no size
+        return
+      }
+  
       const nodes: TaskNode[] = []
       const edges: TaskEdge[] = []
       
@@ -59,6 +74,13 @@ export function useTaskGraph(options: UseTaskGraphOptions = {}) {
       
       // Create a node for each task
       tasksToUse.forEach((task, index) => {
+        // Ensure task is a valid object with an ID
+        if (!task || typeof task !== 'object') {
+          logger.warn('Invalid task object, skipping:', task)
+          return
+        }
+        
+        // Handle both string IDs and objects with ID properties
         if (!task.id) {
           logger.warn('Task missing ID, skipping:', task)
           return
@@ -84,10 +106,16 @@ export function useTaskGraph(options: UseTaskGraphOptions = {}) {
         nodes.push(node)
         
         // Create edges for dependencies
-        if (task.dependencies && task.dependencies.length > 0) {
+        if (task.dependencies && Array.isArray(task.dependencies) && task.dependencies.length > 0) {
           task.dependencies.forEach(depId => {
+            // Skip invalid dependency IDs
+            if (!depId) {
+              logger.warn(`Task ${task.id} has invalid dependency ID:`, depId)
+              return
+            }
+            
             // Verify the dependency ID exists
-            const dependencyExists = tasksToUse.some(t => t.id === depId);
+            const dependencyExists = tasksToUse.some(t => t && t.id === depId);
             
             if (!dependencyExists) {
               logger.warn(`Task ${task.id} depends on missing task ${depId}`)

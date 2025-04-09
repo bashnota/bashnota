@@ -147,11 +147,45 @@ const handleNodeClick = (e: NodeMouseEvent) => {
 // Watch for changes in tasks and rebuild graph
 watch(() => props.tasks, (newTasks) => {
   logger.log('Tasks changed in child component:', newTasks?.length || 0)
-  if (newTasks && newTasks.length > 0) {
-    updateTasks(newTasks)
-    nextTick(() => {
-      buildGraph()
-    })
+  if (!newTasks) {
+    logger.warn('Tasks is undefined or null')
+    elements.value = []
+    return
+  }
+  
+  // Validate tasks have proper IDs before building graph
+  const validTasks = newTasks.filter(task => task && task.id)
+  if (validTasks.length !== newTasks.length) {
+    logger.warn(`Found ${newTasks.length - validTasks.length} invalid tasks without IDs`)
+  }
+  
+  if (validTasks.length === 0) {
+    logger.warn('No valid tasks with IDs to display')
+    elements.value = []
+    return
+  }
+  
+  if (validTasks.length > 0) {
+    try {
+      updateTasks(validTasks)
+      nextTick(() => {
+        buildGraph()
+        // Wait for elements to update then fit view
+        nextTick(() => {
+          setTimeout(() => {
+            if (elements.value.length > 0) {
+              fitView({ padding: 0.2 })
+            }
+          }, 100)
+        })
+      })
+    } catch (error) {
+      logger.error('Error building graph:', error)
+      elements.value = []
+    }
+  } else {
+    // Clear the graph if no tasks
+    elements.value = []
   }
 }, { deep: true, immediate: true })
 
@@ -188,25 +222,39 @@ watch(() => props.selectedTaskId, (newId) => {
 onMounted(() => {
   logger.log('Child TaskGraph mounted, tasks:', props.tasks?.length || 0)
   
-  // Delay slightly to ensure DOM is ready
+  // Give DOM time to fully render and calculate dimensions
   setTimeout(() => {
+    const container = document.querySelector('.task-graph-container')
+    if (container) {
+      const { width, height } = container.getBoundingClientRect()
+      logger.log(`Graph container dimensions: ${width}x${height}`)
+      
+      if (width === 0 || height === 0) {
+        logger.warn('Graph container has zero width or height')
+      }
+    }
+    
     if (props.tasks && props.tasks.length > 0) {
       updateTasks(props.tasks)
-      buildGraph()
-      nextTick(() => {
-        setTimeout(() => {
-          fitView({ padding: 0.2, duration: 800 })
-        }, 100)
-      })
+      
+      // Delay graph building to ensure container is ready
+      setTimeout(() => {
+        buildGraph()
+        nextTick(() => {
+          setTimeout(() => {
+            fitView({ padding: 0.2, duration: 800 })
+          }, 200)
+        })
+      }, 100)
     }
-  }, 50)
+  }, 200) // Increased delay for container to render
 })
 </script>
 
 <style scoped>
 .task-graph-container {
   width: 100%;
-  height: 100%;
+  height: 500px;
   min-height: 400px;
   position: relative;
   display: flex;
@@ -276,11 +324,17 @@ onMounted(() => {
 
 .task-graph {
   padding: 0;
+  width: 100%;
+  height: 400px;
+  position: relative;
 }
 
 .task-flow {
   width: 100%;
   height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 
 :deep(.vue-flow) {
@@ -424,8 +478,13 @@ onMounted(() => {
 /* Add responsive adjustments */
 @media (max-width: 768px) {
   .task-graph-container {
+    height: 450px;
     min-height: 350px;
-    max-height: 400px;
+    max-height: 500px;
+  }
+  
+  .task-graph {
+    height: 350px;
   }
   
   .task-graph-header {

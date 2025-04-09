@@ -4,35 +4,30 @@
       <Input
         :value="props.query"
         placeholder="Enter your query to start the Vibe agent..."
-        class="h-12 pr-24"
-        :class="{ 'border-primary border-2': props.isInitialQuery }"
+        class="h-14 pl-12 pr-5 text-base transition-all focus:ring-2 focus:ring-primary/30"
+        :class="{ 'border-primary border-2 shadow-sm shadow-primary/20': props.isInitialQuery }"
         @input="updateQuery($event)"
         @keyup.enter="handleSubmit"
         aria-label="Vibe query input"
         autofocus
       />
-      <Button 
-        @click.stop.prevent="handleSubmit" 
-        class="absolute right-1 top-1 h-10 whitespace-nowrap"
-        type="button"
-        aria-label="Ask Vibe"
-        :disabled="!props.query.trim()"
-        :class="{ 'bg-primary hover:bg-primary/90': props.isInitialQuery }"
-      >
-        <Zap class="h-4 w-4 mr-2" />
-        {{ props.isInitialQuery ? 'Start Agent' : 'Ask' }}
-      </Button>
+      <div class="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/70">
+        <Zap class="h-5 w-5" :class="{ 'text-primary': props.isInitialQuery || props.query.trim() }" />
+      </div>
+      <div v-if="props.query.trim()" class="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+        Press Enter to submit
+      </div>
     </div>
-    <div v-if="props.isInitialQuery" class="text-xs text-primary mt-1 pl-1">
-      Enter your question or task to begin working with this agent
+    <div v-if="props.isInitialQuery" class="text-xs text-primary mt-1.5 pl-2 flex items-center gap-1.5">
+      <MessageSquare class="h-3.5 w-3.5" />
+      <span>Enter your question or task to begin working with this agent</span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Zap } from 'lucide-vue-next'
+import { Zap, MessageSquare } from 'lucide-vue-next'
 
 const props = defineProps({
   query: {
@@ -61,4 +56,22 @@ function handleSubmit() {
     emit('submit')
   }
 }
-</script> 
+</script>
+
+<style scoped>
+/* Add subtle animation to the input icon when typing */
+.text-primary {
+  transition: all 0.2s ease;
+}
+
+.border-primary {
+  transition: all 0.3s ease;
+}
+
+/* Better focus state */
+.input:focus-visible {
+  outline: none;
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 2px hsla(var(--primary), 0.2);
+}
+</style> 

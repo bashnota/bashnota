@@ -345,14 +345,15 @@ function getStatusVariant(status) {
 }
 
 .task-content-panel {
-  display: flex;
-  flex-direction: column;
-  height: calc(100% - 40px); /* Accounting for tab header height */
-  overflow: hidden;
+  /* Add explicit dimensions */
+  min-height: 400px;
+  height: 500px;
 }
 
 .graph-panel {
-  min-height: 500px;
+  display: flex;
+  flex-direction: column;
+  height: 500px;
 }
 
 .task-details-panel {
