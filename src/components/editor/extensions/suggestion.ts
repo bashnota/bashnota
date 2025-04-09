@@ -29,7 +29,8 @@ import {
   PenTool,
   SparklesIcon,
   BookIcon,
-  FileText
+  FileText,
+  Terminal
 } from 'lucide-vue-next'
 import { toast } from '@/lib/utils'
 import { logger } from '@/services/logger'
@@ -880,6 +881,23 @@ function createAdvancedCommands(): CommandItem[] {
             }
           } as any)
           .run();
+      },
+    },
+    {
+      title: 'Vibe Terminal',
+      description: 'Open Vibe in terminal mode',
+      category: 'AI',
+      icon: Terminal,
+      keywords: ['ai', 'vibe', 'terminal', 'assistant', 'chat'],
+      command: ({ editor, range }: CommandArgs) => {
+        // Delete the slash command text
+        editor.chain().focus().deleteRange(range).run()
+        
+        // Emit the vibe:command event
+        editor.emit('vibe:command', { 
+          query: '',
+          isActive: false
+        })
       },
     },
     // Sub Nota command defined separately for clarity

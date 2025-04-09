@@ -2,8 +2,15 @@ import { Node, type NodeViewRenderer } from '@tiptap/core'
 import { VueNodeViewRenderer } from '@tiptap/vue-3'
 import VibeBlock from '../blocks/vibe-block/VibeBlock.vue'
 
-// Add type declaration for the Vibe command
+// Add custom event to EditorEvents
 declare module '@tiptap/core' {
+  interface EditorEvents {
+    'vibe:command': { 
+      query: string; 
+      isActive: boolean 
+    }
+  }
+  
   interface Commands<ReturnType> {
     vibe: {
       /**
@@ -29,6 +36,7 @@ export interface VibeAttributes {
 
 export interface VibeOptions {
   HTMLAttributes: Record<string, any>
+  useTerminal?: boolean
 }
 
 export const VibeExtension = Node.create<VibeOptions>({
@@ -39,6 +47,13 @@ export const VibeExtension = Node.create<VibeOptions>({
   content: '',
   
   atom: true,
+
+  addOptions() {
+    return {
+      HTMLAttributes: {},
+      useTerminal: true,
+    }
+  },
   
   addAttributes() {
     return {
@@ -77,7 +92,19 @@ export const VibeExtension = Node.create<VibeOptions>({
   
   addCommands() {
     return {
-      insertVibe: (options = {}) => ({ commands }) => {
+      insertVibe: (options = {}) => ({ commands, editor }) => {
+        // If terminal mode is enabled, emit an event instead of inserting a block
+        if (this.options.useTerminal) {
+          // Emit an event that can be caught by the terminal component
+          editor.emit('vibe:command', {
+            query: options.query || '',
+            isActive: options.isActive || false,
+          })
+          
+          return true
+        }
+        
+        // Otherwise insert a block as usual
         return commands.insertContent({
           type: this.name,
           attrs: {

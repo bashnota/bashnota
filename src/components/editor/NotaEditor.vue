@@ -21,6 +21,7 @@ import { getEditorExtensions } from './extensions'
 import { useEquationCounter, EQUATION_COUNTER_KEY } from '@/composables/useEquationCounter'
 import { useCitationStore } from '@/stores/citationStore'
 import { logger } from '@/services/logger'
+import VibeTerminal from './VibeTerminal.vue'
 
 // Import shared CSS
 import '@/assets/editor-styles.css'
@@ -44,6 +45,9 @@ const isReferencesOpen = ref(false)
 const isJupyterServersOpen = ref(false)
 const autoSaveEnabled = ref(true)
 const showVersionHistory = ref(false)
+const isLoading = ref(true)
+const editorContainer = ref(null)
+const isTerminalVisible = ref(false)
 
 const currentNota = computed(() => {
   return notaStore.getCurrentNota(props.notaId)
@@ -206,8 +210,6 @@ watch(() => content.value, () => {
   // Reset the equation counter when the content changes
   resetEquationCounter()
 })
-
-const isLoading = ref(true)
 
 const wordCount = computed(() => {
   if (!editor.value) return 0
@@ -567,6 +569,27 @@ watch(() => citationStore.getCitationsByNotaId(props.notaId), () => {
   updateCitationNumbers()
 }, { deep: true })
 
+// Handle vibe terminal toggle
+const handleVibeTerminalToggle = (isVisible: boolean) => {
+  isTerminalVisible.value = isVisible
+}
+
+// Handle vibe terminal resize
+const handleVibeTerminalResize = (resizeData: { height: number, isMaximized: boolean }) => {
+  const { height, isMaximized } = resizeData
+  const container = editorContainer.value as HTMLElement | null
+  
+  if (container) {
+    const editorContent = container.querySelector('.editor-content') as HTMLElement
+    if (editorContent) {
+      // Apply new height to editor content based on terminal height
+      editorContent.style.height = isMaximized 
+        ? `calc(100vh - ${height + 120}px)` // Extra space for header
+        : `calc(100vh - ${height + 50}px)`
+    }
+  }
+}
+
 defineExpose({
   insertSubNotaLink,
   createAndLinkSubNota,
@@ -574,7 +597,7 @@ defineExpose({
 </script>
 
 <template>
-  <div class="h-full w-full flex overflow-hidden">
+  <div class="h-full w-full flex overflow-hidden" :class="{'editor-with-terminal': isTerminalVisible}">
     <!-- Loading spinner -->
     <LoadingSpinner v-if="isLoading" class="absolute inset-0 z-10" />
 
@@ -675,9 +698,9 @@ defineExpose({
       </div>
 
       <!-- Editor Content -->
-      <div class="flex-1 relative overflow-auto">
+      <div class="flex-1 relative overflow-auto" ref="editorContainer">
         <!-- Editor Content Area -->
-        <div class="h-full overflow-hidden px-4 md:px-8 lg:px-12">
+        <div class="h-full overflow-hidden px-4 md:px-8 lg:px-12 editor-content">
           <ScrollArea class="h-full">
             <editor-content :editor="editor" class="max-w-4xl mx-auto py-8" />
           </ScrollArea>
@@ -694,6 +717,14 @@ defineExpose({
       v-model:open="showVersionHistory"
       @version-restored="refreshEditorContent" 
     />
+
+    <!-- Vibe Terminal -->
+    <VibeTerminal 
+      v-if="editor" 
+      :editor="editor" 
+      @toggle="handleVibeTerminalToggle"
+      @resize="handleVibeTerminalResize"
+    />
   </div>
 </template>
 
@@ -701,5 +732,97 @@ defineExpose({
 /* Apply the editor-specific class to the editable ProseMirror instance */
 :deep(.ProseMirror) {
   @apply min-h-[calc(100vh-10rem)];
+}
+
+/* Styles for editor with terminal */
+.editor-with-terminal .editor-content {
+  transition: height 0.2s ease-out;
+  background-color: hsl(var(--background));
+}
+
+.editor-with-terminal :deep(.ProseMirror) {
+  min-height: unset; /* Allow the editor to be smaller when terminal is open */
+}
+
+/* Ensure the editor area has a solid background when terminal is open */
+.editor-with-terminal .flex-1.relative.overflow-auto {
+  background-color: hsl(var(--background));
+}
+
+/* Global styles to prevent transparency in terminal elements */
+:global(.vibe-terminal) {
+  background-color: hsl(var(--background)) !important;
+  border-top: 1px solid hsl(var(--border));
+}
+
+:global(.vibe-block-terminal) {
+  background-color: hsl(var(--background)) !important;
+}
+
+/* Ensure all terminal elements have solid backgrounds */
+:global(.vibe-terminal *),
+:global(.vibe-block-terminal *) {
+  backdrop-filter: none !important;
+}
+
+/* Force solid backgrounds on various UI elements */
+:global(.vibe-terminal .card),
+:global(.vibe-terminal .card-content),
+:global(.vibe-terminal .tabs-content),
+:global(.vibe-terminal .tabs-list),
+:global(.vibe-terminal .tabs-trigger) {
+  background-color: hsl(var(--card)) !important;
+}
+
+/* Ensure form elements have solid backgrounds */
+:global(.vibe-terminal button),
+:global(.vibe-terminal input),
+:global(.vibe-terminal textarea),
+:global(.vibe-terminal select) {
+  background-color: hsl(var(--background)) !important;
+  backdrop-filter: none !important;
+}
+
+/* Specific overrides for shadcn components */
+:global(.vibe-terminal [data-state='active']) {
+  background-color: hsl(var(--background)) !important;
+}
+
+:global(.vibe-terminal .alert),
+:global(.vibe-terminal .button),
+:global(.vibe-terminal .input),
+:global(.vibe-terminal .dropdown) {
+  background-color: hsl(var(--background)) !important;
+}
+
+/* Dark mode support */
+:global(.dark) .editor-with-terminal .editor-content,
+:global(.dark) .editor-with-terminal .flex-1.relative.overflow-auto {
+  background-color: hsl(var(--background));
+}
+
+:global(.dark) .vibe-terminal {
+  background-color: hsl(var(--background)) !important;
+  border-top: 1px solid hsl(var(--border));
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+}
+
+:global(.dark) .vibe-terminal button,
+:global(.dark) .vibe-terminal input,
+:global(.dark) .vibe-terminal textarea,
+:global(.dark) .vibe-terminal select {
+  background-color: hsl(var(--muted)) !important;
+}
+
+/* Ensure proper form element styling in dark mode */
+:global(.dark) .vibe-input-panel input[type="checkbox"] {
+  background-color: hsl(var(--muted)) !important;
+  opacity: 1 !important;
+}
+
+/* Make sure card components are properly styled in dark mode */
+:global(.dark) .vibe-terminal .card,
+:global(.dark) .vibe-terminal .card-content {
+  background-color: hsl(var(--card)) !important;
 }
 </style>

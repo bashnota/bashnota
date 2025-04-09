@@ -1,5 +1,5 @@
 <template>
-  <node-view-wrapper>
+  <node-view-wrapper v-if="!terminalMode">
     <div class="vibe-block" :class="{ 'vibe-expanded': isExpanded }">
       <!-- Initial compact view -->
       <VibeBlockHeader
@@ -86,6 +86,71 @@
       @insert-result="insertTaskResult"
     />
   </node-view-wrapper>
+  
+  <!-- Terminal mode version of the component -->
+  <div v-else class="vibe-block-terminal">
+    <!-- Input form when not active -->
+    <VibeInputPanel
+      v-if="!isActive"
+      v-model="queryText"
+      :showJupyterConfig="showJupyterConfig"
+      :showActorSelector="showActorSelector"
+      :jupyterConfig="jupyterConfig"
+      @toggle-jupyter="toggleJupyterConfig"
+      @toggle-actors="toggleActorSelector"
+      @update-jupyter="updateJupyterConfig"
+      @update-actors="updateActorSettings"
+      @submit="onButtonClick"
+    />
+
+    <!-- Active content -->
+    <div v-else class="vibe-active-panel space-y-3">
+      <!-- Loading state -->
+      <div v-if="isLoading" class="flex flex-col items-center justify-center p-4 text-center">
+        <Loader class="h-8 w-8 animate-spin mb-3" />
+        <p class="text-muted-foreground">{{ loadingMessage }}</p>
+      </div>
+
+      <!-- Error state -->
+      <div v-else-if="error" class="flex flex-col items-center">
+        <Alert variant="destructive" class="mb-3">
+          <AlertCircle class="h-4 w-4 mr-2" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{{ error }}</AlertDescription>
+        </Alert>
+        <Button @click="resetVibe" variant="outline" class="mt-2">
+          <RefreshCw class="h-4 w-4 mr-2" />
+          Try Again
+        </Button>
+      </div>
+
+      <!-- Task board details -->
+      <VibeTaskBoard
+        v-else-if="boardTasks.length > 0"
+              :tasks="boardTasks" 
+        :expandedTaskIds="expandedTaskIds"
+        :selectedTaskId="selectedTaskId"
+        :canInsertResult="canInsertResult"
+        :hasStuckTasks="hasStuckTasks"
+        @refresh="refreshTasks"
+        @reset="resetTaskExecution"
+        @toggle-task="toggleTask"
+        @select-dependency="selectDependency"
+        @select-task="selectedTaskId = $event"
+        @insert-result="insertTaskResult"
+        @view-details="showTaskDetailsModal"
+        @load-database="loadDatabaseTables"
+      >
+        <template #database-content>
+          <VibeDatabaseView
+            :tables="databaseTables"
+            :expandedTableIds="expandedTableIds"
+            @toggle-table="toggleTableExpansion"
+          />
+        </template>
+      </VibeTaskBoard>
+    </div>
+  </div>
 </template>
 
 <script setup>
@@ -139,7 +204,11 @@ const props = defineProps({
   node: Object,
   updateAttributes: Function,
   deleteNode: Function,
-  getPos: Function
+  getPos: Function,
+  terminalMode: {
+    type: Boolean,
+    default: false
+  }
 })
 
 const { toast } = useToast()
@@ -574,12 +643,85 @@ const activateVibe = async () => {
 }
 </script>
 
-<style scoped>
+<style>
 .vibe-block {
   @apply border rounded-md my-2 overflow-hidden shadow-sm bg-card text-card-foreground;
 }
 
 .vibe-content {
   @apply p-4;
+}
+
+/* Terminal mode specific styles */
+.vibe-block-terminal {
+  height: 100%;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--background, #ffffff) !important;
+  color: var(--foreground, #0f172a);
+  border-radius: 0;
+  padding: 0.5rem;
+  /* Ensure the background is solid */
+  box-shadow: none;
+  border: none;
+}
+
+.vibe-block-terminal .vibe-content {
+  padding: 0.5rem;
+  flex: 1;
+  overflow: auto;
+  background-color: var(--background, #ffffff) !important;
+}
+
+.vibe-block-terminal .vibe-active-panel {
+  height: 100%;
+  overflow: auto;
+  background-color: var(--background, #ffffff) !important;
+}
+
+/* Ensure all alerts, buttons and other components have solid backgrounds */
+.vibe-block-terminal .vibe-input-panel,
+.vibe-block-terminal .alert,
+.vibe-block-terminal .button,
+.vibe-block-terminal .task-board {
+  background-color: var(--background, #ffffff) !important;
+  backdrop-filter: none !important;
+}
+
+/* Ensure input elements have proper backgrounds */
+.vibe-block-terminal input,
+.vibe-block-terminal textarea,
+.vibe-block-terminal select,
+.vibe-block-terminal button {
+  background-color: var(--background, #ffffff) !important;
+  border: 1px solid var(--border, #e2e8f0);
+}
+
+/* Dark mode support for terminal mode */
+:global(.dark) .vibe-block-terminal {
+  background-color: var(--background, #0f172a) !important;
+  color: var(--foreground, #f8fafc);
+}
+
+:global(.dark) .vibe-block-terminal .vibe-content,
+:global(.dark) .vibe-block-terminal .vibe-active-panel {
+  background-color: var(--background, #0f172a) !important;
+}
+
+:global(.dark) .vibe-block-terminal .vibe-input-panel,
+:global(.dark) .vibe-block-terminal .alert,
+:global(.dark) .vibe-block-terminal .button,
+:global(.dark) .vibe-block-terminal .task-board {
+  background-color: var(--background, #0f172a) !important;
+}
+
+:global(.dark) .vibe-block-terminal input,
+:global(.dark) .vibe-block-terminal textarea,
+:global(.dark) .vibe-block-terminal select,
+:global(.dark) .vibe-block-terminal button {
+  background-color: var(--background-subtle, #1e293b) !important;
+  border-color: var(--border, #334155);
+  color: var(--foreground, #f8fafc);
 }
 </style> 
