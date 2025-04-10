@@ -19,12 +19,12 @@ export interface TerminalConfig {
  * Provides consistent handling of fullscreen, expanded, and collapsed modes
  */
 export function useTerminalExpansion(config?: TerminalConfig) {
-  const isExpanded = ref(!config?.defaultCollapsed)
+  const isExpanded = ref(true)
   const isFullscreen = ref(false)
   const displayMode = ref<TerminalMode>(config?.defaultMode || 'right-nav')
   
   // Computed value for collapsed based on expanded and fullscreen states
-  const isCollapsed = computed(() => !isExpanded.value && !isFullscreen.value)
+  const isCollapsed = computed(() => false)
 
   // Terminal state as an object
   const terminalState = computed<TerminalState>(() => ({
@@ -91,7 +91,7 @@ export function useTerminalExpansion(config?: TerminalConfig) {
       isExpanded.value = false
     } else {
       isFullscreen.value = false
-      isExpanded.value = true
+      // Don't automatically expand when changing display mode
     }
   }
   
@@ -108,9 +108,9 @@ export function useTerminalExpansion(config?: TerminalConfig) {
 
     // Base styles
     const styles: Record<string, any> = {
-      opacity: isCollapsed.value ? '0.95' : '1',
+      opacity: 1, // Always fully visible
       visibility: 'visible', // Always keep visible to prevent display issues
-      display: isCollapsed.value ? 'flex' : 'block',
+      display: 'block', // Always use block display for proper content layout
       zIndex: '1000', // Ensure high z-index to appear above other elements
     };
 
@@ -122,7 +122,7 @@ export function useTerminalExpansion(config?: TerminalConfig) {
       styles.right = '0';
       styles.bottom = '0';
       styles.left = 'auto';
-      styles.width = isCollapsed.value ? '40px' : '30%'; // Default width when expanded
+      styles.width = '30%'; // Always use expanded width
       styles.height = '100vh';
       styles.borderLeft = '1px solid hsl(var(--border))';
       styles.borderTop = 'none';
@@ -133,13 +133,13 @@ export function useTerminalExpansion(config?: TerminalConfig) {
       styles.right = '0';
       styles.bottom = '0';
       styles.left = 'auto';
-      styles.width = isCollapsed.value ? '40px' : '300px'; // Narrow when expanded
+      styles.width = '300px'; // Always use expanded width
       styles.height = 'calc(100vh - 60px)';
       styles.borderLeft = '1px solid hsl(var(--border))';
       styles.borderTop = 'none';
       styles.borderRadius = '8px 0 0 8px';
       styles.boxShadow = '-2px 0 10px rgba(0, 0, 0, 0.15)';
-      styles.marginRight = isCollapsed.value ? '0' : '0';
+      styles.marginRight = '0';
     } else if (displayMode.value === 'fullscreen') {
       // Fullscreen mode
       styles.position = 'fixed';
@@ -157,7 +157,7 @@ export function useTerminalExpansion(config?: TerminalConfig) {
       styles.bottom = '0';
       styles.left = '0';
       styles.width = '100%';
-      styles.height = isCollapsed.value ? '40px' : 'min(80vh, 500px)';
+      styles.height = 'min(80vh, 500px)'; // Always use expanded height
     }
 
     return styles;

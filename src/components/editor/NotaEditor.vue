@@ -405,6 +405,12 @@ const handleKeyboardShortcuts = (event: KeyboardEvent) => {
 }
 
 onMounted(() => {
+  // Ensure Vibe Terminal is closed on startup
+  vibeUIService.setVisibility(false)
+  
+  // Log editor mounted
+  logger.log('Editor mounted...')
+
   // Add keyboard shortcut event listener
   document.addEventListener('keydown', handleKeyboardShortcuts)
 

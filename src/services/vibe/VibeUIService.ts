@@ -49,7 +49,7 @@ class VibeUIService {
         const parsedState = JSON.parse(savedState)
         this.state.value = {
           ...this.state.value,
-          isVisible: parsedState.isVisible ?? false,
+          isVisible: false,
           windowMode: parsedState.windowMode ?? false,
           width: parsedState.width ?? this.DEFAULT_WIDTH
         }

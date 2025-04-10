@@ -8,60 +8,6 @@
     role="region"
     aria-label="Vibe Terminal"
   >
-    <!-- Mode toggle buttons -->
-    <div class="terminal-mode-toggles" role="toolbar" aria-label="Terminal display modes">
-      <button 
-        class="mode-toggle-btn" 
-        :class="{ active: displayMode === 'bottom' }"
-        @click.stop="setDisplayMode('bottom')"
-        title="Bottom Mode"
-        :aria-pressed="displayMode === 'bottom'"
-      >
-        <ArrowDown class="w-4 h-4" />
-        <span class="sr-only">Bottom Mode</span>
-      </button>
-      <button 
-        class="mode-toggle-btn" 
-        :class="{ active: displayMode === 'side' }"
-        @click.stop="setDisplayMode('side')"
-        title="Side Mode"
-        :aria-pressed="displayMode === 'side'"
-      >
-        <PanelRight class="w-4 h-4" />
-        <span class="sr-only">Side Mode</span>
-      </button>
-      <button 
-        class="mode-toggle-btn" 
-        :class="{ active: displayMode === 'right-nav' }"
-        @click.stop="setDisplayMode('right-nav')"
-        title="Right Nav Mode"
-        :aria-pressed="displayMode === 'right-nav'"
-      >
-        <Sidebar class="w-4 h-4" />
-        <span class="sr-only">Right Nav Mode</span>
-      </button>
-      <button 
-        class="mode-toggle-btn" 
-        :class="{ active: displayMode === 'fullscreen' }"
-        @click.stop="toggleFullscreen"
-        title="Fullscreen Mode"
-        :aria-pressed="isFullscreen"
-      >
-        <Maximize class="w-4 h-4" />
-        <span class="sr-only">Fullscreen Mode</span>
-      </button>
-    </div>
-    
-    <!-- Close button -->
-    <button 
-      class="terminal-close-btn" 
-      @click.stop="closeTerminal"
-      title="Close terminal"
-      aria-label="Close terminal"
-    >
-      <X class="w-4 h-4" />
-    </button>
-
     <!-- Terminal Header Component -->
     <VibeTerminalHeader 
       :task-count="tasksInQueue"
@@ -80,12 +26,15 @@
       :stdout-output="stdoutOutput"
       :stderr-output="stderrOutput"
       :current-task="currentTask"
+      :display-mode="displayMode"
       @toggle-expand="toggleExpand"
       @toggle-fullscreen="toggleFullscreen"
       @clear-terminal="clearAllTasks()"
       @stop-execution="stopExecution"
       @restart-agent="restartAgent"
       @delete-agent="confirmDeleteAgent"
+      @close="closeTerminal"
+      @set-display-mode="setDisplayMode"
     />
 
     <!-- Terminal Content - Use CSS for visibility instead of v-show -->
@@ -304,7 +253,7 @@ const {
   toggleFullscreen,
   setDisplayMode,
   applyVisibilityStyles
-} = useTerminalExpansion({ defaultCollapsed: true })
+} = useTerminalExpansion({ defaultCollapsed: false })
 
 // Reference for the terminal element and resizers
 const terminalRef = ref<HTMLElement | null>(null)
@@ -644,13 +593,11 @@ onMounted(() => {
     }, 5000)
   }
   
-  // Ensure terminal starts collapsed
-  isExpanded.value = false
-  isFullscreen.value = false
-  
-  // Check if terminal should be visible initially
-  if (terminalRef.value && !vibeUIService.state.value.isVisible) {
-    terminalRef.value.style.display = 'none';
+  // Check if terminal should be visible initially - always hide it on startup
+  if (terminalRef.value) {
+    if (!vibeUIService.state.value.isVisible) {
+      terminalRef.value.style.display = 'none'
+    }
   }
 })
 
@@ -702,8 +649,11 @@ function clearAllTasks() {
 }
 
 // Close terminal function
-function closeTerminal(event: MouseEvent) {
-  event.stopPropagation()
+function closeTerminal(event?: MouseEvent) {
+  // Only call stopPropagation if event exists
+  if (event) {
+    event.stopPropagation()
+  }
   
   // Hide terminal immediately
   isExpanded.value = false
@@ -833,42 +783,6 @@ function stopResize() {
   margin-top: 60px;
 }
 
-/* Mode toggle buttons container */
-.terminal-mode-toggles {
-  position: absolute;
-  top: 8px;
-  left: 15px;
-  z-index: 62;
-  display: flex;
-  gap: 8px;
-}
-
-/* Mode toggle button styling */
-.mode-toggle-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: 4px;
-  background-color: transparent;
-  border: 1px solid hsl(var(--border));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  padding: 0;
-  color: hsl(var(--muted-foreground));
-}
-
-.mode-toggle-btn:hover {
-  background-color: hsl(var(--accent) / 0.1);
-  color: hsl(var(--accent));
-}
-
-.mode-toggle-btn.active {
-  background-color: hsl(var(--accent) / 0.2);
-  border-color: hsl(var(--accent));
-  color: hsl(var(--accent));
-}
-
 /* Resizers */
 .horizontal-resizer {
   position: absolute;
@@ -910,11 +824,11 @@ function stopResize() {
   display: none;
 }
 
-/* Terminal content styling - initially hidden in collapsed state */
+/* Terminal content styling - always visible */
 .vibe-terminal .terminal-content {
-  max-height: 0;
-  overflow: hidden;
-  opacity: 0;
+  max-height: calc(100% - 40px);
+  overflow-y: auto;
+  opacity: 1;
   background-color: hsl(var(--background));
   transition: opacity 0.3s ease, max-height 0.3s ease;
   border-top: 1px solid hsl(var(--border));
@@ -925,21 +839,6 @@ function stopResize() {
   display: flex;
   flex-direction: column;
   will-change: opacity, max-height;
-}
-
-/* Expanded content styling */
-.vibe-terminal.expanded .terminal-content {
-  max-height: calc(100% - 40px) !important;
-  overflow-y: auto;
-  opacity: 1;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05); /* Subtle inner shadow */
-}
-
-/* Fullscreen content styling */
-.vibe-terminal.fullscreen .terminal-content {
-  max-height: calc(100vh - 40px) !important;
-  overflow-y: auto;
-  opacity: 1;
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05); /* Subtle inner shadow */
 }
 
@@ -984,37 +883,6 @@ function stopResize() {
 .vibe-terminal .terminal-content::-webkit-scrollbar-thumb:hover,
 .vibe-terminal .terminal-content.is-scrolling::-webkit-scrollbar-thumb {
   background-color: hsl(var(--muted-foreground));
-}
-
-/* Close button styling */
-.terminal-close-btn {
-  position: absolute;
-  right: 10px;
-  top: 8px;
-  z-index: 61;
-  background: none;
-  border: 1px solid hsl(var(--border));
-  color: hsl(var(--destructive));
-  cursor: pointer;
-  padding: 0;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  transition: background-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
-}
-
-.terminal-close-btn:hover {
-  background-color: hsla(var(--destructive), 0.1);
-  color: hsl(var(--destructive));
-  box-shadow: 0 0 0 1px hsla(var(--destructive), 0.3);
-}
-
-.terminal-close-btn:focus-visible {
-  outline: 2px solid hsl(var(--destructive) / 0.5);
-  outline-offset: 2px;
 }
 
 .sr-only {
