@@ -11,7 +11,7 @@ import TableOfContents from './TableOfContents.vue'
 import JupyterServersSidebar from './JupyterServersSidebar.vue'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { ListIcon, BookIcon, ServerIcon, Terminal, RefreshCw, MinusCircle, Maximize2, Minimize2 } from 'lucide-vue-next'
+import { ListIcon, BookIcon, ServerIcon, RefreshCw, MinusCircle, Maximize2, Minimize2 } from 'lucide-vue-next'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
 import { getURLWithoutProtocol, toast } from '@/lib/utils'
 import VersionHistoryDialog from './VersionHistoryDialog.vue'
@@ -724,8 +724,6 @@ defineExpose({
       @show-history="showVersionHistory = true"
       :is-saving-version="isSavingVersion"
       :word-count="wordCount"
-      :toggle-terminal="() => isTerminalVisible = !isTerminalVisible"
-      :is-terminal-visible="isTerminalVisible"
     />
 
     <!-- Main Editor Area -->
@@ -832,17 +830,6 @@ defineExpose({
             >
               <ServerIcon class="h-4 w-4" />
               <span class="text-xs">{{ isJupyterServersOpen ? 'Hide' : 'Show' }} Jupyter</span>
-            </Button>
-            
-            <!-- Toggle Vibe -->
-            <Button
-              variant="ghost"
-              size="sm"
-              @click="isTerminalVisible = !isTerminalVisible"
-              class="flex items-center gap-2"
-            >
-              <Terminal class="h-4 w-4" />
-              <span class="text-xs">{{ isTerminalVisible ? 'Hide' : 'Show' }} Vibe</span>
             </Button>
           </div>
         </div>

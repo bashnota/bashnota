@@ -12,14 +12,14 @@
         autofocus
       />
       <div class="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/70">
-        <Zap class="h-5 w-5" :class="{ 'text-primary': props.isInitialQuery || props.query.trim() }" />
+        <Bot class="h-5 w-5" :class="{ 'text-primary': props.isInitialQuery || props.query.trim() }" />
       </div>
       <div v-if="props.query.trim()" class="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
         Press Enter to submit
       </div>
     </div>
     <div v-if="props.isInitialQuery" class="text-xs text-primary mt-1.5 pl-2 flex items-center gap-1.5">
-      <MessageSquare class="h-3.5 w-3.5" />
+      <Bot class="h-3.5 w-3.5" />
       <span>Enter your question or task to begin working with this agent</span>
     </div>
   </div>
@@ -27,7 +27,7 @@
 
 <script setup lang="ts">
 import { Input } from '@/components/ui/input'
-import { Zap, MessageSquare } from 'lucide-vue-next'
+import { Bot } from 'lucide-vue-next'
 
 const props = defineProps({
   query: {

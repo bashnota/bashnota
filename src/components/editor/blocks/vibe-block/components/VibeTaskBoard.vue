@@ -78,7 +78,7 @@
     
     <!-- Empty state -->
     <div v-else-if="tasks.length === 0" class="py-12 flex flex-col items-center justify-center text-center">
-      <ServerCog class="h-12 w-12 text-muted-foreground/20 mb-3" />
+      <Bot class="h-12 w-12 text-muted-foreground/20 mb-3" />
       <h3 class="text-lg font-medium mb-2">No tasks created yet</h3>
       <p class="text-muted-foreground max-w-md mb-4">
         Vibe will create tasks automatically based on your query. Each task will be assigned to the most appropriate AI agent.
@@ -125,7 +125,7 @@
         <slot name="database-content">
           <!-- Database tables list -->
           <div class="text-center p-8 text-muted-foreground">
-            <Database class="h-12 w-12 mx-auto mb-3 text-muted-foreground/20" />
+            <Bot class="h-12 w-12 mx-auto mb-3 text-muted-foreground/20" />
             <p class="mb-2">No database tables available yet</p>
             <p class="text-xs max-w-md mx-auto">
               Database tables are created when tasks need to store structured data
@@ -214,7 +214,7 @@ import {
   Network, 
   ClipboardCopy, 
   Maximize2, 
-  ServerCog, 
+  Bot, 
   Play 
 } from 'lucide-vue-next'
 import { ActorType } from '@/types/vibe'

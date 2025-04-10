@@ -28,7 +28,7 @@ class VibeUIService {
   
   // Reactive state
   public state = ref<VibeUIState>({
-    isVisible: false,
+    isVisible: true,
     windowMode: false,
     activeTaskId: null,
     expandedTaskIds: [],
@@ -40,6 +40,8 @@ class VibeUIService {
   // Constructor initializes from localStorage if available
   constructor() {
     this.initFromLocalStorage()
+    // Always ensure terminal is visible after loading
+    this.state.value.isVisible = true
   }
 
   private initFromLocalStorage() {
@@ -49,7 +51,7 @@ class VibeUIService {
         const parsedState = JSON.parse(savedState)
         this.state.value = {
           ...this.state.value,
-          isVisible: false,
+          isVisible: true,
           windowMode: parsedState.windowMode ?? false,
           width: parsedState.width ?? this.DEFAULT_WIDTH
         }

@@ -48,12 +48,12 @@
           @select-board="selectBoard"
         />
         
-        <Braces class="h-12 w-12 mb-3 text-muted-foreground/20" />
+        <Bot class="h-12 w-12 mb-3 text-muted-foreground/20" />
         <p class="text-sm mb-2">No active Vibe session</p>
         <p class="text-xs text-muted-foreground mb-4">Start a new Vibe session to get help with tasks</p>
         
         <Button variant="outline" @click="createNewVibeAgent" class="flex items-center gap-1">
-          <Zap class="h-4 w-4 mr-1" />
+          <Bot class="h-4 w-4 mr-1" />
           Create New Vibe Agent
         </Button>
       </div>
@@ -154,7 +154,7 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useToast } from '@/components/ui/toast/use-toast'
 import { useVibeStore } from '@/stores/vibeStore'
 import { Button } from '@/components/ui/button'
-import { Braces, Zap, ArrowDown, PanelRight, Sidebar, Maximize, X } from 'lucide-vue-next'
+import { ArrowDown, PanelRight, Sidebar, Maximize, X, Bot } from 'lucide-vue-next'
 
 // Import components
 import VibeTerminalHeader from './VibeTerminalHeader.vue'

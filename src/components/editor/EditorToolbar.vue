@@ -15,7 +15,6 @@ import {
   Undo,
   Redo,
   MinusSquare,
-  Terminal,
   Save,
   History
 } from 'lucide-vue-next'
@@ -28,11 +27,10 @@ import type { FunctionalComponent } from 'vue'
 const props = defineProps<{
   editor: Editor | null,
   isSavingVersion?: boolean,
-  wordCount?: number,
-  isTerminalVisible?: boolean
+  wordCount?: number
 }>()
 
-const emit = defineEmits(['save-version', 'show-history', 'toggle-terminal'])
+const emit = defineEmits(['save-version', 'show-history'])
 
 // Toolbar groups for better organization
 const headingLevels: { icon: FunctionalComponent; level: 1 | 2 | 3 }[] = [
@@ -189,38 +187,11 @@ const headingLevels: { icon: FunctionalComponent; level: 1 | 2 | 3 }[] = [
           <History class="h-4 w-4 mr-1" />
           <span>History</span>
         </Button>
-        
-        <!-- Terminal toggle -->
-        <Button
-          variant="ghost"
-          size="sm"
-          @click="$emit('toggle-terminal')"
-          class="flex items-center gap-1 terminal-toggle-btn"
-          :class="{ 'bg-muted': isTerminalVisible }"
-        >
-          <Terminal class="h-4 w-4 mr-1" />
-          <span>Terminal</span>
-        </Button>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.terminal-toggle-btn {
-  position: relative;
-}
-
-.terminal-toggle-btn .badge {
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  font-size: 0.65rem;
-  height: 16px;
-  min-width: 16px;
-  padding: 0 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+/* No styles needed after terminal button removal */
 </style>

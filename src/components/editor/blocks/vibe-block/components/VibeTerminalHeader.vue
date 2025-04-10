@@ -36,7 +36,7 @@
     
     <div class="terminal-header-left">
       <div class="terminal-title-section">
-        <ServerCog class="h-4 w-4 mr-2 text-primary" />
+        <Bot class="h-4 w-4 mr-2 text-primary" />
         <span class="terminal-title hide-when-narrow">Vibe</span>
         <span v-if="props.status" class="terminal-status-indicator" :class="statusClass">
           <span class="status-dot" :class="statusClass"></span>
@@ -148,7 +148,7 @@ import { ref, computed } from 'vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tooltip } from '@/components/ui/tooltip'
-import { ServerCog, Square, RotateCw, Trash, Maximize2, Minimize2, ChevronDown, Eraser, ArrowDown, PanelRight, Sidebar, X } from 'lucide-vue-next'
+import { Square, RotateCw, Trash, Maximize2, Minimize2, ChevronDown, Eraser, ArrowDown, PanelRight, Sidebar, X, Bot } from 'lucide-vue-next'
 
 // Props with proper TypeScript typings
 const props = defineProps({
