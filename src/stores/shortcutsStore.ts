@@ -11,14 +11,16 @@ interface Shortcut {
 
 // Define default shortcuts
 const defaultGeneralShortcuts: Shortcut[] = [
-  { id: 'global-search', key: '⌘ K', description: 'Open global search' },
-  { id: 'new-nota', key: '⌘ N', description: 'Create new nota' },
-  { id: 'focus-editor', key: '⌘ /', description: 'Focus editor' },
-  { id: 'commands-menu', key: '/', description: 'Open commands menu (in editor)' },
-  { id: 'bold-text', key: '⌘ B', description: 'Bold text (in editor)' },
-  { id: 'italic-text', key: '⌘ I', description: 'Italic text (in editor)' },
+  { id: 'global-search', key: 'Ctrl+Shift+Alt+Space', description: 'Open global search' },
+  { id: 'new-nota', key: 'Ctrl+Shift+Alt+N', description: 'Create new nota' },
+  { id: 'focus-editor', key: 'Ctrl+Shift+Alt+E', description: 'Focus editor' },
+  { id: 'commands-menu', key: 'Ctrl+Shift+Alt+/', description: 'Open commands menu (in editor)' },
+  { id: 'bold-text', key: 'Ctrl+Shift+Alt+B', description: 'Bold text (in editor)' },
+  { id: 'italic-text', key: 'Ctrl+Shift+Alt+I', description: 'Italic text (in editor)' },
   { id: 'escape', key: 'Esc', description: 'Close dialogs / Cancel editing' },
-  { id: 'ai-generation', key: '⌘ G', description: 'AI text generation' },
+  { id: 'ai-generation', key: 'Ctrl+Shift+Alt+G', description: 'AI text generation' },
+  { id: 'favorites-sidebar', key: 'Ctrl+Shift+Alt+V', description: 'Toggle favorites sidebar' },
+  { id: 'favorites-search', key: 'Ctrl+Shift+Alt+P', description: 'Search in favorites' },
 ]
 
 const defaultBlockShortcuts: Shortcut[] = [
@@ -92,4 +94,4 @@ export const useShortcutsStore = defineStore('shortcuts', {
       }
     }
   }
-}) 
+})

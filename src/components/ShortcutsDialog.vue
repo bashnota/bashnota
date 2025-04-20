@@ -1,33 +1,14 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { Dialog, DialogPanel } from '@headlessui/vue'
+import { useShortcutsStore } from '@/stores/shortcutsStore'
 
 const isOpen = ref(false)
+const shortcutsStore = useShortcutsStore()
 
-const shortcuts = [
-  { key: '⌘ K', description: 'Open global search' },
-  { key: '⌘ N', description: 'Create new nota' },
-  { key: '⌘ /', description: 'Focus editor' },
-  { key: '/', description: 'Open commands menu (in editor)' },
-  { key: '⌘ B', description: 'Bold text (in editor)' },
-  { key: '⌘ I', description: 'Italic text (in editor)' },
-  { key: 'Esc', description: 'Close dialogs / Cancel editing' },
-]
-
-const blockShortcuts = [
-  { key: 'Ctrl+Shift+Alt+C', description: 'Insert code block' },
-  { key: 'Ctrl+Shift+Alt+T', description: 'Insert table' },
-  { key: 'Ctrl+Shift+Alt+I', description: 'Insert image' },
-  { key: 'Ctrl+Shift+Alt+M', description: 'Insert math block' },
-  { key: 'Ctrl+Shift+Alt+D', description: 'Insert Mermaid diagram' },
-  { key: 'Ctrl+Shift+Alt+Y', description: 'Insert YouTube video' },
-  { key: 'Ctrl+Shift+Alt+F', description: 'Insert subfigures' },
-  { key: 'Ctrl+Shift+Alt+H', description: 'Insert horizontal rule' },
-  { key: 'Ctrl+Shift+Alt+Q', description: 'Insert blockquote' },
-  { key: 'Ctrl+Shift+Alt+K', description: 'Insert task list' },
-  { key: 'Ctrl+Shift+Alt+G', description: 'Insert Draw.io diagram' },
-  { key: 'Ctrl+Shift+Alt+B', description: 'Insert data table' },
-]
+// Use shortcuts directly from the store
+const generalShortcuts = computed(() => shortcutsStore.generalShortcuts)
+const blockShortcuts = computed(() => shortcutsStore.blockShortcuts)
 
 defineExpose({ isOpen })
 </script>
@@ -40,7 +21,7 @@ defineExpose({ isOpen })
       
       <h3 class="text-lg font-medium mt-4 mb-2">General</h3>
       <div class="shortcuts-grid">
-        <div v-for="shortcut in shortcuts" :key="shortcut.key" class="shortcut">
+        <div v-for="shortcut in generalShortcuts" :key="shortcut.id" class="shortcut">
           <kbd>{{ shortcut.key }}</kbd>
           <span>{{ shortcut.description }}</span>
         </div>
@@ -48,7 +29,7 @@ defineExpose({ isOpen })
       
       <h3 class="text-lg font-medium mt-6 mb-2">Insert Blocks</h3>
       <div class="shortcuts-grid">
-        <div v-for="shortcut in blockShortcuts" :key="shortcut.key" class="shortcut">
+        <div v-for="shortcut in blockShortcuts" :key="shortcut.id" class="shortcut">
           <kbd>{{ shortcut.key }}</kbd>
           <span>{{ shortcut.description }}</span>
         </div>

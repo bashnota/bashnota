@@ -536,6 +536,12 @@ const saveChanges = () => {
 const copyCode = () => {
   // Implementation
 }
+
+// Initialize code block shortcuts
+const { shortcuts } = useCodeBlockShortcuts({
+  onExecute: executeCode,
+  onToggleFullscreen: () => { isFullScreen.value = true }
+})
 </script>
 
 <template>
@@ -819,8 +825,8 @@ const copyCode = () => {
             <span class="ml-1">run</span>
           </div>
           <div class="flex items-center">
-            <kbd class="px-1.5 py-0.5 border rounded text-[10px]">Ctrl+S</kbd>
-            <span class="ml-1">save</span>
+            <kbd class="px-1.5 py-0.5 border rounded text-[10px]">Ctrl+Shift+Alt+F11</kbd>
+            <span class="ml-1">fullscreen</span>
           </div>
         </div>
 

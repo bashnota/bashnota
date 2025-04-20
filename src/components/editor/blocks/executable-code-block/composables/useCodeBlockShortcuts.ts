@@ -2,7 +2,6 @@ import { onMounted, onBeforeUnmount } from 'vue'
 
 interface ShortcutOptions {
   onExecute: () => void
-  onSave: () => void
   onToggleFullscreen: () => void
 }
 
@@ -15,15 +14,8 @@ export function useCodeBlockShortcuts(options: ShortcutOptions) {
       return
     }
 
-    // Save changes: Ctrl+S
-    if (e.ctrlKey && e.key === 's') {
-      e.preventDefault()
-      options.onSave()
-      return
-    }
-
-    // Toggle fullscreen: Ctrl+M
-    if (e.ctrlKey && e.key === 'm') {
+    // Toggle fullscreen: Ctrl+Shift+Alt+F11
+    if (e.ctrlKey && e.shiftKey && e.altKey && e.key === 'F11') {
       e.preventDefault()
       options.onToggleFullscreen()
       return
@@ -41,8 +33,7 @@ export function useCodeBlockShortcuts(options: ShortcutOptions) {
   return {
     shortcuts: {
       execute: 'Ctrl+Shift+Alt+Enter',
-      save: 'Ctrl+S',
-      fullscreen: 'Ctrl+M',
+      fullscreen: 'Ctrl+Shift+Alt+F11',
     },
   }
-} 
+}
