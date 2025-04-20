@@ -133,17 +133,17 @@ const toggleSidebar = () => {
   isOpen.value = !isOpen.value
 }
 
-// Keyboard shortcuts
-onKeyStroke('f', (e) => {
-  if (e.metaKey || e.ctrlKey) {
+// Keyboard shortcuts - use the shortcuts from shortcutsStore
+onKeyStroke('v', (e) => {
+  if (e.ctrlKey && e.shiftKey && e.altKey) {
     e.preventDefault()
     toggleSidebar()
   }
 })
 
-// Change to Ctrl+Alt+Shift+P for search focus (P for 'Peek' or 'Preview')
+// Use Ctrl+Shift+Alt+P for search focus (P for 'Peek' or 'Preview')
 onKeyStroke('p', (e) => {
-  if (e.ctrlKey && e.altKey && e.shiftKey && isOpen.value) {
+  if (e.ctrlKey && e.shiftKey && e.altKey && isOpen.value) {
     e.preventDefault()
     document.querySelector<HTMLInputElement>('.favorite-blocks-search')?.focus()
   }
@@ -212,7 +212,7 @@ const openCustomizationSettings = () => {
             <Input
               :value="searchQuery"
               @input="(e: Event) => debouncedSearch((e.target as HTMLInputElement).value)"
-              placeholder="Search blocks... (Ctrl+Alt+Shift+P) - Try 'block name'"
+              placeholder="Search blocks... (Ctrl+Shift+Alt+P) - Try 'block name'"
               class="pl-9 favorite-blocks-search"
               aria-autocomplete="list"
               aria-controls="search-suggestions"
