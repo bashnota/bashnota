@@ -19,9 +19,9 @@ export const useAISettingsStore = defineStore('aiSettings', () => {
     preferredProviderId: 'gemini',
     apiKeys: {},
     customPrompt: '',
-    maxTokens: 1024,
+    maxTokens: 2048, // Increased from 1024 to avoid token limit issues
     temperature: 0.7,
-    geminiModel: 'gemini-1.5-pro', // Default to Gemini 1.5 Pro
+    geminiModel: 'gemini-1.5-pro', // Default to stable Gemini 1.5 Pro instead of experimental model
     geminiSafetyThreshold: 'BLOCK_MEDIUM_AND_ABOVE' // Default safety threshold
   })
 
@@ -103,4 +103,4 @@ export const useAISettingsStore = defineStore('aiSettings', () => {
     setPreferredProvider,
     updateSettings
   }
-}) 
+})

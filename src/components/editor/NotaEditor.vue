@@ -11,12 +11,13 @@ import TableOfContents from './TableOfContents.vue'
 import JupyterServersSidebar from './JupyterServersSidebar.vue'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { ListIcon, BookIcon, ServerIcon } from 'lucide-vue-next'
+import { ListIcon, BookIcon, ServerIcon, BrainIcon } from 'lucide-vue-next'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
 import { getURLWithoutProtocol, toast } from '@/lib/utils'
 import VersionHistoryDialog from './VersionHistoryDialog.vue'
 import FavoriteBlocksSidebar from './FavoriteBlocksSidebar.vue'
 import ReferencesSidebar from './ReferencesSidebar.vue'
+import AIAssistantSidebar from './AIAssistantSidebar.vue'
 import { getEditorExtensions } from './extensions'
 import { useEquationCounter, EQUATION_COUNTER_KEY } from '@/composables/useEquationCounter'
 import { useCitationStore } from '@/stores/citationStore'
@@ -42,6 +43,7 @@ const router = useRouter()
 const isSidebarOpen = ref(false)
 const isReferencesOpen = ref(false)
 const isJupyterServersOpen = ref(false)
+const isAIAssistantOpen = ref(false)
 const autoSaveEnabled = ref(true)
 const showVersionHistory = ref(false)
 
@@ -375,6 +377,18 @@ onMounted(() => {
     }
   }) as EventListener)
 
+  // Add event listener for activating AI Assistant when a robot button is clicked
+  window.addEventListener('activate-ai-assistant', ((event: CustomEvent) => {
+    if (event.detail) {
+      // Open the AI Assistant sidebar
+      isAIAssistantOpen.value = true
+      // Close other sidebars
+      isSidebarOpen.value = false
+      isReferencesOpen.value = false
+      isJupyterServersOpen.value = false
+    }
+  }) as EventListener)
+
   // Load saved editor settings
   const savedEditorSettings = localStorage.getItem('editor-settings')
   if (savedEditorSettings) {
@@ -438,6 +452,7 @@ onUnmounted(() => {
   // Clean up event listeners
   document.removeEventListener('keydown', handleKeyboardShortcuts)
   window.removeEventListener('toggle-references', (() => {}) as EventListener)
+  window.removeEventListener('activate-ai-assistant', (() => {}) as EventListener)
   codeExecutionStore.cleanup()
 })
 
@@ -602,6 +617,18 @@ defineExpose({
       <JupyterServersSidebar :notaId="notaId" />
     </div>
 
+    <!-- AI Assistant Sidebar -->
+    <div
+      v-if="isAIAssistantOpen"
+      class="h-full border-r flex-shrink-0 flex flex-col bg-background"
+    >
+      <AIAssistantSidebar 
+        :editor="editor" 
+        :notaId="notaId"
+        @close="isAIAssistantOpen = false"
+      />
+    </div>
+
     <!-- Main Editor Area -->
     <div class="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
       <!-- Editor Toolbar -->
@@ -617,7 +644,7 @@ defineExpose({
               variant="ghost"
               size="sm"
               class="flex items-center gap-2"
-              @click="isSidebarOpen = !isSidebarOpen; isReferencesOpen = false; isJupyterServersOpen = false"
+              @click="isSidebarOpen = !isSidebarOpen; isReferencesOpen = false; isJupyterServersOpen = false; isAIAssistantOpen = false"
               :class="{ 'bg-muted': isSidebarOpen }"
             >
               <ListIcon class="h-4 w-4" />
@@ -628,7 +655,7 @@ defineExpose({
               variant="ghost"
               size="sm"
               class="flex items-center gap-2"
-              @click="isReferencesOpen = !isReferencesOpen; isSidebarOpen = false; isJupyterServersOpen = false"
+              @click="isReferencesOpen = !isReferencesOpen; isSidebarOpen = false; isJupyterServersOpen = false; isAIAssistantOpen = false"
               :class="{ 'bg-muted': isReferencesOpen }"
             >
               <BookIcon class="h-4 w-4" />
@@ -639,11 +666,22 @@ defineExpose({
               variant="ghost"
               size="sm"
               class="flex items-center gap-2"
-              @click="isJupyterServersOpen = !isJupyterServersOpen; isSidebarOpen = false; isReferencesOpen = false"
+              @click="isJupyterServersOpen = !isJupyterServersOpen; isSidebarOpen = false; isReferencesOpen = false; isAIAssistantOpen = false"
               :class="{ 'bg-muted': isJupyterServersOpen }"
             >
               <ServerIcon class="h-4 w-4" />
               <span class="text-xs">Jupyter Servers</span>
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              class="flex items-center gap-2"
+              @click="isAIAssistantOpen = !isAIAssistantOpen; isSidebarOpen = false; isReferencesOpen = false; isJupyterServersOpen = false"
+              :class="{ 'bg-muted': isAIAssistantOpen }"
+            >
+              <BrainIcon class="h-4 w-4" />
+              <span class="text-xs">AI Assistant</span>
             </Button>
           </div>
           

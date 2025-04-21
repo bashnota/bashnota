@@ -282,7 +282,7 @@ export class AIService {
             }
           ],
           generationConfig: {
-            maxOutputTokens: options.maxTokens || 1024,
+            maxOutputTokens: options.maxTokens || 2048, // Increased from 1024 to avoid MAX_TOKEN issues
             temperature: options.temperature || 0.7,
             topP: options.topP || 0.95,
             topK: tuningOptions.topK || 40,
@@ -323,7 +323,13 @@ export class AIService {
           ];
         }
 
+        // Log the payload for debugging
+        logger.log('Sending Gemini API request with payload:', JSON.stringify(payload));
+
         const response = await axios.post(endpoint, payload);
+        
+        // Log the full response for debugging
+        logger.log('Received Gemini API response:', JSON.stringify(response.data));
 
         // Extract the generated text from Gemini's response format
         let generatedText = '';
@@ -332,17 +338,87 @@ export class AIService {
             response.data.candidates[0].content &&
             response.data.candidates[0].content.parts) {
           
+          // Log each part for debugging
+          logger.log('Response parts:', JSON.stringify(response.data.candidates[0].content.parts));
+          
           // Concatenate all text parts from the response
           generatedText = response.data.candidates[0].content.parts
             .filter((part: any) => part.text)
             .map((part: any) => part.text)
             .join('');
+        } else {
+          // If response structure is different than expected, try to extract text in alternative ways
+          logger.warn('Unusual Gemini response structure, attempting alternative text extraction');
+          
+          if (response.data.candidates?.[0]?.text) {
+            generatedText = response.data.candidates[0].text;
+          } else if (response.data.text) {
+            generatedText = response.data.text;
+          } else if (typeof response.data === 'string') {
+            generatedText = response.data;
+          }
+        }
+        
+        // If we still don't have text, check finish reason and provide appropriate message
+        if (!generatedText) {
+          const finishReason = response.data.candidates?.[0]?.finishReason;
+          logger.error('Failed to extract text from Gemini response', response.data);
+          
+          if (finishReason === 'MAX_TOKENS') {
+            // If stopped due to max tokens limit, try again with a smaller prompt or different model
+            if (retryCount < MAX_RETRIES) {
+              logger.warn(`MAX_TOKENS limit hit, retrying with different configuration (attempt ${retryCount + 1})`);
+              
+              // Try with a different model or settings on retry
+              if (model === 'gemini-2.0-pro-exp-02-05') {
+                // If using experimental model, try the stable one instead
+                const stableModel = 'gemini-1.5-pro';
+                logger.log(`Switching from experimental model to stable model: ${stableModel}`);
+                
+                // Use a different endpoint
+                const stableEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${stableModel}:generateContent?key=${apiKey}`;
+                
+                // Make request with stable model
+                const stableResponse = await axios.post(stableEndpoint, payload);
+                logger.log('Received stable model response:', JSON.stringify(stableResponse.data));
+                
+                // Try to extract text from stable model response
+                if (stableResponse.data.candidates?.[0]?.content?.parts) {
+                  generatedText = stableResponse.data.candidates[0].content.parts
+                    .filter((part: any) => part.text)
+                    .map((part: any) => part.text)
+                    .join('');
+                    
+                  if (generatedText) {
+                    // We got text from the stable model, return it
+                    return {
+                      text: generatedText,
+                      provider: 'gemini',
+                      tokens: stableResponse.data.usageMetadata?.totalTokenCount || 0
+                    };
+                  }
+                }
+              }
+              
+              // If we couldn't get a response from the stable model, retry with current one
+              retryCount++;
+              continue;
+            }
+            
+            generatedText = "I apologize, but I couldn't complete generating a response due to length constraints. Please try a more specific prompt.";
+          } else if (finishReason === 'SAFETY') {
+            generatedText = "I apologize, but I can't provide a response to that prompt due to safety guidelines.";
+          } else if (finishReason === 'RECITATION') {
+            generatedText = "I apologize, but I can't provide a detailed response as it would require reciting content that I shouldn't reproduce.";
+          } else {
+            generatedText = "I'm sorry, I couldn't generate a response. Please try again with a different prompt.";
+          }
         }
 
         return {
           text: generatedText,
           provider: 'gemini',
-          tokens: 0 // Gemini doesn't provide token count in the same way
+          tokens: response.data.usageMetadata?.totalTokenCount || 0
         };
       } catch (error) {
         lastError = error;
@@ -1227,4 +1303,4 @@ export class AIService {
   }
 }
 
-export const aiService = new AIService() 
+export const aiService = new AIService()
