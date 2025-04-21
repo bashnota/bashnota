@@ -150,12 +150,61 @@ const showConsoleMessage = (
 }
 
 // Add this after component refs
-const loadSavedPreferences = () => {
+const loadSavedPreferences = async () => {
   const currentNota = store.getCurrentNota(props.notaId)
   const preferences = currentNota?.config?.kernelPreferences?.[props.id]
   
   if (preferences?.serverId) {
     handleServerSelect(preferences.serverId)
+  } else if (availableServers.value.length > 0) {
+    // Auto-select first available server if no preference exists
+    const firstServer = availableServers.value[0]
+    const serverId = `${firstServer.ip}:${firstServer.port}`
+    handleServerSelect(serverId)
+    
+    // Get kernels for this server
+    try {
+      const kernels = await jupyterService.getAvailableKernels(firstServer)
+      availableKernels.value = kernels
+      
+      // Auto-select a kernel that matches the code block language if available
+      let matchingKernel = kernels.find(k => k.spec.language?.toLowerCase() === props.language.toLowerCase())
+      
+      // If no exact language match, try to find a kernel that includes the language name
+      if (!matchingKernel) {
+        matchingKernel = kernels.find(k => 
+          k.name.toLowerCase().includes(props.language.toLowerCase()) || 
+          k.spec.display_name.toLowerCase().includes(props.language.toLowerCase())
+        )
+      }
+      
+      // If still no match, select the first Python kernel or just the first kernel
+      if (!matchingKernel) {
+        matchingKernel = kernels.find(k => 
+          k.spec.language?.toLowerCase() === 'python' || 
+          k.name.toLowerCase().includes('python')
+        ) || kernels[0]
+      }
+      
+      if (matchingKernel) {
+        handleKernelSelect(matchingKernel.name)
+        
+        // Save this auto-selection as a preference
+        store.updateNotaConfig(props.notaId, (config) => {
+          if (!config.kernelPreferences) config.kernelPreferences = {}
+          config.kernelPreferences[props.id] = {
+            serverId,
+            kernelName: matchingKernel.name,
+            blockId: props.id,
+            lastUsed: new Date().toISOString()
+          }
+        })
+        
+        showConsoleMessage('Info', `Auto-selected server ${serverId} with kernel ${matchingKernel.spec.display_name}`, 'success')
+      }
+    } catch (error) {
+      logger.error('Failed to auto-select kernel:', error)
+    }
   }
 }
 
@@ -244,7 +293,7 @@ onMounted(async () => {
   await refreshJupyterServers()
   
   // Load saved preferences
-  loadSavedPreferences()
+  await loadSavedPreferences()
   
   if (codeBlockRef.value && !props.isReadOnly) {
     const editor = codeBlockRef.value.querySelector('.cm-editor')
