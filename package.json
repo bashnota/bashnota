@@ -73,6 +73,7 @@
     "localforage": "^1.10.0",
     "lowlight": "^3.3.0",
     "lucide-vue-next": "^0.475.0",
+    "marked": "^15.0.9",
     "mathjax": "^3.2.2",
     "mathjax-full": "^3.2.2",
     "mermaid": "^11.4.1",
