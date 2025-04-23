@@ -10,14 +10,14 @@ const createNewSession = () => {
 </script>
 
 <template>
-  <div class="flex-1 flex flex-col items-center justify-center text-muted-foreground p-4 text-center">
-    <Bot class="h-12 w-12 mb-4 text-muted-foreground/70" />
-    <h3 class="text-base font-medium mb-2">AI Assistant</h3>
+  <div class="flex-1 flex flex-col items-center justify-center text-muted-foreground p-6 text-center bg-muted/10">
+    <Bot class="h-14 w-14 mb-6 text-primary/30" />
+    <h3 class="text-base font-medium mb-3 text-foreground">AI Assistant</h3>
     <p class="mb-2">Start a new conversation with the AI assistant.</p>
-    <p class="text-sm mb-6">You can use AI to generate content, answer questions, or help with your writing.</p>
+    <p class="text-sm mb-8 max-w-md">You can use AI to generate content, answer questions, or help with your writing.</p>
     <Button 
       size="default" 
-      class="bg-primary hover:bg-primary/90 text-primary-foreground"
+      class="bg-primary hover:bg-primary/90 text-primary-foreground transition-colors shadow-sm"
       @click="createNewSession"
     >
       <SparklesIcon class="h-4 w-4 mr-2" />

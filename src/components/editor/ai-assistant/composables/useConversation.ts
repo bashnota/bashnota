@@ -1,297 +1,304 @@
 import { ref, computed, watch } from 'vue'
-import { useNotaStore } from '@/stores/nota'
-import { logger } from '@/services/logger'
-import { toast } from '@/components/ui/toast'
+import { nanoid } from 'nanoid'
+import { useAISettingsStore } from '@/stores/aiSettingsStore'
 
 export interface ConversationMessage {
-  role: 'user' | 'assistant'
+  id: string
+  role: 'user' | 'assistant' | 'system'
   content: string
   timestamp?: Date
-  id?: string
 }
 
 export interface AIBlock {
   node: {
     attrs: {
-      id: string
-      prompt: string
-      result: string
-      isLoading: boolean
-      error: string
+      prompt?: string
+      result?: string
+      loading?: boolean
+      error?: string
+      lastUpdated?: string
+      conversation?: ConversationMessage[]
     }
   }
-  updateAttributes: (attrs: any) => void
-  getPos: () => number | undefined
-  conversationHistory?: ConversationMessage[]
+  type: string
 }
 
+// Default token settings
+const DEFAULT_MAX_TOKENS = 8000
+const TOKEN_WARNING_THRESHOLD = 0.8 // 80% of max tokens
+const MAX_INPUT_CHARS = 20000 // Maximum characters allowed in input
+
 export function useConversation(editor: any, notaId: string) {
-  // Store for managing active AI blocks
+  // Get AI settings store for token limits
+  const aiSettings = useAISettingsStore()
+  
+  // State management
   const activeAIBlock = ref<AIBlock | null>(null)
-  const activeBlockId = ref<string | null>(null)
   const promptInput = ref('')
   const followUpPrompt = ref('')
+  const resultInput = ref('')
   const isContinuing = ref(false)
   const isEditing = ref(false)
-  const resultInput = ref('')
   const selectedText = ref('')
   const copied = ref(false)
-
-  // Conversation history
   const conversationHistory = ref<ConversationMessage[]>([])
-
-  // Nota store for accessing notas
-  const notaStore = useNotaStore()
-
-  // Prompt token count
+  const isLoading = ref(false)
+  
+  // Max tokens from settings or default
+  const maxTokens = computed(() => {
+    return aiSettings.settings.maxTokens || DEFAULT_MAX_TOKENS
+  })
+  
+  // Computed properties
   const promptTokenCount = computed(() => {
-    return Math.round(promptInput.value.length / 4)
+    return Math.round(promptInput.value.length / 4) // Approximate token count
   })
-
-  // Check if prompt is empty
+  
   const isPromptEmpty = computed(() => {
-    return !promptInput.value || promptInput.value.trim().length === 0
+    return !promptInput.value.trim()
   })
-
-  // Check if the active block is loading
-  const isLoading = computed(() => {
-    if (!activeAIBlock.value) return false
-    return activeAIBlock.value.node.attrs.isLoading
+  
+  // Token warning computed property
+  const tokenWarning = computed(() => {
+    // Calculate token usage based on current input
+    const currentTokens = isContinuing.value 
+      ? Math.round(followUpPrompt.value.length / 4) // Follow-up tokens
+      : promptTokenCount.value // Initial prompt tokens
+    
+    // Add result tokens if we're continuing conversation
+    const responseTokens = activeAIBlock.value?.node.attrs.result
+      ? Math.round((activeAIBlock.value.node.attrs.result.length || 0) / 4)
+      : 0
+    
+    // Total tokens for continuation mode
+    const totalTokens = isContinuing.value 
+      ? currentTokens + responseTokens
+      : currentTokens
+    
+    // Check if we're approaching the token limit
+    if (totalTokens > maxTokens.value * TOKEN_WARNING_THRESHOLD) {
+      return {
+        show: true,
+        message: `Approaching token limit (${Math.round(totalTokens / maxTokens.value * 100)}%)`
+      }
+    }
+    
+    return { show: false, message: '' }
   })
-
-  // Generate a unique ID for each message
-  function generateUniqueId(): string {
-    return Date.now().toString(36) + Math.random().toString(36).substring(2)
+  
+  // Format timestamp for display
+  const formatTimestamp = (date?: Date): string => {
+    if (!date) return ''
+    
+    const now = new Date()
+    const messageDate = new Date(date)
+    
+    // Same day formatting
+    if (
+      messageDate.getDate() === now.getDate() &&
+      messageDate.getMonth() === now.getMonth() &&
+      messageDate.getFullYear() === now.getFullYear()
+    ) {
+      return messageDate.toLocaleTimeString(undefined, {
+        hour: 'numeric',
+        minute: '2-digit'
+      })
+    }
+    
+    // Different day formatting
+    return messageDate.toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
+    })
   }
-
-  // Format timestamp
-  function formatTimestamp(date?: Date): string {
-    if (!date) return '';
+  
+  // Load conversation from an existing block
+  const loadConversationFromBlock = (block: AIBlock) => {
+    if (!block) return
     
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const messageDate = date instanceof Date ? 
-      new Date(date.getFullYear(), date.getMonth(), date.getDate()) : 
-      new Date();
-    
-    // Time part
-    const hours = date.getHours().toString().padStart(2, '0');
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    const timeStr = `${hours}:${minutes}`;
-    
-    // If same day, just show time
-    if (messageDate.getTime() === today.getTime()) {
-      return timeStr;
-    }
-    
-    // If within the last week, show day name and time
-    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const dayDiff = Math.floor((today.getTime() - messageDate.getTime()) / (1000 * 60 * 60 * 24));
-    if (dayDiff < 7) {
-      return `${dayNames[date.getDay()]} ${timeStr}`;
-    }
-    
-    // Otherwise show date and time
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    return `${month}/${day} ${timeStr}`;
-  }
-
-  // Load conversation from AI block
-  function loadConversationFromBlock(block: AIBlock) {
-    if (!block) {
-      promptInput.value = ''
-      conversationHistory.value = []
-      return
-    }
-    
+    // Set active block
     activeAIBlock.value = block
-    activeBlockId.value = block.node.attrs.id
     
-    // Reset UI states
-    isContinuing.value = false
-    isEditing.value = false
-    
-    // Load the prompt
+    // Reset state
     promptInput.value = block.node.attrs.prompt || ''
+    followUpPrompt.value = ''
+    resultInput.value = block.node.attrs.result || ''
+    isEditing.value = false
+    isContinuing.value = false
     
-    // Reset and build the conversation history
-    conversationHistory.value = []
-    
-    if (block.node.attrs.prompt) {
-      conversationHistory.value.push({
-        role: 'user',
-        content: block.node.attrs.prompt,
-        timestamp: new Date(),
-        id: generateUniqueId()
-      })
+    // Load conversation history from block
+    if (block.node.attrs.conversation) {
+      // Convert ISO strings back to Date objects
+      conversationHistory.value = block.node.attrs.conversation.map((msg: any) => ({
+        ...msg,
+        timestamp: msg.timestamp ? new Date(msg.timestamp) : undefined
+      }))
+    } else if (block.node.attrs.prompt) {
+      // Create a basic conversation if only prompt exists
+      conversationHistory.value = [
+        {
+          id: `user-${Date.now()}`,
+          role: 'user',
+          content: block.node.attrs.prompt,
+          timestamp: block.node.attrs.lastUpdated ? new Date(block.node.attrs.lastUpdated) : new Date()
+        }
+      ]
+      
+      // Add assistant message if result exists
+      if (block.node.attrs.result) {
+        conversationHistory.value.push({
+          id: `assistant-${Date.now()}`,
+          role: 'assistant',
+          content: block.node.attrs.result,
+          timestamp: block.node.attrs.lastUpdated ? new Date(block.node.attrs.lastUpdated) : new Date()
+        })
+      }
     }
     
-    if (block.node.attrs.result) {
-      conversationHistory.value.push({
-        role: 'assistant',
-        content: block.node.attrs.result,
-        timestamp: new Date(),
-        id: generateUniqueId()
-      })
-    }
-    
-    // If block has its own conversation history, use that instead
-    if (block.conversationHistory && Array.isArray(block.conversationHistory)) {
-      conversationHistory.value = block.conversationHistory
-    }
+    // Set loading state
+    isLoading.value = !!block.node.attrs.loading
   }
-
+  
   // Clear active block
   const clearActiveBlock = () => {
     activeAIBlock.value = null
-    activeBlockId.value = null
     promptInput.value = ''
     followUpPrompt.value = ''
     resultInput.value = ''
     isContinuing.value = false
     isEditing.value = false
-    selectedText.value = ''
     conversationHistory.value = []
-    return null
+    isLoading.value = false
   }
-
-  // Create a new AI session directly from the sidebar
+  
+  // Create a new AI session
   const createNewSession = () => {
-    if (!editor) return null
-    
-    try {
-      // Create a new inline AI generation block
-      editor.chain().focus().insertInlineAIGeneration().run()
-      
-      // Clear any existing active block
-      clearActiveBlock()
-      
-      // Create a temporary block to initialize the UI, which will be updated when the actual block node is available
-      const tempBlock = {
-        node: {
-          attrs: {
-            id: generateUniqueId(),
-            prompt: '',
-            result: '',
-            isLoading: false,
-            error: ''
-          }
-        },
-        updateAttributes: (attrs: any) => {
-          // This will be replaced once the actual block node is activated
-          Object.assign(tempBlock.node.attrs, attrs)
-        },
-        getPos: () => 0 // This will be updated when the actual node position is available
-      }
-      
-      // Set this as the active block
-      activeAIBlock.value = tempBlock as AIBlock
-      activeBlockId.value = tempBlock.node.attrs.id
-      
-      // Show success message
-      toast({
-        title: 'New AI Session Created',
-        description: 'Start typing your prompt to generate content'
-      })
-      
-      return tempBlock
-    } catch (error) {
-      logger.error('Failed to create new AI session:', error)
-      toast({
-        title: 'Failed to Create Session',
-        description: 'Could not create a new AI session',
-        variant: 'destructive'
-      })
-      return null
-    }
-  }
-
-  // Toggle continuing mode
-  const toggleContinuing = () => {
-    isContinuing.value = !isContinuing.value
-  }
-
-  // Toggle editing mode
-  const toggleEditing = () => {
-    if (isEditing.value) {
-      isEditing.value = false
+    // First check if editor is available
+    if (!editor) {
+      console.error('Editor not available')
       return
     }
     
-    const result = activeAIBlock.value?.node.attrs.result
-    if (result) {
-      resultInput.value = result
-      isEditing.value = true
+    try {
+      // Create a new AI block in the document
+      editor.chain().focus().insertContent({
+        type: 'aiGeneration',
+        attrs: {
+          id: nanoid(),
+          notaId: notaId, // Associate with current nota
+          loading: false,
+          lastUpdated: new Date().toISOString()
+        }
+      }).run()
+      
+      // Find the newly created block
+      const { state } = editor
+      const { doc } = state
+      let newBlock = null
+      
+      doc.descendants((node: any, pos: number) => {
+        if (node.type.name === 'aiGeneration' && !node.attrs.prompt) {
+          // This is likely our new node
+          newBlock = {
+            node,
+            type: node.type.name,
+            pos
+          }
+          return false // Stop traversal
+        }
+        return true // Continue traversal
+      })
+      
+      if (newBlock) {
+        // Load the new block
+        loadConversationFromBlock(newBlock)
+      }
+    } catch (error) {
+      console.error('Error creating new AI session:', error)
     }
   }
-
+  
+  // Toggle continuing mode
+  const toggleContinuing = () => {
+    isContinuing.value = !isContinuing.value
+    
+    // Reset follow-up prompt when toggling off
+    if (!isContinuing.value) {
+      followUpPrompt.value = ''
+    }
+  }
+  
+  // Toggle editing mode
+  const toggleEditing = () => {
+    if (!activeAIBlock.value) return
+    
+    isEditing.value = !isEditing.value
+    
+    // Set result input when entering edit mode
+    if (isEditing.value) {
+      resultInput.value = activeAIBlock.value.node.attrs.result || ''
+    }
+  }
+  
   // Save edited text
   const saveEditedText = () => {
-    if (!activeAIBlock.value || !resultInput.value.trim()) return
+    if (!activeAIBlock.value || !isEditing.value) return
     
-    // Update the block attributes
-    activeAIBlock.value.updateAttributes({
-      result: resultInput.value
-    })
-    
-    // Update conversation history
-    if (conversationHistory.value.length > 0) {
-      const lastMessageIndex = conversationHistory.value.findIndex(msg => msg.role === 'assistant')
-      if (lastMessageIndex !== -1) {
-        conversationHistory.value[lastMessageIndex].content = resultInput.value
-      } else {
-        conversationHistory.value.push({
-          role: 'assistant',
-          content: resultInput.value,
-          timestamp: new Date(),
-          id: generateUniqueId()
+    try {
+      // Update the block with edited result
+      editor.commands.updateAttributes('aiGeneration', {
+        result: resultInput.value,
+        lastUpdated: new Date().toISOString()
+      })
+      
+      // Update conversation history
+      if (conversationHistory.value.length > 0) {
+        const lastMessage = conversationHistory.value[conversationHistory.value.length - 1]
+        if (lastMessage.role === 'assistant') {
+          lastMessage.content = resultInput.value
+          lastMessage.timestamp = new Date()
+        }
+        
+        // Update block with new conversation history
+        editor.commands.updateAttributes('aiGeneration', {
+          conversation: conversationHistory.value.map(msg => ({
+            ...msg,
+            timestamp: msg.timestamp?.toISOString()
+          }))
         })
       }
+      
+      // Exit editing mode
+      isEditing.value = false
+    } catch (error) {
+      console.error('Error saving edited text:', error)
     }
-    
-    // Exit editing mode
-    isEditing.value = false
   }
-
-  // Watch for changes in the active AI block's result
-  watch(
-    () => activeAIBlock.value?.node.attrs.result,
-    (newResult) => {
-      if (activeAIBlock.value && newResult && !isLoading.value) {
-        // Check if we already have this result in the conversation
-        const resultExists = conversationHistory.value.some(
-          message => message.role === 'assistant' && message.content === newResult
-        )
-
-        // Only add if it doesn't already exist in the conversation
-        if (!resultExists) {
-          conversationHistory.value.push({
-            role: 'assistant',
-            content: newResult,
-            timestamp: new Date(),
-            id: generateUniqueId()
-          })
-        }
-      }
+  
+  // Watch changes to active block to update UI
+  watch(() => activeAIBlock.value?.node.attrs.loading, (loading) => {
+    if (loading !== undefined) {
+      isLoading.value = loading
     }
-  )
-
+  })
+  
   return {
     activeAIBlock,
-    activeBlockId,
     promptInput,
     followUpPrompt,
+    resultInput,
     isContinuing,
     isEditing,
-    resultInput,
     selectedText,
     copied,
     conversationHistory,
     promptTokenCount,
     isPromptEmpty,
     isLoading,
-    generateUniqueId,
+    tokenWarning,
+    maxInputChars: MAX_INPUT_CHARS,
     formatTimestamp,
     loadConversationFromBlock,
     clearActiveBlock,

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount } from 'vue'
 import AIAssistantSidebar from './ai-assistant/components/AIAssistantSidebar.vue'
 
 const props = defineProps<{

@@ -27,6 +27,7 @@ const selectedGeminiModel = ref(aiSettings.settings.geminiModel || aiService.get
 const loadingGeminiModels = ref(false)
 const safetyThreshold = ref(aiSettings.settings.geminiSafetyThreshold || 'BLOCK_MEDIUM_AND_ABOVE')
 const showAdvancedGeminiSettings = ref(false)
+const sidebarWidth = ref([aiSettings.settings.sidebarWidth || 350])
 
 // Only show Gemini model settings when Gemini is selected
 const showGeminiSettings = computed(() => preferredProviderId.value === 'gemini')
@@ -46,7 +47,8 @@ const saveSettings = () => {
     maxTokens: maxTokens.value[0],
     temperature: temperature.value[0],
     geminiModel: selectedGeminiModel.value,
-    geminiSafetyThreshold: safetyThreshold.value
+    geminiSafetyThreshold: safetyThreshold.value,
+    sidebarWidth: sidebarWidth.value[0]
   })
 
   // Set default Gemini model if using Gemini
@@ -425,6 +427,31 @@ const handlePaste = (providerId: string, event: ClipboardEvent) => {
                     Maximum number of tokens to generate
                   </p>
                 </div>
+
+                <!-- Sidebar Width -->
+                <div class="space-y-2">
+                  <div class="flex justify-between">
+                    <Label for="sidebar-width">AI Assistant Sidebar Width: {{ sidebarWidth[0] }}px</Label>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      @click="sidebarWidth = [350]" 
+                      class="h-7 text-xs"
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                  <Slider
+                    id="sidebar-width"
+                    v-model="sidebarWidth"
+                    :min="250"
+                    :max="800"
+                    :step="10"
+                  />
+                  <p class="text-xs text-gray-500">
+                    Controls the width of the AI Assistant sidebar (min: 250px, max: 800px)
+                  </p>
+                </div>
               </div>
 
               <!-- Save Button -->
@@ -442,4 +469,4 @@ const handlePaste = (providerId: string, event: ClipboardEvent) => {
       </TabsContent>
     </Tabs>
   </div>
-</template> 
+</template>

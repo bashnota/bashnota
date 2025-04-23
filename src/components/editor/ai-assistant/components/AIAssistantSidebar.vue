@@ -18,6 +18,10 @@ import ConversationHistory from './ConversationHistory.vue'
 import ConversationInput from './ConversationInput.vue'
 import ActionBar from './ActionBar.vue'
 import EmptyState from './EmptyState.vue'
+import FullscreenWrapper from './FullscreenWrapper.vue'
+
+// Import the fullscreen icons
+import { Maximize2, Minimize2 } from 'lucide-vue-next'
 
 const props = defineProps<{
   editor: any
@@ -46,6 +50,8 @@ const {
   promptTokenCount,
   isPromptEmpty,
   isLoading,
+  tokenWarning,
+  maxInputChars,
   formatTimestamp,
   loadConversationFromBlock,
   clearActiveBlock,
@@ -63,28 +69,50 @@ const {
 } = useAIGeneration(props.editor)
 
 const {
-  mentionSearch,
   showMentionSearch,
   mentionSearchResults,
   mentionsInPrompt,
-  mentionMatchInfo,
   checkForMentions,
   selectNotaFromSearch,
   loadMentionedNotaContents,
   handleOutsideClick,
-  clearMentions
+  clearMentions,
+  updateMentionQuery,
+  closeMentionSearch
 } = useMentions()
 
 const {
   sidebarWidth,
+  constrainedWidth,
   isResizing,
+  minWidth,
+  maxWidth,
   startResizing,
   loadSidebarWidth,
+  setSidebarWidth,
+  resetToDefaultWidth,
   cleanupResizeListeners
 } = useResizableSidebar()
 
 // Reference to the textarea for mention search
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
+
+// Add fullscreen state
+const isFullscreen = ref(false)
+
+// Functions for handling fullscreen
+const enterFullscreen = () => {
+  isFullscreen.value = true
+}
+
+const exitFullscreen = () => {
+  isFullscreen.value = false
+}
+
+// Toggle fullscreen function
+const toggleFullscreen = () => {
+  isFullscreen.value = !isFullscreen.value
+}
 
 // Computed properties
 const hasResult = computed(() => {
@@ -278,6 +306,11 @@ const insertToDocument = () => {
       props.editor.chain().focus().insertContent(text).run()
     }
     
+    // Exit fullscreen mode after inserting
+    if (isFullscreen.value) {
+      isFullscreen.value = false
+    }
+    
     toast({
       title: 'Inserted',
       description: 'Text inserted into document',
@@ -314,6 +347,11 @@ const insertSelectionToDocument = () => {
     } else {
       // Normal insertion for other contexts
       props.editor.chain().focus().insertContent(selectedText.value).run()
+    }
+    
+    // Exit fullscreen mode after inserting
+    if (isFullscreen.value) {
+      isFullscreen.value = false
     }
     
     toast({
@@ -355,6 +393,11 @@ const insertMessageToDocument = (text: string) => {
       props.editor.chain().focus().insertContent(text).run()
     }
     
+    // Exit fullscreen mode after inserting
+    if (isFullscreen.value) {
+      isFullscreen.value = false
+    }
+    
     toast({
       title: 'Inserted',
       description: 'Text inserted into document',
@@ -384,9 +427,25 @@ const handleMentionSelection = (nota: any) => {
   selectNotaFromSearch(nota, textareaRef, isContinuing.value, promptInput, followUpPrompt)
 }
 
+// Update mention search query
+const handleUpdateMentionQuery = (query: string) => {
+  updateMentionQuery(query)
+}
+
+// Close mention search popup
+const handleCloseMentionSearch = () => {
+  closeMentionSearch()
+}
+
 // Listen for "activate-ai-assistant" event from InlineAIGeneration components
 onMounted(() => {
+  // First load from localStorage for backward compatibility
   loadSidebarWidth()
+  
+  // Then check if there's a width in the aiSettings store and use that if available
+  if (aiSettings.settings.sidebarWidth) {
+    setSidebarWidth(aiSettings.settings.sidebarWidth)
+  }
   
   window.addEventListener('activate-ai-assistant', ((event: CustomEvent) => {
     if (event.detail && event.detail.block) {
@@ -405,112 +464,138 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="h-full flex flex-col relative" :style="{ width: `${sidebarWidth}px` }">
-    <!-- Resize Handle -->
+  <FullscreenWrapper 
+    :is-fullscreen="isFullscreen"
+    @exit-fullscreen="exitFullscreen"
+    @enter-fullscreen="enterFullscreen"
+  >
+    <!-- Resize Handle - Only visible when not in fullscreen mode -->
     <div 
-      class="absolute h-full w-1 left-0 top-0 cursor-ew-resize hover:bg-primary/20 z-10"
+      v-if="!isFullscreen"
+      class="absolute h-full w-1.5 left-0 top-0 cursor-ew-resize hover:bg-primary/30 active:bg-primary/50 transition-colors z-10 flex items-center justify-center"
       @mousedown="startResizing"
-    ></div>
+    >
+      <div class="h-16 w-0.5 bg-border/50 rounded-full"></div>
+      <div class="absolute bottom-4 left-2 text-xs px-1.5 py-0.5 bg-background border rounded opacity-0 group-hover:opacity-100 whitespace-nowrap">
+        {{ constrainedWidth }}px
+      </div>
+    </div>
     
-    <!-- Header -->
-    <SidebarHeader 
-      :provider-name="selectedProvider?.name || 'AI'" 
-      :is-loading="isLoading"
-      @close="clearActiveBlock"
-    />
-    
-    <div class="flex-1 flex flex-col overflow-hidden">
-      <!-- Empty State when no active conversation -->
-      <EmptyState 
-        v-if="!activeAIBlock" 
-        @create-session="createNewSession"
+    <!-- Content container with proper width styling -->
+    <div
+      class="flex flex-col h-full w-full overflow-hidden"
+      :style="!isFullscreen ? { width: `${constrainedWidth}px` } : {}"
+    >
+      <!-- Header -->
+      <SidebarHeader 
+        :provider-name="selectedProvider?.name || 'AI'" 
+        :is-loading="isLoading"
+        :is-fullscreen="isFullscreen"
+        @close="emit('close')"
+        @toggle-fullscreen="toggleFullscreen"
       />
       
-      <!-- Conversation Content when a conversation is active -->
-      <template v-else>
-        <!-- Conversation History -->
-        <ConversationHistory
-          :conversation-history="conversationHistory"
-          :is-loading="isLoading"
-          :error="error"
-          :provider-name="selectedProvider?.name || 'AI'"
-          :format-timestamp="formatTimestamp"
-          @copy-message="copyMessageToClipboard"
-          @insert-message="insertMessageToDocument"
-          @select-text="handleTextSelection"
-          @retry="regenerateText"
+      <div class="flex-1 flex flex-col overflow-hidden min-h-0 relative">
+        <!-- Empty State when no active conversation -->
+        <EmptyState 
+          v-if="!activeAIBlock" 
+          @create-session="createNewSession"
         />
         
-        <!-- Input Area -->
-        <div class="border-t p-3 bg-muted/20">
-          <!-- Editing Response -->
-          <div v-if="isEditing">
-            <Textarea
-              v-model="resultInput"
-              class="min-h-[80px] resize-none w-full"
-              @keydown.ctrl.enter.prevent="saveEditedText"
+        <!-- Conversation Content when a conversation is active -->
+        <template v-else>
+          <!-- Conversation History - scrollable area with padding and styling -->
+          <div class="flex-1 overflow-y-auto overflow-x-hidden p-4 bg-gradient-to-b from-background to-muted/10">
+            <ConversationHistory
+              :conversation-history="conversationHistory"
+              :is-loading="isLoading"
+              :error="error"
+              :provider-name="selectedProvider?.name || 'AI'"
+              :format-timestamp="formatTimestamp"
+              @copy-message="copyMessageToClipboard"
+              @insert-message="insertMessageToDocument"
+              @select-text="handleTextSelection"
+              @retry="regenerateText"
             />
-            <div class="flex justify-end gap-2 mt-2">
-              <Button 
-                size="sm" 
-                variant="outline"
-                @click="toggleEditing"
-              >
-                Cancel
-              </Button>
-              <Button 
-                size="sm" 
-                variant="default"
-                @click="saveEditedText"
-              >
-                Save Changes
-              </Button>
-            </div>
           </div>
           
-          <!-- Normal Input (prompt or follow-up) -->
-          <template v-else>
-            <ConversationInput
-              v-if="!hasResult || isContinuing"
-              :promptInput="promptInput"
-              :followUpPrompt="followUpPrompt"
-              :is-prompt-empty="isPromptEmpty"
-              :is-loading="isLoading"
-              :prompt-token-count="promptTokenCount"
-              :is-continuing="isContinuing"
-              :has-mentions="mentionsInPrompt.length > 0"
-              :mention-count="mentionsInPrompt.length"
-              :show-mention-search="showMentionSearch"
-              :mention-search-results="mentionSearchResults"
-              @update:promptInput="promptInput = $event"
-              @update:followUpPrompt="followUpPrompt = $event"
-              @generate="generateText"
-              @continue="continueConversation"
-              @check-mentions="checkForMentions($event, ref(textareaRef))"
-              @select-mention="handleMentionSelection"
-              ref="textareaRef"
-            />
+          <!-- Input Area - fixed at bottom with improved styling -->
+          <div class="border-t p-3 bg-background flex-shrink-0 shadow-[0_-2px_5px_rgba(0,0,0,0.03)]">
+            <!-- Editing Response -->
+            <div v-if="isEditing">
+              <Textarea
+                v-model="resultInput"
+                class="min-h-[80px] resize-none w-full focus:shadow-sm transition-shadow rounded-md"
+                @keydown.ctrl.enter.prevent="saveEditedText"
+              />
+              <div class="flex justify-end gap-2 mt-2">
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  @click="toggleEditing"
+                  class="h-8"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="default"
+                  @click="saveEditedText"
+                  class="h-8 shadow-sm"
+                >
+                  Save Changes
+                </Button>
+              </div>
+            </div>
             
-            <!-- Action Bar -->
-            <ActionBar
-              v-else
-              :has-result="!!hasResult"
-              :is-loading="isLoading"
-              :is-continuing="isContinuing"
-              :has-selection="!!selectedText"
-              @regenerate="regenerateText"
-              @continue="toggleContinuing"
-              @copy="copyToClipboard"
-              @edit="toggleEditing"
-              @insert="insertToDocument"
-              @insert-selection="insertSelectionToDocument"
-              @remove="removeBlock"
-            />
-          </template>
-        </div>
-      </template>
+            <!-- Normal Input (prompt or follow-up) -->
+            <template v-else>
+              <ConversationInput
+                v-if="!hasResult || isContinuing"
+                :promptInput="promptInput"
+                :followUpPrompt="followUpPrompt"
+                :is-prompt-empty="isPromptEmpty"
+                :is-loading="isLoading"
+                :prompt-token-count="promptTokenCount"
+                :is-continuing="isContinuing"
+                :has-mentions="mentionsInPrompt.length > 0"
+                :mention-count="mentionsInPrompt.length"
+                :show-mention-search="showMentionSearch"
+                :mention-search-results="mentionSearchResults"
+                :token-warning="tokenWarning"
+                :max-input-chars="maxInputChars"
+                @update:promptInput="promptInput = $event"
+                @update:followUpPrompt="followUpPrompt = $event"
+                @generate="generateText"
+                @continue="continueConversation"
+                @check-mentions="checkForMentions($event, ref(textareaRef))"
+                @select-mention="handleMentionSelection"
+                @update-mention-search="handleUpdateMentionQuery"
+                @close-mention-search="handleCloseMentionSearch"
+                ref="textareaRef"
+              />
+              
+              <!-- Action Bar -->
+              <ActionBar
+                v-else
+                :has-result="!!hasResult"
+                :is-loading="isLoading"
+                :is-continuing="isContinuing"
+                :has-selection="!!selectedText"
+                @regenerate="regenerateText"
+                @continue="toggleContinuing"
+                @copy="copyToClipboard"
+                @edit="toggleEditing"
+                @insert="insertToDocument"
+                @insert-selection="insertSelectionToDocument"
+                @remove="removeBlock"
+              />
+            </template>
+          </div>
+        </template>
+      </div>
     </div>
-  </div>
+  </FullscreenWrapper>
 </template>
 
 <style scoped>

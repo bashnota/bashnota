@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Avatar } from '@/components/ui/avatar'
-import { XIcon, LoaderIcon, RefreshCwIcon } from 'lucide-vue-next'
+import { XIcon, RefreshCwIcon } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import MessageItem from './MessageItem.vue'
 import { type ConversationMessage } from '../composables/useConversation'
+import { ref, onUpdated, nextTick } from 'vue'
 
 const props = defineProps<{
   conversationHistory: ConversationMessage[]
@@ -20,6 +21,9 @@ const emit = defineEmits([
   'select-text',
   'retry'
 ])
+
+// Reference to scroll area
+const scrollAreaRef = ref<HTMLElement | null>(null)
 
 // Handle copy message
 const handleCopyMessage = (content: string) => {
@@ -40,10 +44,22 @@ const handleSelectText = (text: string) => {
 const retryGeneration = () => {
   emit('retry')
 }
+
+// Auto-scroll to bottom when new messages arrive
+onUpdated(() => {
+  nextTick(() => {
+    if (scrollAreaRef.value) {
+      const scrollContainer = scrollAreaRef.value.querySelector('[data-radix-scroll-area-viewport]')
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight
+      }
+    }
+  })
+})
 </script>
 
 <template>
-  <ScrollArea class="flex-1 p-4 space-y-4">
+  <ScrollArea ref="scrollAreaRef" class="flex-1 p-4 space-y-4">
     <!-- Conversation Messages -->
     <MessageItem
       v-for="(message, index) in conversationHistory"
@@ -56,28 +72,33 @@ const retryGeneration = () => {
       @select="handleSelectText"
     />
     
-    <!-- Loading Indicator -->
-    <div v-if="isLoading" class="flex items-start gap-3">
+    <!-- Enhanced Loading Indicator -->
+    <div v-if="isLoading" class="flex items-start gap-3 loading-indicator">
       <Avatar class="bg-primary/10">
         <div class="h-4 w-4 text-primary" />
       </Avatar>
-      <div class="text-sm text-muted-foreground">
-        <LoaderIcon class="h-4 w-4 animate-spin inline mr-2" />
-        Generating response...
+      <div class="text-sm text-muted-foreground p-3 bg-muted/20 rounded-lg max-w-[80%]">
+        <div class="typing-indicator">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+        <span class="sr-only">AI is generating a response...</span>
       </div>
     </div>
     
     <!-- Error Message -->
-    <div v-if="error" class="flex items-start gap-3 text-destructive">
+    <div v-if="error" class="flex items-start gap-3 text-destructive error-message">
       <Avatar class="bg-destructive/10">
         <XIcon class="h-4 w-4 text-destructive" />
       </Avatar>
-      <div class="space-y-2">
-        <div class="text-sm">Error: {{ error }}</div>
+      <div class="space-y-2 p-3 bg-destructive/5 rounded-lg border border-destructive/20">
+        <div class="text-sm font-medium">Error: {{ error }}</div>
+        <p class="text-xs text-muted-foreground">The AI encountered a problem while generating a response.</p>
         <Button 
           variant="secondary" 
           size="sm"
-          class="h-7 text-xs"
+          class="h-7 text-xs mt-2"
           @click="retryGeneration"
         >
           <RefreshCwIcon class="h-3 w-3 mr-1" />
@@ -87,3 +108,80 @@ const retryGeneration = () => {
     </div>
   </ScrollArea>
 </template>
+
+<style scoped>
+/* Animation for the typing indicator */
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  column-gap: 0.5rem;
+}
+
+.typing-indicator span {
+  height: 8px;
+  width: 8px;
+  background-color: hsl(var(--primary) / 0.7);
+  border-radius: 50%;
+  display: block;
+  opacity: 0.4;
+}
+
+.typing-indicator span:nth-child(1) {
+  animation: pulse 1s infinite ease-in-out;
+}
+
+.typing-indicator span:nth-child(2) {
+  animation: pulse 1s infinite ease-in-out 0.2s;
+}
+
+.typing-indicator span:nth-child(3) {
+  animation: pulse 1s infinite ease-in-out 0.4s;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
+/* Fade in animation for the loading indicator */
+.loading-indicator {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+/* Error message styling */
+.error-message {
+  animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes shake {
+  10%, 90% {
+    transform: translateX(-1px);
+  }
+  20%, 80% {
+    transform: translateX(2px);
+  }
+  30%, 50%, 70% {
+    transform: translateX(-2px);
+  }
+  40%, 60% {
+    transform: translateX(1px);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+</style>

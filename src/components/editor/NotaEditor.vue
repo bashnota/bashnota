@@ -621,6 +621,7 @@ defineExpose({
     <div
       v-if="isAIAssistantOpen"
       class="h-full border-r flex-shrink-0 flex flex-col bg-background"
+      style="width: 350px; overflow: hidden;"
     >
       <AIAssistantSidebar 
         :editor="editor" 

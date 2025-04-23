@@ -2,18 +2,27 @@
 import { CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Sparkles as SparklesIcon, XIcon, LoaderIcon } from 'lucide-vue-next'
+import { Sparkles as SparklesIcon, XIcon, LoaderIcon, Maximize2, Minimize2 } from 'lucide-vue-next'
 
 const props = defineProps<{
   providerName: string
   isLoading: boolean
+  isFullscreen: boolean
 }>()
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'toggleFullscreen'])
+
+// Handle close button click, exit fullscreen first if needed
+const handleClose = () => {
+  if (props.isFullscreen) {
+    emit('toggleFullscreen')
+  }
+  emit('close')
+}
 </script>
 
 <template>
-  <CardHeader class="border-b px-4 py-3 flex-shrink-0">
+  <CardHeader class="border-b px-4 py-3 flex-shrink-0 bg-muted/30">
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-2">
         <SparklesIcon class="h-4 w-4 text-primary" />
@@ -27,14 +36,28 @@ const emit = defineEmits(['close'])
           Processing
         </Badge>
       </div>
-      <Button 
-        variant="ghost" 
-        size="icon" 
-        class="h-7 w-7 hover:text-destructive" 
-        @click="$emit('close')"
-      >
-        <XIcon class="h-4 w-4" />
-      </Button>
+      <div class="flex items-center gap-1">
+        <!-- Fullscreen toggle button -->
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          class="h-7 w-7 hover:bg-muted/70 transition-colors" 
+          @click="$emit('toggleFullscreen')"
+          :title="isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'"
+        >
+          <Maximize2 v-if="!isFullscreen" class="h-4 w-4" />
+          <Minimize2 v-else class="h-4 w-4" />
+        </Button>
+        <!-- Close button -->
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          class="h-7 w-7 hover:text-destructive transition-colors" 
+          @click="handleClose"
+        >
+          <XIcon class="h-4 w-4" />
+        </Button>
+      </div>
     </div>
   </CardHeader>
 </template>

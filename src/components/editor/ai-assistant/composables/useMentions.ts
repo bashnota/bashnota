@@ -1,273 +1,272 @@
-import { ref, nextTick } from 'vue'
-import type { Ref } from 'vue'
-import { useDebounceFn } from '@vueuse/core'
-import { useNotaStore } from '@/stores/nota'
+import { ref, computed, watch, nextTick } from 'vue'
 import { logger } from '@/services/logger'
+import { useNotaStore } from '@/stores/nota'
 
-export interface MentionedNota {
-  id: string
-  title: string
-  content?: string
-  isBlock?: boolean
-}
-
-export interface MentionMatchInfo {
-  startPos: number
-  endPos: number
-  query: string
+// Debounce utility function
+function debounce<T extends (...args: any[]) => any>(fn: T, delay: number): (...args: Parameters<T>) => void {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  return function(...args: Parameters<T>) {
+    if (timeout) clearTimeout(timeout);
+    timeout = setTimeout(() => fn(...args), delay);
+  };
 }
 
 export function useMentions() {
   const notaStore = useNotaStore()
-  const mentionSearch = ref('')
+  
+  // State for mention search
   const showMentionSearch = ref(false)
   const mentionSearchResults = ref<any[]>([])
-  const mentionsInPrompt = ref<MentionedNota[]>([])
-  const mentionMatchInfo = ref<MentionMatchInfo | null>(null)
-  const mentionCursorPosition = ref<{ top: number, left: number } | null>(null)
-
-  // Debounced search for notas
-  const debouncedSearch = useDebounceFn(() => {
-    searchNotas()
-  }, 300)
-
-  // Search notas based on query
-  const searchNotas = async () => {
-    // Skip search if query is empty or search is not visible
-    if (!showMentionSearch.value) return
-    
-    const query = mentionSearch.value.toLowerCase()
-    if (!query.trim() && query.length < 2) {
-      mentionSearchResults.value = notaStore.items.slice(0, 5)
+  const mentionsInPrompt = ref<any[]>([])
+  const searchQuery = ref('')
+  const currentMentionRange = ref<{ start: number; end: number } | null>(null)
+  
+  // Maximum number of results to show in mention search
+  const MAX_SEARCH_RESULTS = 10
+  
+  // Cache for nota content to avoid excessive database queries
+  const notaContentCache = new Map<string, string>()
+  
+  // Debounced search function to prevent too many searches when typing quickly
+  const debouncedSearch = debounce(async (query: string) => {
+    if (!query.trim()) {
+      mentionSearchResults.value = []
       return
     }
     
-    // Filter notas by title and content
-    mentionSearchResults.value = notaStore.items
-      .filter(nota => 
-        nota.title.toLowerCase().includes(query) || 
-        (nota.content && nota.content.toLowerCase().includes(query))
-      )
-      .slice(0, 10) // Limit to 10 results
-  }
-
-  // Detect @ mentions
-  const checkForMentions = (e: Event, textareaRef: Ref<HTMLTextAreaElement | null>) => {
-    const textarea = e.target as HTMLTextAreaElement
-    const value = textarea.value
-    const cursorPos = textarea.selectionStart
-    
-    // Look for @ symbol preceded by space or at the beginning of text
-    const beforeCursor = value.substring(0, cursorPos)
-    const match = beforeCursor.match(/(?:^|\s)@(\w*)$/)
-    
-    if (match) {
-      showMentionSearch.value = true
-      mentionSearch.value = match[1] || ''
+    try {
+      // Search for notas by title
+      const results = await notaStore.searchNotasByTitle(query)
       
-      // Store match information for insertion
-      mentionMatchInfo.value = {
-        startPos: match.index || 0,
-        endPos: cursorPos,
-        query: match[0]
-      }
-      
-      searchNotas()
-    } else {
-      showMentionSearch.value = false
-      mentionMatchInfo.value = null
+      // Limit results and add query for reference
+      mentionSearchResults.value = results
+        .slice(0, MAX_SEARCH_RESULTS)
+        .map(nota => ({
+          ...nota,
+          searchQuery: query
+        }))
+    } catch (error) {
+      logger.error('Error searching for notas:', error)
+      mentionSearchResults.value = []
     }
-  }
-
-  // Calculate position for mention search popup
-  const calculateMentionPopupPosition = (textarea: HTMLTextAreaElement, matchIndex: number) => {
-    const text = textarea.value.substring(0, matchIndex)
-    const lines = text.split('\n')
-    const lineCount = lines.length
-    const lastLine = lines[lineCount - 1] || ''
-    
-    // Create a temporary div to measure text dimensions
-    const div = document.createElement('div')
-    div.style.position = 'absolute'
-    div.style.top = '-9999px'
-    div.style.left = '-9999px'
-    div.style.width = `${textarea.clientWidth}px`
-    div.style.font = window.getComputedStyle(textarea).font
-    div.style.lineHeight = window.getComputedStyle(textarea).lineHeight
-    div.style.whiteSpace = 'pre-wrap'
-    div.style.wordWrap = 'break-word'
-    
-    // Calculate position by measuring text
-    div.textContent = lastLine
-    document.body.appendChild(div)
-    const lineHeight = parseInt(window.getComputedStyle(textarea).lineHeight) || 20
-    const rect = textarea.getBoundingClientRect()
-    
-    mentionCursorPosition.value = {
-      top: rect.top + (lineCount * lineHeight) + 8,
-      left: rect.left + div.clientWidth
-    }
-    
-    document.body.removeChild(div)
-  }
-
-  // Select a nota from search - fixed to handle all edge cases
-  const selectNotaFromSearch = (nota: any, textareaRef: Ref<HTMLTextAreaElement | null>, isContinuing: boolean, promptInput: Ref<string>, followUpPrompt: Ref<string>, isBlock = false) => {
+  }, 300) // 300ms debounce
+  
+  /**
+   * Check for mention triggers in text (e.g., @ or #[)
+   */
+  const checkForMentions = (event: any, textareaRef: any) => {
+    // Skip if textarea ref is not available
     if (!textareaRef.value) return
     
-    try {
-      // Get the target textarea and its current value
-      const textarea = textareaRef.value;
-      let targetValue = isContinuing ? followUpPrompt.value : promptInput.value;
-      
-      // Default cursor position if we can't determine it from the textarea
-      let cursorPos = textarea.selectionStart || 0;
-      
-      // If we have valid match info, use that for precise replacement
-      if (mentionMatchInfo.value) {
-        const { startPos, endPos } = mentionMatchInfo.value;
-        
-        // Replace the @mention with the full reference syntax: #[nota title](id)
-        const replacement = targetValue.substring(0, startPos) + 
-                           `#[${nota.title}](${nota.id})` + 
-                           targetValue.substring(endPos);
-        
-        // Update the appropriate textarea value
-        if (isContinuing) {
-          followUpPrompt.value = replacement;
-        } else {
-          promptInput.value = replacement;
-        }
-        
-        // Set cursor position after the replacement
-        nextTick(() => {
-          if (textareaRef.value) {
-            const newCursorPos = startPos + `#[${nota.title}](${nota.id})`.length;
-            textareaRef.value.selectionStart = newCursorPos;
-            textareaRef.value.selectionEnd = newCursorPos;
-            textareaRef.value.focus();
-          }
-        });
-      } else {
-        // Fallback to inserting at current cursor position
-        const replacement = targetValue.substring(0, cursorPos) + 
-                       `#[${nota.title}](${nota.id})` + 
-                       targetValue.substring(cursorPos);
-        
-        // Update the appropriate textarea value
-        if (isContinuing) {
-          followUpPrompt.value = replacement;
-        } else {
-          promptInput.value = replacement;
-        }
-        
-        // Set cursor position after the replacement
-        nextTick(() => {
-          if (textareaRef.value) {
-            const newCursorPos = cursorPos + `#[${nota.title}](${nota.id})`.length;
-            textareaRef.value.selectionStart = newCursorPos;
-            textareaRef.value.selectionEnd = newCursorPos;
-            textareaRef.value.focus();
-          }
-        });
-      }
-      
-      // Add the mentioned nota to the list
-      mentionsInPrompt.value.push({
-        id: nota.id,
-        title: nota.title,
-        isBlock: isBlock
-      });
-      
-      // Close the mention search
-      showMentionSearch.value = false;
-      
-    } catch (error) {
-      // Handle any errors in selection process
-      logger.error('Error selecting nota from search:', error);
-      showMentionSearch.value = false;
-      
-      // Fallback: just append the reference to the end if all else fails
-      const reference = `#[${nota.title}](${nota.id})`;
-      if (isContinuing) {
-        followUpPrompt.value += reference;
-      } else {
-        promptInput.value += reference;
-      }
-      
-      // Add the mentioned nota to the list
-      mentionsInPrompt.value.push({
-        id: nota.id,
-        title: nota.title,
-        isBlock: isBlock
-      });
-    }
-  }
-
-  // Load nota content for mentioned notas when sending prompt
-  const loadMentionedNotaContents = async (promptText: string) => {
-    // Process mentions in prompt
-    for (const mention of mentionsInPrompt.value) {
-      if (!mention.content) {
-        const nota = await notaStore.loadNota(mention.id)
-        if (nota && nota.content) {
-          mention.content = nota.content
-        }
-      }
-    }
+    const textarea = event.target
+    const value = textarea.value as string
+    const cursorPos = textarea.selectionStart as number
     
-    // Update prompt with content from mentioned notas
-    let updatedPrompt = promptText
+    // Look for '#[' before the cursor
+    const textBeforeCursor = value.substring(0, cursorPos)
+    const mentionMatch = textBeforeCursor.match(/#\[([^\]]+)?$/)
     
-    // Append mentioned nota content
-    if (mentionsInPrompt.value.length > 0) {
-      updatedPrompt += '\n\n### Referenced Content:\n\n'
-      mentionsInPrompt.value.forEach(mention => {
-        if (mention.content) {
-          const contentToAdd = mention.isBlock 
-            ? mention.content  // Just the selected block
-            : `Content from "${mention.title}":\n${mention.content}` // Full nota content
-          
-          updatedPrompt += `${contentToAdd}\n\n---\n\n`
-        }
-      })
-    }
-    
-    return updatedPrompt
-  }
-
-  // Close mention search when clicking outside
-  const handleOutsideClick = (event: MouseEvent) => {
-    const searchElement = document.querySelector('.mention-search')
-    if (!searchElement) return
-    
-    if (!searchElement.contains(event.target as Node)) {
+    if (mentionMatch) {
+      // Found a potential mention
+      const query = mentionMatch[1] || ''
+      searchQuery.value = query
+      
+      // Record the mention range for later replacement
+      const startPos = mentionMatch.index as number
+      const endPos = cursorPos
+      currentMentionRange.value = { start: startPos, end: endPos }
+      
+      // Show search and perform search
+      showMentionSearch.value = true
+      debouncedSearch(query)
+    } else {
+      // No mention found, close search
       showMentionSearch.value = false
+      currentMentionRange.value = null
+    }
+    
+    // Also parse existing mentions in the prompt
+    parseExistingMentions(value)
+  }
+  
+  /**
+   * Select a nota from search results and insert it into the text
+   */
+  const selectNotaFromSearch = (nota: any, textareaRef: any, isContinuing: boolean, promptInput: any, followUpPrompt: any) => {
+    if (!textareaRef.value || !currentMentionRange.value) return
+    
+    const textarea = textareaRef.value
+    const range = currentMentionRange.value
+    
+    // Create the mention text
+    const mentionText = `#[${nota.title}](${nota.id})`
+    
+    // Get the current prompt value
+    const currentValue = isContinuing ? followUpPrompt.value : promptInput.value
+    
+    // Replace the mention placeholder with the actual mention
+    const newValue = 
+      currentValue.substring(0, range.start) + 
+      mentionText + 
+      currentValue.substring(range.end)
+    
+    // Update the appropriate input
+    if (isContinuing) {
+      followUpPrompt.value = newValue
+    } else {
+      promptInput.value = newValue
+    }
+    
+    // Close search
+    showMentionSearch.value = false
+    currentMentionRange.value = null
+    
+    // Update existing mentions
+    parseExistingMentions(newValue)
+    
+    // Focus back on textarea and set cursor position after the mention
+    nextTick(() => {
+      if (textareaRef.value) {
+        textareaRef.value.focus()
+        const newCursorPos = range.start + mentionText.length
+        textareaRef.value.selectionStart = newCursorPos
+        textareaRef.value.selectionEnd = newCursorPos
+      }
+    })
+  }
+  
+  /**
+   * Parse existing mentions from text
+   */
+  const parseExistingMentions = (text: string) => {
+    // Clear previous mentions
+    mentionsInPrompt.value = []
+    
+    // Find all mentions in the format #[Title](id)
+    const mentionRegex = /#\[(.*?)\]\((.*?)\)/g
+    let match
+    
+    while ((match = mentionRegex.exec(text)) !== null) {
+      const title = match[1]
+      const id = match[2]
+      
+      if (title && id) {
+        mentionsInPrompt.value.push({ title, id })
+      }
     }
   }
-
-  // Clear mentions
-  const clearMentions = () => {
-    mentionsInPrompt.value = []
-    mentionSearch.value = ''
-    showMentionSearch.value = false
-    mentionMatchInfo.value = null
+  
+  /**
+   * Load content from mentioned notas
+   */
+  const loadMentionedNotaContents = async (promptText: string): Promise<string> => {
+    if (mentionsInPrompt.value.length === 0) {
+      return promptText
+    }
+    
+    try {
+      // Create a deep copy of the prompt text
+      let enhancedPrompt = promptText
+      
+      // Process each mention
+      for (const mention of mentionsInPrompt.value) {
+        // Check cache first
+        let content = notaContentCache.get(mention.id)
+        
+        // If not in cache, fetch from store
+        if (!content) {
+          const nota = await notaStore.getCurrentNota(mention.id)
+          if (nota && nota.content) {
+            content = nota.content
+            
+            // Add to cache (with a maximum size check)
+            if (notaContentCache.size > 50) {
+              // If cache is too large, clear oldest entries
+              const keys = Array.from(notaContentCache.keys())
+              for (let i = 0; i < 10; i++) {
+                notaContentCache.delete(keys[i])
+              }
+            }
+            notaContentCache.set(mention.id, content)
+          }
+        }
+        
+        // If content was found, replace the mention with the content
+        if (content) {
+          const mentionRegex = new RegExp(`#\\[${mention.title}\\]\\(${mention.id}\\)`, 'g')
+          enhancedPrompt = enhancedPrompt.replace(
+            mentionRegex,
+            `Content from nota "${mention.title}":\n${content}\n`
+          )
+        }
+      }
+      
+      return enhancedPrompt
+    } catch (error) {
+      logger.error('Error loading mentioned nota contents:', error)
+      return promptText // Return original prompt on error
+    }
   }
-
+  
+  /**
+   * Handle clicks outside the mention search to close it
+   */
+  const handleOutsideClick = (event: MouseEvent) => {
+    // Check if click was outside mention search
+    if (showMentionSearch.value) {
+      // Check if the click target is inside mention search
+      const target = event.target as HTMLElement
+      const mentionSearchElement = document.querySelector('.mention-search-popup')
+      
+      if (mentionSearchElement && !mentionSearchElement.contains(target)) {
+        showMentionSearch.value = false
+        currentMentionRange.value = null
+      }
+    }
+  }
+  
+  /**
+   * Clear all mentions state
+   */
+  const clearMentions = () => {
+    showMentionSearch.value = false
+    mentionSearchResults.value = []
+    currentMentionRange.value = null
+    searchQuery.value = ''
+  }
+  
+  /**
+   * Update search query from external components
+   */
+  const updateMentionQuery = (query: string) => {
+    searchQuery.value = query
+    debouncedSearch(query)
+  }
+  
+  /**
+   * Close mention search
+   */
+  const closeMentionSearch = () => {
+    showMentionSearch.value = false
+    currentMentionRange.value = null
+  }
+  
+  // Provide memory management function
+  const clearCache = () => {
+    notaContentCache.clear()
+  }
+  
   return {
-    mentionSearch,
     showMentionSearch,
     mentionSearchResults,
     mentionsInPrompt,
-    mentionMatchInfo,
-    mentionCursorPosition,
-    debouncedSearch,
-    searchNotas,
     checkForMentions,
-    calculateMentionPopupPosition,
     selectNotaFromSearch,
     loadMentionedNotaContents,
     handleOutsideClick,
-    clearMentions
+    clearMentions,
+    updateMentionQuery,
+    closeMentionSearch,
+    clearCache
   }
 }

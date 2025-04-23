@@ -63,7 +63,7 @@ const removeBlock = () => {
       <Button 
         variant="secondary" 
         size="sm"
-        class="h-8"
+        class="h-8 hover:shadow-sm transition-all"
         @click="regenerateText"
         :disabled="isLoading"
       >
@@ -73,7 +73,7 @@ const removeBlock = () => {
       <Button 
         variant="secondary" 
         size="sm"
-        class="h-8"
+        class="h-8 hover:shadow-sm transition-all"
         @click="toggleContinuing"
       >
         <SendIcon class="h-3.5 w-3.5 mr-1" />
@@ -85,24 +85,24 @@ const removeBlock = () => {
     <div class="flex gap-1">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" class="h-8 w-8">
+          <Button variant="ghost" size="icon" class="h-8 w-8 hover:bg-muted transition-colors">
             <MoreHorizontal class="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem @click="copyContent">
+        <DropdownMenuContent align="end" class="min-w-[160px]">
+          <DropdownMenuItem @click="copyContent" class="cursor-pointer">
             <CopyIcon class="h-4 w-4 mr-2" />
             <span>Copy all</span>
           </DropdownMenuItem>
-          <DropdownMenuItem @click="editResponse">
+          <DropdownMenuItem @click="editResponse" class="cursor-pointer">
             <EditIcon class="h-4 w-4 mr-2" />
             <span>Edit response</span>
           </DropdownMenuItem>
-          <DropdownMenuItem @click="insertSelectionToDocument" :disabled="!hasSelection">
+          <DropdownMenuItem @click="insertSelectionToDocument" :disabled="!hasSelection" class="cursor-pointer">
             <ScissorsIcon class="h-4 w-4 mr-2" />
             <span>Insert selection</span>
           </DropdownMenuItem>
-          <DropdownMenuItem @click="removeBlock" class="text-destructive">
+          <DropdownMenuItem @click="removeBlock" class="text-destructive cursor-pointer">
             <XIcon class="h-4 w-4 mr-2" />
             <span>Remove block</span>
           </DropdownMenuItem>
@@ -112,7 +112,7 @@ const removeBlock = () => {
       <Button 
         variant="default" 
         size="sm"
-        class="h-8"
+        class="h-8 shadow-sm hover:shadow-md transition-all"
         @click="insertToDocument"
       >
         Insert

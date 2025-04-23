@@ -2,9 +2,9 @@
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { SparklesIcon, SendIcon, LoaderIcon, FileText, Search } from 'lucide-vue-next'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { ref, computed, nextTick, watch } from 'vue'
+import { SparklesIcon, SendIcon, LoaderIcon, FileText, AlertTriangleIcon } from 'lucide-vue-next'
+import { ref, nextTick, watch, onMounted } from 'vue'
+import MentionSearch from './MentionSearch.vue'
 
 const props = defineProps<{
   promptInput: string
@@ -17,6 +17,8 @@ const props = defineProps<{
   mentionCount: number
   showMentionSearch: boolean
   mentionSearchResults: any[]
+  tokenWarning: { show: boolean; message: string } | null
+  maxInputChars: number
 }>()
 
 const emit = defineEmits([
@@ -25,12 +27,17 @@ const emit = defineEmits([
   'generate',
   'continue',
   'checkMentions',
-  'selectMention'
+  'selectMention',
+  'updateMentionSearch',
+  'closeMentionSearch'
 ])
 
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const localPromptInput = ref(props.promptInput)
 const localFollowUpPrompt = ref(props.followUpPrompt)
+const mentionPosition = ref<{ top: number; left: number } | null>(null)
+const isTyping = ref(false)
+const typingTimeout = ref<number | null>(null)
 
 // Watch for changes in props to update local refs
 watch(() => props.promptInput, (newVal) => {
@@ -45,7 +52,22 @@ watch(() => props.followUpPrompt, (newVal) => {
 watch(localPromptInput, (newVal) => {
   emit('update:promptInput', newVal)
   
-  // Simply emit the checkMentions event with a simple object instead of trying to dispatch a DOM event
+  // Update typing status for visual feedback
+  if (newVal.trim()) {
+    isTyping.value = true
+    
+    // Clear previous timeout
+    if (typingTimeout.value) {
+      clearTimeout(typingTimeout.value)
+    }
+    
+    // Set a new timeout to reset typing status after 1 second
+    typingTimeout.value = window.setTimeout(() => {
+      isTyping.value = false
+    }, 1000)
+  }
+  
+  // Emit the checkMentions event with a simple object
   emit('checkMentions', {
     target: {
       value: newVal,
@@ -58,7 +80,7 @@ watch(localPromptInput, (newVal) => {
 watch(localFollowUpPrompt, (newVal) => {
   emit('update:followUpPrompt', newVal)
   
-  // Simply emit the checkMentions event with a simple object instead of trying to dispatch a DOM event
+  // Emit the checkMentions event with a simple object
   emit('checkMentions', {
     target: {
       value: newVal,
@@ -67,6 +89,93 @@ watch(localFollowUpPrompt, (newVal) => {
     }
   })
 })
+
+// Watch for mention search visibility to calculate position
+watch(() => props.showMentionSearch, (isVisible) => {
+  if (isVisible && textareaRef.value) {
+    calculateMentionPosition()
+  }
+})
+
+// Calculate position for mention search popup
+const calculateMentionPosition = () => {
+  try {
+    // First safety check - verify the textarea ref exists and is an element
+    if (!textareaRef.value || !(textareaRef.value instanceof Element)) {
+      console.warn('textareaRef is not a valid Element in calculateMentionPosition');
+      return;
+    }
+    
+    // Make sure the textarea has all the necessary methods
+    if (typeof textareaRef.value.getBoundingClientRect !== 'function') {
+      console.warn('textareaRef.value.getBoundingClientRect is not a function');
+      return;
+    }
+    
+    const textarea = textareaRef.value;
+    
+    // Get current value from the local state variables since textarea.value might be null
+    const currentValue = props.isContinuing ? localFollowUpPrompt.value : localPromptInput.value;
+    
+    // Second safety check - verify we have a value to work with
+    if (!currentValue) {
+      console.warn('No value available to calculate mention position');
+      return;
+    }
+    
+    const caretPosition = textarea.selectionStart || 0;
+    
+    // Make sure the caret position is within bounds
+    if (caretPosition > currentValue.length) {
+      console.warn('Caret position out of bounds');
+      return;
+    }
+    
+    const text = currentValue.substring(0, caretPosition);
+    const lines = text.split('\n');
+    const lineCount = lines.length;
+    const lastLine = lines[lineCount - 1] || '';
+    
+    // Create temporary element to measure text
+    const div = document.createElement('div');
+    div.style.position = 'absolute';
+    div.style.visibility = 'hidden';
+    div.style.width = `${textarea.clientWidth}px`;
+    
+    // Make sure we can get computed style
+    const computedStyle = window.getComputedStyle(textarea);
+    if (!computedStyle) {
+      console.warn('Could not get computed style for textarea');
+      return;
+    }
+    
+    div.style.font = computedStyle.font;
+    div.style.lineHeight = computedStyle.lineHeight;
+    div.style.whiteSpace = 'pre-wrap';
+    div.style.wordWrap = 'break-word';
+    div.textContent = lastLine;
+    
+    document.body.appendChild(div);
+    
+    const lineHeight = parseInt(computedStyle.lineHeight) || 20;
+    const rect = textarea.getBoundingClientRect();
+    
+    mentionPosition.value = {
+      top: rect.top + window.scrollY + (lineCount * lineHeight) + 8,
+      left: rect.left + window.scrollX + div.clientWidth
+    };
+    
+    document.body.removeChild(div);
+  } catch (error) {
+    console.error('Error in calculateMentionPosition:', error);
+    
+    // Provide a fallback position based on the window
+    mentionPosition.value = {
+      top: 100,
+      left: 100
+    };
+  }
+}
 
 // Handle input on prompt textarea
 const handlePromptInput = (e: Event) => {
@@ -110,41 +219,91 @@ const selectNotaFromSearch = (nota: any) => {
   emit('selectMention', nota)
 }
 
+// Update mention search query
+const updateMentionQuery = (query: string) => {
+  emit('updateMentionSearch', query)
+}
+
+// Close mention search
+const closeMentionSearch = () => {
+  emit('closeMentionSearch')
+}
+
 // Focus textarea after mount
 const focusTextarea = () => {
   nextTick(() => {
-    if (textareaRef.value) {
-      textareaRef.value.focus()
+    try {
+      // Add proper checks to ensure the element exists and has a focus method
+      if (textareaRef.value && typeof textareaRef.value.focus === 'function') {
+        textareaRef.value.focus()
+      }
+    } catch (error) {
+      console.error('Error focusing textarea:', error)
     }
   })
 }
+
+// Calculate initial mention position on mount
+onMounted(() => {
+  focusTextarea()
+})
 </script>
 
 <template>
-  <div>
+  <div class="relative conversation-input">
     <!-- New Prompt Input -->
-    <div v-if="!isContinuing">
-      <Textarea
-        v-model="localPromptInput"
-        placeholder="Enter your prompt here..."
-        class="min-h-[80px] resize-none w-full"
-        @keydown="handleKeyDown"
-        ref="textareaRef"
-      />
-      <div class="flex justify-between items-center text-xs text-muted-foreground mt-2">
-        <span>{{ promptTokenCount }} tokens (approx)</span>
+    <div v-if="!isContinuing" class="relative prompt-container">
+      <div class="textarea-wrapper">
+        <Textarea
+          v-model="localPromptInput"
+          placeholder="Enter your prompt here... (Use #[ to mention a nota)"
+          class="min-h-[90px] resize-none w-full pr-2 transition-all rounded-md input-area"
+          :class="{ 'typing': isTyping, 'focus-visible': isTyping }"
+          @keydown="handleKeyDown"
+          @input="handlePromptInput"
+          ref="textareaRef"
+        />
+        <!-- Shortcut hint -->
+        <div class="shortcut-hint">
+          <kbd>Ctrl</kbd>+<kbd>Enter</kbd> to generate
+        </div>
+      </div>
+      
+      <div class="flex justify-between items-center text-xs text-muted-foreground mt-2 px-0.5">
+        <span class="flex gap-2 items-center">
+          <!-- Token count with warning indicator -->
+          <span 
+            class="text-xs font-medium flex items-center gap-1 token-count"
+            :class="{'warning': tokenWarning && tokenWarning.show}"
+            :title="tokenWarning && tokenWarning.show ? tokenWarning.message : ''"
+          >
+            {{ promptTokenCount }} tokens
+            <AlertTriangleIcon 
+              v-if="tokenWarning && tokenWarning.show" 
+              class="h-3 w-3 text-amber-500" 
+            />
+          </span>
+          <!-- Show character count when approaching limit -->
+          <span 
+            v-if="promptInput.length > 10000" 
+            class="text-xs opacity-75 char-count"
+            :class="{'warning': promptInput.length > 18000}"
+          >
+            {{ promptInput.length }}/{{ maxInputChars }} chars
+          </span>
+        </span>
         <div class="flex items-center gap-2">
           <div v-if="hasMentions" class="flex items-center gap-1">
-            <Badge variant="outline" class="bg-primary/10 border-primary/20 px-2 text-xs flex items-center gap-1">
+            <Badge variant="outline" class="bg-primary/10 border-primary/20 px-2 text-xs flex items-center gap-1 shadow-sm badge-mentions">
               <FileText class="h-3 w-3" />
               {{ mentionCount }} nota{{ mentionCount > 1 ? 's' : '' }} referenced
             </Badge>
           </div>
           <Button 
             size="sm" 
-            class="h-8 bg-primary hover:bg-primary/90 text-primary-foreground"
+            class="h-8 bg-primary hover:bg-primary/90 text-primary-foreground transition-all shadow-sm generate-button"
             @click="generateText" 
-            :disabled="isPromptEmpty"
+            :disabled="isPromptEmpty || isLoading"
           >
             <LoaderIcon v-if="isLoading" class="h-3.5 w-3.5 mr-1.5 animate-spin" />
             <SparklesIcon v-else class="h-3.5 w-3.5 mr-1.5" />
@@ -155,20 +314,34 @@ const focusTextarea = () => {
     </div>
 
     <!-- Continue Conversation Input -->
-    <div v-else>
-      <Textarea
-        v-model="localFollowUpPrompt"
-        placeholder="Continue the conversation..."
-        class="min-h-[80px] resize-none w-full"
-        :disabled="isLoading"
-        @keydown="handleKeyDown"
-        ref="textareaRef"
-      />
-      <div class="flex justify-between items-center text-xs text-muted-foreground mt-2">
-        <span>Ctrl+Enter to send</span>
+    <div v-else class="relative continue-container">
+      <div class="textarea-wrapper">
+        <Textarea
+          v-model="localFollowUpPrompt"
+          placeholder="Continue the conversation... (Use #[ to mention a nota)"
+          class="min-h-[90px] resize-none w-full pr-2 transition-all rounded-md input-area"
+          :class="{ 'typing': isTyping }"
+          :disabled="isLoading"
+          @keydown="handleKeyDown"
+          @input="handleFollowUpInput"
+          ref="textareaRef"
+        />
+        <!-- Shortcut hint -->
+        <div class="shortcut-hint">
+          <kbd>Ctrl</kbd>+<kbd>Enter</kbd> to send
+        </div>
+      </div>
+      
+      <div class="flex justify-between items-center text-xs text-muted-foreground mt-2 px-0.5">
+        <span class="flex gap-2 items-center">
+          <!-- Add token count for follow-up -->
+          <span v-if="followUpPrompt.length > 0" class="text-xs opacity-75">
+            {{ Math.round(followUpPrompt.length / 4) }} tokens
+          </span>
+        </span>
         <Button 
           size="sm" 
-          class="h-8 bg-primary hover:bg-primary/90 text-primary-foreground"
+          class="h-8 bg-primary hover:bg-primary/90 text-primary-foreground transition-all shadow-sm continue-button"
           @click="continueConversation" 
           :disabled="!localFollowUpPrompt.trim() || isLoading"
         >
@@ -178,49 +351,108 @@ const focusTextarea = () => {
       </div>
     </div>
 
-    <!-- Mention Search Results Popup -->
-    <div 
-      v-if="showMentionSearch" 
-      class="border border-border rounded-md shadow-md overflow-hidden mt-2 w-full bg-background"
-    >
-      <div class="p-2 sticky top-0 bg-background border-b flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <Search class="w-4 h-4 text-muted-foreground" />
-          <span class="text-xs font-medium">
-            Search Notas
-          </span>
-        </div>
-        <span class="text-xs text-muted-foreground">
-          {{ mentionSearchResults.length > 0 ? 
-            `${mentionSearchResults.length} result${mentionSearchResults.length > 1 ? 's' : ''}` : 
-            'No results' }}
-        </span>
-      </div>
-      
-      <ScrollArea class="max-h-[200px]">
-        <div v-if="mentionSearchResults.length === 0" class="p-4 text-center text-muted-foreground text-sm">
-          No matching notas found
-        </div>
-        
-        <div v-else>
-          <div 
-            v-for="result in mentionSearchResults" 
-            :key="result.id" 
-            class="p-2 cursor-pointer hover:bg-muted transition-colors border-b border-border/40 last:border-b-0"
-            @click="selectNotaFromSearch(result)"
-          >
-            <div class="flex items-center gap-2">
-              <FileText class="w-4 h-4 text-muted-foreground flex-shrink-0" />
-              <div class="overflow-hidden flex-1">
-                <div class="truncate text-sm font-medium">{{ result.title }}</div>
-                <div class="text-xs text-muted-foreground truncate">
-                  {{ new Date(result.updatedAt).toLocaleDateString() }}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </ScrollArea>
-    </div>
+    <!-- New Mention Search using the MentionSearch component -->
+    <MentionSearch
+      :is-visible="showMentionSearch"
+      :query="props.mentionSearchResults.length > 0 ? props.mentionSearchResults[0]?.searchQuery || '' : ''"
+      :search-results="mentionSearchResults"
+      :position="mentionPosition"
+      @select="selectNotaFromSearch"
+      @close="closeMentionSearch"
+      @update-query="updateMentionQuery"
+    />
   </div>
 </template>
+
+<style scoped>
+.conversation-input {
+  transition: all 0.3s ease;
+}
+
+.textarea-wrapper {
+  position: relative;
+}
+
+.input-area {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  border: 1px solid hsl(var(--border));
+}
+
+.input-area:focus-visible {
+  box-shadow: 0 0 0 1px hsl(var(--primary) / 0.3), 0 0 0 4px hsl(var(--primary) / 0.1);
+  outline: none;
+}
+
+.input-area.typing {
+  border-color: hsl(var(--primary) / 0.5);
+  background-color: hsl(var(--background) / 0.8);
+}
+
+.shortcut-hint {
+  position: absolute;
+  bottom: 0.5rem;
+  right: 0.5rem;
+  font-size: 0.65rem;
+  color: hsl(var(--muted-foreground) / 0.6);
+  pointer-events: none;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.textarea-wrapper:hover .shortcut-hint,
+.input-area:focus + .shortcut-hint {
+  opacity: 1;
+}
+
+kbd {
+  background-color: hsl(var(--muted) / 0.8);
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.7rem;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+}
+
+.token-count,
+.char-count {
+  transition: color 0.3s ease;
+}
+
+.token-count.warning,
+.char-count.warning {
+  color: hsl(var(--warning) / 0.9);
+  font-weight: 500;
+}
+
+.badge-mentions {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.generate-button,
+.continue-button {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.generate-button:not(:disabled):hover,
+.continue-button:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.1);
+}
+
+.generate-button:not(:disabled):active,
+.continue-button:not(:disabled):active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+</style>
