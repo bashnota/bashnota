@@ -17,6 +17,11 @@ const props = defineProps<{
   editor?: Editor | null
 }>()
 
+// Define emit options to communicate with parent
+const emit = defineEmits<{
+  close: []
+}>()
+
 const store = useFavoriteBlocksStore()
 const searchQuery = ref('')
 const selectedTags = ref<string[]>([])
@@ -174,117 +179,91 @@ const openCustomizationSettings = () => {
 </script>
 
 <template>
-  <div 
-    class="fixed top-14 right-0 bottom-0 z-50 transition-transform duration-300 ease-in-out"
-    :class="[isOpen ? 'translate-x-0' : 'translate-x-full']"
-  >
-    <!-- Toggle Button -->
-    <Button
-      class="absolute -left-10 top-4 z-10 shadow-md"
-      variant="ghost"
-      size="icon"
-      @click="toggleSidebar"
-      :title="isOpen ? 'Hide Favorites' : 'Show Favorites'"
-      aria-label="Toggle Favorites Sidebar"
-      tabindex="0"
-    >
-      <ChevronRight class="h-4 w-4" />
-    </Button>
-
-    <!-- Sidebar Content -->
-    <div 
-      class="w-72 h-full flex flex-col bg-background border-l shadow-lg sidebar"
-    >
-      <div class="p-4 border-b">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold flex items-center gap-2">
-            <Star class="h-4 w-4" />
-            Favorite Blocks
-          </h3>
-          <Button variant="ghost" size="icon" @click="isOpen = false">
-            <X class="h-4 w-4" />
-          </Button>
+  <div class="h-full border-l flex-shrink-0 flex flex-col bg-background right-sidebar-container">
+    <div class="p-4 border-b">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-medium flex items-center gap-2">
+          <Star class="h-4 w-4" />
+          Favorite Blocks
+        </h3>
+        <Button variant="ghost" size="icon" @click="emit('close')">
+          <X class="h-4 w-4" />
+        </Button>
+      </div>
+      
+      <div class="space-y-4">
+        <div class="relative">
+          <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            :value="searchQuery"
+            @input="(e: Event) => debouncedSearch((e.target as HTMLInputElement).value)"
+            placeholder="Search blocks... (Ctrl+Shift+Alt+P)"
+            class="pl-9 favorite-blocks-search"
+            aria-autocomplete="list"
+            aria-controls="search-suggestions"
+          />
         </div>
-        
-        <div class="space-y-4">
-          <div class="relative">
-            <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              :value="searchQuery"
-              @input="(e: Event) => debouncedSearch((e.target as HTMLInputElement).value)"
-              placeholder="Search blocks... (Ctrl+Shift+Alt+P) - Try 'block name'"
-              class="pl-9 favorite-blocks-search"
-              aria-autocomplete="list"
-              aria-controls="search-suggestions"
-            />
-          </div>
 
-          <TagsInput v-model="selectedTags" placeholder="Filter by tags...">
-            <TagsInputItem v-for="tag in selectedTags" :key="tag" :value="tag">
-              {{ tag }}
-            </TagsInputItem>
-            <TagsInputInput :placeholder="`Add tag (${availableTags.length} available)...`" />
-          </TagsInput>
+        <TagsInput v-model="selectedTags" placeholder="Filter by tags...">
+          <TagsInputItem v-for="tag in selectedTags" :key="tag" :value="tag">
+            {{ tag }}
+          </TagsInputItem>
+          <TagsInputInput :placeholder="`Add tag (${availableTags.length} available)...`" />
+        </TagsInput>
+      </div>
+    </div>
+
+    <ScrollArea class="flex-1">
+      <div class="p-4 space-y-4">
+        <div v-for="block in filteredBlocks" :key="block.id" 
+          class="block-item border rounded-lg p-2 hover:bg-muted/50 transition-colors"
+          @click="toggleBlockExpansion(block.id)"
+          :class="{ 'expanded': expandedBlocks.has(block.id) }"
+        >
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2 flex-1">
+              <h4 class="font-medium text-sm truncate">{{ block.name }}</h4>
+            </div>
+            <div class="flex items-center gap-1">
+              <Button variant="ghost" size="icon" @click.stop="insertBlock(block.content)">
+                <Plus class="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" @click.stop="removeBlock(block.id)">
+                <X class="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          
+          <div v-if="expandedBlocks.has(block.id)" 
+            class="mt-2 space-y-2"
+            @mouseenter="showPreview(block.id, block.content)"
+            @mouseleave="previewContent[block.id] = ''"
+          >
+            <div class="flex flex-wrap gap-1">
+              <span v-for="tag in block.tags" :key="tag" 
+                class="text-xs bg-muted px-1.5 py-0.5 rounded-full">
+                {{ tag }}
+              </span>
+            </div>
+            <div v-if="previewContent[block.id]" 
+              class="text-xs text-muted-foreground border-t pt-2">
+              {{ previewContent[block.id] }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Empty State -->
+        <div v-if="filteredBlocks.length === 0" class="text-center py-8">
+          <Star class="w-12 h-12 text-muted-foreground/20 mx-auto mb-4" />
+          <h4 class="font-medium mb-2">No Blocks Found</h4>
+          <p class="text-sm text-muted-foreground">
+            {{ searchQuery || selectedTags.length > 0 
+              ? 'Try adjusting your search or filters' 
+              : 'Add blocks to your favorites for quick access' }}
+          </p>
         </div>
       </div>
-
-      <ScrollArea class="flex-1">
-        <div class="p-4 space-y-4">
-          <div v-for="block in filteredBlocks" :key="block.id" 
-            class="block-item border rounded-lg p-2 hover:bg-muted/50 transition-colors"
-            @click="toggleBlockExpansion(block.id)"
-            :class="{ 'expanded': expandedBlocks.has(block.id) }"
-          >
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-2 flex-1">
-                <h4 class="font-medium text-sm truncate">{{ block.name }}</h4>
-              </div>
-              <div class="flex items-center gap-1">
-                <Button variant="ghost" size="icon" @click.stop="insertBlock(block.content)">
-                  <Plus class="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="icon" @click.stop="removeBlock(block.id)">
-                  <X class="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-            
-            <div v-if="expandedBlocks.has(block.id)" 
-              class="mt-2 space-y-2"
-              @mouseenter="showPreview(block.id, block.content)"
-              @mouseleave="previewContent[block.id] = ''"
-            >
-              <div class="flex flex-wrap gap-1">
-                <span v-for="tag in block.tags" :key="tag" 
-                  class="text-xs bg-muted px-1.5 py-0.5 rounded-full">
-                  {{ tag }}
-                </span>
-              </div>
-              <div v-if="previewContent[block.id]" 
-                class="text-xs text-muted-foreground border-t pt-2">
-                {{ previewContent[block.id] }}
-              </div>
-            </div>
-          </div>
-
-          <!-- Empty State -->
-          <div v-if="filteredBlocks.length === 0" class="text-center py-8">
-            <Star class="w-12 h-12 text-muted-foreground/20 mx-auto mb-4" />
-            <h4 class="font-medium mb-2">No Blocks Found</h4>
-            <p class="text-sm text-muted-foreground">
-              {{ searchQuery || selectedTags.length > 0 
-                ? 'Try adjusting your search or filters' 
-                : 'Add blocks to your favorites for quick access' }}
-            </p>
-          </div>
-        </div>
-      </ScrollArea>
-
-      <!-- Add a button to open settings for customization -->
-      <Button variant="ghost" size="icon" @click="openCustomizationSettings">
-        <Settings class="h-4 w-4" />
-      </Button>
-    </div>
+    </ScrollArea>
   </div>
 </template>
 
