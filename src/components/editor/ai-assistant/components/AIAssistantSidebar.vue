@@ -511,6 +511,7 @@ onMounted(() => {
     <!-- Content container with proper width styling -->
     <div
       class="flex flex-col h-full w-full overflow-hidden"
+      :style="{ minWidth: '350px', width: activeAIBlock ? '100%' : '350px' }"
     >
       <!-- Header (only shown if not hidden) -->
       <SidebarHeader 
