@@ -1,85 +1,82 @@
 <template>
-  <div class="p-4 space-y-4">
-    <!-- Tags Section -->
-    <div v-if="currentNota">
-      <h4 class="text-sm font-medium mb-2">Tags</h4>
-      <TagsInput 
-        v-model="currentNota.tags" 
-        @update:modelValue="onTagsUpdate"
-        class="relative"
-      >
-        <TagsInputItem v-for="tag in currentNota.tags" :key="tag" :value="tag">
-          <TagsInputItemText />
-          <TagsInputItemDelete />
-        </TagsInputItem>
-        <TagsInputInput :placeholder="currentNota.tags?.length ? '+' : 'Add tags...'" />
+  <BaseSidebar title="Metadata" :icon="FileText" position="right" @close="$emit('close')">
+    <div class="p-4 space-y-4">
+      <!-- Tags Section -->
+      <SidebarSection v-if="currentNota" title="Tags">
+        <TagsInput 
+          v-model="currentNota.tags" 
+          @update:modelValue="onTagsUpdate"
+          class="relative"
+        >
+          <TagsInputItem v-for="tag in currentNota.tags" :key="tag" :value="tag">
+            <TagsInputItemText />
+            <TagsInputItemDelete />
+          </TagsInputItem>
+          <TagsInputInput :placeholder="currentNota.tags?.length ? '+' : 'Add tags...'" />
+          
+          <!-- Tag suggestions when input is focused -->
+          <div v-if="showSuggestions && filteredSuggestions.length > 0" 
+               class="absolute left-0 right-0 top-full mt-1 bg-background border rounded-md shadow-md z-10 max-h-[150px] overflow-y-auto">
+            <div v-for="tag in filteredSuggestions" 
+                 :key="tag" 
+                 @click="addTag(tag)"
+                 class="px-3 py-1.5 text-sm hover:bg-muted cursor-pointer">
+              {{ tag }}
+            </div>
+          </div>
+        </TagsInput>
         
-        <!-- Tag suggestions when input is focused -->
-        <div v-if="showSuggestions && filteredSuggestions.length > 0" 
-             class="absolute left-0 right-0 top-full mt-1 bg-background border rounded-md shadow-md z-10 max-h-[150px] overflow-y-auto">
-          <div v-for="tag in filteredSuggestions" 
-               :key="tag" 
-               @click="addTag(tag)"
-               class="px-3 py-1.5 text-sm hover:bg-muted cursor-pointer">
-            {{ tag }}
+        <!-- Recently used tags -->
+        <div v-if="recentTags.length > 0" class="mt-2">
+          <div class="text-xs text-muted-foreground mb-1">Recent tags:</div>
+          <div class="flex flex-wrap gap-1">
+            <Button 
+              v-for="tag in recentTags" 
+              :key="tag"
+              variant="outline" 
+              size="sm" 
+              class="text-xs h-6 px-2"
+              @click="addTag(tag)"
+            >
+              + {{ tag }}
+            </Button>
           </div>
         </div>
-      </TagsInput>
-      
-      <!-- Recently used tags -->
-      <div v-if="recentTags.length > 0" class="mt-2">
-        <div class="text-xs text-muted-foreground mb-1">Recent tags:</div>
-        <div class="flex flex-wrap gap-1">
-          <Button 
-            v-for="tag in recentTags" 
-            :key="tag"
-            variant="outline" 
-            size="sm" 
-            class="text-xs h-6 px-2"
-            @click="addTag(tag)"
-          >
-            + {{ tag }}
-          </Button>
+      </SidebarSection>
+
+      <!-- Nota Details -->
+      <SidebarSection v-if="currentNota" title="Note Details">
+        <div class="grid grid-cols-2 gap-2 text-sm">
+          <span class="text-muted-foreground">Created:</span>
+          <span>{{ formatDate(currentNota.createdAt) }}</span>
+          
+          <span class="text-muted-foreground">Updated:</span>
+          <span>{{ formatDate(currentNota.updatedAt) }}</span>
+          
+          <span class="text-muted-foreground">ID:</span>
+          <span class="truncate" :title="currentNota.id">{{ currentNota.id }}</span>
         </div>
-      </div>
-    </div>
+      </SidebarSection>
 
-    <!-- Nota Details -->
-    <div v-if="currentNota" class="space-y-3">
-      <h4 class="text-sm font-medium">Note Details</h4>
-      
-      <div class="grid grid-cols-2 gap-2 text-sm">
-        <span class="text-muted-foreground">Created:</span>
-        <span>{{ formatDate(currentNota.createdAt) }}</span>
-        
-        <span class="text-muted-foreground">Updated:</span>
-        <span>{{ formatDate(currentNota.updatedAt) }}</span>
-        
-        <span class="text-muted-foreground">ID:</span>
-        <span class="truncate" :title="currentNota.id">{{ currentNota.id }}</span>
-      </div>
+      <!-- Word Count Stats -->
+      <SidebarSection v-if="editor" title="Statistics">
+        <div class="grid grid-cols-2 gap-2 text-sm">
+          <span class="text-muted-foreground">Words:</span>
+          <span>{{ wordCount }}</span>
+          
+          <span class="text-muted-foreground">Characters:</span>
+          <span>{{ characterCount }}</span>
+          
+          <span class="text-muted-foreground">Blocks:</span>
+          <span>{{ blockCount }}</span>
+        </div>
+      </SidebarSection>
     </div>
-
-    <!-- Word Count Stats -->
-    <div v-if="editor" class="space-y-3">
-      <h4 class="text-sm font-medium">Statistics</h4>
-      
-      <div class="grid grid-cols-2 gap-2 text-sm">
-        <span class="text-muted-foreground">Words:</span>
-        <span>{{ wordCount }}</span>
-        
-        <span class="text-muted-foreground">Characters:</span>
-        <span>{{ characterCount }}</span>
-        
-        <span class="text-muted-foreground">Blocks:</span>
-        <span>{{ blockCount }}</span>
-      </div>
-    </div>
-  </div>
+  </BaseSidebar>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { TagsInput } from '@/components/ui/tags-input'
 import TagsInputItem from '@/components/ui/tags-input/TagsInputItem.vue'
@@ -87,14 +84,21 @@ import TagsInputItemDelete from '@/components/ui/tags-input/TagsInputItemDelete.
 import TagsInputItemText from '@/components/ui/tags-input/TagsInputItemText.vue'
 import TagsInputInput from '@/components/ui/tags-input/TagsInputInput.vue'
 import { Button } from '@/components/ui/button'
+import { FileText } from 'lucide-vue-next'
 import { Editor } from '@tiptap/vue-3'
 import { logger } from '@/services/logger'
 import { toast } from '@/lib/utils'
+import { BaseSidebar, SidebarSection } from '@/components/ui/sidebar'
 
 // Props definition
 const props = defineProps<{
   notaId: string
   editor?: Editor | null
+}>()
+
+// Define emit options
+const emit = defineEmits<{
+  close: []
 }>()
 
 // Store initialization

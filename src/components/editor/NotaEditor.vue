@@ -40,6 +40,7 @@ interface SidebarConfig {
   minWidth?: number;
   maxWidth?: number;
   defaultWidth?: number;
+  icon?: any; // Add icon property
 }
 
 type SidebarsConfig = Record<SidebarId, SidebarConfig>;
@@ -55,7 +56,8 @@ const useSidebarManager = () => {
       title: 'Table of Contents',
       minWidth: 250,
       maxWidth: 500,
-      defaultWidth: 300
+      defaultWidth: 300,
+      icon: null
     },
     references: {
       isOpen: false,
@@ -63,13 +65,15 @@ const useSidebarManager = () => {
       position: 'right',
       title: 'References',
       minWidth: 300,
-      maxWidth: 600
+      maxWidth: 600,
+      icon: BookIcon
     },
     jupyter: {
       isOpen: false,
       storageKey: 'jupyter-sidebar-width',
       position: 'right',
-      title: 'Jupyter Servers'
+      title: 'Jupyter Servers',
+      icon: ServerIcon
     },
     ai: {
       isOpen: false,
@@ -77,19 +81,22 @@ const useSidebarManager = () => {
       position: 'right',
       title: 'AI Assistant',
       minWidth: 350,
-      maxWidth: 700
+      maxWidth: 700,
+      icon: BrainIcon
     },
     metadata: {
       isOpen: false,
       storageKey: 'metadata-sidebar-width',
       position: 'right',
-      title: 'Metadata'
+      title: 'Metadata',
+      icon: Tag
     },
     favorites: {
       isOpen: false,
       storageKey: 'favorites-sidebar-width',
       position: 'right',
-      title: 'Favorite Blocks'
+      title: 'Favorite Blocks',
+      icon: Star
     }
   });
 
@@ -317,12 +324,12 @@ const editor = useEditor({
 
 // Initialize sidebar width tracking for resize events
 const sidebarWidths = reactive<Record<SidebarId, number>>({
-  toc: 300,
-  references: 350,
-  jupyter: 350,
+  toc: 400,
+  references: 400,
+  jupyter: 400,
   ai: 400,
-  metadata: 350,
-  favorites: 350
+  metadata: 400,
+  favorites: 400
 })
 
 // Setup unified persistence for sidebar widths
@@ -971,23 +978,51 @@ defineExpose({
         :minWidth="config.minWidth"
         :maxWidth="config.maxWidth"
         :defaultWidth="config.defaultWidth"
+        :icon="config.icon"
         @close="toggleSidebar(id)"
         @resize="updateSidebarWidth(id, $event)"
       >
+        <!-- Sidebar Header -->
+        <div class="p-4 border-b flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <component :is="config.icon" v-if="config.icon" class="h-4 w-4 text-primary" />
+            <h3 class="font-medium">{{ config.title }}</h3>
+          </div>
+          <Button variant="ghost" size="icon" @click="toggleSidebar(id)">
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              width="24" 
+              height="24" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              stroke-width="2" 
+              stroke-linecap="round" 
+              stroke-linejoin="round" 
+              class="w-4 h-4"
+            >
+              <path d="M18 6 6 18"></path>
+              <path d="m6 6 12 12"></path>
+            </svg>
+          </Button>
+        </div>
+        
         <!-- References Sidebar -->
-        <ReferencesSidebar v-if="id === 'references'" :editor="editor" :notaId="notaId" />
-        
-        <!-- Jupyter Servers Sidebar -->
-        <JupyterServersSidebar v-else-if="id === 'jupyter'" :notaId="notaId" />
-        
-        <!-- AI Assistant Sidebar -->
-        <AIAssistantSidebar v-else-if="id === 'ai'" :editor="editor" :notaId="notaId" />
-        
-        <!-- Metadata Sidebar -->
-        <MetadataSidebar v-else-if="id === 'metadata'" :notaId="notaId" />
-        
-        <!-- Favorites Sidebar -->
-        <FavoriteBlocksSidebar v-else-if="id === 'favorites'" :editor="editor" />
+        <div class="flex-1 flex flex-col relative">
+          <ReferencesSidebar v-if="id === 'references'" :editor="editor" :notaId="notaId" />
+          
+          <!-- Jupyter Servers Sidebar -->
+          <JupyterServersSidebar v-else-if="id === 'jupyter'" :notaId="notaId" />
+          
+          <!-- AI Assistant Sidebar -->
+          <AIAssistantSidebar v-else-if="id === 'ai'" :editor="editor" :notaId="notaId" :hideHeader="true" />
+          
+          <!-- Metadata Sidebar -->
+          <MetadataSidebar v-else-if="id === 'metadata'" :notaId="notaId" />
+          
+          <!-- Favorites Sidebar -->
+          <FavoriteBlocksSidebar v-else-if="id === 'favorites'" :editor="editor" />
+        </div>
       </ResizableSidebar>
     </template>
 

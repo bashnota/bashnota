@@ -378,15 +378,6 @@ const handleBibFileUpload = (event: Event) => {
 
 <template>
   <div class="flex flex-col gap-4">
-    <!-- Header -->
-    <div class="flex flex-col gap-2 sticky top-0 z-10 bg-background">
-      <div class="flex items-center gap-2 px-2">
-        <BookIcon class="w-4 h-4 text-primary" />
-        <h3 class="font-semibold">References</h3>
-      </div>
-      <Separator class="w-full" />
-    </div>
-    
     <!-- Add Reference Button -->
     <Button 
       variant="outline" 
@@ -622,4 +613,4 @@ const handleBibFileUpload = (event: Event) => {
       </DialogContent>
     </Dialog>
   </div>
-</template> 
+</template>

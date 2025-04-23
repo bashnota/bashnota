@@ -3,14 +3,16 @@ import { computed, ref, watch } from 'vue'
 import { useResizableSidebar } from '@/composables/useResizableSidebar'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { BaseSidebar } from '@/components/ui/sidebar'
 
 const props = defineProps<{
-  title: string;
+  title?: string;
   storageKey?: string;
   defaultWidth?: number;
   minWidth?: number;
   maxWidth?: number;
   position?: 'left' | 'right';
+  icon?: any;
 }>()
 
 const emit = defineEmits<{
@@ -19,7 +21,7 @@ const emit = defineEmits<{
 }>()
 
 // Default values
-const storageKey = props.storageKey || `sidebar-${props.title.toLowerCase()}`
+const storageKey = props.storageKey || `sidebar-${props.title?.toLowerCase() || 'default'}`
 const defaultWidth = props.defaultWidth || 350
 const minWidth = props.minWidth || 250
 const maxWidth = props.maxWidth || 800
@@ -67,9 +69,11 @@ watch(() => props.defaultWidth, (newWidth) => {
 </script>
 
 <template>
-  <div 
-    :class="sidebarClasses"
-    :style="{ width: `${constrainedWidth}px` }"
+  <BaseSidebar 
+    :position="position"
+    :width="constrainedWidth"
+    :className="position === 'right' ? 'border-l' : 'border-r'"
+    :icon="icon"
   >
     <!-- Resize handle -->
     <div 
@@ -77,33 +81,8 @@ watch(() => props.defaultWidth, (newWidth) => {
       @mousedown="startResizing"
     ></div>
     
-    <!-- Header -->
-    <div class="p-4 border-b flex items-center justify-between">
-      <h3 class="font-medium">{{ title }}</h3>
-      <Button variant="ghost" size="icon" @click="onClose">
-        <svg 
-          xmlns="http://www.w3.org/2000/svg" 
-          width="24" 
-          height="24" 
-          viewBox="0 0 24 24" 
-          fill="none" 
-          stroke="currentColor" 
-          stroke-width="2" 
-          stroke-linecap="round" 
-          stroke-linejoin="round" 
-          class="w-4 h-4"
-        >
-          <path d="M18 6 6 18"></path>
-          <path d="m6 6 12 12"></path>
-        </svg>
-      </Button>
-    </div>
-    
-    <!-- Content -->
-    <ScrollArea class="flex-1">
-      <slot></slot>
-    </ScrollArea>
-  </div>
+    <slot></slot>
+  </BaseSidebar>
 </template>
 
 <style>

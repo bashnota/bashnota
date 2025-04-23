@@ -25,6 +25,7 @@ import { Maximize2, Minimize2 } from 'lucide-vue-next'
 const props = defineProps<{
   editor: any
   notaId: string
+  hideHeader?: boolean
 }>()
 
 const emit = defineEmits(['close'])
@@ -455,14 +456,18 @@ onBeforeUnmount(() => {
     <div
       class="flex flex-col h-full w-full overflow-hidden"
     >
-      <!-- Header -->
+      <!-- Header (only shown if not hidden) -->
       <SidebarHeader 
+        v-if="!props.hideHeader"
         :provider-name="selectedProvider?.name || 'AI'" 
         :is-loading="isLoading"
         :is-fullscreen="isFullscreen"
         @close="emit('close')"
         @toggle-fullscreen="toggleFullscreen"
       />
+      
+      <!-- Add a spacer when header is hidden to maintain layout -->
+      <div v-else class="h-2"></div>
       
       <div class="flex-1 flex flex-col overflow-hidden min-h-0 relative">
         <!-- Empty State when no active conversation -->
