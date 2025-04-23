@@ -36,18 +36,21 @@ onMounted(() => {
 
 // Trigger the global AI Assistant sidebar when this component is clicked
 const activateAIAssistant = () => {
-  // Create a custom event with this component instance
+  // Create a custom event with this component instance and properly structured data
   window.dispatchEvent(
     new CustomEvent('activate-ai-assistant', {
       detail: {
-        block: props, // Pass the entire component
+        block: {
+          node: props.node,
+          type: 'inlineAIGeneration'
+        }, // Structure the block data correctly
         conversationHistory: conversationHistory.value
       }
     })
   )
   
   // Also log a message to confirm event was dispatched
-  console.log('AI Assistant activation event dispatched')
+  console.log('AI Assistant activation event dispatched with conversation history:', conversationHistory.value)
 }
 
 // Add to conversation history when result changes

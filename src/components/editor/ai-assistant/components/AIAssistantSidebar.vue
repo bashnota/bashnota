@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { useAISettingsStore } from '@/stores/aiSettingsStore'
@@ -18,9 +18,11 @@ import ConversationInput from './ConversationInput.vue'
 import ActionBar from './ActionBar.vue'
 import EmptyState from './EmptyState.vue'
 import FullscreenWrapper from './FullscreenWrapper.vue'
+import ChatList from './ChatList.vue'
+import {ScrollArea} from '@/components/ui/scroll-area'
 
-// Import the fullscreen icons
-import { Maximize2, Minimize2 } from 'lucide-vue-next'
+// Import the icons
+import { Maximize2, Minimize2, List as ListIcon, ArrowLeft as ArrowLeftIcon } from 'lucide-vue-next'
 
 const props = defineProps<{
   editor: any
@@ -80,8 +82,6 @@ const {
   updateMentionQuery,
   closeMentionSearch
 } = useMentions()
-
-
 
 // Reference to the textarea for mention search
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
@@ -431,7 +431,16 @@ onMounted(() => {
   
   window.addEventListener('activate-ai-assistant', ((event: CustomEvent) => {
     if (event.detail && event.detail.block) {
-      loadConversationFromBlock(event.detail.block)
+      // Use the conversation history if it exists in the event
+      if (event.detail.conversationHistory) {
+        // Set the active block
+        activeAIBlock.value = event.detail.block;
+        // Use the conversation history from the event
+        conversationHistory.value = event.detail.conversationHistory;
+      } else {
+        // Fall back to loading from block if no history provided
+        loadConversationFromBlock(event.detail.block);
+      }
     }
   }) as EventListener)
   
@@ -442,6 +451,54 @@ onMounted(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('mousedown', handleOutsideClick)
 })
+
+// Add state for sidebar view mode
+const showChatList = ref(false)
+
+// Function to handle loading a specific chat from the chat list
+const handleSelectChat = (block: any) => {
+  loadConversationFromBlock(block)
+  showChatList.value = false
+}
+
+// Get ID for the active block for highlighting in the list
+const activeBlockId = computed(() => {
+  if (!activeAIBlock.value) return null
+  // Use a property that exists on the activeAIBlock object
+  return `ai-${activeAIBlock.value.node.attrs.lastUpdated || Date.now()}`
+})
+
+// Toggle between chat list and current conversation
+const toggleChatList = () => {
+  showChatList.value = !showChatList.value
+}
+
+// Auto-scroll to bottom when new messages arrive
+const scrollAreaViewportRef = ref<HTMLElement | null>(null)
+
+// Function to scroll to bottom of conversation
+const scrollToBottom = () => {
+  nextTick(() => {
+    if (scrollAreaViewportRef.value) {
+      scrollAreaViewportRef.value.scrollTop = scrollAreaViewportRef.value.scrollHeight
+    }
+  })
+}
+
+// Watch conversation history changes to auto-scroll
+watch(() => conversationHistory.value.length, () => {
+  scrollToBottom()
+})
+
+// Watch loading state to scroll to bottom when it changes
+watch(() => isLoading.value, () => {
+  scrollToBottom()
+})
+
+// Scroll to bottom when component is mounted
+onMounted(() => {
+  scrollToBottom()
+})
 </script>
 
 <template>
@@ -449,9 +506,8 @@ onBeforeUnmount(() => {
     :is-fullscreen="isFullscreen"
     @exit-fullscreen="exitFullscreen"
     @enter-fullscreen="enterFullscreen"
+    class="h-full"
   >
-
-    
     <!-- Content container with proper width styling -->
     <div
       class="flex flex-col h-full w-full overflow-hidden"
@@ -464,107 +520,146 @@ onBeforeUnmount(() => {
         :is-fullscreen="isFullscreen"
         @close="emit('close')"
         @toggle-fullscreen="toggleFullscreen"
-      />
+        class="flex-shrink-0"
+      >
+        <!-- Add chat list toggle button in the header -->
+        <Button 
+          variant="ghost" 
+          size="icon"
+          class="h-8 w-8"
+          :title="showChatList ? 'Back to conversation' : 'Show all conversations'"
+          @click="toggleChatList"
+        >
+          <ListIcon v-if="!showChatList" class="h-4 w-4" />
+          <ArrowLeftIcon v-else class="h-4 w-4" />
+        </Button>
+      </SidebarHeader>
       
       <!-- Add a spacer when header is hidden to maintain layout -->
-      <div v-else class="h-2"></div>
+      <div v-else class="h-2 flex-shrink-0"></div>
       
-      <div class="flex-1 flex flex-col overflow-hidden min-h-0 relative">
+      <div class="flex-1 flex flex-col min-h-0 relative overflow-hidden">
         <!-- Empty State when no active conversation -->
         <EmptyState 
           v-if="!activeAIBlock" 
           @create-session="createNewSession"
+          class="h-full overflow-y-auto"
         />
         
         <!-- Conversation Content when a conversation is active -->
         <template v-else>
-          <!-- Conversation History - scrollable area with padding and styling -->
-          <div class="flex-1 overflow-y-auto overflow-x-hidden p-4 bg-gradient-to-b from-background to-muted/10">
-            <ConversationHistory
-              :conversation-history="conversationHistory"
-              :is-loading="isLoading"
-              :error="error"
-              :provider-name="selectedProvider?.name || 'AI'"
-              :format-timestamp="formatTimestamp"
-              @copy-message="copyMessageToClipboard"
-              @insert-message="insertMessageToDocument"
-              @select-text="handleTextSelection"
-              @retry="regenerateText"
+          <!-- Chat List -->
+          <ScrollArea 
+            v-if="showChatList"
+            class="flex-1 h-full"
+          >
+            <ChatList
+              :editor="props.editor"
+              :notaId="props.notaId"
+              :active-block-id="activeBlockId"
+              @select-chat="handleSelectChat"
+              @create-new="createNewSession"
             />
-          </div>
+          </ScrollArea>
           
-          <!-- Input Area - fixed at bottom with improved styling -->
-          <div class="border-t p-3 bg-background flex-shrink-0 shadow-[0_-2px_5px_rgba(0,0,0,0.03)]">
-            <!-- Editing Response -->
-            <div v-if="isEditing">
-              <Textarea
-                v-model="resultInput"
-                class="min-h-[80px] resize-none w-full focus:shadow-sm transition-shadow rounded-md"
-                @keydown.ctrl.enter.prevent="saveEditedText"
-              />
-              <div class="flex justify-end gap-2 mt-2">
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  @click="toggleEditing"
-                  class="h-8"
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="default"
-                  @click="saveEditedText"
-                  class="h-8 shadow-sm"
-                >
-                  Save Changes
-                </Button>
+          <!-- Conversation History - scrollable with fixed max-height -->
+          <div 
+            v-else 
+            class="flex flex-col h-full overflow-hidden"
+          >
+            <!-- Scrollable conversation history area -->
+            <div 
+              class="flex-1 overflow-y-auto"
+              ref="scrollAreaViewportRef"
+            >
+              <div class="p-4 space-y-4 bg-gradient-to-b from-background to-muted/10">
+                <ConversationHistory
+                  :conversation-history="conversationHistory"
+                  :is-loading="isLoading"
+                  :error="error"
+                  :provider-name="selectedProvider?.name || 'AI'"
+                  :format-timestamp="formatTimestamp"
+                  @copy-message="copyMessageToClipboard"
+                  @insert-message="insertMessageToDocument"
+                  @select-text="handleTextSelection"
+                  @retry="regenerateText"
+                />
               </div>
             </div>
-            
-            <!-- Normal Input (prompt or follow-up) -->
-            <template v-else>
-              <ConversationInput
-                v-if="!hasResult || isContinuing"
-                :promptInput="promptInput"
-                :followUpPrompt="followUpPrompt"
-                :is-prompt-empty="isPromptEmpty"
-                :is-loading="isLoading"
-                :prompt-token-count="promptTokenCount"
-                :is-continuing="isContinuing"
-                :has-mentions="mentionsInPrompt.length > 0"
-                :mention-count="mentionsInPrompt.length"
-                :show-mention-search="showMentionSearch"
-                :mention-search-results="mentionSearchResults"
-                :token-warning="tokenWarning"
-                :max-input-chars="maxInputChars"
-                @update:promptInput="promptInput = $event"
-                @update:followUpPrompt="followUpPrompt = $event"
-                @generate="generateText"
-                @continue="continueConversation"
-                @check-mentions="checkForMentions($event, ref(textareaRef))"
-                @select-mention="handleMentionSelection"
-                @update-mention-search="handleUpdateMentionQuery"
-                @close-mention-search="handleCloseMentionSearch"
-                ref="textareaRef"
-              />
+  
+            <!-- Input Area - fixed at bottom, separated from scrollable content -->
+            <div class="border-t p-3 bg-background flex-shrink-0 shadow-[0_-2px_5px_rgba(0,0,0,0.03)]">
+              <!-- Editing Response -->
+              <div v-if="isEditing">
+                <Textarea
+                  v-model="resultInput"
+                  class="min-h-[80px] resize-none w-full focus:shadow-sm transition-shadow rounded-md"
+                  @keydown.ctrl.enter.prevent="saveEditedText"
+                />
+                <div class="flex justify-end gap-2 mt-2">
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    @click="toggleEditing"
+                    class="h-8"
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="default"
+                    @click="saveEditedText"
+                    class="h-8 shadow-sm"
+                  >
+                    Save Changes
+                  </Button>
+                </div>
+              </div>
               
-              <!-- Action Bar -->
-              <ActionBar
-                v-else
-                :has-result="!!hasResult"
-                :is-loading="isLoading"
-                :is-continuing="isContinuing"
-                :has-selection="!!selectedText"
-                @regenerate="regenerateText"
-                @continue="toggleContinuing"
-                @copy="copyToClipboard"
-                @edit="toggleEditing"
-                @insert="insertToDocument"
-                @insert-selection="insertSelectionToDocument"
-                @remove="removeBlock"
-              />
-            </template>
+              <!-- Normal Input (prompt or follow-up) -->
+              <template v-else>
+                <ConversationInput
+                  v-if="!hasResult || isContinuing"
+                  :promptInput="promptInput"
+                  :followUpPrompt="followUpPrompt"
+                  :is-prompt-empty="isPromptEmpty"
+                  :is-loading="isLoading"
+                  :prompt-token-count="promptTokenCount"
+                  :is-continuing="isContinuing"
+                  :has-mentions="mentionsInPrompt.length > 0"
+                  :mention-count="mentionsInPrompt.length"
+                  :show-mention-search="showMentionSearch"
+                  :mention-search-results="mentionSearchResults"
+                  :token-warning="tokenWarning"
+                  :max-input-chars="maxInputChars"
+                  @update:promptInput="promptInput = $event"
+                  @update:followUpPrompt="followUpPrompt = $event"
+                  @generate="generateText"
+                  @continue="continueConversation"
+                  @check-mentions="checkForMentions($event, ref(textareaRef))"
+                  @select-mention="handleMentionSelection"
+                  @update-mention-search="handleUpdateMentionQuery"
+                  @close-mention-search="handleCloseMentionSearch"
+                  ref="textareaRef"
+                />
+                
+                <!-- Action Bar -->
+                <ActionBar
+                  v-else
+                  :has-result="!!hasResult"
+                  :is-loading="isLoading"
+                  :is-continuing="isContinuing"
+                  :has-selection="!!selectedText"
+                  @regenerate="regenerateText"
+                  @continue="toggleContinuing"
+                  @copy="copyToClipboard"
+                  @edit="toggleEditing"
+                  @insert="insertToDocument"
+                  @insert-selection="insertSelectionToDocument"
+                  @remove="removeBlock"
+                />
+              </template>
+            </div>
           </div>
         </template>
       </div>
