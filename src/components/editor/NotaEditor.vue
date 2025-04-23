@@ -6,6 +6,8 @@ import { useNotaStore } from '@/stores/nota'
 import { useJupyterStore } from '@/stores/jupyterStore'
 import EditorToolbar from './EditorToolbar.vue'
 import { ref, watch, computed, onUnmounted, onMounted, reactive, provide } from 'vue'
+import { useResizableSidebar } from '@/composables/useResizableSidebar'
+import ResizableSidebar from './ResizableSidebar.vue'
 import 'highlight.js/styles/github.css'
 import { useRouter } from 'vue-router'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
@@ -24,6 +26,99 @@ import { getEditorExtensions } from './extensions'
 import { useEquationCounter, EQUATION_COUNTER_KEY } from '@/composables/useEquationCounter'
 import { useCitationStore } from '@/stores/citationStore'
 import { logger } from '@/services/logger'
+
+// Define sidebar types for better type checking
+type SidebarPosition = 'left' | 'right';
+type SidebarId = 'toc' | 'references' | 'jupyter' | 'ai' | 'metadata' | 'favorites';
+
+interface SidebarConfig {
+  isOpen: boolean;
+  storageKey: string;
+  position: SidebarPosition;
+  title: string;
+  minWidth?: number;
+  maxWidth?: number;
+  defaultWidth?: number;
+}
+
+type SidebarsConfig = Record<SidebarId, SidebarConfig>;
+
+// Sidebar management composable
+const useSidebarManager = () => {
+  // Define sidebar configurations with default values
+  const sidebars = reactive<SidebarsConfig>({
+    toc: {
+      isOpen: false,
+      storageKey: 'toc-sidebar-width',
+      position: 'left',
+      title: 'Table of Contents',
+      minWidth: 250,
+      maxWidth: 500,
+      defaultWidth: 300
+    },
+    references: {
+      isOpen: false,
+      storageKey: 'references-sidebar-width',
+      position: 'right',
+      title: 'References',
+      minWidth: 300,
+      maxWidth: 600
+    },
+    jupyter: {
+      isOpen: false,
+      storageKey: 'jupyter-sidebar-width',
+      position: 'right',
+      title: 'Jupyter Servers'
+    },
+    ai: {
+      isOpen: false,
+      storageKey: 'ai-sidebar-width',
+      position: 'right',
+      title: 'AI Assistant',
+      minWidth: 350,
+      maxWidth: 700
+    },
+    metadata: {
+      isOpen: false,
+      storageKey: 'metadata-sidebar-width',
+      position: 'right',
+      title: 'Metadata'
+    },
+    favorites: {
+      isOpen: false,
+      storageKey: 'favorites-sidebar-width',
+      position: 'right',
+      title: 'Favorite Blocks'
+    }
+  });
+
+  // Toggle a specific sidebar and close others
+  const toggleSidebar = (id: SidebarId): void => {
+    // Get current state of the selected sidebar
+    const currentState = sidebars[id].isOpen;
+    
+    // Close all sidebars first
+    (Object.keys(sidebars) as SidebarId[]).forEach(key => {
+      sidebars[key].isOpen = false;
+    });
+    
+    // Toggle the selected sidebar (open if it was closed, keep closed if it was open)
+    sidebars[id].isOpen = !currentState;
+  };
+
+  // Close all sidebars
+  const closeAllSidebars = (): void => {
+    (Object.keys(sidebars) as SidebarId[]).forEach(key => {
+      sidebars[key].isOpen = false;
+    });
+  };
+
+  return {
+    sidebars,
+    toggleSidebar,
+    closeAllSidebars
+  };
+};
 
 // Import shared CSS
 import '@/assets/editor-styles.css'
@@ -50,14 +145,10 @@ const jupyterStore = useJupyterStore()
 const codeExecutionStore = useCodeExecutionStore()
 const citationStore = useCitationStore()
 const router = useRouter()
-const isSidebarOpen = ref(false)
-const isReferencesOpen = ref(false)
-const isJupyterServersOpen = ref(false)
-const isAIAssistantOpen = ref(false)
-const isMetadataSidebarOpen = ref(false)
-const isFavoriteBlocksOpen = ref(false)
 const autoSaveEnabled = ref(true)
 const showVersionHistory = ref(false)
+
+const { sidebars, toggleSidebar, closeAllSidebars } = useSidebarManager()
 
 const currentNota = computed(() => {
   return notaStore.getCurrentNota(props.notaId)
@@ -223,6 +314,45 @@ const editor = useEditor({
   onUpdate: () => saveEditorContent(),
 })
 
+// Initialize sidebar width tracking for resize events
+const sidebarWidths = reactive<Record<SidebarId, number>>({
+  toc: 300,
+  references: 350,
+  jupyter: 350,
+  ai: 400,
+  metadata: 350,
+  favorites: 350
+})
+
+// Setup unified persistence for sidebar widths
+const updateSidebarWidth = (sidebarId: SidebarId, width: number) => {
+  sidebarWidths[sidebarId] = width
+  
+  // Update the interface settings
+  try {
+    const savedSettings = localStorage.getItem('interface-settings') || '{}'
+    const settings = JSON.parse(savedSettings)
+    
+    // Create a multi-sidebar width tracking structure
+    if (!settings.sidebarWidths) {
+      settings.sidebarWidths = {}
+    }
+    
+    // Save the width for this specific sidebar
+    settings.sidebarWidths[sidebarId] = width
+    
+    // Save back to localStorage
+    localStorage.setItem('interface-settings', JSON.stringify(settings))
+    
+    // Dispatch change event for other components
+    window.dispatchEvent(new CustomEvent('interface-settings-changed', {
+      detail: { sidebarWidths: settings.sidebarWidths }
+    }))
+  } catch (error) {
+    logger.error('Failed to save sidebar width', error)
+  }
+}
+
 // Watch for ID changes to update editor content
 watch(
   [() => props.notaId],
@@ -242,6 +372,22 @@ watch(() => content.value, () => {
   // Reset the equation counter when the content changes
   resetEquationCounter()
 })
+
+// Watch for sidebar state changes and save to localStorage
+  watch(() => sidebars, () => {
+  try {
+    // Create a simplified object with just the open/closed state of each sidebar
+    const sidebarStates = Object.entries(sidebars).reduce<Record<string, boolean>>((acc, [key, sidebar]) => {
+      acc[key] = sidebar.isOpen
+      return acc
+    }, {})
+    
+    // Save to localStorage
+    localStorage.setItem('sidebar-states', JSON.stringify(sidebarStates))
+  } catch (error) {
+    logger.error('Failed to save sidebar states', error)
+  }
+}, { deep: true })
 
 const isLoading = ref(true)
 
@@ -335,7 +481,7 @@ const saveEditorContent = async () => {
   }
 }
 
-// Handle keyboard shortcuts for inserting blocks
+// Handle keyboard shortcuts for inserting blocks and toggling sidebars
 const handleKeyboardShortcuts = (event: KeyboardEvent) => {
   // Check if editor is initialized
   if (!editor.value) return
@@ -354,6 +500,7 @@ const handleKeyboardShortcuts = (event: KeyboardEvent) => {
 
   // Map of key to insertion functions
   const insertionMap: Record<string, () => void> = {
+    // Content insertion shortcuts
     c: () =>
       editor
         .value!.chain()
@@ -390,20 +537,14 @@ const handleKeyboardShortcuts = (event: KeyboardEvent) => {
     a: () => editor.value!.chain().focus().insertInlineAIGeneration().run(),
     x: () => {
       if (editor.value) {
-        // Instead of trying to set text selection at the end,
-        // we'll append a new paragraph directly
         editor.value.chain()
           .focus()
-          // First ensure we're at the end by appending the content
           .command(({ tr, dispatch }) => {
             if (dispatch) {
-              // Create a new paragraph node
               const node = editor.value!.schema.nodes.paragraph.create(
                 null,
                 editor.value!.schema.text('New text block')
               )
-
-              // Append it to the end of the document
               tr.insert(tr.doc.content.size, node)
             }
             return true
@@ -411,6 +552,14 @@ const handleKeyboardShortcuts = (event: KeyboardEvent) => {
           .run()
       }
     },
+    
+    // Sidebar toggle shortcuts
+    r: () => toggleSidebar('references'),
+    j: () => toggleSidebar('jupyter'),
+    i: () => toggleSidebar('ai'),       // i for AI/intelligence
+    v: () => toggleSidebar('favorites'), // v for favorites
+    o: () => toggleSidebar('toc'),      // o for outline/toc
+    l: () => toggleSidebar('metadata'),  // l for labels/metadata
   }
 
   const key = event.key.toLowerCase()
@@ -426,22 +575,59 @@ onMounted(() => {
   // Add event listener for toggling references
   window.addEventListener('toggle-references', ((event: CustomEvent) => {
     if (event.detail && event.detail.open) {
-      isReferencesOpen.value = true
-      isSidebarOpen.value = false
+      toggleSidebar('references')
     }
   }) as EventListener)
 
   // Add event listener for activating AI Assistant when a robot button is clicked
   window.addEventListener('activate-ai-assistant', ((event: CustomEvent) => {
     if (event.detail) {
-      // Open the AI Assistant sidebar
-      isAIAssistantOpen.value = true
-      // Close other sidebars
-      isSidebarOpen.value = false
-      isReferencesOpen.value = false
-      isJupyterServersOpen.value = false
+      toggleSidebar('ai')
     }
   }) as EventListener)
+
+  // Load saved sidebar states and widths
+  try {
+    // Load sidebar open/closed states from localStorage
+    const savedSidebarStates = localStorage.getItem('sidebar-states')
+    if (savedSidebarStates) {
+      const states = JSON.parse(savedSidebarStates)
+      Object.keys(states).forEach(key => {
+        if (sidebars[key as SidebarId]) {
+          sidebars[key as SidebarId].isOpen = states[key]
+        }
+      })
+    }
+
+    // Load sidebar widths from interface settings
+    const savedInterfaceSettings = localStorage.getItem('interface-settings')
+    if (savedInterfaceSettings) {
+      const settings = JSON.parse(savedInterfaceSettings)
+      if (settings.sidebarWidths) {
+        // Apply saved widths to our tracking state
+        Object.entries(settings.sidebarWidths).forEach(([key, width]) => {
+          if (sidebarWidths[key as SidebarId]) {
+            sidebarWidths[key as SidebarId] = width as number
+            
+            // Also update defaultWidth in sidebar config if exists
+            if (sidebars[key as SidebarId]) {
+              sidebars[key as SidebarId].defaultWidth = width as number
+            }
+          }
+        })
+      } 
+      // Legacy support for older format
+      else if (settings.sidebarWidth && settings.sidebarWidth[0]) {
+        // Set default width for toc sidebar from legacy setting
+        sidebarWidths.toc = settings.sidebarWidth[0] as number
+        if (sidebars.toc) {
+          sidebars.toc.defaultWidth = settings.sidebarWidth[0] as number
+        }
+      }
+    }
+  } catch (error) {
+    logger.error('Failed to load sidebar states or widths', error)
+  }
 
   // Load saved editor settings
   const savedEditorSettings = localStorage.getItem('editor-settings')
@@ -645,9 +831,19 @@ defineExpose({
     <LoadingSpinner v-if="isLoading" class="absolute inset-0 z-10" />
 
     <!-- Table of Contents Sidebar -->
-    <div v-if="isSidebarOpen" class="w-64 h-full border-r flex-shrink-0 flex flex-col bg-background">
+    <ResizableSidebar 
+      v-if="sidebars.toc.isOpen" 
+      :title="sidebars.toc.title"
+      :storageKey="sidebars.toc.storageKey"
+      :position="sidebars.toc.position"
+      :minWidth="sidebars.toc.minWidth"
+      :maxWidth="sidebars.toc.maxWidth"
+      :defaultWidth="sidebars.toc.defaultWidth"
+      @close="toggleSidebar('toc')"
+      @resize="updateSidebarWidth('toc', $event)"
+    >
       <TableOfContents :editor="editor" />
-    </div>
+    </ResizableSidebar>
 
     <!-- Main Editor Area -->
     <div class="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
@@ -662,36 +858,47 @@ defineExpose({
         <div class="flex items-center justify-between px-4 py-2 text-sm text-muted-foreground border-t">
           <div class="flex items-center gap-2">
             <Button variant="ghost" size="sm" class="flex items-center gap-2"
-              @click="isReferencesOpen = !isReferencesOpen; isSidebarOpen = false; isJupyterServersOpen = false; isAIAssistantOpen = false; isMetadataSidebarOpen = false; isFavoriteBlocksOpen = false"
-              :class="{ 'bg-muted': isReferencesOpen }" title="References (Ctrl+Shift+Alt+R)">
+              @click="toggleSidebar('references')"
+              :class="{ 'bg-muted': sidebars.references.isOpen }" title="References (Ctrl+Shift+Alt+R)">
               <BookIcon class="h-4 w-4" />
             </Button>
 
             <Button variant="ghost" size="sm" class="flex items-center gap-2"
-              @click="isJupyterServersOpen = !isJupyterServersOpen; isSidebarOpen = false; isReferencesOpen = false; isAIAssistantOpen = false; isMetadataSidebarOpen = false; isFavoriteBlocksOpen = false"
-              :class="{ 'bg-muted': isJupyterServersOpen }" title="Jupyter Servers (Ctrl+Shift+Alt+J)">
+              @click="toggleSidebar('jupyter')"
+              :class="{ 'bg-muted': sidebars.jupyter.isOpen }" title="Jupyter Servers (Ctrl+Shift+Alt+J)">
               <ServerIcon class="h-4 w-4" />
             </Button>
 
             <Button variant="ghost" size="sm" class="flex items-center gap-2"
-              @click="isAIAssistantOpen = !isAIAssistantOpen; isSidebarOpen = false; isReferencesOpen = false; isJupyterServersOpen = false; isMetadataSidebarOpen = false; isFavoriteBlocksOpen = false"
-              :class="{ 'bg-muted': isAIAssistantOpen }" title="AI Assistant (Ctrl+Shift+Alt+A)">
+              @click="toggleSidebar('ai')"
+              :class="{ 'bg-muted': sidebars.ai.isOpen }" title="AI Assistant (Ctrl+Shift+Alt+I)">
               <BrainIcon class="h-4 w-4" />
             </Button>
 
             <Button variant="ghost" size="sm" class="flex items-center gap-2"
-              @click="isMetadataSidebarOpen = !isMetadataSidebarOpen; isSidebarOpen = false; isReferencesOpen = false; isJupyterServersOpen = false; isAIAssistantOpen = false; isFavoriteBlocksOpen = false"
-              :class="{ 'bg-muted': isMetadataSidebarOpen }" title="Metadata (Ctrl+Shift+Alt+M)">
+              @click="toggleSidebar('metadata')"
+              :class="{ 'bg-muted': sidebars.metadata.isOpen }" title="Metadata (Ctrl+Shift+Alt+L)">
               <Tag class="h-4 w-4" />
             </Button>
             
             <Button variant="ghost" size="sm" class="flex items-center gap-2"
-              @click="isFavoriteBlocksOpen = !isFavoriteBlocksOpen; isSidebarOpen = false; isReferencesOpen = false; isJupyterServersOpen = false; isAIAssistantOpen = false; isMetadataSidebarOpen = false"
-              :class="{ 'bg-muted': isFavoriteBlocksOpen }" title="Favorite Blocks (Ctrl+Shift+Alt+V)">
+              @click="toggleSidebar('favorites')"
+              :class="{ 'bg-muted': sidebars.favorites.isOpen }" title="Favorite Blocks (Ctrl+Shift+Alt+V)">
               <Star class="h-4 w-4" />
+            </Button>
+
+            <Button variant="ghost" size="sm" class="flex items-center gap-2"
+              @click="toggleSidebar('toc')"
+              :class="{ 'bg-muted': sidebars.toc.isOpen }" title="Table of Contents (Ctrl+Shift+Alt+O)">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <rect x="9" y="3" width="6" height="4" rx="1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M9 12h6M9 16h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
             </Button>
           </div>
 
+          <!-- Action Buttons -->
           <div class="flex items-center gap-2">
             <Button variant="ghost" size="icon" title="Save Version" @click="saveVersion" :disabled="isSavingVersion">
               <span v-if="isSavingVersion"
@@ -752,52 +959,41 @@ defineExpose({
       </div>
     </div>
 
-    <!-- Right-side Sidebars (move all sidebars to the right side) -->
-    <!-- References Sidebar -->
-    <div v-if="isReferencesOpen"
-      class="h-full border-l flex-shrink-0 flex flex-col bg-background right-sidebar-container">
-      <ReferencesSidebar :editor="editor" :notaId="notaId" @close="isReferencesOpen = false" />
-    </div>
-
-    <!-- Jupyter Servers Sidebar -->
-    <div v-if="isJupyterServersOpen"
-      class="h-full border-l flex-shrink-0 flex flex-col bg-background right-sidebar-container">
-      <JupyterServersSidebar :notaId="notaId" @close="isJupyterServersOpen = false" />
-    </div>
-
-    <!-- AI Assistant Sidebar -->
-    <div v-if="isAIAssistantOpen"
-      class="h-full border-l flex-shrink-0 flex flex-col bg-background right-sidebar-container">
-      <AIAssistantSidebar :editor="editor" :notaId="notaId" @close="isAIAssistantOpen = false" />
-    </div>
-
-    <!-- Metadata Sidebar -->
-    <div v-if="isMetadataSidebarOpen"
-      class="h-full border-l flex-shrink-0 flex flex-col bg-background right-sidebar-container">
-      <div class="p-4 border-b flex items-center justify-between">
-        <h3 class="font-medium">Metadata</h3>
-        <Button variant="ghost" size="icon" @click="isMetadataSidebarOpen = false">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
-            <path d="M18 6 6 18"></path>
-            <path d="m6 6 12 12"></path>
-          </svg>
-        </Button>
-      </div>
-      <ScrollArea class="flex-1 p-4">
-        <div class="space-y-4">
+    <!-- Right-side Sidebars -->
+    <!-- Generate sidebars dynamically for all non-TOC sidebars -->
+    <template v-for="(config, id) in sidebars" :key="id">
+      <ResizableSidebar 
+        v-if="id !== 'toc' && config.isOpen"
+        :title="config.title"
+        :storageKey="config.storageKey"
+        :position="config.position"
+        :minWidth="config.minWidth"
+        :maxWidth="config.maxWidth"
+        :defaultWidth="config.defaultWidth"
+        @close="toggleSidebar(id)"
+        @resize="updateSidebarWidth(id, $event)"
+      >
+        <!-- References Sidebar -->
+        <ReferencesSidebar v-if="id === 'references'" :editor="editor" :notaId="notaId" />
+        
+        <!-- Jupyter Servers Sidebar -->
+        <JupyterServersSidebar v-else-if="id === 'jupyter'" :notaId="notaId" />
+        
+        <!-- AI Assistant Sidebar -->
+        <AIAssistantSidebar v-else-if="id === 'ai'" :editor="editor" :notaId="notaId" />
+        
+        <!-- Metadata Sidebar -->
+        <div v-else-if="id === 'metadata'" class="space-y-4 p-4">
           <div v-if="currentNota">
             <h4 class="text-sm font-medium mb-2">Tags</h4>
             <TagsInput v-model="currentNota.tags" />
           </div>
         </div>
-      </ScrollArea>
-    </div>
-
-    <!-- Favorites Sidebar -->
-    <div v-if="isFavoriteBlocksOpen"
-      class="h-full border-l flex-shrink-0 flex flex-col bg-background right-sidebar-container">
-      <FavoriteBlocksSidebar :editor="editor" @close="isFavoriteBlocksOpen = false" />
-    </div>
+        
+        <!-- Favorites Sidebar -->
+        <FavoriteBlocksSidebar v-else-if="id === 'favorites'" :editor="editor" />
+      </ResizableSidebar>
+    </template>
 
     <!-- Version History Dialog -->
     <VersionHistoryDialog :nota-id="notaId" v-model:open="showVersionHistory"
@@ -808,7 +1004,7 @@ defineExpose({
 <style>
 /* Apply the editor-specific class to the editable ProseMirror instance */
 :deep(.ProseMirror) {
-  @apply min-h-[calc(100vh-10rem)];
+  min-height: calc(100vh - 10rem);
 }
 
 /* Right sidebar container styles */
@@ -817,5 +1013,29 @@ defineExpose({
   width: 350px;
   /* Default width that can be overridden by resize */
   max-width: 800px;
+  position: relative;
+}
+
+/* Resize handle styles */
+.sidebar-resize-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 4px;
+  height: 100%;
+  cursor: ew-resize;
+  background-color: transparent;
+  transition: background-color 0.2s;
+}
+
+.sidebar-resize-handle:hover,
+.sidebar-resize-handle.resizing {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+/* When resizing is active, use this class on body */
+body.sidebar-resizing {
+  cursor: ew-resize !important;
+  user-select: none !important;
 }
 </style>
