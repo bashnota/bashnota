@@ -5,7 +5,7 @@ import TagsInputItem from '@/components/ui/tags-input/TagsInputItem.vue'
 import TagsInputItemText from '@/components/ui/tags-input/TagsInputItemText.vue'
 import TagsInputItemDelete from '@/components/ui/tags-input/TagsInputItemDelete.vue'
 import TagsInputInput from '@/components/ui/tags-input/TagsInputInput.vue'
-import { RotateCw, CheckCircle } from 'lucide-vue-next'
+import { RotateCw, CheckCircle, Star, Share2, Download } from 'lucide-vue-next'
 import { useNotaStore } from '@/stores/nota'
 import { useJupyterStore } from '@/stores/jupyterStore'
 import EditorToolbar from './EditorToolbar.vue'
@@ -736,29 +736,56 @@ defineExpose({
           </div>
           
           <div class="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              @click="saveVersion"
-              :disabled="isSavingVersion"
-              class="flex items-center gap-1"
-            >
-              <span
-                v-if="isSavingVersion"
-                class="inline-block h-3 w-3 animate-spin rounded-full border-2 border-solid border-current border-r-transparent"
-              ></span>
-              <span>Save Version</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              @click="showVersionHistory = true"
-              class="flex items-center gap-1"
-            >
-              <span>History</span>
-            </Button>
-            <span>{{ wordCount }} words</span>
-          </div>
+  <Button
+    variant="outline"
+    size="sm"
+    @click="saveVersion"
+    :disabled="isSavingVersion"
+    class="flex items-center gap-1"
+  >
+    <span
+      v-if="isSavingVersion"
+      class="inline-block h-3 w-3 animate-spin rounded-full border-2 border-solid border-current border-r-transparent"
+    ></span>
+    <span>Save Version</span>
+  </Button>
+  <Button
+    variant="ghost"
+    size="sm"
+    @click="showVersionHistory = true"
+    class="flex items-center gap-1"
+  >
+    <span>History</span>
+  </Button>
+
+  <!-- Action Buttons -->
+  <Button
+    variant="ghost"
+    size="icon"
+    title="Star"
+    @click="$emit('toggle-favorite')"
+    :class="{ 'text-yellow-500': isFavorite }"
+  >
+    <Star class="w-4 h-4" :fill="isFavorite ? 'currentColor' : 'none'" />
+  </Button>
+  <Button
+    variant="ghost"
+    size="icon"
+    title="Share"
+    @click="$emit('share')"
+  >
+    <Share2 class="w-4 h-4" />
+  </Button>
+  <Button
+    variant="ghost"
+    size="icon"
+    title="Export"
+    @click="$emit('export-nota')"
+  >
+    <Download class="w-4 h-4" />
+  </Button>
+  <span>{{ wordCount }} words</span>
+</div>
         </div>
       </div>
 
