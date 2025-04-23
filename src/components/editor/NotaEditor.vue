@@ -1,14 +1,8 @@
 <script setup lang="ts">
 import { useEditor, EditorContent } from '@tiptap/vue-3'
-import { TagsInput } from '@/components/ui/tags-input'
-import TagsInputItem from '@/components/ui/tags-input/TagsInputItem.vue'
-import TagsInputItemText from '@/components/ui/tags-input/TagsInputItemText.vue'
-import TagsInputItemDelete from '@/components/ui/tags-input/TagsInputItemDelete.vue'
-import TagsInputInput from '@/components/ui/tags-input/TagsInputInput.vue'
-import { RotateCw, CheckCircle, Star, Share2, Download, PlayCircle, Loader2, Save, Clock, Sparkles, Book, Server } from 'lucide-vue-next'
+import { Star, Share2, Download, PlayCircle, Loader2, Save, Clock, Tag } from 'lucide-vue-next'
 import { useNotaStore } from '@/stores/nota'
 import { useJupyterStore } from '@/stores/jupyterStore'
-import { useUIStore } from '@/stores/uiStore'
 import { useSaveHandler } from '@/composables/useSaveHandler'
 import EditorToolbar from './EditorToolbar.vue'
 import { ref, watch, computed, onUnmounted, onMounted, reactive, provide } from 'vue'
@@ -19,9 +13,9 @@ import TableOfContents from './TableOfContents.vue'
 import JupyterServersSidebar from './JupyterServersSidebar.vue'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { ListIcon, BookIcon, ServerIcon, BrainIcon } from 'lucide-vue-next'
+import { BookIcon, ServerIcon, BrainIcon } from 'lucide-vue-next'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
-import { getURLWithoutProtocol, toast, formatDate } from '@/lib/utils'
+import { getURLWithoutProtocol, toast} from '@/lib/utils'
 import VersionHistoryDialog from './VersionHistoryDialog.vue'
 import FavoriteBlocksSidebar from './FavoriteBlocksSidebar.vue'
 import ReferencesSidebar from './ReferencesSidebar.vue'
@@ -30,6 +24,8 @@ import { getEditorExtensions } from './extensions'
 import { useEquationCounter, EQUATION_COUNTER_KEY } from '@/composables/useEquationCounter'
 import { useCitationStore } from '@/stores/citationStore'
 import { logger } from '@/services/logger'
+import NotaMetadata from './NotaMetadata.vue'
+import MetadataSidebar from './MetadataSidebar.vue'
 
 // Import shared CSS
 import '@/assets/editor-styles.css'
@@ -65,6 +61,7 @@ const isSidebarOpen = ref(false)
 const isReferencesOpen = ref(false)
 const isJupyterServersOpen = ref(false)
 const isAIAssistantOpen = ref(false)
+const isMetadataSidebarOpen = ref(false)
 const autoSaveEnabled = ref(true)
 const showVersionHistory = ref(false)
 
@@ -594,7 +591,7 @@ provide(EQUATION_COUNTER_KEY, {
   getNumber: (id: string) => {
     if (!counters.has(id)) {
       const nextNumber = counters.size + 1
-      counters.set(id, nextNumber)
+    counters.set(id, nextNumber)
     }
     return counters.get(id) || 0
   },
@@ -700,21 +697,33 @@ defineExpose({
           <div class="flex items-center gap-2">
 
             <Button variant="ghost" size="sm" class="flex items-center gap-2"
-              @click="isReferencesOpen = !isReferencesOpen; isSidebarOpen = false; isJupyterServersOpen = false; isAIAssistantOpen = false"
+              @click="isReferencesOpen = !isReferencesOpen; isSidebarOpen = false; isJupyterServersOpen = false; isAIAssistantOpen = false; isMetadataSidebarOpen = false"
               :class="{ 'bg-muted': isReferencesOpen }">
               <BookIcon class="h-4 w-4" />
             </Button>
 
             <Button variant="ghost" size="sm" class="flex items-center gap-2"
-              @click="isJupyterServersOpen = !isJupyterServersOpen; isSidebarOpen = false; isReferencesOpen = false; isAIAssistantOpen = false"
+              @click="isJupyterServersOpen = !isJupyterServersOpen; isSidebarOpen = false; isReferencesOpen = false; isAIAssistantOpen = false; isMetadataSidebarOpen = false"
               :class="{ 'bg-muted': isJupyterServersOpen }">
               <ServerIcon class="h-4 w-4" />
             </Button>
 
             <Button variant="ghost" size="sm" class="flex items-center gap-2"
-              @click="isAIAssistantOpen = !isAIAssistantOpen; isSidebarOpen = false; isReferencesOpen = false; isJupyterServersOpen = false"
+              @click="isAIAssistantOpen = !isAIAssistantOpen; isSidebarOpen = false; isReferencesOpen = false; isJupyterServersOpen = false; isMetadataSidebarOpen = false"
               :class="{ 'bg-muted': isAIAssistantOpen }">
               <BrainIcon class="h-4 w-4" />
+            </Button>
+            
+            <!-- Metadata Sidebar Button -->
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              class="flex items-center gap-2"
+              @click="isMetadataSidebarOpen = !isMetadataSidebarOpen; isSidebarOpen = false; isReferencesOpen = false; isJupyterServersOpen = false; isAIAssistantOpen = false"
+              :class="{ 'bg-muted': isMetadataSidebarOpen }"
+              title="Toggle Metadata Sidebar (Ctrl+Shift+Alt+M)"
+            >
+              <Tag class="h-4 w-4" />
             </Button>
           </div>
 
@@ -751,51 +760,12 @@ defineExpose({
 
       <!-- Editor Content -->
       <div class="flex-1 min-h-0 relative overflow-auto">
-        <!-- Editor Content Area -->
-        <div class="h-full overflow-hidden px-4 md:px-8 lg:px-12">
+        <!-- Editor Content Area - reduced padding -->
+        <div class="h-full overflow-hidden px-2 md:px-4 lg:px-6">
           <ScrollArea class="h-full">
-            <div class="max-w-4xl mx-auto py-8">
+            <div class="max-w-4xl mx-auto py-4">
               <!-- The title is now the first block inside the editor -->
               <editor-content :editor="editor" />
-              
-              <!-- Use slot to allow injection of metadata components -->
-              <slot name="metadata">
-                <!-- Default implementation if no slot is provided -->
-                <div class="max-w-4xl mx-auto mb-6 -mt-4 relative z-10">
-                  <TagsInput v-if="currentNota" v-model="currentNota.tags" class="w-full border-none" @update:model-value="handleTagsUpdate">
-                    <TagsInputItem v-for="item in currentNota.tags" :key="item" :value="item">
-                      <TagsInputItemText />
-                      <TagsInputItemDelete />
-                    </TagsInputItem>
-
-                    <TagsInputInput placeholder="Enter Tags ..." />
-                  </TagsInput>
-                  
-                  <!-- Save Status and Last Updated below tags -->
-                  <div class="flex items-center gap-3 mt-2">
-                    <div class="flex-1 flex items-center gap-4">
-                      <!-- Save Status Indicator -->
-                      <div
-                        class="flex items-center text-xs text-muted-foreground transition-opacity duration-200"
-                        :class="{ 'opacity-0': !isSaving && !showSaved }"
-                      >
-                        <span v-if="isSaving" class="flex items-center gap-1">
-                          <RotateCw class="w-3 h-3 animate-spin" />
-                          Saving
-                        </span>
-                        <span v-else-if="showSaved" class="flex items-center gap-1">
-                          <CheckCircle class="w-3 h-3 text-green-600" />
-                          Saved
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <span v-if="currentNota?.updatedAt" class="text-xs text-muted-foreground mt-1">
-                    Last updated {{ formatDate(currentNota.updatedAt) }}
-                  </span>
-                </div>
-              </slot>
             </div>
           </ScrollArea>
         </div>
@@ -808,6 +778,17 @@ defineExpose({
     <!-- Version History Dialog -->
     <VersionHistoryDialog :nota-id="notaId" v-model:open="showVersionHistory"
       @version-restored="refreshEditorContent" />
+      
+    <!-- Metadata Sidebar -->
+    <MetadataSidebar
+      :nota="currentNota || null"
+      :is-saving="isSaving"
+      :show-saved="showSaved"
+      :auto-save-enabled="autoSaveEnabled"
+      :is-metadata-sidebar-open="isMetadataSidebarOpen"
+      @update:is-metadata-sidebar-open="isMetadataSidebarOpen = $event"
+      @update:tags="handleTagsUpdate"
+    />
   </div>
 </template>
 
