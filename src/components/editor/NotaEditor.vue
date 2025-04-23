@@ -8,6 +8,8 @@ import TagsInputInput from '@/components/ui/tags-input/TagsInputInput.vue'
 import { RotateCw, CheckCircle, Star, Share2, Download, PlayCircle, Loader2, Save, Clock, Sparkles, Book, Server } from 'lucide-vue-next'
 import { useNotaStore } from '@/stores/nota'
 import { useJupyterStore } from '@/stores/jupyterStore'
+import { useUIStore } from '@/stores/uiStore'
+import { useSaveHandler } from '@/composables/useSaveHandler'
 import EditorToolbar from './EditorToolbar.vue'
 import { ref, watch, computed, onUnmounted, onMounted, reactive, provide } from 'vue'
 import 'highlight.js/styles/github.css'
@@ -19,7 +21,7 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ListIcon, BookIcon, ServerIcon, BrainIcon } from 'lucide-vue-next'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
-import { getURLWithoutProtocol, toast } from '@/lib/utils'
+import { getURLWithoutProtocol, toast, formatDate } from '@/lib/utils'
 import VersionHistoryDialog from './VersionHistoryDialog.vue'
 import FavoriteBlocksSidebar from './FavoriteBlocksSidebar.vue'
 import ReferencesSidebar from './ReferencesSidebar.vue'
@@ -44,10 +46,15 @@ const emit = defineEmits<{
   saving: [boolean]
   'run-all': []
   'toggle-favorite': []
+  'update:favorite': []
+  'update:tags': [tags: string[]]
   share: []
   'open-config': []
   'export-nota': []
 }>()
+
+// Use our save handler composable
+const { isSaving, showSaved, handleSaving } = useSaveHandler(props.notaId)
 
 const notaStore = useNotaStore()
 const jupyterStore = useJupyterStore()
@@ -287,8 +294,6 @@ function applyEditorSettings(settings = editorSettings) {
   autoSaveEnabled.value = settings.autoSave
 }
 
-const isSaving = ref(false)
-const showSaved = ref(false)
 
 // Function to save editor content
 const saveEditorContent = async () => {
@@ -312,7 +317,7 @@ const saveEditorContent = async () => {
   if (!editor.value) return
 
   try {
-    emit('saving', true)
+    handleSaving(true)
     const content = editor.value.getJSON()
 
     // Register/update code cells on content change
@@ -328,11 +333,11 @@ const saveEditorContent = async () => {
         updatedAt: new Date(),
       })
       .finally(() => {
-        emit('saving', false)
+        handleSaving(false)
       })
   } catch (error) {
     logger.error('Error saving content:', error)
-    emit('saving', false)
+    handleSaving(false)
     return Promise.reject(error)
   }
 }
@@ -635,6 +640,20 @@ watch(() => citationStore.getCitationsByNotaId(props.notaId), () => {
   updateCitationNumbers()
 }, { deep: true })
 
+/**
+ * Update tags and save the nota
+ */
+const handleTagsUpdate = async (tags: any[]) => {
+  // Convert tags to string array if they're not already
+  const stringTags = tags.map(tag => typeof tag === 'string' ? tag : String(tag));
+  
+  if (currentNota.value) {
+    currentNota.value.tags = stringTags
+    emit('update:tags', stringTags)
+    await notaStore.saveItem(currentNota.value)
+  }
+}
+
 defineExpose({
   insertSubNotaLink,
   createAndLinkSubNota,
@@ -738,21 +757,45 @@ defineExpose({
             <div class="max-w-4xl mx-auto py-8">
               <!-- The title is now the first block inside the editor -->
               <editor-content :editor="editor" />
-              <!-- Tags and Save Status below title -->
-              <div class="flex items-center gap-4 mt-2">
-                <TagsInput v-if="currentNota" v-model="currentNota.tags" class="w-full border-none" />
-                <div class="flex items-center text-xs text-muted-foreground transition-opacity duration-200"
-                  :class="{ 'opacity-0': !isSaving && !showSaved }">
-                  <span v-if="isSaving" class="flex items-center gap-1">
-                    <RotateCw class="w-3 h-3 animate-spin" />
-                    Saving
-                  </span>
-                  <span v-else-if="showSaved" class="flex items-center gap-1">
-                    <CheckCircle class="w-3 h-3 text-green-600" />
-                    Saved
+              
+              <!-- Use slot to allow injection of metadata components -->
+              <slot name="metadata">
+                <!-- Default implementation if no slot is provided -->
+                <div class="max-w-4xl mx-auto mb-6 -mt-4 relative z-10">
+                  <TagsInput v-if="currentNota" v-model="currentNota.tags" class="w-full border-none" @update:model-value="handleTagsUpdate">
+                    <TagsInputItem v-for="item in currentNota.tags" :key="item" :value="item">
+                      <TagsInputItemText />
+                      <TagsInputItemDelete />
+                    </TagsInputItem>
+
+                    <TagsInputInput placeholder="Enter Tags ..." />
+                  </TagsInput>
+                  
+                  <!-- Save Status and Last Updated below tags -->
+                  <div class="flex items-center gap-3 mt-2">
+                    <div class="flex-1 flex items-center gap-4">
+                      <!-- Save Status Indicator -->
+                      <div
+                        class="flex items-center text-xs text-muted-foreground transition-opacity duration-200"
+                        :class="{ 'opacity-0': !isSaving && !showSaved }"
+                      >
+                        <span v-if="isSaving" class="flex items-center gap-1">
+                          <RotateCw class="w-3 h-3 animate-spin" />
+                          Saving
+                        </span>
+                        <span v-else-if="showSaved" class="flex items-center gap-1">
+                          <CheckCircle class="w-3 h-3 text-green-600" />
+                          Saved
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <span v-if="currentNota?.updatedAt" class="text-xs text-muted-foreground mt-1">
+                    Last updated {{ formatDate(currentNota.updatedAt) }}
                   </span>
                 </div>
-              </div>
+              </slot>
             </div>
           </ScrollArea>
         </div>

@@ -1,28 +1,11 @@
 <script setup lang="ts">
 import NotaEditor from '@/components/editor/NotaEditor.vue'
 import NotaConfigModal from '@/components/editor/blocks/nota-config/NotaConfigModal.vue'
-import { ref, onMounted, watch, nextTick } from 'vue'
+import NotaMetadata from '@/components/editor/NotaMetadata.vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { useJupyterStore } from '@/stores/jupyterStore'
 import { useTabsStore } from '@/stores/tabsStore'
-import { computed } from 'vue'
-import { 
-  Share2,
-  CheckCircle,
-  RotateCw,
-  Star,
-  Download,
-  Cpu,
-  Loader2,
-  PlayCircle
-} from 'lucide-vue-next'
-import { Button } from '@/components/ui/button'
-import { formatDate } from '@/lib/utils'
-import { TagsInput } from '@/components/ui/tags-input'
-import TagsInputItem from '@/components/ui/tags-input/TagsInputItem.vue'
-import TagsInputItemText from '@/components/ui/tags-input/TagsInputItemText.vue'
-import TagsInputItemDelete from '@/components/ui/tags-input/TagsInputItemDelete.vue'
-import TagsInputInput from '@/components/ui/tags-input/TagsInputInput.vue'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
 import { toast } from '@/components/ui/toast'
 import PublishNotaModal from '@/components/editor/PublishNotaModal.vue'
@@ -32,31 +15,22 @@ const props = defineProps<{
   id: string
 }>()
 
-const store = useNotaStore()
+// Stores
+const notaStore = useNotaStore()
 const jupyterStore = useJupyterStore()
 const tabsStore = useTabsStore()
 const codeExecutionStore = useCodeExecutionStore()
+
+// State
 const isExecutingAll = ref(false)
 const isReady = ref(false)
-
-const nota = computed(() => store.getCurrentNota(props.id))
 const showConfigModal = ref(false)
 const showShareDialog = ref(false)
-const isSaving = ref(false)
-const showSaved = ref(false)
 
+// Computed properties
+const nota = computed(() => notaStore.getCurrentNota(props.id))
 
-// Add watch to save changes when tags are updated
-watch(
-  () => nota.value?.tags,
-  async (newTags) => {
-    if (nota.value && newTags) {
-      await store.saveItem(nota.value)
-    }
-  },
-)
-
-// Add watch to sync tab title with nota title
+// Watch for title changes to update tab title
 watch(
   () => nota.value?.title,
   (newTitle) => {
@@ -68,136 +42,161 @@ watch(
 )
 
 onMounted(async () => {
-  // Ensure the nota is loaded before showing the editor
-  const loadedNota = await store.loadNota(props.id)
-  if (loadedNota && !loadedNota.tags) {
-    loadedNota.tags = []
-    await store.saveItem(loadedNota)
-  }
-  isReady.value = true
-  
-  // Register this nota with the tab system
-  tabsStore.openTab({
-    id: props.id,
-    title: loadedNota?.title || 'Untitled',
-    route: {
-      name: 'nota',
-      params: { id: props.id }
+  try {
+    // Ensure the nota is loaded before showing the editor
+    const loadedNota = await notaStore.loadNota(props.id)
+    
+    // Initialize tags array if it doesn't exist
+    if (loadedNota && !loadedNota.tags) {
+      loadedNota.tags = []
+      await notaStore.saveItem(loadedNota)
     }
-  })
+    
+    // Register this nota with the tab system
+    tabsStore.openTab({
+      id: props.id,
+      title: loadedNota?.title || 'Untitled',
+      route: {
+        name: 'nota',
+        params: { id: props.id }
+      }
+    })
 
-  // Check if this is a root nota and has no Jupyter servers configured
-  if (nota.value && !nota.value.parentId) {
-    // Check global Jupyter servers instead of nota-specific config
-    if (jupyterStore.jupyterServers.length === 0) {
+    // Check if this is a root nota and has no Jupyter servers configured
+    if (loadedNota && !loadedNota.parentId && jupyterStore.jupyterServers.length === 0) {
       toast({
         title: 'Configure Jupyter',
         description: 'Set up your Jupyter server to enable code execution in this notebook.',
       })
     }
+    
+    isReady.value = true
+  } catch (error) {
+    logger.error('Error loading nota:', error)
+    toast({
+      title: 'Error',
+      description: 'Failed to load notebook. Please try again.',
+      variant: 'destructive'
+    })
   }
 })
 
+/**
+ * Execute all code cells in the nota
+ */
 const executeAllCells = async () => {
   isExecutingAll.value = true
   try {
     await codeExecutionStore.executeAll()
   } catch (error) {
     logger.error('Error executing all cells:', error)
+    toast({
+      title: 'Execution Error',
+      description: 'Failed to execute all cells. Please check your code or server connection.',
+      variant: 'destructive'
+    })
   } finally {
     isExecutingAll.value = false
   }
 }
 
+/**
+ * Toggle the configuration modal
+ */
 const toggleConfigModal = () => {
   showConfigModal.value = !showConfigModal.value
 }
 
-// New function to toggle share dialog
+/**
+ * Toggle the share dialog
+ */
 const toggleShareDialog = () => {
   showShareDialog.value = !showShareDialog.value
 }
 
-// Save status handlers
-const handleSaving = (saving: boolean) => {
-  isSaving.value = saving
-  // Update the tab's dirty state
-  tabsStore.updateTab(props.id, { isDirty: saving })
-  
-  if (!saving) {
-    showSaved.value = true
-    setTimeout(() => {
-      showSaved.value = false
-    }, 2000)
+/**
+ * Export the nota to a JSON file
+ */
+const exportNota = async () => {
+  try {
+    const notas = await notaStore.exportNota(props.id)
+    
+    // Create file content
+    const fileContent = JSON.stringify(notas, null, 2)
+    
+    // Create blob and download link
+    const blob = new Blob([fileContent], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    
+    // Create download link
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${nota.value?.title || 'nota'}.nota`
+    
+    // Trigger download
+    document.body.appendChild(link)
+    link.click()
+    
+    // Cleanup
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    
+    toast({
+      title: 'Export Complete',
+      description: 'Your nota has been exported successfully.'
+    })
+  } catch (error) {
+    logger.error('Error exporting nota:', error)
+    toast({
+      title: 'Export Error',
+      description: 'Failed to export nota. Please try again.',
+      variant: 'destructive'
+    })
   }
 }
 
-const exportNota = async () => {
-  const notas = await store.exportNota(props.id)
+/**
+ * Toggle the favorite status of the nota
+ */
+const toggleFavorite = () => {
+  if (nota.value) {
+    notaStore.toggleFavorite(props.id)
+  }
+}
 
-  // Create file content
-  const fileContent = JSON.stringify(notas, null, 2)
-
-  // Create blob and download link
-  const blob = new Blob([fileContent], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-
-  // Create download link
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `${nota.value?.title || 'nota'}.nota`
-
-  // Trigger download
-  document.body.appendChild(link)
-  link.click()
-
-  // Cleanup
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
+/**
+ * Handle tags update from editor
+ */
+const handleTagsUpdate = async (tags: string[]) => {
+  if (nota.value) {
+    // The editor component now handles saving the nota with updated tags
+    // This function is kept for any additional processing needed at this level
+  }
 }
 </script>
 
 <template>
   <div class="bg-background flex flex-col flex-1 min-h-0 h-full">
-
-    <header class="flex items-center justify-between px-6 py-4 border-b">
-      <div class="flex-1">
-        <div class="flex items-center gap-3">
-          <div class="flex-1 flex items-center gap-4">
-            
-
-            
-
-            
-          </div>
-        </div>
-
-        <span v-if="nota?.updatedAt" class="text-xs text-muted-foreground mt-1">
-          Last updated {{ formatDate(nota.updatedAt) }}
-        </span>
-      </div>
-
-      
-    </header>
-
+    <!-- Main content area -->
     <main class="flex-1 min-h-0 overflow-auto">
-      <template v-if="isReady">
+      <template v-if="isReady && nota">
         <NotaEditor
-  v-if="nota"
-  :nota-id="id"
-  @saving="handleSaving"
-  :key="id"
-  :can-run-all="nota && nota.config?.savedSessions && nota.config?.savedSessions.length > 0"
-  :is-executing-all="isExecutingAll"
-  @run-all="executeAllCells"
-  :is-favorite="nota?.favorite"
-  @toggle-favorite="() => store.toggleFavorite(id)"
-  @share="toggleShareDialog"
-  @open-config="toggleConfigModal"
-  @export-nota="exportNota"
-/>
-
+          :nota-id="id"
+          :key="id"
+          :can-run-all="nota && nota.config?.savedSessions && nota.config?.savedSessions.length > 0"
+          :is-executing-all="isExecutingAll"
+          @run-all="executeAllCells"
+          :is-favorite="nota?.favorite"
+          @update:favorite="toggleFavorite"
+          @update:tags="handleTagsUpdate"
+          @share="toggleShareDialog"
+          @open-config="toggleConfigModal"
+          @export-nota="exportNota"
+        >
+          <!-- We no longer need to pass NotaMetadata as a slot since the editor handles it internally -->
+        </NotaEditor>
       </template>
+      
       <div v-else class="flex items-center justify-center h-full">
         <p class="text-muted-foreground">Loading...</p>
       </div>
@@ -211,6 +210,10 @@ const exportNota = async () => {
     />
 
     <!-- Share Dialog -->
-    <PublishNotaModal v-if="nota" :nota-id="id" v-model:open="showShareDialog" />
+    <PublishNotaModal 
+      v-if="nota" 
+      :nota-id="id" 
+      v-model:open="showShareDialog" 
+    />
   </div>
 </template>
