@@ -73,11 +73,8 @@ onUpdated(() => {
     />
     
     <!-- Enhanced Loading Indicator -->
-    <div v-if="isLoading" class="flex items-start gap-3 loading-indicator">
-      <Avatar class="bg-primary/10">
-        <div class="h-4 w-4 text-primary" />
-      </Avatar>
-      <div class="text-sm text-muted-foreground p-3 bg-muted/20 rounded-lg max-w-[80%]">
+    <div v-if="isLoading" class="loading-indicator mb-3">
+      <div class="text-sm text-muted-foreground p-2.5 bg-muted/20 rounded-lg max-w-[80%] ml-auto">
         <div class="typing-indicator">
           <span></span>
           <span></span>
@@ -88,17 +85,17 @@ onUpdated(() => {
     </div>
     
     <!-- Error Message -->
-    <div v-if="error" class="flex items-start gap-3 text-destructive error-message">
-      <Avatar class="bg-destructive/10">
-        <XIcon class="h-4 w-4 text-destructive" />
-      </Avatar>
-      <div class="space-y-2 p-3 bg-destructive/5 rounded-lg border border-destructive/20">
-        <div class="text-sm font-medium">Error: {{ error }}</div>
-        <p class="text-xs text-muted-foreground">The AI encountered a problem while generating a response.</p>
+    <div v-if="error" class="error-message mb-3">
+      <div class="space-y-1.5 p-3 bg-destructive/5 rounded-lg border border-destructive/20">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium text-destructive">Error</span>
+        </div>
+        <div class="text-sm font-medium text-destructive mt-1">{{ error }}</div>
+        <p class="text-xs text-muted-foreground mt-1">The AI encountered a problem while generating a response.</p>
         <Button 
           variant="secondary" 
           size="sm"
-          class="h-7 text-xs mt-2"
+          class="h-7 text-xs mt-2 bg-background/80"
           @click="retryGeneration"
         >
           <RefreshCwIcon class="h-3 w-3 mr-1" />

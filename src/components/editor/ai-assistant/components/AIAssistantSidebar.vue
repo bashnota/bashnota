@@ -472,12 +472,23 @@ onBeforeUnmount(() => {
     <!-- Resize Handle - Only visible when not in fullscreen mode -->
     <div 
       v-if="!isFullscreen"
-      class="absolute h-full w-1.5 left-0 top-0 cursor-ew-resize hover:bg-primary/30 active:bg-primary/50 transition-colors z-10 flex items-center justify-center"
+      class="absolute h-full w-3 left-0 top-0 cursor-ew-resize hover:bg-primary/30 active:bg-primary/50 transition-colors z-10 group"
       @mousedown="startResizing"
+      :class="{ 'resizing': isResizing }"
     >
-      <div class="h-16 w-0.5 bg-border/50 rounded-full"></div>
-      <div class="absolute bottom-4 left-2 text-xs px-1.5 py-0.5 bg-background border rounded opacity-0 group-hover:opacity-100 whitespace-nowrap">
-        {{ constrainedWidth }}px
+      <!-- Vertical line indicator -->
+      <div class="h-16 w-0.5 bg-border/50 rounded-full absolute top-1/2 left-1/2 transform -translate-y-1/2 -translate-x-1/2 group-hover:bg-primary/70 group-hover:h-24 transition-all"></div>
+      
+      <!-- Width indicator tooltip -->
+      <div class="absolute bottom-4 left-4 text-xs px-2 py-1 bg-background border rounded shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
+        <span class="font-medium">{{ constrainedWidth }}px</span>
+      </div>
+      
+      <!-- Resize indicator dots -->
+      <div class="absolute top-1/2 left-1/2 transform -translate-y-1/2 -translate-x-1/2 flex flex-col gap-1.5 opacity-0 group-hover:opacity-70">
+        <div class="w-1 h-1 rounded-full bg-primary/90"></div>
+        <div class="w-1 h-1 rounded-full bg-primary/90"></div>
+        <div class="w-1 h-1 rounded-full bg-primary/90"></div>
       </div>
     </div>
     
@@ -485,6 +496,7 @@ onBeforeUnmount(() => {
     <div
       class="flex flex-col h-full w-full overflow-hidden"
       :style="!isFullscreen ? { width: `${constrainedWidth}px` } : {}"
+      :class="{ 'resize-transition': !isResizing }"
     >
       <!-- Header -->
       <SidebarHeader 
@@ -613,6 +625,21 @@ onBeforeUnmount(() => {
   padding: 0.5em;
   margin: 0.5em 0;
   overflow-x: auto;
+}
+
+/* Resize styling */
+.resize-transition {
+  transition: width 0.15s ease-out;
+}
+
+.resizing {
+  background-color: hsl(var(--primary) / 0.2);
+  box-shadow: 0 0 0 1px hsl(var(--primary) / 0.3);
+  z-index: 20;
+}
+
+.resizing + div {
+  pointer-events: none; /* Prevent interaction with content while resizing */
 }
 
 /* Mention search styling */

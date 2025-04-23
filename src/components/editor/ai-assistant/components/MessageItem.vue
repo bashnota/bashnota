@@ -72,21 +72,12 @@ const handleMouseLeave = () => {
 
 <template>
   <div 
-    class="flex gap-3 mb-4 relative"
+    class="mb-3 relative message-container"
     @mouseenter="handleMouseEnter"
     @mouseleave="handleMouseLeave"
   >
-    <Avatar 
-      :class="message.role === 'user' ? 'bg-muted' : 'bg-primary/10'" 
-      aria-hidden="true"
-      class="mt-1"
-    >
-      <User v-if="message.role === 'user'" class="h-4 w-4" />
-      <Bot v-else class="h-4 w-4 text-primary" />
-    </Avatar>
-    
-    <div class="flex-1 space-y-1.5">
-      <div class="text-xs text-muted-foreground flex items-center justify-between">
+    <div class="flex-1 space-y-1 message-content">
+      <div class="text-xs text-muted-foreground flex items-center justify-between message-header">
         <span class="font-medium">{{ message.role === 'user' ? 'You' : providerName || 'AI' }}</span>
         <span class="text-xs opacity-60">{{ timestamp }}</span>
       </div>
@@ -156,27 +147,34 @@ const handleMouseLeave = () => {
   background: rgba(var(--primary), 0.2);
 }
 
-/* Add smooth animation for message appearance */
-.flex.gap-3.mb-4 {
-  animation: fadeIn 0.3s ease-in-out;
+/* More compact message container */
+.message-container {
+  margin-bottom: 0.75rem;
+  padding: 0.25rem 0;
+  transition: background-color 0.2s ease;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(5px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.message-container:hover {
+  background-color: hsl(var(--muted) / 0.05);
+}
+
+/* Better styling for message content without avatars */
+.message-content {
+  width: 100%;
+}
+
+.message-header {
+  margin-bottom: 0.25rem;
+  padding: 0 0.25rem;
+  display: flex;
+  justify-content: space-between;
 }
 
 /* Quick action buttons that appear on hover */
 .quick-actions {
   display: flex;
   gap: 0.5rem;
-  margin-top: 0.75rem;
+  margin-top: 0.5rem;
   opacity: 0;
   transform: translateY(5px);
   transition: opacity 0.2s ease, transform 0.2s ease;
@@ -197,20 +195,50 @@ const handleMouseLeave = () => {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-/* Add styling to distinguish user/assistant messages better */
+/* Improve styling to better distinguish user/assistant messages without avatars */
 :deep(.user-message) {
   background-color: hsl(var(--muted) / 0.3);
   border-radius: 0.75rem;
-  padding: 0.85rem;
+  padding: 0.75rem;
   border-bottom-left-radius: 0.25rem;
+  margin-right: 1.5rem; /* Add more space on the right for user messages */
+  margin-left: 0.25rem; /* Add slight indent on the left */
+  font-size: 0.925rem;
+  position: relative;
+}
+
+:deep(.user-message)::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -0.25rem;
+  height: 100%;
+  width: 0.25rem;
+  background-color: hsl(var(--muted) / 0.5);
+  border-radius: 4px;
 }
 
 :deep(.assistant-message) {
   background-color: hsl(var(--primary) / 0.05);
   border-radius: 0.75rem;
-  padding: 0.85rem;
-  border-left: 2px solid hsl(var(--primary) / 0.3);
+  padding: 0.75rem;
+  margin-left: 1.5rem; /* Add more space on the left for AI messages */
+  margin-right: 0.25rem; /* Add slight indent on the right */
   border-bottom-right-radius: 0.25rem;
+  font-size: 0.925rem;
+  position: relative;
+  border-left: 2px solid hsl(var(--primary) / 0.3);
+}
+
+:deep(.assistant-message)::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -0.2rem;
+  height: 100%;
+  width: 0.2rem;
+  background-color: hsl(var(--primary) / 0.3);
+  border-radius: 4px;
 }
 
 /* Enhanced code block styling */

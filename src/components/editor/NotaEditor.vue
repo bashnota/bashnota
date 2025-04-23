@@ -620,8 +620,7 @@ defineExpose({
     <!-- AI Assistant Sidebar -->
     <div
       v-if="isAIAssistantOpen"
-      class="h-full border-r flex-shrink-0 flex flex-col bg-background"
-      style="width: 350px; overflow: hidden;"
+      class="h-full border-r flex-shrink-0 flex flex-col bg-background ai-sidebar-container"
     >
       <AIAssistantSidebar 
         :editor="editor" 
@@ -740,5 +739,12 @@ defineExpose({
 /* Apply the editor-specific class to the editable ProseMirror instance */
 :deep(.ProseMirror) {
   @apply min-h-[calc(100vh-10rem)];
+}
+
+/* AI Sidebar container styles */
+.ai-sidebar-container {
+  min-width: 300px;
+  width: 350px; /* Default width that can be overridden by resize */
+  max-width: 800px;
 }
 </style>
