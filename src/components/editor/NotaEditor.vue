@@ -26,6 +26,7 @@ import { getEditorExtensions } from './extensions'
 import { useEquationCounter, EQUATION_COUNTER_KEY } from '@/composables/useEquationCounter'
 import { useCitationStore } from '@/stores/citationStore'
 import { logger } from '@/services/logger'
+import MetadataSidebar from './MetadataSidebar.vue'
 
 // Define sidebar types for better type checking
 type SidebarPosition = 'left' | 'right';
@@ -983,12 +984,7 @@ defineExpose({
         <AIAssistantSidebar v-else-if="id === 'ai'" :editor="editor" :notaId="notaId" />
         
         <!-- Metadata Sidebar -->
-        <div v-else-if="id === 'metadata'" class="space-y-4 p-4">
-          <div v-if="currentNota">
-            <h4 class="text-sm font-medium mb-2">Tags</h4>
-            <TagsInput v-model="currentNota.tags" />
-          </div>
-        </div>
+        <MetadataSidebar v-else-if="id === 'metadata'" :notaId="notaId" />
         
         <!-- Favorites Sidebar -->
         <FavoriteBlocksSidebar v-else-if="id === 'favorites'" :editor="editor" />

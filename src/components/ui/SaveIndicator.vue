@@ -70,7 +70,7 @@ watch(() => props.showSaved, (newValue) => {
 </script>
 
 <template>
-  <div class="save-indicator" :class="{ 'compact': $attrs.class?.includes('compact') }">
+  <div class="save-indicator" :class="{ 'compact': typeof $attrs.class === 'string' && $attrs.class.includes('compact') }">
     <!-- Save Status Indicator -->
     <div class="flex items-center justify-between">
       <transition
@@ -93,7 +93,7 @@ watch(() => props.showSaved, (newValue) => {
       
       <!-- Last Updated Time - simplified in compact mode -->
       <div v-if="updatedAt" class="text-[10px] text-muted-foreground flex items-center">
-        <Clock v-if="!$attrs.class?.includes('compact')" class="w-2.5 h-2.5 mr-1 opacity-70" />
+        <Clock v-if="!(typeof $attrs.class === 'string' && $attrs.class.includes('compact'))" class="w-2.5 h-2.5 mr-1 opacity-70" />
         <span :title="formattedTimestamp">{{ relativeTime }}</span>
       </div>
     </div>
@@ -102,7 +102,7 @@ watch(() => props.showSaved, (newValue) => {
     <div 
       v-if="autoSaveEnabled !== undefined" 
       class="text-[10px] text-muted-foreground flex items-center"
-      :class="{ 'mt-0 inline-flex ml-2': $attrs.class?.includes('compact'), 'mt-1': !$attrs.class?.includes('compact') }"
+      :class="{ 'mt-0 inline-flex ml-2': typeof $attrs.class === 'string' && $attrs.class.includes('compact'), 'mt-1': !(typeof $attrs.class === 'string' && $attrs.class.includes('compact')) }"
     >
       <span class="mr-1 whitespace-nowrap">
         Auto: {{ autoSaveEnabled ? 'On' : 'Off' }}
