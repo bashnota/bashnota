@@ -5,7 +5,7 @@ import TagsInputItem from '@/components/ui/tags-input/TagsInputItem.vue'
 import TagsInputItemText from '@/components/ui/tags-input/TagsInputItemText.vue'
 import TagsInputItemDelete from '@/components/ui/tags-input/TagsInputItemDelete.vue'
 import TagsInputInput from '@/components/ui/tags-input/TagsInputInput.vue'
-import { RotateCw, CheckCircle, Star, Share2, Download } from 'lucide-vue-next'
+import { RotateCw, CheckCircle, Star, Share2, Download, PlayCircle, Loader2, Save, Clock } from 'lucide-vue-next'
 import { useNotaStore } from '@/stores/nota'
 import { useJupyterStore } from '@/stores/jupyterStore'
 import EditorToolbar from './EditorToolbar.vue'
@@ -737,28 +737,36 @@ defineExpose({
           
           <div class="flex items-center gap-2">
   <Button
-    variant="outline"
-    size="sm"
+    variant="ghost"
+    size="icon"
+    title="Save Version"
     @click="saveVersion"
     :disabled="isSavingVersion"
-    class="flex items-center gap-1"
   >
-    <span
-      v-if="isSavingVersion"
-      class="inline-block h-3 w-3 animate-spin rounded-full border-2 border-solid border-current border-r-transparent"
-    ></span>
-    <span>Save Version</span>
+    <span v-if="isSavingVersion" class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent"></span>
+    <Save v-else class="w-4 h-4" />
   </Button>
   <Button
     variant="ghost"
-    size="sm"
+    size="icon"
+    title="History"
     @click="showVersionHistory = true"
-    class="flex items-center gap-1"
   >
-    <span>History</span>
+    <Clock class="w-4 h-4" />
   </Button>
 
   <!-- Action Buttons -->
+  <Button
+    v-if="canRunAll"
+    variant="ghost"
+    size="icon"
+    title="Run All"
+    :disabled="isExecutingAll"
+    @click="$emit('run-all')"
+  >
+    <Loader2 v-if="isExecutingAll" class="w-4 h-4 animate-spin" />
+    <PlayCircle v-else class="w-4 h-4" />
+  </Button>
   <Button
     variant="ghost"
     size="icon"
