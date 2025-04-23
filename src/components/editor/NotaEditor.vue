@@ -983,12 +983,12 @@ defineExpose({
         @resize="updateSidebarWidth(id, $event)"
       >
         <!-- Sidebar Header -->
-        <div class="p-4 border-b flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <component :is="config.icon" v-if="config.icon" class="h-4 w-4 text-primary" />
-            <h3 class="font-medium">{{ config.title }}</h3>
+        <div class="py-2 px-3 border-b flex items-center justify-between">
+          <div class="flex items-center gap-1.5">
+            <component :is="config.icon" v-if="config.icon" class="h-3.5 w-3.5 text-primary" />
+            <h3 class="text-sm font-medium">{{ config.title }}</h3>
           </div>
-          <Button variant="ghost" size="icon" @click="toggleSidebar(id)">
+          <Button variant="ghost" size="icon" class="h-6 w-6" @click="toggleSidebar(id)">
             <svg 
               xmlns="http://www.w3.org/2000/svg" 
               width="24" 
@@ -999,7 +999,7 @@ defineExpose({
               stroke-width="2" 
               stroke-linecap="round" 
               stroke-linejoin="round" 
-              class="w-4 h-4"
+              class="w-3.5 h-3.5"
             >
               <path d="M18 6 6 18"></path>
               <path d="m6 6 12 12"></path>
