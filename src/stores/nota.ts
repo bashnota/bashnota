@@ -717,6 +717,16 @@ export const useNotaStore = defineStore('nota', {
         this.items[index] = updatedNota
         this.saveItem(updatedNota)
       }
+    },
+
+    async searchNotasByTitle(title: string): Promise<Nota[]> {
+      try {
+        const results = this.items.filter((nota) => nota.title.toLowerCase().includes(title.toLowerCase()))
+        return results
+      } catch (error) {
+        logger.error('Failed to search notas by title:', error)
+        return []
+      }
     }
   },
 })

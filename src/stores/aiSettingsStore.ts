@@ -12,6 +12,7 @@ export interface AISettings {
   temperature: number
   geminiModel?: string // The specific Gemini model to use
   geminiSafetyThreshold?: string // Safety threshold for content filtering
+  sidebarWidth?: number // Width of the AI assistant sidebar
 }
 
 export const useAISettingsStore = defineStore('aiSettings', () => {
@@ -22,7 +23,8 @@ export const useAISettingsStore = defineStore('aiSettings', () => {
     maxTokens: 2048, // Increased from 1024 to avoid token limit issues
     temperature: 0.7,
     geminiModel: 'gemini-1.5-pro', // Default to stable Gemini 1.5 Pro instead of experimental model
-    geminiSafetyThreshold: 'BLOCK_MEDIUM_AND_ABOVE' // Default safety threshold
+    geminiSafetyThreshold: 'BLOCK_MEDIUM_AND_ABOVE', // Default safety threshold
+    sidebarWidth: 350 // Default sidebar width
   })
 
   const providers = computed(() => supportedProviders)
