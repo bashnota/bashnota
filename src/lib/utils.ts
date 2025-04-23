@@ -11,6 +11,16 @@ export const formatDate = (date: Date | string) => {
   return formatDistanceToNow(new Date(date), { addSuffix: true })
 }
 
+/**
+ * Format a date into a human-readable relative time (e.g., "2 hours ago")
+ * @param date The date to format
+ * @returns A string representation of the relative time
+ */
+export const formatRelativeTime = (date: Date | string) => {
+  const dateObj = typeof date === 'string' ? new Date(date) : date
+  return formatDistanceToNow(dateObj, { addSuffix: true })
+}
+
 export const toast = (
   message: string,
   title: string = '',

@@ -15,14 +15,31 @@ import {
   Undo,
   Redo,
   MinusSquare,
+  Loader2,
+  PlayCircle,
+  Star,
+  Share2,
+  Cpu,
+  Download
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import type { FunctionalComponent } from 'vue'
 
+const emit = defineEmits([
+  'run-all',
+  'toggle-favorite',
+  'share',
+  'open-config',
+  'export-nota',
+])
+
 defineProps<{
   editor: Editor | null
+  canRunAll?: boolean
+  isExecutingAll?: boolean
+  isFavorite?: boolean
 }>()
 
 // Toolbar groups for better organization
@@ -149,6 +166,7 @@ const headingLevels: { icon: FunctionalComponent; level: 1 | 2 | 3 }[] = [
           <MinusSquare class="h-4 w-4" />
         </Button>
       </div>
+      
     </div>
   </div>
 </template>
