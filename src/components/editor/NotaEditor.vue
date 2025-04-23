@@ -5,7 +5,7 @@ import TagsInputItem from '@/components/ui/tags-input/TagsInputItem.vue'
 import TagsInputItemText from '@/components/ui/tags-input/TagsInputItemText.vue'
 import TagsInputItemDelete from '@/components/ui/tags-input/TagsInputItemDelete.vue'
 import TagsInputInput from '@/components/ui/tags-input/TagsInputInput.vue'
-import { RotateCw, CheckCircle, Star, Share2, Download, PlayCircle, Loader2, Save, Clock } from 'lucide-vue-next'
+import { RotateCw, CheckCircle, Star, Share2, Download, PlayCircle, Loader2, Save, Clock, Sparkles, Book, Server } from 'lucide-vue-next'
 import { useNotaStore } from '@/stores/nota'
 import { useJupyterStore } from '@/stores/jupyterStore'
 import EditorToolbar from './EditorToolbar.vue'
@@ -42,6 +42,11 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   saving: [boolean]
+  'run-all': []
+  'toggle-favorite': []
+  share: []
+  'open-config': []
+  'export-nota': []
 }>()
 
 const notaStore = useNotaStore()
@@ -111,8 +116,8 @@ const registerCodeCells = (content: any) => {
     const serverID = attrs.serverID ? getURLWithoutProtocol(attrs.serverID).split(':') : null
     const server = serverID
       ? servers.find(
-          (s: any) => getURLWithoutProtocol(s.ip) === serverID[0] && s.port === serverID[1],
-        )
+        (s: any) => getURLWithoutProtocol(s.ip) === serverID[0] && s.port === serverID[1],
+      )
       : undefined
 
     codeExecutionStore.addCell({
@@ -399,7 +404,7 @@ const handleKeyboardShortcuts = (event: KeyboardEvent) => {
                 null,
                 editor.value!.schema.text('New text block')
               )
-              
+
               // Append it to the end of the document
               tr.insert(tr.doc.content.size, node)
             }
@@ -459,7 +464,7 @@ onMounted(() => {
       Object.entries(settingsMap).forEach(([key, transform]) => {
         const value = transform(settings[key])
         if (value !== undefined) {
-          ;(editorSettings as any)[key] = value
+          ; (editorSettings as any)[key] = value
         }
       })
 
@@ -487,7 +492,7 @@ onMounted(() => {
       Object.entries(settingsMap).forEach(([key, transform]) => {
         const value = transform(event.detail[key])
         if (value !== undefined) {
-          ;(editorSettings as any)[key] = value
+          ; (editorSettings as any)[key] = value
           hasChanges = true
         }
       })
@@ -502,8 +507,8 @@ onMounted(() => {
 onUnmounted(() => {
   // Clean up event listeners
   document.removeEventListener('keydown', handleKeyboardShortcuts)
-  window.removeEventListener('toggle-references', (() => {}) as EventListener)
-  window.removeEventListener('activate-ai-assistant', (() => {}) as EventListener)
+  window.removeEventListener('toggle-references', (() => { }) as EventListener)
+  window.removeEventListener('activate-ai-assistant', (() => { }) as EventListener)
   codeExecutionStore.cleanup()
 })
 
@@ -594,22 +599,22 @@ provide(EQUATION_COUNTER_KEY, {
 // Function to update citation numbers
 const updateCitationNumbers = () => {
   if (!editor.value) return
-  
+
   // Get all citations in the current nota
   const notaCitations = citationStore.getCitationsByNotaId(props.notaId)
-  
+
   // Create a map of citation keys to their numbers
   const citationMap = new Map()
   notaCitations.forEach((citation, index) => {
     citationMap.set(citation.key, index + 1)
   })
-  
+
   // Find all citation nodes in the document
   editor.value.state.doc.descendants((node, pos) => {
     if (node.type.name === 'citation') {
       const citationKey = node.attrs.citationKey
       const citationNumber = citationMap.get(citationKey)
-      
+
       if (citationNumber !== undefined && citationNumber !== node.attrs.citationNumber) {
         // Update the citation number if it has changed
         editor.value?.commands.command(({ tr }) => {
@@ -642,158 +647,86 @@ defineExpose({
     <LoadingSpinner v-if="isLoading" class="absolute inset-0 z-10" />
 
     <!-- Table of Contents Sidebar -->
-    <div
-      v-if="isSidebarOpen"
-      class="w-64 h-full border-r flex-shrink-0 flex flex-col bg-background"
-    >
+    <div v-if="isSidebarOpen" class="w-64 h-full border-r flex-shrink-0 flex flex-col bg-background">
       <TableOfContents :editor="editor" />
     </div>
 
     <!-- References Sidebar -->
-    <div
-      v-if="isReferencesOpen"
-      class="w-64 h-full border-r flex-shrink-0 flex flex-col bg-background"
-    >
+    <div v-if="isReferencesOpen" class="w-64 h-full border-r flex-shrink-0 flex flex-col bg-background">
       <ReferencesSidebar :editor="editor" :notaId="notaId" />
     </div>
 
     <!-- Jupyter Servers Sidebar -->
-    <div
-      v-if="isJupyterServersOpen"
-      class="w-64 h-full border-r flex-shrink-0 flex flex-col bg-background"
-    >
+    <div v-if="isJupyterServersOpen" class="w-64 h-full border-r flex-shrink-0 flex flex-col bg-background">
       <JupyterServersSidebar :notaId="notaId" />
     </div>
 
     <!-- AI Assistant Sidebar -->
-    <div
-      v-if="isAIAssistantOpen"
-      class="h-full border-r flex-shrink-0 flex flex-col bg-background ai-sidebar-container"
-    >
-      <AIAssistantSidebar 
-        :editor="editor" 
-        :notaId="notaId"
-        @close="isAIAssistantOpen = false"
-      />
+    <div v-if="isAIAssistantOpen"
+      class="h-full border-r flex-shrink-0 flex flex-col bg-background ai-sidebar-container">
+      <AIAssistantSidebar :editor="editor" :notaId="notaId" @close="isAIAssistantOpen = false" />
     </div>
 
     <!-- Main Editor Area -->
     <div class="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
       <!-- Editor Toolbar -->
       <div class="border-b bg-background sticky top-0 z-10">
-        <EditorToolbar
-  v-if="editor"
-  :editor="editor"
-  class="px-4 py-2"
-  :can-run-all="canRunAll"
-  :is-executing-all="isExecutingAll"
-  @run-all="$emit('run-all')"
-  :is-favorite="isFavorite"
-  @toggle-favorite="$emit('toggle-favorite')"
-  @share="$emit('share')"
-  @open-config="$emit('open-config')"
-  @export-nota="$emit('export-nota')"
-/>
+        <EditorToolbar v-if="editor" :editor="editor" class="px-4 py-2" :can-run-all="canRunAll"
+          :is-executing-all="isExecutingAll" @run-all="$emit('run-all')" :is-favorite="isFavorite"
+          @toggle-favorite="$emit('toggle-favorite')" @share="$emit('share')" @open-config="$emit('open-config')"
+          @export-nota="$emit('export-nota')" />
 
         <!-- Editor Info Bar -->
-        <div
-          class="flex items-center justify-between px-4 py-2 text-sm text-muted-foreground border-t"
-        >
+        <div class="flex items-center justify-between px-4 py-2 text-sm text-muted-foreground border-t">
           <div class="flex items-center gap-2">
 
-              <Button
-              variant="ghost"
-              size="sm"
-              class="flex items-center gap-2"
+            <Button variant="ghost" size="sm" class="flex items-center gap-2"
               @click="isReferencesOpen = !isReferencesOpen; isSidebarOpen = false; isJupyterServersOpen = false; isAIAssistantOpen = false"
-              :class="{ 'bg-muted': isReferencesOpen }"
-            >
+              :class="{ 'bg-muted': isReferencesOpen }">
               <BookIcon class="h-4 w-4" />
-              <span class="text-xs">References</span>
             </Button>
-            
-            <Button
-              variant="ghost"
-              size="sm"
-              class="flex items-center gap-2"
+
+            <Button variant="ghost" size="sm" class="flex items-center gap-2"
               @click="isJupyterServersOpen = !isJupyterServersOpen; isSidebarOpen = false; isReferencesOpen = false; isAIAssistantOpen = false"
-              :class="{ 'bg-muted': isJupyterServersOpen }"
-            >
+              :class="{ 'bg-muted': isJupyterServersOpen }">
               <ServerIcon class="h-4 w-4" />
-              <span class="text-xs">Jupyter Servers</span>
             </Button>
-            
-            <Button
-              variant="ghost"
-              size="sm"
-              class="flex items-center gap-2"
+
+            <Button variant="ghost" size="sm" class="flex items-center gap-2"
               @click="isAIAssistantOpen = !isAIAssistantOpen; isSidebarOpen = false; isReferencesOpen = false; isJupyterServersOpen = false"
-              :class="{ 'bg-muted': isAIAssistantOpen }"
-            >
+              :class="{ 'bg-muted': isAIAssistantOpen }">
               <BrainIcon class="h-4 w-4" />
-              <span class="text-xs">AI Assistant</span>
             </Button>
           </div>
-          
-          <div class="flex items-center gap-2">
-  <Button
-    variant="ghost"
-    size="icon"
-    title="Save Version"
-    @click="saveVersion"
-    :disabled="isSavingVersion"
-  >
-    <span v-if="isSavingVersion" class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent"></span>
-    <Save v-else class="w-4 h-4" />
-  </Button>
-  <Button
-    variant="ghost"
-    size="icon"
-    title="History"
-    @click="showVersionHistory = true"
-  >
-    <Clock class="w-4 h-4" />
-  </Button>
 
-  <!-- Action Buttons -->
-  <Button
-    v-if="canRunAll"
-    variant="ghost"
-    size="icon"
-    title="Run All"
-    :disabled="isExecutingAll"
-    @click="$emit('run-all')"
-  >
-    <Loader2 v-if="isExecutingAll" class="w-4 h-4 animate-spin" />
-    <PlayCircle v-else class="w-4 h-4" />
-  </Button>
-  <Button
-    variant="ghost"
-    size="icon"
-    title="Star"
-    @click="$emit('toggle-favorite')"
-    :class="{ 'text-yellow-500': isFavorite }"
-  >
-    <Star class="w-4 h-4" :fill="isFavorite ? 'currentColor' : 'none'" />
-  </Button>
-  <Button
-    variant="ghost"
-    size="icon"
-    title="Share"
-    @click="$emit('share')"
-  >
-    <Share2 class="w-4 h-4" />
-  </Button>
-  <Button
-    variant="ghost"
-    size="icon"
-    title="Export"
-    @click="$emit('export-nota')"
-  >
-    <Download class="w-4 h-4" />
-  </Button>
-  <span>{{ wordCount }} words</span>
-</div>
+          <div class="flex items-center gap-2">
+            <Button variant="ghost" size="icon" title="Save Version" @click="saveVersion" :disabled="isSavingVersion">
+              <span v-if="isSavingVersion"
+                class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent"></span>
+              <Save v-else class="w-4 h-4" />
+            </Button>
+            <Button variant="ghost" size="icon" title="History" @click="showVersionHistory = true">
+              <Clock class="w-4 h-4" />
+            </Button>
+
+            <!-- Action Buttons -->
+            <Button v-if="canRunAll" variant="ghost" size="icon" title="Run All" :disabled="isExecutingAll"
+              @click="$emit('run-all')">
+              <Loader2 v-if="isExecutingAll" class="w-4 h-4 animate-spin" />
+              <PlayCircle v-else class="w-4 h-4" />
+            </Button>
+            <Button variant="ghost" size="icon" title="Star" @click="$emit('toggle-favorite')"
+              :class="{ 'text-yellow-500': isFavorite }">
+              <Star class="w-4 h-4" :fill="isFavorite ? 'currentColor' : 'none'" />
+            </Button>
+            <Button variant="ghost" size="icon" title="Share" @click="$emit('share')">
+              <Share2 class="w-4 h-4" />
+            </Button>
+            <Button variant="ghost" size="icon" title="Export" @click="$emit('export-nota')">
+              <Download class="w-4 h-4" />
+            </Button>
+            <span>{{ wordCount }} words</span>
+          </div>
         </div>
       </div>
 
@@ -803,23 +736,24 @@ defineExpose({
         <div class="h-full overflow-hidden px-4 md:px-8 lg:px-12">
           <ScrollArea class="h-full">
             <div class="max-w-4xl mx-auto py-8">
-  <!-- The title is now the first block inside the editor -->
-  <editor-content :editor="editor" />
-  <!-- Tags and Save Status below title -->
-  <div class="flex items-center gap-4 mt-2">
-    <TagsInput v-if="currentNota" v-model="currentNota.tags" class="w-full border-none" />
-    <div class="flex items-center text-xs text-muted-foreground transition-opacity duration-200" :class="{ 'opacity-0': !isSaving && !showSaved }">
-      <span v-if="isSaving" class="flex items-center gap-1">
-        <RotateCw class="w-3 h-3 animate-spin" />
-        Saving
-      </span>
-      <span v-else-if="showSaved" class="flex items-center gap-1">
-        <CheckCircle class="w-3 h-3 text-green-600" />
-        Saved
-      </span>
-    </div>
-  </div>
-</div>
+              <!-- The title is now the first block inside the editor -->
+              <editor-content :editor="editor" />
+              <!-- Tags and Save Status below title -->
+              <div class="flex items-center gap-4 mt-2">
+                <TagsInput v-if="currentNota" v-model="currentNota.tags" class="w-full border-none" />
+                <div class="flex items-center text-xs text-muted-foreground transition-opacity duration-200"
+                  :class="{ 'opacity-0': !isSaving && !showSaved }">
+                  <span v-if="isSaving" class="flex items-center gap-1">
+                    <RotateCw class="w-3 h-3 animate-spin" />
+                    Saving
+                  </span>
+                  <span v-else-if="showSaved" class="flex items-center gap-1">
+                    <CheckCircle class="w-3 h-3 text-green-600" />
+                    Saved
+                  </span>
+                </div>
+              </div>
+            </div>
           </ScrollArea>
         </div>
       </div>
@@ -829,11 +763,8 @@ defineExpose({
     <FavoriteBlocksSidebar :editor="editor" />
 
     <!-- Version History Dialog -->
-    <VersionHistoryDialog 
-      :nota-id="notaId"
-      v-model:open="showVersionHistory"
-      @version-restored="refreshEditorContent" 
-    />
+    <VersionHistoryDialog :nota-id="notaId" v-model:open="showVersionHistory"
+      @version-restored="refreshEditorContent" />
   </div>
 </template>
 
@@ -846,7 +777,8 @@ defineExpose({
 /* AI Sidebar container styles */
 .ai-sidebar-container {
   min-width: 300px;
-  width: 350px; /* Default width that can be overridden by resize */
+  width: 350px;
+  /* Default width that can be overridden by resize */
   max-width: 800px;
 }
 </style>
