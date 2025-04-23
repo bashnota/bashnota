@@ -166,30 +166,9 @@ const exportNota = async () => {
           <div class="flex-1 flex items-center gap-4">
             
 
-            <!-- Save Status Indicator -->
-            <div
-              class="flex items-center text-xs text-muted-foreground transition-opacity duration-200"
-              :class="{ 'opacity-0': !isSaving && !showSaved }"
-            >
-              <span v-if="isSaving" class="flex items-center gap-1">
-                <RotateCw class="w-3 h-3 animate-spin" />
-                Saving
-              </span>
-              <span v-else-if="showSaved" class="flex items-center gap-1">
-                <CheckCircle class="w-3 h-3 text-green-600" />
-                Saved
-              </span>
-            </div>
+            
 
-            <!-- Tags moved here -->
-            <TagsInput v-if="nota" v-model="nota.tags" class="w-full border-none">
-              <TagsInputItem v-for="item in nota.tags" :key="item" :value="item">
-                <TagsInputItemText />
-                <TagsInputItemDelete />
-              </TagsInputItem>
-
-              <TagsInputInput placeholder="Enter Tags ..." />
-            </TagsInput>
+            
           </div>
         </div>
 

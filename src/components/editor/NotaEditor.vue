@@ -1,5 +1,11 @@
 <script setup lang="ts">
 import { useEditor, EditorContent } from '@tiptap/vue-3'
+import { TagsInput } from '@/components/ui/tags-input'
+import TagsInputItem from '@/components/ui/tags-input/TagsInputItem.vue'
+import TagsInputItemText from '@/components/ui/tags-input/TagsInputItemText.vue'
+import TagsInputItemDelete from '@/components/ui/tags-input/TagsInputItemDelete.vue'
+import TagsInputInput from '@/components/ui/tags-input/TagsInputInput.vue'
+import { RotateCw, CheckCircle } from 'lucide-vue-next'
 import { useNotaStore } from '@/stores/nota'
 import { useJupyterStore } from '@/stores/jupyterStore'
 import EditorToolbar from './EditorToolbar.vue'
@@ -276,6 +282,9 @@ function applyEditorSettings(settings = editorSettings) {
   autoSaveEnabled.value = settings.autoSave
 }
 
+const isSaving = ref(false)
+const showSaved = ref(false)
+
 // Function to save editor content
 const saveEditorContent = async () => {
   // Before saving, sync the title from the first block
@@ -506,14 +515,12 @@ const saveVersion = async () => {
   try {
     isSavingVersion.value = true
     const content = editor.value.getJSON()
-
     await notaStore.saveNotaVersion({
       id: props.notaId,
       content: JSON.stringify(content),
       versionName: `Version ${new Date().toLocaleString()}`,
       createdAt: new Date(),
     })
-
     toast('Version saved successfully')
   } catch (error) {
     logger.error('Error saving version:', error)
@@ -522,7 +529,6 @@ const saveVersion = async () => {
     isSavingVersion.value = false
   }
 }
-
 const refreshEditorContent = async () => {
   if (editor.value) {
     // Reload the nota content
@@ -761,8 +767,24 @@ defineExpose({
         <!-- Editor Content Area -->
         <div class="h-full overflow-hidden px-4 md:px-8 lg:px-12">
           <ScrollArea class="h-full">
-            <editor-content :editor="editor" class="max-w-4xl mx-auto py-8" />
-<!-- The title is now the first block inside the editor -->
+            <div class="max-w-4xl mx-auto py-8">
+  <!-- The title is now the first block inside the editor -->
+  <editor-content :editor="editor" />
+  <!-- Tags and Save Status below title -->
+  <div class="flex items-center gap-4 mt-2">
+    <TagsInput v-if="currentNota" v-model="currentNota.tags" class="w-full border-none" />
+    <div class="flex items-center text-xs text-muted-foreground transition-opacity duration-200" :class="{ 'opacity-0': !isSaving && !showSaved }">
+      <span v-if="isSaving" class="flex items-center gap-1">
+        <RotateCw class="w-3 h-3 animate-spin" />
+        Saving
+      </span>
+      <span v-else-if="showSaved" class="flex items-center gap-1">
+        <CheckCircle class="w-3 h-3 text-green-600" />
+        Saved
+      </span>
+    </div>
+  </div>
+</div>
           </ScrollArea>
         </div>
       </div>
