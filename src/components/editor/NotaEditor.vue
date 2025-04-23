@@ -29,6 +29,9 @@ import '@/assets/editor-styles.css'
 const props = defineProps<{
   notaId: string
   extensions?: any[]
+  canRunAll?: boolean
+  isExecutingAll?: boolean
+  isFavorite?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -633,7 +636,19 @@ defineExpose({
     <div class="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
       <!-- Editor Toolbar -->
       <div class="border-b bg-background sticky top-0 z-10">
-        <EditorToolbar v-if="editor" :editor="editor" class="px-4 py-2" />
+        <EditorToolbar
+  v-if="editor"
+  :editor="editor"
+  class="px-4 py-2"
+  :can-run-all="canRunAll"
+  :is-executing-all="isExecutingAll"
+  @run-all="$emit('run-all')"
+  :is-favorite="isFavorite"
+  @toggle-favorite="$emit('toggle-favorite')"
+  @share="$emit('share')"
+  @open-config="$emit('open-config')"
+  @export-nota="$emit('export-nota')"
+/>
 
         <!-- Editor Info Bar -->
         <div

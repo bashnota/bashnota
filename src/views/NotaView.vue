@@ -247,62 +247,26 @@ const exportNota = async () => {
         </span>
       </div>
 
-      <div class="flex items-center gap-2">
-        <Button
-          title="Run All"
-          @click="executeAllCells"
-          :disabled="isExecutingAll"
-          v-if="nota && nota.config?.savedSessions && nota.config?.savedSessions.length > 0"
-        >
-          <Loader2 v-if="isExecutingAll" class="w-5 h-5 animate-spin" />
-          <PlayCircle class="w-5 h-5" v-else />
-          Run All
-        </Button>
-
-        <Button
-          variant="ghost"
-          size="icon"
-          title="Star"
-          @click="store.toggleFavorite(id)"
-          v-if="nota"
-        >
-          <Star
-            class="w-5 h-5"
-            :class="{ 'text-yellow-400 fill-yellow-400': nota?.favorite }"
-          />
-        </Button>
-
-        <Button
-          variant="outline"
-          title="Share"
-          @click="toggleShareDialog"
-          v-if="nota"
-          class="flex items-center gap-2"
-        >
-          <Share2 class="w-5 h-5" />
-          <span class="hidden sm:inline">Share</span>
-        </Button>
-
-        <Button
-          variant="outline"
-          title="Jupyter Settings"
-          @click="toggleConfigModal"
-          v-if="nota"
-          class="flex items-center gap-2"
-        >
-          <Cpu class="w-5 h-5" />
-          <span class="hidden sm:inline">Jupyter Settings</span>
-        </Button>
-
-        <Button variant="ghost" size="icon" title="Export" @click="exportNota" v-if="nota">
-          <Download class="w-5 h-5" />
-        </Button>
-      </div>
+      
     </header>
 
     <main class="flex-1 min-h-0 overflow-auto">
       <template v-if="isReady">
-        <NotaEditor v-if="nota" :nota-id="id" @saving="handleSaving" :key="id" />
+        <NotaEditor
+  v-if="nota"
+  :nota-id="id"
+  @saving="handleSaving"
+  :key="id"
+  :can-run-all="nota && nota.config?.savedSessions && nota.config?.savedSessions.length > 0"
+  :is-executing-all="isExecutingAll"
+  @run-all="executeAllCells"
+  :is-favorite="nota?.favorite"
+  @toggle-favorite="() => store.toggleFavorite(id)"
+  @share="toggleShareDialog"
+  @open-config="toggleConfigModal"
+  @export-nota="exportNota"
+/>
+
       </template>
       <div v-else class="flex items-center justify-center h-full">
         <p class="text-muted-foreground">Loading...</p>

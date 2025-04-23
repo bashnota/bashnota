@@ -15,14 +15,31 @@ import {
   Undo,
   Redo,
   MinusSquare,
+  Loader2,
+  PlayCircle,
+  Star,
+  Share2,
+  Cpu,
+  Download
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import type { FunctionalComponent } from 'vue'
 
+const emit = defineEmits([
+  'run-all',
+  'toggle-favorite',
+  'share',
+  'open-config',
+  'export-nota',
+])
+
 defineProps<{
   editor: Editor | null
+  canRunAll?: boolean
+  isExecutingAll?: boolean
+  isFavorite?: boolean
 }>()
 
 // Toolbar groups for better organization
@@ -147,6 +164,59 @@ const headingLevels: { icon: FunctionalComponent; level: 1 | 2 | 3 }[] = [
         </Button>
         <Button variant="ghost" size="sm" @click="editor.chain().focus().setHorizontalRule().run()">
           <MinusSquare class="h-4 w-4" />
+        </Button>
+      </div>
+      <!-- Editor Action Buttons (moved from header) -->
+      <div class="flex items-center gap-1 ml-auto">
+        <Button
+          v-if="canRunAll"
+          title="Run All"
+          size="sm"
+          :disabled="isExecutingAll"
+          @click="$emit('run-all')"
+        >
+          <Loader2 v-if="isExecutingAll" class="w-4 h-4 animate-spin mr-1" />
+          <PlayCircle v-else class="w-4 h-4 mr-1" />
+          <span class="hidden md:inline">Run All</span>
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          title="Star"
+          @click="$emit('toggle-favorite')"
+        >
+          <Star
+            class="w-4 h-4"
+            :class="{ 'text-yellow-400 fill-yellow-400': isFavorite }"
+          />
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          title="Share"
+          @click="$emit('share')"
+          class="flex items-center gap-1"
+        >
+          <Share2 class="w-4 h-4" />
+          <span class="hidden md:inline">Share</span>
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          title="Jupyter Settings"
+          @click="$emit('open-config')"
+          class="flex items-center gap-1"
+        >
+          <Cpu class="w-4 h-4" />
+          <span class="hidden md:inline">Jupyter Settings</span>
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          title="Export"
+          @click="$emit('export-nota')"
+        >
+          <Download class="w-4 h-4" />
         </Button>
       </div>
     </div>
