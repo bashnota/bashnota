@@ -55,7 +55,7 @@
           v-for="server in jupyterStore.jupyterServers"
           :key="`${server.ip}:${server.port}`"
           :server="server"
-          :is-expanded="expandedServers[`${server.ip}:${server.port}`]"
+          :is-expanded="expandedServers[`${server.ip}:${server.port}`] || false"
           :is-refreshing="isRefreshing === `${server.ip}:${server.port}`"
           :test-results="testResults[`${server.ip}:${server.port}`]"
           :kernel-count="getKernelsForServer(server).length"
