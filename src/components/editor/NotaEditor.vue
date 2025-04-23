@@ -55,7 +55,28 @@ const currentNota = computed(() => {
 })
 
 const content = computed(() => {
-  return currentNota.value?.content
+  // Insert the title as the first block if not present
+  if (!currentNota.value) return null
+  let doc
+  try {
+    doc = currentNota.value.content ? JSON.parse(currentNota.value.content) : null
+  } catch (e) {
+    doc = null
+  }
+  if (!doc || !doc.content || !Array.isArray(doc.content)) {
+    doc = { type: 'doc', content: [] }
+  }
+  // Ensure first block is h1 with title
+  if (!doc.content.length || doc.content[0].type !== 'heading' || doc.content[0].attrs?.level !== 1) {
+    doc.content.unshift({
+      type: 'heading',
+      attrs: { level: 1 },
+      content: [{ type: 'text', text: currentNota.value.title || 'Untitled' }]
+    })
+  } else if (doc.content[0].content?.[0]?.text !== currentNota.value.title) {
+    doc.content[0].content = [{ type: 'text', text: currentNota.value.title || 'Untitled' }]
+  }
+  return doc
 })
 
 const registerCodeCells = (content: any) => {
@@ -114,7 +135,8 @@ const editorSettings = reactive({
 const editorExtensions = getEditorExtensions()
 
 const editor = useEditor({
-  content: content.value ? JSON.parse(content.value) : null,
+  content: content.value,
+
   extensions: editorExtensions,
   editorProps: {
     attributes: {
@@ -255,7 +277,24 @@ function applyEditorSettings(settings = editorSettings) {
 }
 
 // Function to save editor content
-const saveEditorContent = () => {
+const saveEditorContent = async () => {
+  // Before saving, sync the title from the first block
+  if (editor.value && currentNota.value) {
+    const json = editor.value.getJSON()
+    if (
+      json.content &&
+      json.content.length > 0 &&
+      json.content[0].type === 'heading' &&
+      json.content[0].attrs?.level === 1 &&
+      json.content[0].content &&
+      json.content[0].content[0]?.text
+    ) {
+      const newTitle = json.content[0].content[0].text.trim()
+      if (newTitle && newTitle !== currentNota.value.title) {
+        currentNota.value.title = newTitle
+      }
+    }
+  }
   if (!editor.value) return
 
   try {
@@ -723,6 +762,7 @@ defineExpose({
         <div class="h-full overflow-hidden px-4 md:px-8 lg:px-12">
           <ScrollArea class="h-full">
             <editor-content :editor="editor" class="max-w-4xl mx-auto py-8" />
+<!-- The title is now the first block inside the editor -->
           </ScrollArea>
         </div>
       </div>

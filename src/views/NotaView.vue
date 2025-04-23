@@ -44,9 +44,7 @@ const showConfigModal = ref(false)
 const showShareDialog = ref(false)
 const isSaving = ref(false)
 const showSaved = ref(false)
-const isEditingTitle = ref(false)
-const editedTitle = ref('')
-const titleInput = ref<HTMLInputElement | null>(null)
+
 
 // Add watch to save changes when tags are updated
 watch(
@@ -134,32 +132,6 @@ const handleSaving = (saving: boolean) => {
   }
 }
 
-const startTitleEdit = () => {
-  editedTitle.value = nota.value?.title || ''
-  isEditingTitle.value = true
-  nextTick(() => {
-    titleInput.value?.focus()
-    titleInput.value?.select()
-  })
-}
-
-const saveTitle = async () => {
-  if (!nota.value || !editedTitle.value.trim()) {
-    cancelTitleEdit()
-    return
-  }
-
-  if (editedTitle.value !== nota.value.title) {
-    await store.renameItem(nota.value.id, editedTitle.value)
-  }
-  isEditingTitle.value = false
-}
-
-const cancelTitleEdit = () => {
-  isEditingTitle.value = false
-  editedTitle.value = nota.value?.title || ''
-}
-
 const exportNota = async () => {
   const notas = await store.exportNota(props.id)
 
@@ -192,28 +164,7 @@ const exportNota = async () => {
       <div class="flex-1">
         <div class="flex items-center gap-3">
           <div class="flex-1 flex items-center gap-4">
-            <h1
-              class="text-2xl font-semibold tracking-tight whitespace-nowrap flex items-center gap-2 max-w-[400px]"
-            >
-              <template v-if="isEditingTitle">
-                <input
-                  v-model="editedTitle"
-                  class="bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-primary px-1 rounded"
-                  @keyup.enter="saveTitle"
-                  @keyup.esc="cancelTitleEdit"
-                  @blur="saveTitle"
-                  ref="titleInput"
-                  :class="{ 'border-red-500': editedTitle.trim() === '' }"
-                />
-              </template>
-              <span
-                v-else
-                class="cursor-pointer hover:text-primary transition-colors truncate"
-                @click="startTitleEdit"
-              >
-                {{ nota?.title || 'Untitled' }}
-              </span>
-            </h1>
+            
 
             <!-- Save Status Indicator -->
             <div
