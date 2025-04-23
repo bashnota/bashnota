@@ -133,8 +133,8 @@ const handleMouseMove = (event: MouseEvent) => {
       <AppTabs />
 
       <!-- Router View -->
-      <div class="flex-1 overflow-auto">
-        <RouterView />
+      <div class="flex-1 min-h-0 flex flex-col overflow-hidden">
+        <RouterView class="flex-1 min-h-0 flex flex-col overflow-hidden" />
       </div>
     </div>
   </div>

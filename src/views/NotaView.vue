@@ -186,7 +186,8 @@ const exportNota = async () => {
 </script>
 
 <template>
-  <div class="bg-background">
+  <div class="bg-background flex flex-col flex-1 min-h-0 h-full">
+
     <header class="flex items-center justify-between px-6 py-4 border-b">
       <div class="flex-1">
         <div class="flex items-center gap-3">
@@ -299,7 +300,7 @@ const exportNota = async () => {
       </div>
     </header>
 
-    <main>
+    <main class="flex-1 min-h-0 overflow-auto">
       <template v-if="isReady">
         <NotaEditor v-if="nota" :nota-id="id" @saving="handleSaving" :key="id" />
       </template>

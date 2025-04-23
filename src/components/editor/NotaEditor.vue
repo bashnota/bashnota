@@ -640,18 +640,8 @@ defineExpose({
           class="flex items-center justify-between px-4 py-2 text-sm text-muted-foreground border-t"
         >
           <div class="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              class="flex items-center gap-2"
-              @click="isSidebarOpen = !isSidebarOpen; isReferencesOpen = false; isJupyterServersOpen = false; isAIAssistantOpen = false"
-              :class="{ 'bg-muted': isSidebarOpen }"
-            >
-              <ListIcon class="h-4 w-4" />
-              <span class="text-xs">Contents</span>
-            </Button>
-            
-            <Button
+
+              <Button
               variant="ghost"
               size="sm"
               class="flex items-center gap-2"
@@ -713,7 +703,7 @@ defineExpose({
       </div>
 
       <!-- Editor Content -->
-      <div class="flex-1 relative overflow-auto">
+      <div class="flex-1 min-h-0 relative overflow-auto">
         <!-- Editor Content Area -->
         <div class="h-full overflow-hidden px-4 md:px-8 lg:px-12">
           <ScrollArea class="h-full">
