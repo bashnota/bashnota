@@ -7,12 +7,12 @@ import { logger } from '@/services/logger'
 import { toast } from '@/components/ui/toast'
 
 // Import composables
-import { useConversation } from '../composables/useConversation'
-import { useAIGeneration } from '../composables/useAIGeneration'
-import { useMentions } from '../composables/useMentions'
+import { useConversation } from '../../ai-assistant/composables/useConversation'
+import { useAIGeneration } from '../../ai-assistant/composables/useAIGeneration'
+import { useMentions } from '../../ai-assistant/composables/useMentions'
 
 // Import components
-import SidebarHeader from './SidebarHeader.vue'
+import { BaseSidebar, SidebarHeader, KeyboardShortcut } from '@/components/ui/sidebars'
 import ConversationHistory from './ConversationHistory.vue'
 import ConversationInput from './ConversationInput.vue'
 import ActionBar from './ActionBar.vue'
@@ -463,7 +463,7 @@ const handleSelectChat = (block: any) => {
 
 // Get ID for the active block for highlighting in the list
 const activeBlockId = computed(() => {
-  if (!activeAIBlock.value) return null
+  if (!activeAIBlock.value) return undefined
   // Use a property that exists on the activeAIBlock object
   return `ai-${activeAIBlock.value.node.attrs.lastUpdated || Date.now()}`
 })
@@ -506,16 +506,14 @@ onMounted(() => {
     :is-fullscreen="isFullscreen"
     @exit-fullscreen="exitFullscreen"
     @enter-fullscreen="enterFullscreen"
-    class="h-full"
+    class="h-full w-full flex flex-col"
   >
     <!-- Content container with proper width styling -->
-    <div
-      class="flex flex-col h-full w-full overflow-hidden"
-      :style="{ minWidth: '350px', width: activeAIBlock ? '100%' : '350px' }"
-    >
+    <div class="sidebar-content-wrapper h-full w-full flex flex-col" :style="{ '--min-width': '320px' }">
       <!-- Header (only shown if not hidden) -->
       <SidebarHeader 
         v-if="!props.hideHeader"
+        title="AI Assistant"
         :provider-name="selectedProvider?.name || 'AI'" 
         :is-loading="isLoading"
         :is-fullscreen="isFullscreen"
@@ -539,7 +537,7 @@ onMounted(() => {
       <!-- Add a spacer when header is hidden to maintain layout -->
       <div v-else class="h-2 flex-shrink-0"></div>
       
-      <div class="flex-1 flex flex-col min-h-0 relative overflow-hidden">
+      <div class="flex-1 flex flex-col h-full min-h-0 relative overflow-hidden">
         <!-- Empty State when no active conversation -->
         <EmptyState 
           v-if="!activeAIBlock" 
@@ -564,13 +562,10 @@ onMounted(() => {
           </ScrollArea>
           
           <!-- Conversation History - scrollable with fixed max-height -->
-          <div 
-            v-else 
-            class="flex flex-col h-full overflow-hidden"
-          >
+          <div v-else class="conversation-container h-full flex flex-col">
             <!-- Scrollable conversation history area -->
             <div 
-              class="flex-1 overflow-y-auto"
+              class="flex-1 overflow-y-auto h-full"
               ref="scrollAreaViewportRef"
             >
               <div class="p-4 space-y-4 bg-gradient-to-b from-background to-muted/10">
@@ -685,7 +680,29 @@ onMounted(() => {
   overflow-x: auto;
 }
 
+/* Content area layout */
+.sidebar-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  flex: 1 1 auto;
+}
 
+/* When in a conversation, the content area needs a minimum width */
+.conversation-container {
+  min-width: var(--min-width, 320px);
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  flex: 1 1 auto;
+}
 
 /* Mention search styling */
 .mention-search {

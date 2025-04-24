@@ -147,13 +147,13 @@ const formatCitation = (style: string): string => {
   
   switch (style) {
     case 'apa':
-      return `${formatAuthors(c.authors, true)} (${c.year}). ${c.title}. ${c.journal ? `${c.journal}` : ''}${c.volume ? `, ${c.volume}` : ''}${c.number ? `(${c.number})` : ''}${c.pages ? `, ${c.pages}` : ''}.${c.doi ? ` https://doi.org/${c.doi}` : ''}`
+      return `${formatAuthors(c.authors, true)} (${c.year}). ${c.title}${c.title.endsWith('.') ? '' : '.'} ${c.journal ? `${c.journal}` : ''}${c.volume ? `, ${c.volume}` : ''}${c.number ? `(${c.number})` : ''}${c.pages ? `, ${c.pages}` : ''}.${c.doi ? ` https://doi.org/${c.doi}` : ''}${c.url && !c.doi ? ` Retrieved from ${c.url}` : ''}`
     
     case 'mla':
-      return `${formatAuthors(c.authors, true)}. "${c.title}." ${c.journal ? `${c.journal}` : ''}${c.volume ? ` ${c.volume}` : ''}${c.number ? `.${c.number}` : ''} (${c.year})${c.pages ? `: ${c.pages}` : ''}.${c.doi ? ` DOI: ${c.doi}` : ''}`
+      return `${formatAuthors(c.authors, true)}. "${c.title}"${c.title.endsWith('?') || c.title.endsWith('!') ? '' : '.'} ${c.journal ? `${c.journal}` : ''}${c.volume ? `, vol. ${c.volume}` : ''}${c.number ? `, no. ${c.number}` : ''}, ${c.year}${c.pages ? `, pp. ${c.pages}` : ''}.${c.doi ? ` DOI: ${c.doi}` : ''}${c.url && !c.doi ? ` ${c.url}` : ''}`
     
     case 'chicago':
-      return `${formatAuthors(c.authors, true)}. "${c.title}." ${c.journal ? `${c.journal}` : ''}${c.volume ? ` ${c.volume}` : ''}${c.number ? `, no. ${c.number}` : ''} (${c.year})${c.pages ? `: ${c.pages}` : ''}.${c.doi ? ` https://doi.org/${c.doi}` : ''}`
+      return `${formatAuthors(c.authors, true)}. "${c.title}"${c.title.endsWith('?') || c.title.endsWith('!') ? '' : '.'} ${c.journal ? `${c.journal}` : ''}${c.volume ? ` ${c.volume}` : ''}${c.number ? `, no. ${c.number}` : ''} (${c.year})${c.pages ? `: ${c.pages}` : ''}.${c.publisher ? ` ${c.publisher}.` : ''}${c.doi ? ` https://doi.org/${c.doi}` : ''}${c.url && !c.doi ? ` ${c.url}` : ''}`
     
     case 'bibtex':
       return `@article{${c.key},
@@ -355,4 +355,4 @@ const jumpToReferences = () => {
     transform: translateY(0);
   }
 }
-</style> 
+</style>

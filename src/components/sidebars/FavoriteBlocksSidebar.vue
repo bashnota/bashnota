@@ -11,7 +11,8 @@ import { onKeyStroke, useDebounceFn } from '@vueuse/core'
 import type { Editor } from '@tiptap/vue-3'
 import Fuse from 'fuse.js'
 import { logger } from '@/services/logger'
-import { BaseSidebar, SidebarSection, KeyboardShortcut } from '@/components/ui/sidebar'
+import { BaseSidebar, SidebarSection, KeyboardShortcut } from '@/components/ui/sidebars'
+import { useSidebarComposable } from '@/composables/useSidebarComposable'
 
 const props = defineProps<{
   editor?: Editor | null
@@ -27,6 +28,20 @@ const searchQuery = ref('')
 const selectedTags = ref<string[]>([])
 const expandedBlocks = ref<Set<string>>(new Set())
 const previewContent = ref<Record<string, string>>({})
+
+// Use our sidebar composable
+const { isOpen, width } = useSidebarComposable({
+  id: 'favorite-blocks',
+  defaultWidth: 350,
+  minWidth: 280,
+  maxWidth: 500,
+  keyboard: {
+    ctrl: true,
+    shift: true,
+    alt: true,
+    key: 'v'
+  }
+})
 
 // Configure Fuse.js for fuzzy search
 const fuseOptions = {
@@ -151,7 +166,13 @@ const blocks = computed(() => {
 </script>
 
 <template>
-  <BaseSidebar title="Favorite Blocks" :icon="Star" position="right" @close="emit('close')">
+  <BaseSidebar 
+    id="favorite-blocks"
+    title="Favorite Blocks" 
+    :icon="Star" 
+    position="right" 
+    @close="emit('close')"
+  >
     <ScrollArea class="flex-1">
       <div class="p-4 space-y-4">
         <!-- Search and Filter Section -->
