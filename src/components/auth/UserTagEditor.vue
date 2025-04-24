@@ -164,21 +164,22 @@ const checkAndUpdateTag = async () => {
   isCheckingAvailability.value = true
   
   try {
-    const { isAvailable, error } = await import('@/utils/userTagGenerator').then(module => 
-      module.validateUserTag(tagInput.value)
-    )
+    // Import directly instead of dynamic import to avoid potential issues
+    const { validateUserTag } = await import('@/utils/userTagGenerator')
+    const result = await validateUserTag(tagInput.value)
     
     hasBeenValidated.value = true
     
-    if (isAvailable) {
+    if (result.isAvailable) {
       validationMessage.value = 'This tag is available! Click Update to use it.'
       validationStatus.value = 'success'
     } else {
-      validationMessage.value = error || 'This tag is not available'
+      validationMessage.value = result.error || 'This tag is not available'
       validationStatus.value = 'error'
     }
-  } catch (error) {
-    validationMessage.value = 'Error checking tag availability'
+  } catch (error: any) {
+    console.error('Tag validation error:', error)
+    validationMessage.value = `Error checking tag availability: ${error?.message || 'Unknown error'}`
     validationStatus.value = 'error'
   } finally {
     isCheckingAvailability.value = false

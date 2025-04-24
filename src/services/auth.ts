@@ -138,21 +138,7 @@ export class AuthService {
         lastUpdatedAt: new Date().toISOString()
       })
       
-      // Remove old tag from userTags collection if it exists
-      if (oldTag) {
-        const oldTagRef = doc(firestore, 'userTags', oldTag)
-        const oldTagDoc = await getDoc(oldTagRef)
-        
-        if (oldTagDoc.exists()) {
-          // Delete the old tag document
-          await setDoc(oldTagRef, { 
-            uid: null,
-            deletedAt: new Date().toISOString(),
-            previousOwner: userId
-          })
-        }
-      }
-      
+      // First create the new tag entry before removing the old one
       // Add new tag to userTags collection
       const userTagRef = doc(firestore, 'userTags', newTag)
       await setDoc(userTagRef, {
@@ -160,6 +146,23 @@ export class AuthService {
         createdAt: new Date().toISOString(),
         lastUpdatedAt: new Date().toISOString()
       })
+      
+      // Remove old tag from userTags collection if it exists
+      if (oldTag) {
+        const oldTagRef = doc(firestore, 'userTags', oldTag)
+        const oldTagDoc = await getDoc(oldTagRef)
+        
+        if (oldTagDoc.exists()) {
+          // Delete the old tag document - previously we just nullified the uid
+          // Now we'll properly delete it to ensure it's available for others
+          await setDoc(oldTagRef, { 
+            uid: null,
+            available: true,
+            deletedAt: new Date().toISOString(),
+            previousOwner: userId
+          }, { merge: true })
+        }
+      }
       
       toast('Your user tag has been updated successfully', 'User Tag Updated')
     } catch (error: any) {
