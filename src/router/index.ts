@@ -50,6 +50,20 @@ const router = createRouter({
       component: () => import('@/views/PublicNotaView.vue'),
       props: true,
     },
+    // User routes with tag
+    {
+      path: '/@:userTag',
+      name: 'user-tag-profile',
+      component: () => import('@/views/UserPublishedView.vue'),
+      props: true,
+    },
+    {
+      path: '/@:userTag/:notaId',
+      name: 'user-tag-nota',
+      component: () => import('@/views/PublicNotaView.vue'),
+      props: true,
+    },
+    // Legacy user route
     {
       path: '/u/:userId',
       name: 'user-published',

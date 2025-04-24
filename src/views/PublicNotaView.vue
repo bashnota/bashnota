@@ -39,6 +39,16 @@ const showBreadcrumbs = computed(() => {
   return !!parentNota.value
 })
 
+// Get route parameters
+const notaId = computed(() => {
+  const id = route.params.id || route.params.notaId;
+  return typeof id === 'string' ? id : (Array.isArray(id) ? id[0] : '');
+})
+const userTag = computed(() => {
+  const tag = route.params.userTag;
+  return typeof tag === 'string' ? tag : (Array.isArray(tag) ? tag[0] : '');
+})
+
 // Get a short description from the content (first 160 characters)
 const getMetaDescription = (content: string | null): string => {
   if (!content) {
@@ -72,12 +82,20 @@ const getMetaDescription = (content: string | null): string => {
   }
 }
 
+// Determine the proper URL for this nota
+const getPublicLink = (id: string): string => {
+  if (userTag.value) {
+    return `${window.location.origin}/@${userTag.value}/${id}`
+  }
+  return `${window.location.origin}/p/${id}`
+}
+
 // Update meta tags when nota changes
 watch(() => nota.value, (newNota) => {
   if (newNota) {
     pageTitle.value = `${newNota.title} | BashNota`
     metaDescription.value = getMetaDescription(newNota.content)
-    canonicalUrl.value = notaStore.getPublicLink(newNota.id)
+    canonicalUrl.value = getPublicLink(newNota.id)
     
     // Set meta tags in document head
     updateMetaTags()
@@ -158,14 +176,13 @@ onBeforeMount(() => {
 onMounted(async () => {
   try {
     isLoading.value = true
-    const notaId = route.params.id as string
-
-    if (!notaId) {
+    
+    if (!notaId.value) {
       error.value = 'No nota ID provided'
       return
     }
 
-    const publishedNota = await notaStore.getPublishedNota(notaId)
+    const publishedNota = await notaStore.getPublishedNota(notaId.value)
 
     if (!publishedNota) {
       error.value = 'This nota does not exist or is no longer public'
@@ -202,8 +219,16 @@ onMounted(async () => {
 const goBack = async () => {
   if (parentNota.value) {
     // If we know the parent, go directly to it
-    await router.push(`/p/${parentNota.value.id}`)
+    // Use the user tag format if available
+    if (userTag.value) {
+      await router.push(`/@${userTag.value}/${parentNota.value.id}`)
+    } else {
+      await router.push(`/p/${parentNota.value.id}`)
+    }
     location.reload()
+  } else if (userTag.value) {
+    // Go to the user's profile if we came from there
+    router.push(`/@${userTag.value}`)
   } else {
     // Otherwise go to home
     router.push('/')
@@ -214,7 +239,7 @@ const shareNota = () => {
   if (!nota.value) return
 
   navigator.clipboard
-    .writeText(notaStore.getPublicLink(nota.value.id))
+    .writeText(getPublicLink(nota.value.id))
     .then(() => {
       alert('Link copied to clipboard')
     })
@@ -222,6 +247,17 @@ const shareNota = () => {
       alert('Failed to copy link')
     })
 }
+
+// Update author link to use tag if available
+const getAuthorLink = computed(() => {
+  if (!nota.value) return '#'
+  
+  if (userTag.value) {
+    return `/@${userTag.value}`
+  } else {
+    return `/u/${nota.value.authorId}`
+  }
+})
 </script>
 
 <template>
@@ -261,7 +297,7 @@ const shareNota = () => {
               <ChevronLeft class="h-4 w-4" />
               <span itemprop="name">Back to {{ parentNota?.title || 'Parent' }}</span>
               <meta itemprop="position" content="1" />
-              <meta itemprop="item" :content="parentNota ? notaStore.getPublicLink(parentNota.id) : '/'" />
+              <meta itemprop="item" :content="parentNota ? getPublicLink(parentNota.id) : '/'" />
             </Button>
           </li>
         </ol>
@@ -291,13 +327,15 @@ const shareNota = () => {
           <span>
             By:
             <a
-              @click="router.push(`/u/${nota.authorId}`)"
+              @click="router.push(getAuthorLink)"
               class="underline cursor-pointer hover:text-black"
               itemprop="author"
               itemscope
               itemtype="https://schema.org/Person"
             >
-              <span itemprop="name">{{ nota.authorName }}</span>
+              <span itemprop="name">
+                {{ userTag ? `@${userTag}` : nota.authorName }}
+              </span>
             </a>
           </span>
         </div>
@@ -323,7 +361,7 @@ const shareNota = () => {
         <h2 class="text-xl font-semibold mb-4">Related Notes</h2>
         <ul class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <li v-for="(relatedNota, index) in nota.relatedNotas" :key="index" class="border rounded-lg p-4 hover:bg-muted/30 transition-colors">
-            <a :href="notaStore.getPublicLink(relatedNota.id)" class="block">
+            <a :href="getPublicLink(relatedNota.id)" class="block">
               <h3 class="font-medium text-lg">{{ relatedNota.title }}</h3>
               <p class="text-sm text-muted-foreground mt-1">{{ formatDate(relatedNota.updatedAt) }}</p>
             </a>

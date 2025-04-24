@@ -9,10 +9,12 @@ import {
   type User,
   onAuthStateChanged,
 } from 'firebase/auth'
-import { auth } from '@/services/firebase'
+import { auth, firestore } from '@/services/firebase'
 import { toast } from '@/lib/utils'
 import { logAnalyticsEvent } from '@/services/firebase'
 import type { UserProfile } from '@/types/user'
+import { collection, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore'
+import { generateUniqueUserTag } from '@/utils/userTagGenerator'
 
 export class AuthService {
   // Sign in with email and password
@@ -52,6 +54,10 @@ export class AuthService {
       // Update the user profile with the displayName
       if (userCredential.user) {
         await updateProfile(userCredential.user, { displayName })
+        
+        // Generate a unique user tag and save it to Firestore
+        await this.createUserTagForNewUser(userCredential.user)
+        
         logAnalyticsEvent('sign_up', { method: 'email' })
       }
 
@@ -61,6 +67,122 @@ export class AuthService {
       const errorMessage = this.getReadableErrorMessage(errorCode)
       toast(errorMessage, 'Registration Failed', 'destructive')
       throw error
+    }
+  }
+
+  // Create and save user tag for a new user
+  async createUserTagForNewUser(user: User): Promise<string> {
+    try {
+      // Generate a unique tag based on displayName if available, otherwise generate a random one
+      const baseTagText = user.displayName ? 
+        user.displayName.toLowerCase().replace(/[^a-z0-9]/g, '') : 
+        '';
+      
+      const userTag = await generateUniqueUserTag(3, { 
+        prefix: baseTagText ? `${baseTagText.substring(0, 10)}` : '',
+        useWords: !baseTagText
+      });
+      
+      // Save to users collection
+      const userRef = doc(firestore, 'users', user.uid)
+      
+      // Check if user document exists
+      const userDoc = await getDoc(userRef)
+      
+      if (userDoc.exists()) {
+        // Update existing document
+        await updateDoc(userRef, { userTag })
+      } else {
+        // Create new user document
+        await setDoc(userRef, {
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+          userTag,
+          createdAt: new Date().toISOString(),
+        })
+      }
+      
+      // Save to userTags collection for faster lookup
+      const userTagRef = doc(firestore, 'userTags', userTag)
+      await setDoc(userTagRef, {
+        uid: user.uid,
+        createdAt: new Date().toISOString(),
+        lastUpdatedAt: new Date().toISOString()
+      })
+      
+      return userTag
+    } catch (error) {
+      console.error('Error creating user tag:', error)
+      throw error
+    }
+  }
+  
+  // Update a user's tag
+  async updateUserTag(userId: string, newTag: string): Promise<void> {
+    try {
+      // Get the current user document to check if they already have a tag
+      const userRef = doc(firestore, 'users', userId)
+      const userDoc = await getDoc(userRef)
+      
+      if (!userDoc.exists()) {
+        throw new Error('User document not found')
+      }
+      
+      const userData = userDoc.data()
+      const oldTag = userData.userTag
+      
+      // Update the user document with the new tag
+      await updateDoc(userRef, { 
+        userTag: newTag,
+        lastUpdatedAt: new Date().toISOString()
+      })
+      
+      // Remove old tag from userTags collection if it exists
+      if (oldTag) {
+        const oldTagRef = doc(firestore, 'userTags', oldTag)
+        const oldTagDoc = await getDoc(oldTagRef)
+        
+        if (oldTagDoc.exists()) {
+          // Delete the old tag document
+          await setDoc(oldTagRef, { 
+            uid: null,
+            deletedAt: new Date().toISOString(),
+            previousOwner: userId
+          })
+        }
+      }
+      
+      // Add new tag to userTags collection
+      const userTagRef = doc(firestore, 'userTags', newTag)
+      await setDoc(userTagRef, {
+        uid: userId,
+        createdAt: new Date().toISOString(),
+        lastUpdatedAt: new Date().toISOString()
+      })
+      
+      toast('Your user tag has been updated successfully', 'User Tag Updated')
+    } catch (error: any) {
+      const errorMessage = error.message || 'An error occurred while updating your user tag'
+      toast(errorMessage, 'User Tag Update Failed', 'destructive')
+      throw error
+    }
+  }
+
+  // Get user profile data from Firestore
+  async getUserProfileData(userId: string): Promise<Record<string, any> | null> {
+    try {
+      const userRef = doc(firestore, 'users', userId)
+      const userDoc = await getDoc(userRef)
+      
+      if (userDoc.exists()) {
+        return userDoc.data()
+      }
+      
+      return null
+    } catch (error) {
+      console.error('Error getting user profile data:', error)
+      return null
     }
   }
 
@@ -145,9 +267,12 @@ export class AuthService {
   }
 
   // Convert Firebase user to UserProfile
-  mapUserToProfile(user: User | null): UserProfile | null {
+  async mapUserToProfile(user: User | null): Promise<UserProfile | null> {
     if (!user) return null
 
+    // Try to get additional user data from Firestore
+    const firestoreData = await this.getUserProfileData(user.uid)
+    
     return {
       uid: user.uid,
       email: user.email || '',
@@ -156,6 +281,7 @@ export class AuthService {
       emailVerified: user.emailVerified,
       createdAt: user.metadata.creationTime || '',
       lastLoginAt: user.metadata.lastSignInTime || '',
+      userTag: firestoreData?.userTag || '',
     }
   }
 }

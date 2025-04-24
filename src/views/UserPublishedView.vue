@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useNotaStore } from '@/stores/nota'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar' // Import Avatar
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import { type PublishedNota } from '@/types/nota'
 import { logger } from '@/services/logger'
+import { collection, query, where, getDocs } from 'firebase/firestore'
+import { firestore } from '@/services/firebase'
 
 const route = useRoute()
 const router = useRouter()
@@ -17,6 +19,7 @@ const notaStore = useNotaStore()
 const publishedNotas = ref<PublishedNota[]>([])
 const isLoading = ref(true)
 const error = ref<string | null>(null)
+const userId = ref<string | null>(null)
 
 // Computed property to get author name from the first published nota
 const authorName = computed(() => {
@@ -39,17 +42,58 @@ const authorInitials = computed(() => {
   return ''
 })
 
-onMounted(async () => {
+// Computed property to check which route parameter is available
+const userTag = computed(() => {
+  const tag = route.params.userTag;
+  return typeof tag === 'string' ? tag : (Array.isArray(tag) ? tag[0] : '');
+})
+const legacyUserId = computed(() => {
+  const id = route.params.userId;
+  return typeof id === 'string' ? id : (Array.isArray(id) ? id[0] : '');
+})
+
+// Determine correct URL format for sharing
+const profileUrl = computed(() => {
+  if (userTag.value) {
+    return `/@${userTag.value}`
+  }
+  return `/u/${userId.value}`
+})
+
+// Convert user tag to user ID if needed
+const getUserIdFromTag = async (tag: string): Promise<string | null> => {
+  try {
+    const userTagsRef = collection(firestore, 'userTags')
+    const q = query(userTagsRef, where('userTag', '==', tag))
+    const querySnapshot = await getDocs(q)
+    
+    if (!querySnapshot.empty) {
+      const doc = querySnapshot.docs[0]
+      return doc.data().uid
+    }
+    
+    return null
+  } catch (err) {
+    logger.error('Error fetching user ID from tag:', err)
+    return null
+  }
+}
+
+// Load user's published notas
+const loadPublishedNotas = async () => {
   try {
     isLoading.value = true
-    const userId = route.params.userId as string
-
-    if (!userId) {
+    error.value = null
+    
+    // Determine which identifier to use
+    let userIdToUse = userId.value
+    
+    if (!userIdToUse) {
       error.value = 'No user ID provided'
       return
     }
 
-    const notas = await notaStore.getPublishedNotasByUser(userId)
+    const notas = await notaStore.getPublishedNotasByUser(userIdToUse)
     publishedNotas.value = notas
 
     if (notas.length === 0) {
@@ -63,10 +107,57 @@ onMounted(async () => {
   } finally {
     isLoading.value = false
   }
+}
+
+// Watch for changes in route parameters
+watch(
+  () => route.params,
+  async () => {
+    await resolveUserId()
+  }
+)
+
+// Resolve user ID from either direct ID or user tag
+const resolveUserId = async () => {
+  try {
+    if (legacyUserId.value) {
+      // Direct user ID provided
+      userId.value = legacyUserId.value
+    } else if (userTag.value) {
+      // User tag provided, need to look up the ID
+      const id = await getUserIdFromTag(userTag.value)
+      if (id) {
+        userId.value = id
+      } else {
+        error.value = 'User not found'
+        isLoading.value = false
+        return
+      }
+    } else {
+      error.value = 'No valid user identifier provided'
+      isLoading.value = false
+      return
+    }
+    
+    await loadPublishedNotas()
+  } catch (err) {
+    logger.error('Error resolving user ID:', err)
+    error.value = 'Error finding user'
+    isLoading.value = false
+  }
+}
+
+onMounted(async () => {
+  await resolveUserId()
 })
 
 const viewNota = (id: string) => {
-  router.push(`/p/${id}`)
+  // Use the user tag in the URL if available
+  if (userTag.value) {
+    router.push(`/@${userTag.value}/${id}`)
+  } else {
+    router.push(`/p/${id}`)
+  }
 }
 </script>
 
@@ -84,7 +175,10 @@ const viewNota = (id: string) => {
         <!-- User info from publishedNotas -->
         <div>
           <h1 class="text-3xl font-bold">{{ authorName }}'s Notas</h1>
-          <p class="text-muted-foreground mt-1">Published documents and notes</p>
+          <p class="text-muted-foreground mt-1">
+            <span v-if="userTag">@{{ userTag }} • </span>
+            Published documents and notes
+          </p>
         </div>
       </div>
     </header>

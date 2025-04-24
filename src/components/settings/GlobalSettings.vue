@@ -19,7 +19,8 @@ import {
   Paintbrush,
   Settings2,
   Pencil,
-  Brain
+  Brain,
+  User
 } from 'lucide-vue-next'
 import { useShortcutsStore } from '@/stores/shortcutsStore'
 import { Switch } from '@/components/ui/switch'
@@ -37,11 +38,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import AISettings from '@/components/settings/AISettings.vue'
 import JupyterSettings from '@/components/settings/JupyterSettings.vue'
 import VibeSettings from '@/components/settings/VibeSettings.vue'
+import UserTagEditor from '@/components/auth/UserTagEditor.vue'
 import { logger } from '@/services/logger'
+import { useAuthStore } from '@/stores/auth'
 
 // Use shortcuts from the store instead of duplicating them
 const shortcutsStore = useShortcutsStore()
 const notaStore = useNotaStore()
+const authStore = useAuthStore()
+
+// Get current user
+const isAuthenticated = computed(() => authStore.isAuthenticated)
 
 // Theme settings
 const theme = ref('system')
@@ -689,6 +696,20 @@ function formatShortcutKey(key: string) {
         <!-- Advanced Tab -->
         <TabsContent value="advanced" class="space-y-6">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Profile Settings Card -->
+            <Card v-if="isAuthenticated" class="overflow-hidden border-2 hover:border-primary/50 transition-all">
+              <CardHeader class="bg-muted/50">
+                <CardTitle class="flex items-center gap-2">
+                  <User class="h-5 w-5 text-primary" />
+                  Profile Settings
+                </CardTitle>
+                <CardDescription>Manage your account and profile</CardDescription>
+              </CardHeader>
+              <CardContent class="pt-6">
+                <UserTagEditor />
+              </CardContent>
+            </Card>
+            
             <!-- Data Management Card -->
             <Card class="overflow-hidden border-2 hover:border-primary/50 transition-all">
               <CardHeader class="bg-muted/50">
@@ -896,4 +917,4 @@ kbd {
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
   margin: 0 0.125rem;
 }
-</style> 
+</style>
