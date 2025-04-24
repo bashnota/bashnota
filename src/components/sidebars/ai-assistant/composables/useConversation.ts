@@ -182,16 +182,11 @@ export function useConversation(editor: any, notaId: string) {
     }
     
     try {
-      // Create a new AI block in the document
-      editor.chain().focus().insertContent({
-        type: 'aiGeneration',
-        attrs: {
-          id: nanoid(),
-          notaId: notaId, // Associate with current nota
-          loading: false,
-          lastUpdated: new Date().toISOString()
-        }
-      }).run()
+      // Instead of inserting "/gen " as text, directly use the command to insert an AI block
+      editor.chain()
+        .focus()
+        .insertInlineAIGeneration() // This directly calls the extension's command
+        .run()
       
       // Find the newly created block
       const { state } = editor
@@ -199,7 +194,7 @@ export function useConversation(editor: any, notaId: string) {
       let newBlock = null
       
       doc.descendants((node: any, pos: number) => {
-        if (node.type.name === 'aiGeneration' && !node.attrs.prompt) {
+        if (node.type.name === 'inlineAIGeneration' && !node.attrs.prompt) {
           // This is likely our new node
           newBlock = {
             node,

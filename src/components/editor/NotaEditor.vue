@@ -6,27 +6,27 @@ import { useNotaStore } from '@/stores/nota'
 import { useJupyterStore } from '@/stores/jupyterStore'
 import EditorToolbar from './EditorToolbar.vue'
 import { ref, watch, computed, onUnmounted, onMounted, reactive, provide } from 'vue'
-import { useResizableSidebar } from '@/composables/useResizableSidebar'
-import ResizableSidebar from './ResizableSidebar.vue'
+import { useSidebarsGroup } from '@/composables/useSidebarsGroup'
+import SidebarsGroup from '@/components/sidebars/SidebarsGroup.vue'
 import 'highlight.js/styles/github.css'
 import { useRouter } from 'vue-router'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import TableOfContents from './TableOfContents.vue'
-import JupyterServersSidebar from './JupyterServersSidebar.vue'
+import JupyterServersSidebar from '@/components/sidebars/JupyterServersSidebar.vue'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { BookIcon, ServerIcon, BrainIcon } from 'lucide-vue-next'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
 import { getURLWithoutProtocol, toast } from '@/lib/utils'
 import VersionHistoryDialog from './VersionHistoryDialog.vue'
-import FavoriteBlocksSidebar from './FavoriteBlocksSidebar.vue'
-import ReferencesSidebar from './ReferencesSidebar.vue'
-import AIAssistantSidebar from './ai-assistant/components/AIAssistantSidebar.vue'
+import FavoriteBlocksSidebar from '@/components/sidebars/FavoriteBlocksSidebar.vue'
+import ReferencesSidebar from '@/components/sidebars/ReferencesSidebar.vue'
+import AIAssistantSidebar from '@/components/sidebars/AIAssistantSidebar.vue'
 import { getEditorExtensions } from './extensions'
 import { useEquationCounter, EQUATION_COUNTER_KEY } from '@/composables/useEquationCounter'
 import { useCitationStore } from '@/stores/citationStore'
 import { logger } from '@/services/logger'
-import MetadataSidebar from './MetadataSidebar.vue'
+import MetadataSidebar from '@/components/sidebars/MetadataSidebar.vue'
 
 // Define sidebar types for better type checking
 type SidebarPosition = 'left' | 'right';
@@ -40,6 +40,7 @@ interface SidebarConfig {
   minWidth?: number;
   maxWidth?: number;
   defaultWidth?: number;
+  icon?: any; // Add icon property
 }
 
 type SidebarsConfig = Record<SidebarId, SidebarConfig>;
@@ -53,43 +54,42 @@ const useSidebarManager = () => {
       storageKey: 'toc-sidebar-width',
       position: 'left',
       title: 'Table of Contents',
-      minWidth: 250,
-      maxWidth: 500,
-      defaultWidth: 300
+      icon: null
     },
     references: {
       isOpen: false,
       storageKey: 'references-sidebar-width',
       position: 'right',
       title: 'References',
-      minWidth: 300,
-      maxWidth: 600
+      icon: BookIcon
     },
     jupyter: {
       isOpen: false,
       storageKey: 'jupyter-sidebar-width',
       position: 'right',
-      title: 'Jupyter Servers'
+      title: 'Jupyter Servers',
+      icon: ServerIcon
     },
     ai: {
       isOpen: false,
       storageKey: 'ai-sidebar-width',
       position: 'right',
       title: 'AI Assistant',
-      minWidth: 350,
-      maxWidth: 700
+      icon: BrainIcon
     },
     metadata: {
       isOpen: false,
       storageKey: 'metadata-sidebar-width',
       position: 'right',
-      title: 'Metadata'
+      title: 'Metadata',
+      icon: Tag
     },
     favorites: {
       isOpen: false,
       storageKey: 'favorites-sidebar-width',
       position: 'right',
-      title: 'Favorite Blocks'
+      title: 'Favorite Blocks',
+      icon: Star
     }
   });
 
@@ -315,43 +315,32 @@ const editor = useEditor({
   onUpdate: () => saveEditorContent(),
 })
 
+// Use a single unified width for all sidebars, but don't set a default
+// This allows the sidebars to use their natural width
+const unifiedSidebarWidth = ref<number | null>(null);
+
 // Initialize sidebar width tracking for resize events
 const sidebarWidths = reactive<Record<SidebarId, number>>({
-  toc: 300,
-  references: 350,
-  jupyter: 350,
-  ai: 400,
-  metadata: 350,
-  favorites: 350
+  toc: unifiedSidebarWidth.value ?? 300,
+  references: unifiedSidebarWidth.value ?? 300,
+  jupyter: unifiedSidebarWidth.value ?? 300,
+  ai: unifiedSidebarWidth.value ?? 300,
+  metadata: unifiedSidebarWidth.value ?? 300,
+  favorites: unifiedSidebarWidth.value ?? 300
 })
 
 // Setup unified persistence for sidebar widths
 const updateSidebarWidth = (sidebarId: SidebarId, width: number) => {
-  sidebarWidths[sidebarId] = width
+  // Update the unified width for all sidebars
+  unifiedSidebarWidth.value = width;
   
-  // Update the interface settings
-  try {
-    const savedSettings = localStorage.getItem('interface-settings') || '{}'
-    const settings = JSON.parse(savedSettings)
-    
-    // Create a multi-sidebar width tracking structure
-    if (!settings.sidebarWidths) {
-      settings.sidebarWidths = {}
-    }
-    
-    // Save the width for this specific sidebar
-    settings.sidebarWidths[sidebarId] = width
-    
-    // Save back to localStorage
-    localStorage.setItem('interface-settings', JSON.stringify(settings))
-    
-    // Dispatch change event for other components
-    window.dispatchEvent(new CustomEvent('interface-settings-changed', {
-      detail: { sidebarWidths: settings.sidebarWidths }
-    }))
-  } catch (error) {
-    logger.error('Failed to save sidebar width', error)
-  }
+  // Update all sidebar widths to match
+  Object.keys(sidebarWidths).forEach(key => {
+    sidebarWidths[key as SidebarId] = width;
+  });
+  
+  // Store in localStorage
+  localStorage.setItem('unified-sidebar-width', String(width));
 }
 
 // Watch for ID changes to update editor content
@@ -573,14 +562,20 @@ onMounted(() => {
   // Add keyboard shortcut event listener
   document.addEventListener('keydown', handleKeyboardShortcuts)
 
-  // Add event listener for toggling references
-  window.addEventListener('toggle-references', ((event: CustomEvent) => {
-    if (event.detail && event.detail.open) {
-      toggleSidebar('references')
+  // Load unified sidebar width from localStorage
+  const savedWidth = localStorage.getItem('unified-sidebar-width');
+  if (savedWidth) {
+    const width = parseInt(savedWidth, 10);
+    if (!isNaN(width)) {
+      unifiedSidebarWidth.value = width;
+      // Update all sidebar widths
+      Object.keys(sidebarWidths).forEach(key => {
+        sidebarWidths[key as SidebarId] = width;
+      });
     }
-  }) as EventListener)
-
-  // Add event listener for activating AI Assistant when a robot button is clicked
+  }
+  
+  // Add event listener for activating AI Assistant
   window.addEventListener('activate-ai-assistant', ((event: CustomEvent) => {
     if (event.detail) {
       toggleSidebar('ai')
@@ -832,19 +827,46 @@ defineExpose({
     <LoadingSpinner v-if="isLoading" class="absolute inset-0 z-10" />
 
     <!-- Table of Contents Sidebar -->
-    <ResizableSidebar 
-      v-if="sidebars.toc.isOpen" 
-      :title="sidebars.toc.title"
-      :storageKey="sidebars.toc.storageKey"
+    <SidebarsGroup 
+      v-if="sidebars.toc.isOpen"
       :position="sidebars.toc.position"
-      :minWidth="sidebars.toc.minWidth"
-      :maxWidth="sidebars.toc.maxWidth"
-      :defaultWidth="sidebars.toc.defaultWidth"
-      @close="toggleSidebar('toc')"
+      :width="unifiedSidebarWidth === null ? undefined : unifiedSidebarWidth"
       @resize="updateSidebarWidth('toc', $event)"
     >
-      <TableOfContents :editor="editor" />
-    </ResizableSidebar>
+      <!-- Sidebar Header -->
+      <div class="py-1 px-2 border-b flex items-center justify-between">
+        <div class="flex items-center">
+          <svg class="h-3.5 w-3.5 text-primary mr-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <rect x="9" y="3" width="6" height="4" rx="1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M9 12h6M9 16h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <h3 class="text-sm font-medium">{{ sidebars.toc.title }}</h3>
+        </div>
+        <Button variant="ghost" size="icon" class="h-5 w-5 -mr-1" @click="toggleSidebar('toc')">
+          <svg 
+            xmlns="http://www.w3.org/2000/svg" 
+            width="24" 
+            height="24" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            stroke-width="2" 
+            stroke-linecap="round" 
+            stroke-linejoin="round" 
+            class="w-3 h-3"
+          >
+            <path d="M18 6 6 18"></path>
+            <path d="m6 6 12 12"></path>
+          </svg>
+        </Button>
+      </div>
+      
+      <!-- Sidebar Content -->
+      <div class="flex-1 flex flex-col relative overflow-hidden w-full h-full p-0 m-0">
+        <TableOfContents :editor="editor" />
+      </div>
+    </SidebarsGroup>
 
     <!-- Main Editor Area -->
     <div class="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
@@ -963,32 +985,55 @@ defineExpose({
     <!-- Right-side Sidebars -->
     <!-- Generate sidebars dynamically for all non-TOC sidebars -->
     <template v-for="(config, id) in sidebars" :key="id">
-      <ResizableSidebar 
+      <SidebarsGroup 
         v-if="id !== 'toc' && config.isOpen"
-        :title="config.title"
-        :storageKey="config.storageKey"
         :position="config.position"
-        :minWidth="config.minWidth"
-        :maxWidth="config.maxWidth"
-        :defaultWidth="config.defaultWidth"
-        @close="toggleSidebar(id)"
+        :width="unifiedSidebarWidth === null ? undefined : unifiedSidebarWidth"
         @resize="updateSidebarWidth(id, $event)"
       >
-        <!-- References Sidebar -->
-        <ReferencesSidebar v-if="id === 'references'" :editor="editor" :notaId="notaId" />
+        <!-- Sidebar Header -->
+        <div class="py-1 px-2 border-b flex items-center justify-between">
+          <div class="flex items-center ">
+            <component :is="config.icon" v-if="config.icon" class="h-3.5 w-3.5 text-primary" />
+            <h3 class="text-sm font-medium">{{ config.title }}</h3>
+          </div>
+          <Button variant="ghost" size="icon" class="h-5 w-5 -mr-1" @click="toggleSidebar(id)">
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              width="24" 
+              height="24" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              stroke-width="2" 
+              stroke-linecap="round" 
+              stroke-linejoin="round" 
+              class="w-3 h-3"
+            >
+              <path d="M18 6 6 18"></path>
+              <path d="m6 6 12 12"></path>
+            </svg>
+          </Button>
+        </div>
         
-        <!-- Jupyter Servers Sidebar -->
-        <JupyterServersSidebar v-else-if="id === 'jupyter'" :notaId="notaId" />
-        
-        <!-- AI Assistant Sidebar -->
-        <AIAssistantSidebar v-else-if="id === 'ai'" :editor="editor" :notaId="notaId" />
-        
-        <!-- Metadata Sidebar -->
-        <MetadataSidebar v-else-if="id === 'metadata'" :notaId="notaId" />
-        
-        <!-- Favorites Sidebar -->
-        <FavoriteBlocksSidebar v-else-if="id === 'favorites'" :editor="editor" />
-      </ResizableSidebar>
+        <!-- Sidebar Content -->
+        <div class="flex-1 flex flex-col relative overflow-hidden w-full h-full p-0 m-0">
+          <!-- Dynamic sidebar content based on ID -->
+          <component 
+            :is="{
+              'references': ReferencesSidebar,
+              'jupyter': JupyterServersSidebar,
+              'ai': AIAssistantSidebar,
+              'metadata': MetadataSidebar,
+              'favorites': FavoriteBlocksSidebar
+            }[id]" 
+            :editor="editor" 
+            :notaId="notaId"
+            :hideHeader="id === 'ai'"
+            class="h-full w-full flex-1 overflow-hidden"
+          />
+        </div>
+      </SidebarsGroup>
     </template>
 
     <!-- Version History Dialog -->
@@ -1006,7 +1051,6 @@ defineExpose({
 /* Right sidebar container styles */
 .right-sidebar-container {
   min-width: 300px;
-  width: 350px;
   /* Default width that can be overridden by resize */
   max-width: 800px;
   position: relative;

@@ -1,17 +1,18 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useFavoriteBlocksStore } from '@/stores/favoriteBlocksStore'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Star, Search, X, Plus, Menu, ChevronRight, Settings } from 'lucide-vue-next'
+import { Button } from '@/components/ui/button'
+import { Star, Search, X, Plus } from 'lucide-vue-next'
 import { TagsInput, TagsInputInput, TagsInputItem } from '@/components/ui/tags-input'
 import { toast } from '@/lib/utils'
-import { onKeyStroke } from '@vueuse/core'
+import { onKeyStroke, useDebounceFn } from '@vueuse/core'
 import type { Editor } from '@tiptap/vue-3'
-import { useDebounceFn } from '@vueuse/core'
 import Fuse from 'fuse.js'
 import { logger } from '@/services/logger'
+import { BaseSidebar, SidebarSection, KeyboardShortcut } from '@/components/ui/sidebars'
+import { useSidebarComposable } from '@/composables/useSidebarComposable'
 
 const props = defineProps<{
   editor?: Editor | null
@@ -25,9 +26,22 @@ const emit = defineEmits<{
 const store = useFavoriteBlocksStore()
 const searchQuery = ref('')
 const selectedTags = ref<string[]>([])
-const isOpen = ref(true)
-const previewContent = ref<Record<string, string>>({})
 const expandedBlocks = ref<Set<string>>(new Set())
+const previewContent = ref<Record<string, string>>({})
+
+// Use our sidebar composable
+const { isOpen, width } = useSidebarComposable({
+  id: 'favorite-blocks',
+  defaultWidth: 350,
+  minWidth: 280,
+  maxWidth: 500,
+  keyboard: {
+    ctrl: true,
+    shift: true,
+    alt: true,
+    key: 'v'
+  }
+})
 
 // Configure Fuse.js for fuzzy search
 const fuseOptions = {
@@ -47,18 +61,9 @@ const debouncedSearch = useDebounceFn((query: string) => {
   searchQuery.value = query
 }, 500)
 
-// Load saved state
+// Load store data
 onMounted(() => {
-  const savedState = localStorage.getItem('favorite-blocks-sidebar')
-  if (savedState) {
-    isOpen.value = JSON.parse(savedState)
-  }
   store.loadBlocks()
-})
-
-// Watch for changes to save state
-watch(isOpen, (newState) => {
-  localStorage.setItem('favorite-blocks-sidebar', JSON.stringify(newState))
 })
 
 const filteredBlocks = computed(() => {
@@ -133,22 +138,9 @@ const showPreview = (blockId: string, content: string) => {
   }
 }
 
-// Toggle sidebar
-const toggleSidebar = () => {
-  isOpen.value = !isOpen.value
-}
-
-// Keyboard shortcuts - use the shortcuts from shortcutsStore
-onKeyStroke('v', (e) => {
-  if (e.ctrlKey && e.shiftKey && e.altKey) {
-    e.preventDefault()
-    toggleSidebar()
-  }
-})
-
-// Use Ctrl+Shift+Alt+P for search focus (P for 'Peek' or 'Preview')
+// Keyboard shortcut for search focus
 onKeyStroke('p', (e) => {
-  if (e.ctrlKey && e.shiftKey && e.altKey && isOpen.value) {
+  if (e.ctrlKey && e.shiftKey && e.altKey) {
     e.preventDefault()
     document.querySelector<HTMLInputElement>('.favorite-blocks-search')?.focus()
   }
@@ -171,50 +163,43 @@ const blocks = computed(() => {
     parsedContent: getSearchableContent(block.content)
   }))
 })
-
-// Add a button to open settings for customization
-const openCustomizationSettings = () => {
-  // Implementation of opening customization settings
-}
 </script>
 
 <template>
-  <div class="h-full border-l flex-shrink-0 flex flex-col bg-background right-sidebar-container">
-    <div class="p-4 border-b">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="font-medium flex items-center gap-2">
-          <Star class="h-4 w-4" />
-          Favorite Blocks
-        </h3>
-        <Button variant="ghost" size="icon" @click="emit('close')">
-          <X class="h-4 w-4" />
-        </Button>
-      </div>
-      
-      <div class="space-y-4">
-        <div class="relative">
-          <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            :value="searchQuery"
-            @input="(e: Event) => debouncedSearch((e.target as HTMLInputElement).value)"
-            placeholder="Search blocks... (Ctrl+Shift+Alt+P)"
-            class="pl-9 favorite-blocks-search"
-            aria-autocomplete="list"
-            aria-controls="search-suggestions"
-          />
-        </div>
-
-        <TagsInput v-model="selectedTags" placeholder="Filter by tags...">
-          <TagsInputItem v-for="tag in selectedTags" :key="tag" :value="tag">
-            {{ tag }}
-          </TagsInputItem>
-          <TagsInputInput :placeholder="`Add tag (${availableTags.length} available)...`" />
-        </TagsInput>
-      </div>
-    </div>
-
+  <BaseSidebar 
+    id="favorite-blocks"
+    title="Favorite Blocks" 
+    :icon="Star" 
+    position="right" 
+    @close="emit('close')"
+  >
     <ScrollArea class="flex-1">
       <div class="p-4 space-y-4">
+        <!-- Search and Filter Section -->
+        <SidebarSection>
+          <div class="space-y-4">
+            <div class="relative">
+              <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                :value="searchQuery"
+                @input="(e: Event) => debouncedSearch((e.target as HTMLInputElement).value)"
+                placeholder="Search blocks... (Ctrl+Shift+Alt+P)"
+                class="pl-9 favorite-blocks-search"
+                aria-autocomplete="list"
+                aria-controls="search-suggestions"
+              />
+            </div>
+
+            <TagsInput v-model="selectedTags" placeholder="Filter by tags...">
+              <TagsInputItem v-for="tag in selectedTags" :key="tag" :value="tag">
+                {{ tag }}
+              </TagsInputItem>
+              <TagsInputInput :placeholder="`Add tag (${availableTags.length} available)...`" />
+            </TagsInput>
+          </div>
+        </SidebarSection>
+
+        <!-- Blocks List -->
         <div v-for="block in filteredBlocks" :key="block.id" 
           class="block-item border rounded-lg p-2 hover:bg-muted/50 transition-colors"
           @click="toggleBlockExpansion(block.id)"
@@ -264,7 +249,16 @@ const openCustomizationSettings = () => {
         </div>
       </div>
     </ScrollArea>
-  </div>
+
+    <!-- Keyboard Shortcut Info -->
+    <KeyboardShortcut 
+      ctrl
+      shift
+      alt
+      keyName="V" 
+      action="toggle favorites"
+    />
+  </BaseSidebar>
 </template>
 
 <style scoped>

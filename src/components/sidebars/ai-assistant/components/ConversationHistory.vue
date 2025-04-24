@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Avatar } from '@/components/ui/avatar'
-import { XIcon, RefreshCwIcon } from 'lucide-vue-next'
+import { RefreshCwIcon } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import MessageItem from './MessageItem.vue'
 import { type ConversationMessage } from '../composables/useConversation'
-import { ref, onUpdated, nextTick } from 'vue'
 
 const props = defineProps<{
   conversationHistory: ConversationMessage[]
@@ -21,9 +19,6 @@ const emit = defineEmits([
   'select-text',
   'retry'
 ])
-
-// Reference to scroll area
-const scrollAreaRef = ref<HTMLElement | null>(null)
 
 // Handle copy message
 const handleCopyMessage = (content: string) => {
@@ -44,22 +39,10 @@ const handleSelectText = (text: string) => {
 const retryGeneration = () => {
   emit('retry')
 }
-
-// Auto-scroll to bottom when new messages arrive
-onUpdated(() => {
-  nextTick(() => {
-    if (scrollAreaRef.value) {
-      const scrollContainer = scrollAreaRef.value.querySelector('[data-radix-scroll-area-viewport]')
-      if (scrollContainer) {
-        scrollContainer.scrollTop = scrollContainer.scrollHeight
-      }
-    }
-  })
-})
 </script>
 
 <template>
-  <ScrollArea ref="scrollAreaRef" class="flex-1 p-4 space-y-4">
+  <div class="space-y-4">
     <!-- Conversation Messages -->
     <MessageItem
       v-for="(message, index) in conversationHistory"
@@ -103,7 +86,7 @@ onUpdated(() => {
         </Button>
       </div>
     </div>
-  </ScrollArea>
+  </div>
 </template>
 
 <style scoped>
