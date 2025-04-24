@@ -30,12 +30,12 @@
         </p>
       </div>
       <Button
-        @click="updateTag"
-        :disabled="!canUpdate || isLoading"
-        :class="{ 'opacity-50 cursor-not-allowed': !canUpdate }"
+        @click="checkAndUpdateTag"
+        :disabled="isButtonDisabled"
+        :class="{ 'opacity-50 cursor-not-allowed': isButtonDisabled }"
       >
         <RefreshCcw v-if="isLoading" class="mr-2 h-4 w-4 animate-spin" />
-        <span v-else>Update</span>
+        <span v-else>{{ buttonText }}</span>
       </Button>
     </div>
 
@@ -49,7 +49,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -64,7 +64,9 @@ const tagInput = ref('')
 const validationMessage = ref('')
 const validationStatus = ref<'success' | 'error' | 'warning' | null>(null)
 const isValidating = ref(false)
-const isLoading = computed(() => authStore.isLoading || isValidating.value)
+const hasBeenValidated = ref(false)
+const isCheckingAvailability = ref(false)
+const isLoading = computed(() => authStore.isLoading || isValidating.value || isCheckingAvailability.value)
 
 // Get current tag from the store
 const currentTag = computed(() => authStore.currentUser?.userTag || '')
@@ -90,53 +92,86 @@ const validationClass = computed(() => {
   }
 })
 
-// Can only update if input is valid and different from current tag
-const canUpdate = computed(() => {
-  return (
-    tagInput.value !== currentTag.value && 
-    tagInput.value.length > 0 && 
-    validationStatus.value === 'success'
-  )
+// Button text changes based on validation state
+const buttonText = computed(() => {
+  if (isCheckingAvailability.value) return 'Checking...'
+  if (hasBeenValidated.value && validationStatus.value === 'success') return 'Update'
+  return 'Check Availability'
 })
 
-// Handle input change
-const handleInput = (event: Event) => {
-  tagInput.value = (event.target as HTMLInputElement).value
-}
+// Button is disabled if input is empty, unchanged, or loading
+const isButtonDisabled = computed(() => {
+  if (isLoading.value) return true
+  if (tagInput.value === currentTag.value) return true
+  if (tagInput.value.length === 0) return true
+  if (hasBeenValidated.value && validationStatus.value !== 'success') return true
+  return false
+})
 
-// Validate tag when input changes
-watch(tagInput, async (newValue) => {
-  if (!newValue) {
+// Basic format validation
+const validateFormat = (value: string): boolean => {
+  if (!value) {
     validationMessage.value = 'Tag cannot be empty'
     validationStatus.value = 'error'
-    return
+    return false
   }
 
-  // Basic format validation first
-  const isValidFormat = validateUserTagFormat(newValue)
+  // Basic format validation
+  const isValidFormat = validateUserTagFormat(value)
   
   if (!isValidFormat) {
     validationMessage.value = 'Tag must be 3-30 characters and contain only letters, numbers, and underscores'
     validationStatus.value = 'error'
-    return
+    return false
   }
 
   // If same as current, no need to check availability
-  if (newValue === currentTag.value) {
+  if (value === currentTag.value) {
     validationMessage.value = 'This is your current tag'
     validationStatus.value = 'warning'
-    return
+    return false
   }
 
-  // Check availability
-  isValidating.value = true
+  return true
+}
+
+// Handle input change - only do basic validation, don't check availability yet
+const handleInput = (event: Event) => {
+  tagInput.value = (event.target as HTMLInputElement).value
+  
+  // Reset validation state when input changes
+  if (hasBeenValidated.value) {
+    hasBeenValidated.value = false
+  }
+  
+  // Only do basic format validation
+  validateFormat(tagInput.value)
+}
+
+// Check availability and then update if available
+const checkAndUpdateTag = async () => {
+  // If already validated and successful, proceed to update
+  if (hasBeenValidated.value && validationStatus.value === 'success') {
+    await updateTag()
+    return
+  }
+  
+  // Otherwise check availability first
+  if (!validateFormat(tagInput.value)) return
+  
+  validationMessage.value = 'Checking availability...'
+  validationStatus.value = 'warning'
+  isCheckingAvailability.value = true
+  
   try {
     const { isAvailable, error } = await import('@/utils/userTagGenerator').then(module => 
-      module.validateUserTag(newValue)
+      module.validateUserTag(tagInput.value)
     )
     
+    hasBeenValidated.value = true
+    
     if (isAvailable) {
-      validationMessage.value = 'This tag is available'
+      validationMessage.value = 'This tag is available! Click Update to use it.'
       validationStatus.value = 'success'
     } else {
       validationMessage.value = error || 'This tag is not available'
@@ -146,14 +181,15 @@ watch(tagInput, async (newValue) => {
     validationMessage.value = 'Error checking tag availability'
     validationStatus.value = 'error'
   } finally {
-    isValidating.value = false
+    isCheckingAvailability.value = false
   }
-}, { flush: 'post' })
+}
 
 // Update user tag
 const updateTag = async () => {
-  if (!canUpdate.value) return
+  if (tagInput.value === currentTag.value) return
   
+  isValidating.value = true
   try {
     const result = await authStore.updateUserTag(tagInput.value)
     if (result) {
@@ -163,6 +199,8 @@ const updateTag = async () => {
   } catch (error) {
     validationMessage.value = 'Failed to update tag'
     validationStatus.value = 'error'
+  } finally {
+    isValidating.value = false
   }
 }
 </script>
