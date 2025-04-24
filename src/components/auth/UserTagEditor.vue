@@ -12,7 +12,8 @@
         <div class="relative">
           <Input
             id="userTag"
-            v-model="tagInput"
+            :value="tagInput"
+            @input="handleInput"
             placeholder="Enter a unique tag"
             :class="{ 'pr-24': tagInput }"
             :disabled="isLoading"
@@ -97,6 +98,11 @@ const canUpdate = computed(() => {
     validationStatus.value === 'success'
   )
 })
+
+// Handle input change
+const handleInput = (event: Event) => {
+  tagInput.value = (event.target as HTMLInputElement).value
+}
 
 // Validate tag when input changes
 watch(tagInput, async (newValue) => {

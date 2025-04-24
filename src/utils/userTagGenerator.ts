@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid'
-import { collection, query, where, getDocs } from 'firebase/firestore'
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore'
 import { firestore as db } from '@/services/firebase'
 import { logger } from '@/services/logger'
 import type { UserTagValidation } from '@/types/user'
@@ -55,13 +55,12 @@ export async function isUserTagAvailable(tag: string): Promise<boolean> {
       return false
     }
     
-    // Query the users collection for the tag
-    const usersRef = collection(db, 'users')
-    const q = query(usersRef, where('userTag', '==', tag))
-    const querySnapshot = await getDocs(q)
+    // Query the userTags collection for the tag
+    const tagDoc = doc(db, 'userTags', tag)
+    const tagSnapshot = await getDoc(tagDoc)
     
-    // If no documents found with this tag, it's available
-    return querySnapshot.empty
+    // If no document found with this tag, it's available
+    return !tagSnapshot.exists()
   } catch (error) {
     logger.error('Error checking tag availability:', error)
     throw error

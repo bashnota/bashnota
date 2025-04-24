@@ -105,6 +105,28 @@ const browserInfo = computed(() => {
   return { browser: 'Unknown', platform: 'Unknown' }
 })
 
+// Computed properties to filter shortcuts by category
+const editorShortcuts = computed(() => {
+  return shortcutsStore.shortcuts.filter(shortcut => 
+    shortcut.category === 'editor' || 
+    ['bold-text', 'italic-text', 'commands-menu', 'focus-editor'].includes(shortcut.id || '')
+  )
+})
+
+const navigationShortcuts = computed(() => {
+  return shortcutsStore.shortcuts.filter(shortcut => 
+    shortcut.category === 'navigation' || 
+    ['global-search', 'favorites-sidebar', 'favorites-search'].includes(shortcut.id || '')
+  )
+})
+
+const otherShortcuts = computed(() => {
+  return shortcutsStore.shortcuts.filter(shortcut => 
+    !shortcut.category && 
+    !['bold-text', 'italic-text', 'commands-menu', 'focus-editor', 'global-search', 'favorites-sidebar', 'favorites-search'].includes(shortcut.id || '')
+  )
+})
+
 onMounted(() => {
   // Load saved theme preference
   const savedTheme = localStorage.getItem('theme')
@@ -335,7 +357,7 @@ function formatShortcutKey(key: string) {
       </div>
 
       <Tabs default-value="appearance" class="w-full">
-        <TabsList class="grid w-full grid-cols-6">
+        <TabsList class="grid w-full grid-cols-7">
           <TabsTrigger value="appearance" class="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <div class="flex items-center justify-center gap-2 p-2">
               <Paintbrush class="w-4 h-4 shrink-0" />
@@ -346,6 +368,12 @@ function formatShortcutKey(key: string) {
             <div class="flex items-center justify-center gap-2 p-2">
               <Code2 class="w-4 h-4 shrink-0" />
               <span class="text-sm font-medium">Editor</span>
+            </div>
+          </TabsTrigger>
+          <TabsTrigger value="shortcuts" class="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <div class="flex items-center justify-center gap-2 p-2">
+              <Keyboard class="w-4 h-4 shrink-0" />
+              <span class="text-sm font-medium">Shortcuts</span>
             </div>
           </TabsTrigger>
           <TabsTrigger value="advanced" class="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
@@ -498,10 +526,12 @@ function formatShortcutKey(key: string) {
               </CardContent>
             </Card>
           </div>
-          
-          <!-- Keyboard Shortcuts Card -->
-          <Card class="card">
-            <CardHeader>
+        </TabsContent>
+
+        <!-- Shortcuts Tab -->
+        <TabsContent value="shortcuts" class="space-y-6">
+          <Card class="overflow-hidden border-2 hover:border-primary/50 transition-all">
+            <CardHeader class="bg-muted/50">
               <CardTitle class="flex items-center gap-2">
                 <Keyboard class="h-5 w-5 text-primary" />
                 Keyboard Shortcuts
@@ -509,35 +539,107 @@ function formatShortcutKey(key: string) {
               <CardDescription>Customize keyboard shortcuts for common actions</CardDescription>
             </CardHeader>
             <CardContent class="pt-6">
-              <div class="space-y-4">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Action</TableHead>
-                      <TableHead>Shortcut</TableHead>
-                      <TableHead class="w-[100px]">Edit</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <TableRow v-for="shortcut in shortcutsStore.shortcuts" :key="shortcut.id">
-                      <TableCell class="font-medium">{{ shortcut.description }}</TableCell>
-                      <TableCell>
-                        <div v-html="formatShortcutKey(shortcut.key)"></div>
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm" @click="editShortcut(shortcut)">
-                          <Pencil class="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-                
-                <div class="flex justify-end">
+              <div class="space-y-6">
+                <div class="flex items-center justify-between">
+                  <p class="text-sm text-muted-foreground">
+                    Configure keyboard shortcuts to boost your productivity. Click the edit button to change a shortcut.
+                  </p>
                   <Button variant="outline" @click="resetShortcuts" class="flex items-center gap-2">
                     <RotateCw class="h-4 w-4" />
                     Reset to Defaults
                   </Button>
+                </div>
+                
+                <Separator />
+                
+                <div class="space-y-4">
+                  <!-- Editor Section -->
+                  <div>
+                    <h3 class="text-lg font-medium mb-3">Editor Shortcuts</h3>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Action</TableHead>
+                          <TableHead>Shortcut</TableHead>
+                          <TableHead class="w-[100px]">Edit</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        <TableRow v-for="shortcut in editorShortcuts" :key="shortcut.id">
+                          <TableCell class="font-medium">{{ shortcut.description }}</TableCell>
+                          <TableCell>
+                            <div v-html="formatShortcutKey(shortcut.key)"></div>
+                          </TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="sm" @click="editShortcut(shortcut)">
+                              <Pencil class="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                  
+                  <!-- Navigation Section -->
+                  <div>
+                    <h3 class="text-lg font-medium mb-3">Navigation Shortcuts</h3>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Action</TableHead>
+                          <TableHead>Shortcut</TableHead>
+                          <TableHead class="w-[100px]">Edit</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        <TableRow v-for="shortcut in navigationShortcuts" :key="shortcut.id">
+                          <TableCell class="font-medium">{{ shortcut.description }}</TableCell>
+                          <TableCell>
+                            <div v-html="formatShortcutKey(shortcut.key)"></div>
+                          </TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="sm" @click="editShortcut(shortcut)">
+                              <Pencil class="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                  
+                  <!-- Other Shortcuts Section -->
+                  <div>
+                    <h3 class="text-lg font-medium mb-3">Other Shortcuts</h3>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Action</TableHead>
+                          <TableHead>Shortcut</TableHead>
+                          <TableHead class="w-[100px]">Edit</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        <TableRow v-for="shortcut in otherShortcuts" :key="shortcut.id">
+                          <TableCell class="font-medium">{{ shortcut.description }}</TableCell>
+                          <TableCell>
+                            <div v-html="formatShortcutKey(shortcut.key)"></div>
+                          </TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="sm" @click="editShortcut(shortcut)">
+                              <Pencil class="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+                
+                <div class="bg-muted/30 p-4 rounded-md mt-4">
+                  <p class="text-sm">
+                    <strong>Tip:</strong> Most keyboard shortcuts can be used anywhere in the application. 
+                    Some shortcuts may be context-specific and only work in certain areas.
+                  </p>
                 </div>
               </div>
             </CardContent>

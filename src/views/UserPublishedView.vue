@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar' // Import Avatar
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import { type PublishedNota } from '@/types/nota'
 import { logger } from '@/services/logger'
-import { collection, query, where, getDocs } from 'firebase/firestore'
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore'
 import { firestore } from '@/services/firebase'
 
 const route = useRoute()
@@ -52,24 +52,16 @@ const legacyUserId = computed(() => {
   return typeof id === 'string' ? id : (Array.isArray(id) ? id[0] : '');
 })
 
-// Determine correct URL format for sharing
-const profileUrl = computed(() => {
-  if (userTag.value) {
-    return `/@${userTag.value}`
-  }
-  return `/u/${userId.value}`
-})
-
 // Convert user tag to user ID if needed
 const getUserIdFromTag = async (tag: string): Promise<string | null> => {
   try {
-    const userTagsRef = collection(firestore, 'userTags')
-    const q = query(userTagsRef, where('userTag', '==', tag))
-    const querySnapshot = await getDocs(q)
+    // Instead of querying the users collection, directly check the userTags collection
+    // This follows our updated security model
+    const tagDoc = doc(firestore, 'userTags', tag)
+    const tagSnapshot = await getDoc(tagDoc)
     
-    if (!querySnapshot.empty) {
-      const doc = querySnapshot.docs[0]
-      return doc.data().uid
+    if (tagSnapshot.exists()) {
+      return tagSnapshot.data().uid
     }
     
     return null
