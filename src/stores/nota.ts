@@ -756,6 +756,51 @@ export const useNotaStore = defineStore('nota', {
         logger.error('Failed to search notas by title:', error)
         return []
       }
+    },
+
+    async clonePublishedNota(publishedNotaId: string): Promise<Nota | null> {
+      try {
+        // Get the published nota data
+        const publishedNota = await this.getPublishedNota(publishedNotaId)
+        if (!publishedNota || !publishedNota.content) {
+          throw new Error('Published nota not found or has no content')
+        }
+
+        // Create a new nota with a new ID but copy the content
+        const newNota: Nota = {
+          id: nanoid(), // Generate a new UUID
+          title: `${publishedNota.title} (Clone)`,
+          content: publishedNota.content,
+          parentId: null, // Reset parent ID as this is a clone
+          tags: publishedNota.tags ? [...publishedNota.tags] : [],
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }
+
+        // Copy citations if they exist
+        if (publishedNota.citations && publishedNota.citations.length > 0) {
+          newNota.citations = publishedNota.citations.map(citation => ({
+            ...citation,
+            // Generate new IDs for each citation
+            id: crypto.randomUUID()
+          }))
+        }
+
+        // Save the new nota to the database
+        const serialized = serializeNota(newNota)
+        await db.notas.add(serialized)
+        
+        // Add to the store's items array
+        this.items.push(newNota)
+
+        toast(`Nota "${newNota.title}" cloned successfully`)
+
+        return newNota
+      } catch (error) {
+        logger.error('Failed to clone published nota:', error)
+        toast('Failed to clone nota')
+        return null
+      }
     }
   },
 })

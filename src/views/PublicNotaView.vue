@@ -5,7 +5,7 @@ import { useNotaStore } from '@/stores/nota'
 import { useAuthStore } from '@/stores/auth'
 import { Button } from '@/components/ui/button'
 import { formatDate, toast } from '@/lib/utils'
-import { Share2, ChevronLeft, ThumbsUp, ThumbsDown } from 'lucide-vue-next'
+import { Share2, ChevronLeft, ThumbsUp, ThumbsDown, FileText } from 'lucide-vue-next'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import NotaContentViewer from '@/components/editor/NotaContentViewer.vue'
 import { type PublishedNota } from '@/types/nota'
@@ -289,6 +289,31 @@ const shareNota = () => {
     })
 }
 
+const cloneNota = async () => {
+  if (!nota.value) return
+  
+  try {
+    // Show loading state
+    isLoading.value = true
+    
+    // Call the store method to clone the nota
+    const newNota = await notaStore.clonePublishedNota(notaId.value)
+    
+    // If successful, navigate to the newly created nota
+    if (newNota) {
+      // Small delay to allow for the toast to be visible
+      setTimeout(() => {
+        router.push(`/nota/${newNota.id}`)
+      }, 1000)
+    }
+  } catch (error) {
+    logger.error('Error cloning nota:', error)
+    toast('Failed to clone nota')
+  } finally {
+    isLoading.value = false
+  }
+}
+
 // Update author link to use tag if available
 const getAuthorLink = computed(() => {
   if (!nota.value) return '#'
@@ -411,6 +436,10 @@ const handleVote = async (voteType: 'like' | 'dislike') => {
         </div>
 
         <div class="flex items-center gap-2">
+          <Button variant="outline" size="sm" @click="cloneNota" v-if="authStore.isAuthenticated">
+            <FileText class="mr-2 h-4 w-4" />
+            Clone
+          </Button>
           <Button variant="outline" size="sm" @click="shareNota">
             <Share2 class="mr-2 h-4 w-4" />
             Share
