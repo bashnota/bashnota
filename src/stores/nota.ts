@@ -810,7 +810,104 @@ export const useNotaStore = defineStore('nota', {
         // Add to the store's items array
         this.items.push(newNota)
 
-        toast(`Nota "${newNota.title}" cloned successfully`)
+        // Clone sub-notas if they exist
+        if (publishedNota.publishedSubPages && publishedNota.publishedSubPages.length > 0) {
+          toast(`Cloning ${publishedNota.publishedSubPages.length} sub-pages...`)
+          
+          // Keep track of original ID to new ID mapping
+          const idMapping = new Map<string, string>()
+          idMapping.set(publishedNotaId, newNota.id)
+          
+          // First pass: clone all sub-pages
+          for (const subPageId of publishedNota.publishedSubPages) {
+            try {
+              const subPageNota = await this.getPublishedNota(subPageId)
+              if (!subPageNota) continue
+              
+              // Create clone of sub-nota
+              const newSubNota: Nota = {
+                id: nanoid(),
+                title: subPageNota.title,
+                content: subPageNota.content,
+                parentId: newNota.id, // Set parent to the new parent nota
+                tags: subPageNota.tags ? [...subPageNota.tags] : [],
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              }
+              
+              // Copy citations if they exist
+              if (subPageNota.citations && subPageNota.citations.length > 0) {
+                newSubNota.citations = subPageNota.citations.map(citation => ({
+                  ...citation,
+                  id: crypto.randomUUID()
+                }))
+              }
+              
+              // Save the new sub-nota
+              const serializedSub = serializeNota(newSubNota)
+              await db.notas.add(serializedSub)
+              
+              // Add to store's items array
+              this.items.push(newSubNota)
+              
+              // Track ID mapping for updating references
+              idMapping.set(subPageId, newSubNota.id)
+              
+            } catch (error) {
+              logger.error(`Failed to clone sub-nota ${subPageId}:`, error)
+              // Continue with other sub-notas even if one fails
+            }
+          }
+          
+          // Second pass: update all content to reference new IDs for page links
+          for (const newNotaId of idMapping.values()) {
+            try {
+              const nota = this.getCurrentNota(newNotaId)
+              if (!nota || !nota.content) continue
+              
+              let contentObj = JSON.parse(nota.content)
+              let modified = false
+              
+              // Helper function to recursively update page links
+              const updatePageLinks = (node: any) => {
+                if (node.type === 'pageLink' && node.attrs && node.attrs.href) {
+                  // Extract the old ID from the href
+                  const hrefMatch = node.attrs.href.match(/\/nota\/([^/]+)/)
+                  if (hrefMatch && hrefMatch[1]) {
+                    const oldId = hrefMatch[1]
+                    const newId = idMapping.get(oldId)
+                    
+                    if (newId) {
+                      // Update href with new ID
+                      node.attrs.href = `/nota/${newId}`
+                      modified = true
+                    }
+                  }
+                }
+                
+                // Process child nodes
+                if (node.content && Array.isArray(node.content)) {
+                  node.content.forEach(updatePageLinks)
+                }
+              }
+              
+              // Update links in content
+              if (contentObj.content && Array.isArray(contentObj.content)) {
+                contentObj.content.forEach(updatePageLinks)
+              }
+              
+              // Save updated content if modified
+              if (modified) {
+                nota.content = JSON.stringify(contentObj)
+                await this.saveItem(nota)
+              }
+            } catch (error) {
+              logger.error(`Failed to update references in nota ${newNotaId}:`, error)
+            }
+          }
+        }
+
+        toast(`Nota "${newNota.title}" cloned successfully with all sub-pages`)
 
         return newNota
       } catch (error) {
