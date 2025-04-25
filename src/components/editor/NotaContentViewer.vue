@@ -27,6 +27,9 @@ const props = defineProps<{
   citations?: any[] // Add citations prop
 }>()
 
+// Define emits
+const emit = defineEmits(['content-rendered'])
+
 const codeExecutionStore = useCodeExecutionStore()
 const citationStore = useCitationStore()
 const isSidebarOpen = ref(false)
@@ -85,6 +88,8 @@ const editor = useEditor({
   onCreate({ editor }: { editor: Editor }) {
     registerCodeCells(editor.getJSON())
     isLoading.value = false
+    // Emit an event when the editor is created and content is loaded
+    emit('content-rendered')
   },
   nodeViews: {
     citation: (node: ProseMirrorNode, view: EditorView, getPos: () => number, decorations: any) => {

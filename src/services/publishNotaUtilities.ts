@@ -114,6 +114,27 @@ async function processContentObject(
   if (typeof obj === 'object') {
     const result = { ...obj }
 
+    // Handle page links - convert internal /nota/ links to public /p/ links
+    if (obj.type === 'pageLink' && obj.attrs?.href && typeof obj.attrs.href === 'string') {
+      // Check if this is an internal nota link
+      if (obj.attrs.href.startsWith('/nota/')) {
+        const notaId = obj.attrs.href.replace('/nota/', '')
+        
+        // Check if this sub-nota is published
+        if (options?.publishedSubPages?.includes(notaId)) {
+          // Replace with public link format
+          result.attrs = {
+            ...obj.attrs,
+            href: `/p/${notaId}`, // Use the standard public format
+          }
+        } else {
+          // This sub-nota is not published, so we should remove the link or handle it specially
+          // For now, we'll keep it as is, but in a real implementation, you might want to handle this differently
+          logger.warn(`Sub-nota ${notaId} referenced in content is not published`)
+        }
+      }
+    }
+
     // Process inline code block outputs that might contain HTML with images
     if (obj.type === 'executableCodeBlock' && obj.attrs?.output) {
       if (typeof obj.attrs.output === 'string' && obj.attrs.output.includes('<img')) {

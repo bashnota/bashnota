@@ -5,7 +5,7 @@ import { useNotaStore } from '@/stores/nota'
 import { useAuthStore } from '@/stores/auth'
 import { Button } from '@/components/ui/button'
 import { formatDate, toast } from '@/lib/utils'
-import { Share2, ChevronLeft, ThumbsUp, ThumbsDown } from 'lucide-vue-next'
+import { Share2, ChevronLeft, ChevronUp, ChevronDown, FileText } from 'lucide-vue-next'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import NotaContentViewer from '@/components/editor/NotaContentViewer.vue'
 import { type PublishedNota } from '@/types/nota'
@@ -220,11 +220,6 @@ onMounted(async () => {
       }
     }
 
-    // Convert links in the content after it's rendered
-    setTimeout(() => {
-      convertPublicPageLinks(document)
-    }, 100)
-
     // Load voting data
     await loadVotingData()
   } catch (err) {
@@ -287,6 +282,31 @@ const shareNota = () => {
     .catch(() => {
       alert('Failed to copy link')
     })
+}
+
+const cloneNota = async () => {
+  if (!nota.value) return
+  
+  try {
+    // Show loading state
+    isLoading.value = true
+    
+    // Call the store method to clone the nota
+    const newNota = await notaStore.clonePublishedNota(notaId.value)
+    
+    // If successful, navigate to the newly created nota
+    if (newNota) {
+      // Small delay to allow for the toast to be visible
+      setTimeout(() => {
+        router.push(`/nota/${newNota.id}`)
+      }, 1000)
+    }
+  } catch (error) {
+    logger.error('Error cloning nota:', error)
+    toast('Failed to clone nota')
+  } finally {
+    isLoading.value = false
+  }
 }
 
 // Update author link to use tag if available
@@ -359,6 +379,13 @@ const handleVote = async (voteType: 'like' | 'dislike') => {
     isVoting.value = false;
   }
 }
+
+// Handle content rendered event from NotaContentViewer
+const handleContentRendered = () => {
+  // Once the content is rendered, convert the page links
+  convertPublicPageLinks(document)
+  logger.debug('Content rendered, converting public page links. Current path:', window.location.pathname)
+}
 </script>
 
 <template>
@@ -411,6 +438,10 @@ const handleVote = async (voteType: 'like' | 'dislike') => {
         </div>
 
         <div class="flex items-center gap-2">
+          <Button variant="outline" size="sm" @click="cloneNota" v-if="authStore.isAuthenticated">
+            <FileText class="mr-2 h-4 w-4" />
+            Clone
+          </Button>
           <Button variant="outline" size="sm" @click="shareNota">
             <Share2 class="mr-2 h-4 w-4" />
             Share
@@ -420,27 +451,85 @@ const handleVote = async (voteType: 'like' | 'dislike') => {
 
       <!-- Meta information -->
       <div class="flex flex-wrap items-center justify-between text-sm text-muted-foreground">
-        <div itemscope itemtype="https://schema.org/PublicationEvent">
-          <span>Published: <time itemprop="datePublished" :datetime="new Date(nota.publishedAt).toISOString()">{{ formatDate(nota.publishedAt) }}</time></span>
-          <span class="mx-2">•</span>
-          <span>Last updated: <time itemprop="dateModified" :datetime="new Date(nota.updatedAt).toISOString()">{{ formatDate(nota.updatedAt) }}</time></span>
-          <span class="mx-2">•</span>
-          <span>
-            By:
-            <a
-              @click="router.push(getAuthorLink)"
-              class="underline cursor-pointer hover:text-black"
-              itemprop="author"
-              itemscope
-              itemtype="https://schema.org/Person"
-            >
-              <span itemprop="name">
-                {{ userTag ? `@${userTag}` : nota.authorName }}
-              </span>
-            </a>
-          </span>
+        <div class="flex items-center gap-4">
+          <div itemscope itemtype="https://schema.org/PublicationEvent">
+            <span>Published: <time itemprop="datePublished" :datetime="new Date(nota.publishedAt).toISOString()">{{ formatDate(nota.publishedAt) }}</time></span>
+            <span class="mx-2">•</span>
+            <span>Last updated: <time itemprop="dateModified" :datetime="new Date(nota.updatedAt).toISOString()">{{ formatDate(nota.updatedAt) }}</time></span>
+            <span class="mx-2">•</span>
+            <span>
+              By:
+              <a
+                @click="router.push(getAuthorLink)"
+                class="underline cursor-pointer hover:text-black"
+                itemprop="author"
+                itemscope
+                itemtype="https://schema.org/Person"
+              >
+                <span itemprop="name">
+                  {{ userTag ? `@${userTag}` : nota.authorName }}
+                </span>
+              </a>
+            </span>
+          </div>
+          
+          <!-- Voting buttons moved next to metadata -->
+          <div class="flex items-center gap-2">
+            <div class="relative group">
+              <Button
+                :variant="userVote === 'like' ? 'default' : 'ghost'"
+                :class="[
+                  'transition-all duration-200 flex items-center gap-1 relative',
+                  userVote === 'like' ? 'text-green-600 hover:text-green-700' : 'hover:text-green-600',
+                  !authStore.isAuthenticated ? 'cursor-help' : ''
+                ]"
+                size="sm"
+                :disabled="isVoting"
+                @click="authStore.isAuthenticated ? handleVote('like') : null"
+                @mouseenter="!authStore.isAuthenticated ? toast('Please login to vote', '', 'default') : null"
+              >
+                <ChevronUp 
+                  class="h-5 w-5 transition-transform duration-200" 
+                  :class="{ 'scale-125': userVote === 'like' }" 
+                />
+                <span class="font-medium">{{ likeCount }}</span>
+                <span v-if="isVoting && userVote === 'like'" class="absolute -top-1 -right-1 h-2 w-2 bg-green-500 rounded-full animate-ping"></span>
+              </Button>
+              <div class="absolute -top-8 left-0 bg-black bg-opacity-80 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
+                {{ userVote === 'like' ? 'Remove Upvote' : 'Upvote this nota' }}
+              </div>
+            </div>
+            
+            <div class="relative group">
+              <Button
+                :variant="userVote === 'dislike' ? 'default' : 'ghost'"
+                :class="[
+                  'transition-all duration-200 flex items-center gap-1 relative',
+                  userVote === 'dislike' ? 'text-red-600 hover:text-red-700' : 'hover:text-red-600',
+                  !authStore.isAuthenticated ? 'cursor-help' : ''
+                ]"
+                size="sm"
+                :disabled="isVoting"
+                @click="authStore.isAuthenticated ? handleVote('dislike') : null"
+                @mouseenter="!authStore.isAuthenticated ? toast('Please login to vote', '', 'default') : null"
+              >
+                <ChevronDown 
+                  class="h-5 w-5 transition-transform duration-200" 
+                  :class="{ 'scale-125': userVote === 'dislike' }" 
+                />
+                <span class="font-medium">{{ dislikeCount }}</span>
+                <span v-if="isVoting && userVote === 'dislike'" class="absolute -top-1 -right-1 h-2 w-2 bg-red-500 rounded-full animate-ping"></span>
+              </Button>
+              <div class="absolute -top-8 left-0 bg-black bg-opacity-80 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
+                {{ userVote === 'dislike' ? 'Remove Downvote' : 'Downvote this nota' }}
+              </div>
+            </div>
+            
+            <!-- Show voters list button -->
+            <VotersList :notaId="notaId" v-if="likeCount > 0 || dislikeCount > 0" />
+          </div>
         </div>
-        
+
         <!-- Tags display if available -->
         <div v-if="nota.tags && nota.tags.length > 0" class="mt-2 sm:mt-0">
           <span class="text-muted-foreground">Tags: </span>
@@ -449,37 +538,22 @@ const handleVote = async (voteType: 'like' | 'dislike') => {
           </span>
         </div>
       </div>
-      <!-- Voting section -->
-      <div class="flex items-center gap-4 mt-4">
-        <Button
-          :variant="userVote === 'like' ? 'default' : 'outline'"
-          size="sm"
-          :disabled="isVoting"
-          @click="handleVote('like')"
-        >
-          <ThumbsUp class="mr-2 h-4 w-4" />
-          {{ likeCount }}
-        </Button>
-        <Button
-          :variant="userVote === 'dislike' ? 'default' : 'outline'"
-          size="sm"
-          :disabled="isVoting"
-          @click="handleVote('dislike')"
-        >
-          <ThumbsDown class="mr-2 h-4 w-4" />
-          {{ dislikeCount }}
-        </Button>
-        
-        <!-- Show voters list button -->
-        <VotersList :notaId="notaId" v-if="likeCount > 0 || dislikeCount > 0" />
+      
+      <!-- Login prompt for non-authenticated users -->
+      <div v-if="!authStore.isAuthenticated" class="text-sm text-muted-foreground bg-muted/30 p-2 rounded text-center my-2">
+        Please <button class="underline text-primary hover:text-primary/80" @click="router.push('/login')">login</button> to vote on this nota
       </div>
-
 
       <hr class="border-t border-gray-200" />
 
       <!-- Content area with itemprop for search engines -->
       <div itemprop="articleBody">
-        <NotaContentViewer :content="nota.content" :citations="nota.citations" readonly />
+        <NotaContentViewer 
+          :content="nota.content" 
+          :citations="nota.citations" 
+          readonly 
+          @content-rendered="handleContentRendered"
+        />
       </div>
       
       <!-- Footer with related/related articles if available -->
@@ -502,7 +576,7 @@ const handleVote = async (voteType: 'like' | 'dislike') => {
 /* Simple toast notification styles */
 .toast {
   position: fixed;
-  bottom: 20px;
+  bottom:20px;
   right: 20px;
   padding: 10px 15px;
   background: #fff;
