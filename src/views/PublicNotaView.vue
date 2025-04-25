@@ -220,11 +220,6 @@ onMounted(async () => {
       }
     }
 
-    // Convert links in the content after it's rendered
-    setTimeout(() => {
-      convertPublicPageLinks(document)
-    }, 100)
-
     // Load voting data
     await loadVotingData()
   } catch (err) {
@@ -383,6 +378,13 @@ const handleVote = async (voteType: 'like' | 'dislike') => {
   } finally {
     isVoting.value = false;
   }
+}
+
+// Handle content rendered event from NotaContentViewer
+const handleContentRendered = () => {
+  // Once the content is rendered, convert the page links
+  convertPublicPageLinks(document)
+  logger.debug('Content rendered, converting public page links. Current path:', window.location.pathname)
 }
 </script>
 
@@ -546,7 +548,12 @@ const handleVote = async (voteType: 'like' | 'dislike') => {
 
       <!-- Content area with itemprop for search engines -->
       <div itemprop="articleBody">
-        <NotaContentViewer :content="nota.content" :citations="nota.citations" readonly />
+        <NotaContentViewer 
+          :content="nota.content" 
+          :citations="nota.citations" 
+          readonly 
+          @content-rendered="handleContentRendered"
+        />
       </div>
       
       <!-- Footer with related/related articles if available -->
@@ -569,7 +576,7 @@ const handleVote = async (voteType: 'like' | 'dislike') => {
 /* Simple toast notification styles */
 .toast {
   position: fixed;
-  bottom: 20px;
+  bottom:20px;
   right: 20px;
   padding: 10px 15px;
   background: #fff;

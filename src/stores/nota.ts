@@ -135,8 +135,25 @@ export const useNotaStore = defineStore('nota', {
     },
 
     getPublicLink: () => (id: string) => {
+      // Check if we're currently using a user tag URL format
+      const currentPath = window.location.pathname
+      const isUserTagFormat = currentPath.startsWith('/@')
+      
+      // Extract user tag if present (format: /@username/notaId)
+      let userTag = ''
+      if (isUserTagFormat) {
+        const pathParts = currentPath.split('/')
+        if (pathParts.length >= 2) {
+          userTag = pathParts[1] // Will include the @ symbol
+        }
+      }
+      
       const baseURL = import.meta.env.VITE_APP_BASE_URL
-      // Format your public URL as needed
+      
+      // Return URL in the appropriate format
+      if (isUserTagFormat && userTag) {
+        return `${baseURL}/${userTag}/${id}`
+      }
       return `${baseURL}/p/${id}`
     },
   },

@@ -1013,38 +1013,42 @@ const handlePageSizeChange = (event: Event) => {
 
               <!-- Grid View -->
               <div v-if="viewType === 'grid'" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card v-for="nota in paginatedNotas" :key="nota.id" class="flex flex-col">
-                  <CardHeader>
-                    <CardTitle class="truncate" :title="nota.title">{{ nota.title }}</CardTitle>
-                  </CardHeader>
-                  <CardContent class="flex-1">
-                    <div class="flex flex-col gap-1 text-sm">
-                      <p class="text-sm text-muted-foreground flex justify-between">
-                        <span>Published: {{ formatDate(nota.publishedAt) }}</span>
-                        <span v-if="nota.viewCount !== undefined" class="flex items-center">
-                          <Eye class="h-3.5 w-3.5 mr-1" /> {{ nota.viewCount }}
-                        </span>
-                      </p>
-                      <p class="text-sm text-muted-foreground">
-                        Last updated: {{ formatDate(nota.updatedAt) }}
-                      </p>
-                      <!-- Show tags if available -->
-                      <div v-if="nota.tags && nota.tags.length > 0" class="flex flex-wrap gap-1 mt-2">
-                        <span 
-                          v-for="tag in nota.tags" 
-                          :key="tag"
-                          class="px-1.5 py-0.5 text-xs rounded-full bg-muted text-muted-foreground"
-                        >
-                          {{ tag }}
-                        </span>
+                <Card v-for="nota in paginatedNotas" :key="nota.id" class="flex flex-col hover:shadow-md transition-shadow">
+                  <!-- Make the card header and content clickable -->
+                  <div 
+                    class="cursor-pointer flex-1 flex flex-col"
+                    @click="viewNota(nota.id)"
+                    role="button"
+                    :aria-label="`Open ${nota.title}`"
+                  >
+                    <CardHeader>
+                      <CardTitle class="truncate" :title="nota.title">{{ nota.title }}</CardTitle>
+                    </CardHeader>
+                    <CardContent class="flex-1">
+                      <div class="flex flex-col gap-1 text-sm">
+                        <p class="text-sm text-muted-foreground flex justify-between">
+                          <span>Published: {{ formatDate(nota.publishedAt) }}</span>
+                          <span v-if="nota.viewCount !== undefined" class="flex items-center">
+                            <Eye class="h-3.5 w-3.5 mr-1" /> {{ nota.viewCount }}
+                          </span>
+                        </p>
+                        <p class="text-sm text-muted-foreground">
+                          Last updated: {{ formatDate(nota.updatedAt) }}
+                        </p>
+                        <!-- Show tags if available -->
+                        <div v-if="nota.tags && nota.tags.length > 0" class="flex flex-wrap gap-1 mt-2">
+                          <span 
+                            v-for="tag in nota.tags" 
+                            :key="tag"
+                            class="px-1.5 py-0.5 text-xs rounded-full bg-muted text-muted-foreground"
+                          >
+                            {{ tag }}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
+                    </CardContent>
+                  </div>
                   <CardFooter class="flex flex-col gap-2">
-                    <Button variant="outline" class="w-full" @click="viewNota(nota.id)">
-                      <ExternalLink class="mr-2 h-4 w-4" />
-                      View Nota
-                    </Button>
                     <Button 
                       v-if="isOwnProfile" 
                       variant="outline" 
@@ -1072,7 +1076,7 @@ const handlePageSizeChange = (event: Event) => {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="nota in paginatedNotas" :key="nota.id" class="border-b hover:bg-muted/50 transition-colors">
+                    <tr v-for="nota in paginatedNotas" :key="nota.id" class="border-b hover:bg-muted/50 transition-colors cursor-pointer" @click="viewNota(nota.id)">
                       <td class="py-3 px-4">
                         <div class="font-medium max-w-[250px] truncate" :title="nota.title">{{ nota.title }}</div>
                         <!-- Show tags if available -->
@@ -1107,12 +1111,8 @@ const handlePageSizeChange = (event: Event) => {
                           </span>
                         </div>
                       </td>
-                      <td class="py-3 px-4 text-right">
+                      <td class="py-3 px-4 text-right" @click.stop>
                         <div class="flex justify-end gap-2">
-                          <Button size="sm" variant="outline" @click="viewNota(nota.id)">
-                            <ExternalLink class="mr-1 h-4 w-4" />
-                            View
-                          </Button>
                           <Button 
                             v-if="isOwnProfile" 
                             size="sm"
