@@ -7,6 +7,7 @@ import { toast } from '@/lib/utils'
 import { useAuthStore } from './auth'
 import { fetchAPI } from '@/services/axios'
 import { processNotaContent } from '@/services/publishNotaUtilities'
+import { statisticsService } from '@/services/statisticsService'
 import { logger } from '@/services/logger'
 
 // Helper functions to convert dates and ensure data is serializable
@@ -667,7 +668,35 @@ export const useNotaStore = defineStore('nota', {
       try {
         // Call the API to get published notas by user
         const response = await fetchAPI.get(`/nota/user/${userId}`)
-        return response.data as PublishedNota[]
+        
+        // Get the published notas from the response
+        const publishedNotas = response.data as PublishedNota[]
+        
+        // For each published nota, try to fetch its statistics
+        for (const nota of publishedNotas) {
+          try {
+            // Fetch statistics non-blockingly (don't await to avoid slowing down the main response)
+            statisticsService.getStatistics(nota.id)
+              .then(stats => {
+                // Update the nota with its statistics
+                if (stats) {
+                  nota.viewCount = stats.viewCount
+                  nota.uniqueViewers = stats.uniqueViewers
+                  nota.lastViewedAt = stats.lastViewedAt ? stats.lastViewedAt.toISOString() : undefined
+                  nota.stats = stats.stats
+                }
+              })
+              .catch(err => {
+                // Just log the error without breaking the flow
+                logger.error(`Failed to fetch statistics for nota ${nota.id}:`, err)
+              })
+          } catch (statError) {
+            // Non-blocking error handling - don't let stats errors break the main flow
+            logger.error(`Error fetching statistics for nota ${nota.id}:`, statError)
+          }
+        }
+        
+        return publishedNotas
       } catch (error) {
         logger.error('Failed to fetch published notas by user:', error)
         return []

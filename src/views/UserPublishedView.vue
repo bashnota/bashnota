@@ -1,25 +1,67 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed, watch, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useNotaStore } from '@/stores/nota'
+import { useAuthStore } from '@/stores/auth'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { formatDate } from '@/lib/utils'
-import { ExternalLink } from 'lucide-vue-next'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar' // Import Avatar components
+import { ExternalLink, Trash2, Clock, Search, Grid, List, Table, AlertCircle, CalendarDays, BarChart, Eye, Filter, DownloadCloud, ThumbsUp, ThumbsDown } from 'lucide-vue-next'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import { type PublishedNota } from '@/types/nota'
 import { logger } from '@/services/logger'
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore'
 import { firestore } from '@/services/firebase'
+import { toast } from '@/lib/utils'
 
 const route = useRoute()
 const router = useRouter()
 const notaStore = useNotaStore()
+const authStore = useAuthStore()
 const publishedNotas = ref<PublishedNota[]>([])
 const isLoading = ref(true)
 const error = ref<string | null>(null)
 const userId = ref<string | null>(null)
+const searchQuery = ref('')
+const viewType = ref<'grid' | 'list' | 'table'>('grid')
+const isConfirmDeleteOpen = ref(false)
+const notaToDelete = ref<string | null>(null)
+const dateFilter = ref<'all' | 'today' | 'week' | 'month' | 'year'>('all')
+const isFilterOpen = ref(false)
+const sortBy = ref<'date' | 'views' | 'title'>('date')
+const sortDirection = ref<'asc' | 'desc'>('desc')
+
+// Statistics
+const stats = reactive({
+  totalViews: 0,
+  mostViewed: null as PublishedNota | null,
+  averageViews: 0,
+  publishedToday: 0,
+  publishedThisWeek: 0,
+  publishedThisMonth: 0,
+  topTags: [] as {tag: string, count: number}[],
+  totalLikes: 0,
+  totalDislikes: 0,
+  mostLiked: null as PublishedNota | null,
+  likeRatio: undefined as number | undefined
+})
+
+// Check if the current logged-in user is viewing their own profile
+const isOwnProfile = computed(() => {
+  return authStore.isAuthenticated && authStore.currentUser?.uid === userId.value
+})
+
+// Filtered notas based on search query
+const filteredNotas = computed(() => {
+  if (!searchQuery.value) return publishedNotas.value
+  
+  const query = searchQuery.value.toLowerCase()
+  return publishedNotas.value.filter(nota => 
+    nota.title.toLowerCase().includes(query)
+  )
+})
 
 // Computed property to get author name from the first published nota
 const authorName = computed(() => {
@@ -47,16 +89,24 @@ const userTag = computed(() => {
   const tag = route.params.userTag;
   return typeof tag === 'string' ? tag : (Array.isArray(tag) ? tag[0] : '');
 })
+
 const legacyUserId = computed(() => {
   const id = route.params.userId;
   return typeof id === 'string' ? id : (Array.isArray(id) ? id[0] : '');
 })
 
+// Profile URL for sharing
+const profileUrl = computed(() => {
+  if (userTag.value) {
+    return `/@${userTag.value}`
+  }
+  return `/u/${userId.value}`
+})
+
 // Convert user tag to user ID if needed
 const getUserIdFromTag = async (tag: string): Promise<string | null> => {
   try {
-    // Instead of querying the users collection, directly check the userTags collection
-    // This follows our updated security model
+    // Use the userTags collection for lookup
     const tagDoc = doc(firestore, 'userTags', tag)
     const tagSnapshot = await getDoc(tagDoc)
     
@@ -70,6 +120,64 @@ const getUserIdFromTag = async (tag: string): Promise<string | null> => {
     return null
   }
 }
+
+// Date filtering logic
+const getDateFilter = (filter: string) => {
+  const now = new Date()
+  switch (filter) {
+    case 'today':
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      return (date: Date) => date >= today
+    case 'week':
+      const week = new Date(now)
+      week.setDate(now.getDate() - 7)
+      return (date: Date) => date >= week
+    case 'month':
+      const month = new Date(now)
+      month.setMonth(now.getMonth() - 1)
+      return (date: Date) => date >= month
+    case 'year':
+      const year = new Date(now)
+      year.setFullYear(now.getFullYear() - 1)
+      return (date: Date) => date >= year
+    default:
+      return () => true
+  }
+}
+
+// Sorted and filtered notas
+const processedNotas = computed(() => {
+  // First apply search filter
+  let result = searchQuery.value 
+    ? publishedNotas.value.filter(nota => nota.title.toLowerCase().includes(searchQuery.value.toLowerCase()))
+    : [...publishedNotas.value]
+  
+  // Then apply date filter
+  if (dateFilter.value !== 'all') {
+    const filterFn = getDateFilter(dateFilter.value)
+    result = result.filter(nota => filterFn(new Date(nota.publishedAt)))
+  }
+  
+  // Then sort
+  result.sort((a, b) => {
+    let comparison = 0
+    
+    if (sortBy.value === 'date') {
+      comparison = new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+    } else if (sortBy.value === 'title') {
+      comparison = a.title.localeCompare(b.title)
+    } else if (sortBy.value === 'views') {
+      // Fallback to view count if available, otherwise publishedAt
+      const viewsA = a.viewCount || 0
+      const viewsB = b.viewCount || 0
+      comparison = viewsB - viewsA
+    }
+    
+    return sortDirection.value === 'asc' ? -comparison : comparison
+  })
+  
+  return result
+})
 
 // Load user's published notas
 const loadPublishedNotas = async () => {
@@ -93,12 +201,139 @@ const loadPublishedNotas = async () => {
       isLoading.value = false
       return
     }
+    
+    // Calculate statistics
+    calculateStats(notas)
   } catch (err) {
     logger.error('Error loading published notas:', err)
     error.value = 'Failed to load published notas'
   } finally {
     isLoading.value = false
   }
+}
+
+// Calculate statistics for the published notas
+const calculateStats = (notas: PublishedNota[]) => {
+  // Reset stats
+  stats.totalViews = 0
+  stats.mostViewed = null
+  stats.averageViews = 0
+  stats.publishedToday = 0
+  stats.publishedThisWeek = 0
+  stats.publishedThisMonth = 0
+  stats.topTags = []
+  stats.totalLikes = 0
+  stats.totalDislikes = 0
+  stats.mostLiked = null
+  stats.likeRatio = undefined
+  
+  // Find the current date boundaries
+  const now = new Date()
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const weekStart = new Date(now); weekStart.setDate(now.getDate() - 7)
+  const monthStart = new Date(now); monthStart.setMonth(now.getMonth() - 1)
+  
+  // Tag counter
+  const tagCounter: Record<string, number> = {}
+  
+  // Process each nota
+  notas.forEach(nota => {
+    // Count views
+    const views = nota.viewCount || 0
+    stats.totalViews += views
+    
+    // Find most viewed
+    if (!stats.mostViewed || views > (stats.mostViewed.viewCount || 0)) {
+      stats.mostViewed = nota
+    }
+    
+    // Count by publication date
+    const pubDate = new Date(nota.publishedAt)
+    if (pubDate >= todayStart) stats.publishedToday++
+    if (pubDate >= weekStart) stats.publishedThisWeek++
+    if (pubDate >= monthStart) stats.publishedThisMonth++
+    
+    // Count tags if available
+    if (nota.tags && Array.isArray(nota.tags)) {
+      nota.tags.forEach(tag => {
+        tagCounter[tag] = (tagCounter[tag] || 0) + 1
+      })
+    }
+
+    // Count likes and dislikes
+    const likes = nota.likeCount || 0
+    const dislikes = nota.dislikeCount || 0
+    stats.totalLikes += likes
+    stats.totalDislikes += dislikes
+
+    // Find most liked
+    if (!stats.mostLiked || likes > (stats.mostLiked.likeCount || 0)) {
+      stats.mostLiked = nota
+    }
+  })
+  
+  // Calculate average views
+  stats.averageViews = notas.length > 0 ? Math.round(stats.totalViews / notas.length) : 0
+  
+  // Get top tags
+  stats.topTags = Object.entries(tagCounter)
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5)
+
+  // Calculate like ratio
+  const totalVotes = stats.totalLikes + stats.totalDislikes
+  stats.likeRatio = totalVotes > 0 ? stats.totalLikes / totalVotes : undefined
+}
+
+// Set the date filter
+const setDateFilter = (filter: 'all' | 'today' | 'week' | 'month' | 'year') => {
+  dateFilter.value = filter
+  isFilterOpen.value = false
+}
+
+// Toggle sort direction
+const toggleSortDirection = () => {
+  sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
+}
+
+// Set sort criteria
+const setSortBy = (sort: 'date' | 'views' | 'title') => {
+  if (sortBy.value === sort) {
+    toggleSortDirection()
+  } else {
+    sortBy.value = sort
+    sortDirection.value = 'desc'
+  }
+}
+
+// Export data as CSV
+const exportAsCSV = () => {
+  // Create CSV headers
+  let csvContent = "Title,Published Date,Last Updated,Views\n"
+  
+  // Add each nota as a row
+  processedNotas.value.forEach(nota => {
+    const title = nota.title.replace(/,/g, ' ')
+    const published = formatDate(nota.publishedAt)
+    const updated = formatDate(nota.updatedAt)
+    const views = nota.viewCount || 0
+    
+    csvContent += `"${title}",${published},${updated},${views}\n`
+  })
+  
+  // Create and trigger download
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.setAttribute('href', url)
+  link.setAttribute('download', `published-notas-${formatDate(new Date())}.csv`)
+  link.style.visibility = 'hidden'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  
+  toast('CSV file downloaded successfully')
 }
 
 // Watch for changes in route parameters
@@ -151,26 +386,100 @@ const viewNota = (id: string) => {
     router.push(`/p/${id}`)
   }
 }
+
+// Handle unpublishing a nota (deleting it from public view)
+const confirmDelete = (notaId: string) => {
+  notaToDelete.value = notaId
+  isConfirmDeleteOpen.value = true
+}
+
+const cancelDelete = () => {
+  notaToDelete.value = null
+  isConfirmDeleteOpen.value = false
+}
+
+const unpublishNota = async () => {
+  if (!notaToDelete.value) return
+  
+  try {
+    // First try to load the nota into the store to ensure it exists locally
+    await notaStore.loadNota(notaToDelete.value)
+    
+    // Then unpublish it
+    await notaStore.unpublishNota(notaToDelete.value)
+    
+    // Remove the nota from the list
+    publishedNotas.value = publishedNotas.value.filter(nota => nota.id !== notaToDelete.value)
+    toast('Nota unpublished successfully')
+  } catch (error) {
+    logger.error('Error unpublishing nota:', error)
+    toast('Failed to unpublish nota', undefined, 'destructive')
+  } finally {
+    isConfirmDeleteOpen.value = false
+    notaToDelete.value = null
+  }
+}
 </script>
 
 <template>
-  <div class="container mx-auto max-w-6xl py-8 px-4">
+  <div class="container mx-auto py-8 px-4 overflow-auto">
+    <!-- Profile Header -->
     <header class="mb-8">
-      <div class="flex items-center gap-4 mb-4">
-        <!-- User Avatar (using initials from author name) -->
-        <Avatar class="h-16 w-16">
-          <AvatarFallback class="text-lg">
-            {{ authorInitials || 'A' }}
-          </AvatarFallback>
-        </Avatar>
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div class="flex items-center gap-4">
+          <!-- User Avatar -->
+          <Avatar class="h-16 w-16">
+            <AvatarFallback class="text-lg">
+              {{ authorInitials || 'A' }}
+            </AvatarFallback>
+          </Avatar>
 
-        <!-- User info from publishedNotas -->
-        <div>
-          <h1 class="text-3xl font-bold">{{ authorName }}'s Notas</h1>
-          <p class="text-muted-foreground mt-1">
-            <span v-if="userTag">@{{ userTag }} • </span>
-            Published documents and notes
-          </p>
+          <!-- User info -->
+          <div>
+            <h1 class="text-3xl font-bold">{{ authorName }}'s Notas</h1>
+            <p class="text-muted-foreground mt-1">
+              <span v-if="userTag">@{{ userTag }} • </span>
+              Published documents and notes
+            </p>
+          </div>
+        </div>
+
+        <!-- Search and view controls -->
+        <div class="flex items-center gap-2 mt-2 md:mt-0">
+          <div class="relative w-full md:w-auto">
+            <Search class="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              :value="searchQuery"
+              @input="(event: Event) => searchQuery = (event.target as HTMLInputElement).value"
+              type="search"
+              placeholder="Search notas..."
+              class="pl-8 w-full md:w-[200px]"
+            />
+          </div>
+          <Button
+            variant="outline"
+            size="icon"
+            @click="viewType = 'grid'"
+            :class="{ 'bg-primary/10': viewType === 'grid' }"
+          >
+            <Grid class="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            @click="viewType = 'list'"
+            :class="{ 'bg-primary/10': viewType === 'list' }"
+          >
+            <List class="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            @click="viewType = 'table'"
+            :class="{ 'bg-primary/10': viewType === 'table' }"
+          >
+            <Table class="h-4 w-4" />
+          </Button>
         </div>
       </div>
     </header>
@@ -197,25 +506,380 @@ const viewNota = (id: string) => {
       <Button @click="router.push('/')">Go Home</Button>
     </div>
 
-    <!-- Content state -->
-    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <Card v-for="nota in publishedNotas" :key="nota.id" class="flex flex-col">
-        <CardHeader>
-          <CardTitle class="line-clamp-2">{{ nota.title }}</CardTitle>
+    <!-- Content state with Stats and Notas -->
+    <div v-else-if="publishedNotas.length > 0" class="space-y-6">
+      <!-- Stats Section -->
+      <Card class="overflow-hidden">
+        <CardHeader class="bg-card border-b px-6">
+          <div class="flex items-center justify-between">
+            <CardTitle class="flex items-center gap-2">
+              <BarChart class="h-4 w-4" />
+              Publication Statistics
+            </CardTitle>
+          </div>
         </CardHeader>
-        <CardContent class="flex-1">
-          <p class="text-sm text-muted-foreground">Published: {{ formatDate(nota.publishedAt) }}</p>
-          <p class="text-sm text-muted-foreground">
-            Last updated: {{ formatDate(nota.updatedAt) }}
-          </p>
+        <CardContent class="p-4">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- Views -->
+            <div class="bg-muted/50 rounded-lg p-4 space-y-2">
+              <div class="flex items-center justify-between">
+                <p class="text-sm font-medium text-muted-foreground">Total Views</p>
+                <Eye class="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p class="text-2xl font-bold">{{ stats.totalViews }}</p>
+              <p class="text-xs text-muted-foreground">Avg. {{ stats.averageViews }} per nota</p>
+            </div>
+            
+            <!-- Time-based Stats -->
+            <div class="bg-muted/50 rounded-lg p-4 space-y-2">
+              <div class="flex items-center justify-between">
+                <p class="text-sm font-medium text-muted-foreground">Recent Publications</p>
+                <CalendarDays class="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div class="space-y-1">
+                <div class="flex justify-between items-center">
+                  <span class="text-xs">Today:</span>
+                  <span class="text-sm font-medium">{{ stats.publishedToday }}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-xs">This Week:</span>
+                  <span class="text-sm font-medium">{{ stats.publishedThisWeek }}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-xs">This Month:</span>
+                  <span class="text-sm font-medium">{{ stats.publishedThisMonth }}</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Most Viewed -->
+            <div class="bg-muted/50 rounded-lg p-4 space-y-2">
+              <div class="flex items-center justify-between">
+                <p class="text-sm font-medium text-muted-foreground">Most Viewed</p>
+                <Eye class="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p v-if="stats.mostViewed" class="text-sm font-medium line-clamp-1">
+                {{ stats.mostViewed.title }}
+              </p>
+              <p v-if="stats.mostViewed" class="text-xs text-muted-foreground">
+                {{ stats.mostViewed.viewCount || 0 }} views
+              </p>
+              <p v-else class="text-sm italic text-muted-foreground">No view data available</p>
+            </div>
+          </div>
+          
+          <!-- Votes Statistics -->
+          <div class="mt-4 bg-muted/50 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-2">
+              <p class="text-sm font-medium text-muted-foreground">Community Engagement</p>
+              <ThumbsUp class="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <div class="flex items-center gap-1">
+                  <ThumbsUp class="h-3.5 w-3.5 text-primary" />
+                  <span class="text-sm font-medium">{{ stats.totalLikes || 0 }} Likes</span>
+                </div>
+                <p v-if="stats.mostLiked" class="text-xs text-muted-foreground mt-1">
+                  Most liked: {{ stats.mostLiked.title }} ({{ stats.mostLiked.likeCount || 0 }})
+                </p>
+              </div>
+              <div>
+                <div class="flex items-center gap-1">
+                  <ThumbsDown class="h-3.5 w-3.5 text-muted-foreground" />
+                  <span class="text-sm font-medium">{{ stats.totalDislikes || 0 }} Dislikes</span>
+                </div>
+                <p v-if="stats.likeRatio !== undefined" class="text-xs text-muted-foreground mt-1">
+                  Like ratio: {{ Math.round(stats.likeRatio * 100) }}%
+                </p>
+              </div>
+            </div>
+          </div>
         </CardContent>
-        <CardFooter>
-          <Button variant="outline" class="w-full" @click="viewNota(nota.id)">
-            <ExternalLink class="mr-2 h-4 w-4" />
-            View Nota
-          </Button>
-        </CardFooter>
       </Card>
+      
+      <!-- Notas Card with Enhanced Controls -->
+      <Card class="overflow-hidden">
+        <CardHeader class="bg-card border-b px-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <CardTitle class="flex items-center gap-2">
+                <Clock class="h-4 w-4" />
+                Published Notas
+              </CardTitle>
+              <CardDescription>
+                {{ processedNotas.length }} public nota{{ processedNotas.length > 1 ? 's' : '' }}
+                {{ dateFilter !== 'all' ? ` (${dateFilter})` : '' }}
+              </CardDescription>
+            </div>
+            
+            <!-- Enhanced Controls -->
+            <div class="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                @click="exportAsCSV"
+                class="hidden md:flex"
+              >
+                <DownloadCloud class="mr-1 h-4 w-4" />
+                Export CSV
+              </Button>
+              
+              <!-- Date Filter Dropdown -->
+              <div class="relative">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  @click="isFilterOpen = !isFilterOpen"
+                  class="gap-1"
+                >
+                  <Filter class="h-4 w-4" />
+                  <span class="hidden md:inline">{{ dateFilter === 'all' ? 'All time' : dateFilter }}</span>
+                </Button>
+                
+                <div 
+                  v-if="isFilterOpen" 
+                  class="absolute right-0 mt-1 w-40 bg-card border rounded-md shadow-lg z-50"
+                >
+                  <div class="p-1">
+                    <button 
+                      v-for="filter in ['all', 'today', 'week', 'month', 'year']" 
+                      :key="filter"
+                      @click="setDateFilter(filter as any)"
+                      class="w-full text-left px-3 py-1.5 text-sm rounded hover:bg-muted transition-colors"
+                      :class="{ 'bg-muted': dateFilter === filter }"
+                    >
+                      {{ filter === 'all' ? 'All time' : filter }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Sort Buttons -->
+              <div class="flex items-center border rounded-md overflow-hidden">
+                <button 
+                  @click="setSortBy('date')"
+                  class="px-2 py-1 text-xs border-r"
+                  :class="sortBy === 'date' ? 'bg-muted' : 'hover:bg-muted/50'"
+                >
+                  Date {{ sortBy === 'date' ? (sortDirection === 'desc' ? '↓' : '↑') : '' }}
+                </button>
+                <button 
+                  @click="setSortBy('title')"
+                  class="px-2 py-1 text-xs border-r"
+                  :class="sortBy === 'title' ? 'bg-muted' : 'hover:bg-muted/50'"
+                >
+                  Title {{ sortBy === 'title' ? (sortDirection === 'desc' ? '↓' : '↑') : '' }}
+                </button>
+                <button 
+                  @click="setSortBy('views')"
+                  class="px-2 py-1 text-xs"
+                  :class="sortBy === 'views' ? 'bg-muted' : 'hover:bg-muted/50'"
+                >
+                  Views {{ sortBy === 'views' ? (sortDirection === 'desc' ? '↓' : '↑') : '' }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        
+        <CardContent class="p-4">
+          <!-- Grid View -->
+          <div v-if="viewType === 'grid'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <Card v-for="nota in processedNotas" :key="nota.id" class="flex flex-col">
+              <CardHeader>
+                <CardTitle class="line-clamp-2">{{ nota.title }}</CardTitle>
+              </CardHeader>
+              <CardContent class="flex-1">
+                <div class="flex flex-col gap-1 text-sm">
+                  <p class="text-sm text-muted-foreground flex justify-between">
+                    <span>Published: {{ formatDate(nota.publishedAt) }}</span>
+                    <span v-if="nota.viewCount !== undefined" class="flex items-center">
+                      <Eye class="h-3.5 w-3.5 mr-1" /> {{ nota.viewCount }}
+                    </span>
+                  </p>
+                  <p class="text-sm text-muted-foreground">
+                    Last updated: {{ formatDate(nota.updatedAt) }}
+                  </p>
+                  <!-- Show tags if available -->
+                  <div v-if="nota.tags && nota.tags.length > 0" class="flex flex-wrap gap-1 mt-2">
+                    <span 
+                      v-for="tag in nota.tags" 
+                      :key="tag"
+                      class="px-1.5 py-0.5 text-xs rounded-full bg-muted text-muted-foreground"
+                    >
+                      {{ tag }}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter class="flex flex-col gap-2">
+                <Button variant="outline" class="w-full" @click="viewNota(nota.id)">
+                  <ExternalLink class="mr-2 h-4 w-4" />
+                  View Nota
+                </Button>
+                <Button 
+                  v-if="isOwnProfile" 
+                  variant="outline" 
+                  class="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+                  @click="confirmDelete(nota.id)"
+                >
+                  <Trash2 class="mr-2 h-4 w-4" />
+                  Unpublish
+                </Button>
+              </CardFooter>
+            </Card>
+          </div>
+
+          <!-- List View - Enhanced -->
+          <div v-else-if="viewType === 'list'" class="space-y-2">
+            <div v-for="nota in processedNotas" :key="nota.id" 
+                 class="flex flex-col sm:flex-row sm:items-center justify-between border rounded-md p-4 gap-4 hover:bg-muted/50 transition-colors">
+              <div class="flex-1">
+                <h3 class="font-medium text-lg">{{ nota.title }}</h3>
+                <div class="flex flex-wrap gap-3 text-xs text-muted-foreground mt-1">
+                  <span class="flex items-center">
+                    <Clock class="mr-1 h-3 w-3" /> 
+                    Published: {{ formatDate(nota.publishedAt) }}
+                  </span>
+                  <span class="flex items-center">
+                    <Clock class="mr-1 h-3 w-3" /> 
+                    Updated: {{ formatDate(nota.updatedAt) }}
+                  </span>
+                  <span v-if="nota.viewCount !== undefined" class="flex items-center">
+                    <Eye class="mr-1 h-3 w-3" /> 
+                    {{ nota.viewCount }} views
+                  </span>
+                </div>
+                <!-- Show tags if available -->
+                <div v-if="nota.tags && nota.tags.length > 0" class="flex flex-wrap gap-1 mt-2">
+                  <span 
+                    v-for="tag in nota.tags" 
+                    :key="tag"
+                    class="px-1.5 py-0.5 text-xs rounded-full bg-muted text-muted-foreground"
+                  >
+                    {{ tag }}
+                  </span>
+                </div>
+              </div>
+              <div class="flex gap-2 mt-2 sm:mt-0">
+                <Button size="sm" variant="outline" @click="viewNota(nota.id)">
+                  <ExternalLink class="mr-1 h-4 w-4" />
+                  View
+                </Button>
+                <Button 
+                  v-if="isOwnProfile" 
+                  size="sm"
+                  variant="outline" 
+                  class="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  @click="confirmDelete(nota.id)"
+                >
+                  <Trash2 class="mr-1 h-4 w-4" />
+                  Unpublish
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Table View (Enhanced) -->
+          <div v-else class="overflow-x-auto">
+            <table class="w-full border-collapse">
+              <thead>
+                <tr class="border-b">
+                  <th class="text-left py-3 px-4 font-medium">Title</th>
+                  <th class="text-left py-3 px-4 font-medium">Published</th>
+                  <th class="text-left py-3 px-4 font-medium">Updated</th>
+                  <th class="text-center py-3 px-4 font-medium">Views</th>
+                  <th class="text-center py-3 px-4 font-medium">Likes</th>
+                  <th class="text-right py-3 px-4 font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="nota in processedNotas" :key="nota.id" class="border-b hover:bg-muted/50 transition-colors">
+                  <td class="py-3 px-4">
+                    <div class="font-medium">{{ nota.title }}</div>
+                    <!-- Show tags if available -->
+                    <div v-if="nota.tags && nota.tags.length > 0" class="flex flex-wrap gap-1 mt-1">
+                      <span 
+                        v-for="tag in nota.tags" 
+                        :key="tag"
+                        class="px-1.5 py-0.5 text-xs rounded-full bg-muted text-muted-foreground"
+                      >
+                        {{ tag }}
+                      </span>
+                    </div>
+                  </td>
+                  <td class="py-3 px-4 text-sm text-muted-foreground">
+                    {{ formatDate(nota.publishedAt) }}
+                  </td>
+                  <td class="py-3 px-4 text-sm text-muted-foreground">
+                    {{ formatDate(nota.updatedAt) }}
+                  </td>
+                  <td class="py-3 px-4 text-sm text-center text-muted-foreground">
+                    <span class="flex items-center justify-center">
+                      <Eye class="mr-1 h-3.5 w-3.5" /> {{ nota.viewCount || 0 }}
+                    </span>
+                  </td>
+                  <td class="py-3 px-4 text-sm text-center text-muted-foreground">
+                    <div class="flex items-center justify-center gap-2">
+                      <span class="flex items-center">
+                        <ThumbsUp class="mr-1 h-3 w-3 text-primary" /> {{ nota.likeCount || 0 }}
+                      </span>
+                      <span class="flex items-center">
+                        <ThumbsDown class="mr-1 h-3 w-3" /> {{ nota.dislikeCount || 0 }}
+                      </span>
+                    </div>
+                  </td>
+                  <td class="py-3 px-4 text-right">
+                    <div class="flex justify-end gap-2">
+                      <Button size="sm" variant="outline" @click="viewNota(nota.id)">
+                        <ExternalLink class="mr-1 h-4 w-4" />
+                        View
+                      </Button>
+                      <Button 
+                        v-if="isOwnProfile" 
+                        size="sm"
+                        variant="outline" 
+                        class="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        @click="confirmDelete(nota.id)"
+                      >
+                        <Trash2 class="mr-1 h-4 w-4" />
+                        Unpublish
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <!-- Empty search/filter results -->
+      <div v-if="publishedNotas.length > 0 && processedNotas.length === 0" class="text-center py-12">
+        <AlertCircle class="mx-auto h-12 w-12 text-muted-foreground" />
+        <h3 class="mt-4 text-lg font-semibold">No matching notas</h3>
+        <p class="text-muted-foreground">Try adjusting your search query or filters.</p>
+        <div class="flex gap-2 justify-center mt-4">
+          <Button variant="outline" @click="searchQuery = ''">Clear Search</Button>
+          <Button variant="outline" @click="dateFilter = 'all'">Clear Filters</Button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div v-if="isConfirmDeleteOpen" class="fixed inset-0 bg-background/80 flex items-center justify-center z-50">
+    <div class="bg-card border rounded-lg shadow-lg max-w-md w-full p-6">
+      <h2 class="text-xl font-semibold mb-4">Unpublish Nota</h2>
+      <p class="mb-6">
+        Are you sure you want to unpublish this nota? It will no longer be accessible to the public,
+        but you can publish it again later.
+      </p>
+      <div class="flex justify-end gap-2">
+        <Button variant="outline" @click="cancelDelete">Cancel</Button>
+        <Button variant="destructive" @click="unpublishNota">Unpublish</Button>
+      </div>
     </div>
   </div>
 </template>

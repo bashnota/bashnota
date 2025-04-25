@@ -29,7 +29,6 @@ const props = defineProps<{
 
 const codeExecutionStore = useCodeExecutionStore()
 const citationStore = useCitationStore()
-const notaStore = useNotaStore()
 const isSidebarOpen = ref(false)
 
 // Initialize citations if provided
@@ -37,7 +36,6 @@ const initializeCitations = () => {
   if (props.citations) {
     // Get the current nota ID from the route
     const currentRoute = useRouter().currentRoute.value
-    const notaId = currentRoute.params.id as string
     
     // Set public citations
     citationStore.setPublicCitations(props.citations || [])

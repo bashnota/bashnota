@@ -45,6 +45,29 @@ export interface PublishedNota {
   parentId?: string | null
   publishedSubPages?: string[]
   citations?: CitationEntry[]
+  // Statistics fields
+  viewCount?: number
+  uniqueViewers?: number
+  lastViewedAt?: string
+  referrers?: {[source: string]: number}
+  tags?: string[]
+  stats?: {
+    dailyViews?: {[date: string]: number}
+    weeklyViews?: {[week: string]: number}
+    monthlyViews?: {[month: string]: number}
+  }
+  // Voting fields
+  likeCount?: number
+  dislikeCount?: number
+}
+
+// User votes tracking
+export interface NotaVote {
+  notaId: string
+  userId: string
+  voteType: 'like' | 'dislike'
+  createdAt: Date | string
+  updatedAt: Date | string
 }
 
 export interface CitationEntry {
