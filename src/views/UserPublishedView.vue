@@ -508,298 +508,259 @@ const unpublishNota = async () => {
 
     <!-- Content state with Stats and Notas -->
     <div v-else-if="publishedNotas.length > 0" class="space-y-6">
-      <!-- Stats Section -->
-      <Card class="overflow-hidden">
-        <CardHeader class="bg-card border-b px-6">
-          <div class="flex items-center justify-between">
-            <CardTitle class="flex items-center gap-2">
-              <BarChart class="h-4 w-4" />
-              Publication Statistics
-            </CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent class="p-4">
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <!-- Views -->
-            <div class="bg-muted/50 rounded-lg p-4 space-y-2">
-              <div class="flex items-center justify-between">
-                <p class="text-sm font-medium text-muted-foreground">Total Views</p>
-                <Eye class="h-4 w-4 text-muted-foreground" />
-              </div>
-              <p class="text-2xl font-bold">{{ stats.totalViews }}</p>
-              <p class="text-xs text-muted-foreground">Avg. {{ stats.averageViews }} per nota</p>
-            </div>
-            
-            <!-- Time-based Stats -->
-            <div class="bg-muted/50 rounded-lg p-4 space-y-2">
-              <div class="flex items-center justify-between">
-                <p class="text-sm font-medium text-muted-foreground">Recent Publications</p>
-                <CalendarDays class="h-4 w-4 text-muted-foreground" />
-              </div>
-              <div class="space-y-1">
-                <div class="flex justify-between items-center">
-                  <span class="text-xs">Today:</span>
-                  <span class="text-sm font-medium">{{ stats.publishedToday }}</span>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-xs">This Week:</span>
-                  <span class="text-sm font-medium">{{ stats.publishedThisWeek }}</span>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-xs">This Month:</span>
-                  <span class="text-sm font-medium">{{ stats.publishedThisMonth }}</span>
-                </div>
-              </div>
-            </div>
-            
-            <!-- Most Viewed -->
-            <div class="bg-muted/50 rounded-lg p-4 space-y-2">
-              <div class="flex items-center justify-between">
-                <p class="text-sm font-medium text-muted-foreground">Most Viewed</p>
-                <Eye class="h-4 w-4 text-muted-foreground" />
-              </div>
-              <p v-if="stats.mostViewed" class="text-sm font-medium line-clamp-1">
-                {{ stats.mostViewed.title }}
-              </p>
-              <p v-if="stats.mostViewed" class="text-xs text-muted-foreground">
-                {{ stats.mostViewed.viewCount || 0 }} views
-              </p>
-              <p v-else class="text-sm italic text-muted-foreground">No view data available</p>
-            </div>
-          </div>
-          
-          <!-- Votes Statistics -->
-          <div class="mt-4 bg-muted/50 rounded-lg p-4">
-            <div class="flex items-center justify-between mb-2">
-              <p class="text-sm font-medium text-muted-foreground">Community Engagement</p>
-              <ThumbsUp class="h-4 w-4 text-muted-foreground" />
-            </div>
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <div class="flex items-center gap-1">
-                  <ThumbsUp class="h-3.5 w-3.5 text-primary" />
-                  <span class="text-sm font-medium">{{ stats.totalLikes || 0 }} Likes</span>
-                </div>
-                <p v-if="stats.mostLiked" class="text-xs text-muted-foreground mt-1">
-                  Most liked: {{ stats.mostLiked.title }} ({{ stats.mostLiked.likeCount || 0 }})
-                </p>
-              </div>
-              <div>
-                <div class="flex items-center gap-1">
-                  <ThumbsDown class="h-3.5 w-3.5 text-muted-foreground" />
-                  <span class="text-sm font-medium">{{ stats.totalDislikes || 0 }} Dislikes</span>
-                </div>
-                <p v-if="stats.likeRatio !== undefined" class="text-xs text-muted-foreground mt-1">
-                  Like ratio: {{ Math.round(stats.likeRatio * 100) }}%
-                </p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      
-      <!-- Notas Card with Enhanced Controls -->
-      <Card class="overflow-hidden">
-        <CardHeader class="bg-card border-b px-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <CardTitle class="flex items-center gap-2">
-                <Clock class="h-4 w-4" />
-                Published Notas
+      <!-- Two-column layout for larger screens -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Stats Card - Takes 1/3 of the space on larger screens -->
+        <div class="lg:col-span-1">
+          <Card class="overflow-hidden h-full">
+            <CardHeader class="bg-card border-b px-4 py-3">
+              <CardTitle class="text-base flex items-center gap-2">
+                <BarChart class="h-4 w-4" />
+                Publication Statistics
               </CardTitle>
-              <CardDescription>
-                {{ processedNotas.length }} public nota{{ processedNotas.length > 1 ? 's' : '' }}
-                {{ dateFilter !== 'all' ? ` (${dateFilter})` : '' }}
-              </CardDescription>
-            </div>
-            
-            <!-- Enhanced Controls -->
-            <div class="flex items-center gap-2">
-              <Button 
-                variant="outline" 
-                size="sm"
-                @click="exportAsCSV"
-                class="hidden md:flex"
-              >
-                <DownloadCloud class="mr-1 h-4 w-4" />
-                Export CSV
-              </Button>
-              
-              <!-- Date Filter Dropdown -->
-              <div class="relative">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  @click="isFilterOpen = !isFilterOpen"
-                  class="gap-1"
-                >
-                  <Filter class="h-4 w-4" />
-                  <span class="hidden md:inline">{{ dateFilter === 'all' ? 'All time' : dateFilter }}</span>
-                </Button>
+            </CardHeader>
+            <CardContent class="p-3">
+              <div class="space-y-3">
+                <!-- Combined Stats Grid -->
+                <div class="grid grid-cols-2 gap-2">
+                  <!-- Views -->
+                  <div class="bg-muted/30 rounded-md p-2.5 flex flex-col">
+                    <div class="flex items-center justify-between">
+                      <p class="text-xs font-medium text-muted-foreground">Total Views</p>
+                      <Eye class="h-3.5 w-3.5 text-muted-foreground" />
+                    </div>
+                    <div class="mt-1 flex items-end justify-between">
+                      <p class="text-lg font-bold">{{ stats.totalViews }}</p>
+                      <p class="text-xs text-muted-foreground">Avg: {{ stats.averageViews }}</p>
+                    </div>
+                  </div>
+                  
+                  <!-- Recent Publications -->
+                  <div class="bg-muted/30 rounded-md p-2.5 flex flex-col">
+                    <div class="flex items-center justify-between">
+                      <p class="text-xs font-medium text-muted-foreground">Publications</p>
+                      <CalendarDays class="h-3.5 w-3.5 text-muted-foreground" />
+                    </div>
+                    <div class="mt-1 flex flex-col text-xs">
+                      <div class="grid grid-cols-3 gap-1">
+                        <span class="text-muted-foreground">Today:</span>
+                        <span class="font-medium col-span-2">{{ stats.publishedToday }}</span>
+                      </div>
+                      <div class="grid grid-cols-3 gap-1">
+                        <span class="text-muted-foreground">Week:</span>
+                        <span class="font-medium col-span-2">{{ stats.publishedThisWeek }}</span>
+                      </div>
+                      <div class="grid grid-cols-3 gap-1">
+                        <span class="text-muted-foreground">Month:</span>
+                        <span class="font-medium col-span-2">{{ stats.publishedThisMonth }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 
-                <div 
-                  v-if="isFilterOpen" 
-                  class="absolute right-0 mt-1 w-40 bg-card border rounded-md shadow-lg z-50"
-                >
-                  <div class="p-1">
-                    <button 
-                      v-for="filter in ['all', 'today', 'week', 'month', 'year']" 
-                      :key="filter"
-                      @click="setDateFilter(filter as any)"
-                      class="w-full text-left px-3 py-1.5 text-sm rounded hover:bg-muted transition-colors"
-                      :class="{ 'bg-muted': dateFilter === filter }"
+                <!-- Most Viewed -->
+                <div class="bg-muted/30 rounded-md p-2.5">
+                  <div class="flex items-center justify-between mb-1">
+                    <p class="text-xs font-medium text-muted-foreground">Most Viewed</p>
+                    <Eye class="h-3.5 w-3.5 text-muted-foreground" />
+                  </div>
+                  <p v-if="stats.mostViewed" class="text-xs font-medium line-clamp-1">
+                    {{ stats.mostViewed.title }}
+                  </p>
+                  <p v-if="stats.mostViewed" class="text-xs text-muted-foreground">
+                    {{ stats.mostViewed.viewCount || 0 }} views
+                  </p>
+                  <p v-else class="text-xs italic text-muted-foreground">No view data available</p>
+                </div>
+              
+                <!-- Engagement Stats -->
+                <div class="bg-muted/30 rounded-md p-2.5">
+                  <div class="flex items-center justify-between mb-1">
+                    <p class="text-xs font-medium text-muted-foreground">Engagement</p>
+                    <ThumbsUp class="h-3.5 w-3.5 text-muted-foreground" />
+                  </div>
+                  <div class="grid grid-cols-2 gap-2">
+                    <div>
+                      <div class="flex items-center gap-1">
+                        <ThumbsUp class="h-3 w-3 text-primary" />
+                        <span class="text-xs font-medium">{{ stats.totalLikes || 0 }} Likes</span>
+                      </div>
+                      <p v-if="stats.mostLiked" class="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                        Most: {{ stats.mostLiked.title }}
+                      </p>
+                    </div>
+                    <div>
+                      <div class="flex items-center gap-1">
+                        <ThumbsDown class="h-3 w-3 text-muted-foreground" />
+                        <span class="text-xs font-medium">{{ stats.totalDislikes || 0 }} Dislikes</span>
+                      </div>
+                      <p v-if="stats.likeRatio !== undefined" class="text-xs text-muted-foreground mt-0.5">
+                        Ratio: {{ Math.round(stats.likeRatio * 100) }}%
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        
+        <!-- Notas Card - Takes 2/3 of the space on larger screens -->
+        <div class="lg:col-span-2">
+          <Card class="overflow-hidden h-full flex flex-col">
+            <CardHeader class="bg-card border-b px-6">
+              <div class="flex items-center justify-between">
+                <div>
+                  <CardTitle class="flex items-center gap-2">
+                    <Clock class="h-4 w-4" />
+                    Published Notas
+                  </CardTitle>
+                  <CardDescription>
+                    {{ processedNotas.length }} public nota{{ processedNotas.length > 1 ? 's' : '' }}
+                    {{ dateFilter !== 'all' ? ` (${dateFilter})` : '' }}
+                  </CardDescription>
+                </div>
+                
+                <!-- Enhanced Controls -->
+                <div class="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    @click="exportAsCSV"
+                    class="hidden md:flex"
+                  >
+                    <DownloadCloud class="mr-1 h-4 w-4" />
+                    Export CSV
+                  </Button>
+                  
+                  <!-- Date Filter Dropdown -->
+                  <div class="relative">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      @click="isFilterOpen = !isFilterOpen"
+                      class="gap-1"
                     >
-                      {{ filter === 'all' ? 'All time' : filter }}
+                      <Filter class="h-4 w-4" />
+                      <span class="hidden md:inline">{{ dateFilter === 'all' ? 'All time' : dateFilter }}</span>
+                    </Button>
+                    
+                    <div 
+                      v-if="isFilterOpen" 
+                      class="absolute right-0 mt-1 w-40 bg-card border rounded-md shadow-lg z-50"
+                    >
+                      <div class="p-1">
+                        <button 
+                          v-for="filter in ['all', 'today', 'week', 'month', 'year']" 
+                          :key="filter"
+                          @click="setDateFilter(filter as any)"
+                          class="w-full text-left px-3 py-1.5 text-sm rounded hover:bg-muted transition-colors"
+                          :class="{ 'bg-muted': dateFilter === filter }"
+                        >
+                          {{ filter === 'all' ? 'All time' : filter }}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Sort Buttons -->
+                  <div class="flex items-center border rounded-md overflow-hidden">
+                    <button 
+                      @click="setSortBy('date')"
+                      class="px-2 py-1 text-xs border-r"
+                      :class="sortBy === 'date' ? 'bg-muted' : 'hover:bg-muted/50'"
+                    >
+                      Date {{ sortBy === 'date' ? (sortDirection === 'desc' ? '↓' : '↑') : '' }}
+                    </button>
+                    <button 
+                      @click="setSortBy('title')"
+                      class="px-2 py-1 text-xs border-r"
+                      :class="sortBy === 'title' ? 'bg-muted' : 'hover:bg-muted/50'"
+                    >
+                      Title {{ sortBy === 'title' ? (sortDirection === 'desc' ? '↓' : '↑') : '' }}
+                    </button>
+                    <button 
+                      @click="setSortBy('views')"
+                      class="px-2 py-1 text-xs"
+                      :class="sortBy === 'views' ? 'bg-muted' : 'hover:bg-muted/50'"
+                    >
+                      Views {{ sortBy === 'views' ? (sortDirection === 'desc' ? '↓' : '↑') : '' }}
                     </button>
                   </div>
                 </div>
               </div>
-              
-              <!-- Sort Buttons -->
-              <div class="flex items-center border rounded-md overflow-hidden">
-                <button 
-                  @click="setSortBy('date')"
-                  class="px-2 py-1 text-xs border-r"
-                  :class="sortBy === 'date' ? 'bg-muted' : 'hover:bg-muted/50'"
-                >
-                  Date {{ sortBy === 'date' ? (sortDirection === 'desc' ? '↓' : '↑') : '' }}
-                </button>
-                <button 
-                  @click="setSortBy('title')"
-                  class="px-2 py-1 text-xs border-r"
-                  :class="sortBy === 'title' ? 'bg-muted' : 'hover:bg-muted/50'"
-                >
-                  Title {{ sortBy === 'title' ? (sortDirection === 'desc' ? '↓' : '↑') : '' }}
-                </button>
-                <button 
-                  @click="setSortBy('views')"
-                  class="px-2 py-1 text-xs"
-                  :class="sortBy === 'views' ? 'bg-muted' : 'hover:bg-muted/50'"
-                >
-                  Views {{ sortBy === 'views' ? (sortDirection === 'desc' ? '↓' : '↑') : '' }}
-                </button>
-              </div>
-            </div>
-          </div>
-        </CardHeader>
-        
-        <CardContent class="p-4">
-          <!-- Grid View -->
-          <div v-if="viewType === 'grid'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Card v-for="nota in processedNotas" :key="nota.id" class="flex flex-col">
-              <CardHeader>
-                <CardTitle class="line-clamp-2">{{ nota.title }}</CardTitle>
-              </CardHeader>
-              <CardContent class="flex-1">
-                <div class="flex flex-col gap-1 text-sm">
-                  <p class="text-sm text-muted-foreground flex justify-between">
-                    <span>Published: {{ formatDate(nota.publishedAt) }}</span>
-                    <span v-if="nota.viewCount !== undefined" class="flex items-center">
-                      <Eye class="h-3.5 w-3.5 mr-1" /> {{ nota.viewCount }}
-                    </span>
-                  </p>
-                  <p class="text-sm text-muted-foreground">
-                    Last updated: {{ formatDate(nota.updatedAt) }}
-                  </p>
-                  <!-- Show tags if available -->
-                  <div v-if="nota.tags && nota.tags.length > 0" class="flex flex-wrap gap-1 mt-2">
-                    <span 
-                      v-for="tag in nota.tags" 
-                      :key="tag"
-                      class="px-1.5 py-0.5 text-xs rounded-full bg-muted text-muted-foreground"
+            </CardHeader>
+            
+            <CardContent class="p-4 overflow-auto flex-1">
+              <!-- Grid View -->
+              <div v-if="viewType === 'grid'" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card v-for="nota in processedNotas" :key="nota.id" class="flex flex-col">
+                  <CardHeader>
+                    <CardTitle class="line-clamp-2">{{ nota.title }}</CardTitle>
+                  </CardHeader>
+                  <CardContent class="flex-1">
+                    <div class="flex flex-col gap-1 text-sm">
+                      <p class="text-sm text-muted-foreground flex justify-between">
+                        <span>Published: {{ formatDate(nota.publishedAt) }}</span>
+                        <span v-if="nota.viewCount !== undefined" class="flex items-center">
+                          <Eye class="h-3.5 w-3.5 mr-1" /> {{ nota.viewCount }}
+                        </span>
+                      </p>
+                      <p class="text-sm text-muted-foreground">
+                        Last updated: {{ formatDate(nota.updatedAt) }}
+                      </p>
+                      <!-- Show tags if available -->
+                      <div v-if="nota.tags && nota.tags.length > 0" class="flex flex-wrap gap-1 mt-2">
+                        <span 
+                          v-for="tag in nota.tags" 
+                          :key="tag"
+                          class="px-1.5 py-0.5 text-xs rounded-full bg-muted text-muted-foreground"
+                        >
+                          {{ tag }}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                  <CardFooter class="flex flex-col gap-2">
+                    <Button variant="outline" class="w-full" @click="viewNota(nota.id)">
+                      <ExternalLink class="mr-2 h-4 w-4" />
+                      View Nota
+                    </Button>
+                    <Button 
+                      v-if="isOwnProfile" 
+                      variant="outline" 
+                      class="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+                      @click="confirmDelete(nota.id)"
                     >
-                      {{ tag }}
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-              <CardFooter class="flex flex-col gap-2">
-                <Button variant="outline" class="w-full" @click="viewNota(nota.id)">
-                  <ExternalLink class="mr-2 h-4 w-4" />
-                  View Nota
-                </Button>
-                <Button 
-                  v-if="isOwnProfile" 
-                  variant="outline" 
-                  class="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
-                  @click="confirmDelete(nota.id)"
-                >
-                  <Trash2 class="mr-2 h-4 w-4" />
-                  Unpublish
-                </Button>
-              </CardFooter>
-            </Card>
-          </div>
-
-          <!-- List View - Enhanced -->
-          <div v-else-if="viewType === 'list'" class="space-y-2">
-            <div v-for="nota in processedNotas" :key="nota.id" 
-                 class="flex flex-col sm:flex-row sm:items-center justify-between border rounded-md p-4 gap-4 hover:bg-muted/50 transition-colors">
-              <div class="flex-1">
-                <h3 class="font-medium text-lg">{{ nota.title }}</h3>
-                <div class="flex flex-wrap gap-3 text-xs text-muted-foreground mt-1">
-                  <span class="flex items-center">
-                    <Clock class="mr-1 h-3 w-3" /> 
-                    Published: {{ formatDate(nota.publishedAt) }}
-                  </span>
-                  <span class="flex items-center">
-                    <Clock class="mr-1 h-3 w-3" /> 
-                    Updated: {{ formatDate(nota.updatedAt) }}
-                  </span>
-                  <span v-if="nota.viewCount !== undefined" class="flex items-center">
-                    <Eye class="mr-1 h-3 w-3" /> 
-                    {{ nota.viewCount }} views
-                  </span>
-                </div>
-                <!-- Show tags if available -->
-                <div v-if="nota.tags && nota.tags.length > 0" class="flex flex-wrap gap-1 mt-2">
-                  <span 
-                    v-for="tag in nota.tags" 
-                    :key="tag"
-                    class="px-1.5 py-0.5 text-xs rounded-full bg-muted text-muted-foreground"
-                  >
-                    {{ tag }}
-                  </span>
-                </div>
+                      <Trash2 class="mr-2 h-4 w-4" />
+                      Unpublish
+                    </Button>
+                  </CardFooter>
+                </Card>
               </div>
-              <div class="flex gap-2 mt-2 sm:mt-0">
-                <Button size="sm" variant="outline" @click="viewNota(nota.id)">
-                  <ExternalLink class="mr-1 h-4 w-4" />
-                  View
-                </Button>
-                <Button 
-                  v-if="isOwnProfile" 
-                  size="sm"
-                  variant="outline" 
-                  class="text-destructive hover:text-destructive hover:bg-destructive/10"
-                  @click="confirmDelete(nota.id)"
-                >
-                  <Trash2 class="mr-1 h-4 w-4" />
-                  Unpublish
-                </Button>
-              </div>
-            </div>
-          </div>
 
-          <!-- Table View (Enhanced) -->
-          <div v-else class="overflow-x-auto">
-            <table class="w-full border-collapse">
-              <thead>
-                <tr class="border-b">
-                  <th class="text-left py-3 px-4 font-medium">Title</th>
-                  <th class="text-left py-3 px-4 font-medium">Published</th>
-                  <th class="text-left py-3 px-4 font-medium">Updated</th>
-                  <th class="text-center py-3 px-4 font-medium">Views</th>
-                  <th class="text-center py-3 px-4 font-medium">Likes</th>
-                  <th class="text-right py-3 px-4 font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="nota in processedNotas" :key="nota.id" class="border-b hover:bg-muted/50 transition-colors">
-                  <td class="py-3 px-4">
-                    <div class="font-medium">{{ nota.title }}</div>
+              <!-- List View - Enhanced -->
+              <div v-else-if="viewType === 'list'" class="space-y-2">
+                <div v-for="nota in processedNotas" :key="nota.id" 
+                     class="flex flex-col sm:flex-row sm:items-center justify-between border rounded-md p-4 gap-4 hover:bg-muted/50 transition-colors">
+                  <div class="flex-1">
+                    <h3 class="font-medium text-lg">{{ nota.title }}</h3>
+                    <div class="flex flex-wrap gap-3 text-xs text-muted-foreground mt-1">
+                      <span class="flex items-center">
+                        <Clock class="mr-1 h-3 w-3" /> 
+                        Published: {{ formatDate(nota.publishedAt) }}
+                      </span>
+                      <span class="flex items-center">
+                        <Clock class="mr-1 h-3 w-3" /> 
+                        Updated: {{ formatDate(nota.updatedAt) }}
+                      </span>
+                      <span v-if="nota.viewCount !== undefined" class="flex items-center">
+                        <Eye class="mr-1 h-3 w-3" /> 
+                        {{ nota.viewCount }} views
+                      </span>
+                    </div>
                     <!-- Show tags if available -->
-                    <div v-if="nota.tags && nota.tags.length > 0" class="flex flex-wrap gap-1 mt-1">
+                    <div v-if="nota.tags && nota.tags.length > 0" class="flex flex-wrap gap-1 mt-2">
                       <span 
                         v-for="tag in nota.tags" 
                         :key="tag"
@@ -808,52 +769,101 @@ const unpublishNota = async () => {
                         {{ tag }}
                       </span>
                     </div>
-                  </td>
-                  <td class="py-3 px-4 text-sm text-muted-foreground">
-                    {{ formatDate(nota.publishedAt) }}
-                  </td>
-                  <td class="py-3 px-4 text-sm text-muted-foreground">
-                    {{ formatDate(nota.updatedAt) }}
-                  </td>
-                  <td class="py-3 px-4 text-sm text-center text-muted-foreground">
-                    <span class="flex items-center justify-center">
-                      <Eye class="mr-1 h-3.5 w-3.5" /> {{ nota.viewCount || 0 }}
-                    </span>
-                  </td>
-                  <td class="py-3 px-4 text-sm text-center text-muted-foreground">
-                    <div class="flex items-center justify-center gap-2">
-                      <span class="flex items-center">
-                        <ThumbsUp class="mr-1 h-3 w-3 text-primary" /> {{ nota.likeCount || 0 }}
-                      </span>
-                      <span class="flex items-center">
-                        <ThumbsDown class="mr-1 h-3 w-3" /> {{ nota.dislikeCount || 0 }}
-                      </span>
-                    </div>
-                  </td>
-                  <td class="py-3 px-4 text-right">
-                    <div class="flex justify-end gap-2">
-                      <Button size="sm" variant="outline" @click="viewNota(nota.id)">
-                        <ExternalLink class="mr-1 h-4 w-4" />
-                        View
-                      </Button>
-                      <Button 
-                        v-if="isOwnProfile" 
-                        size="sm"
-                        variant="outline" 
-                        class="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        @click="confirmDelete(nota.id)"
-                      >
-                        <Trash2 class="mr-1 h-4 w-4" />
-                        Unpublish
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+                  </div>
+                  <div class="flex gap-2 mt-2 sm:mt-0">
+                    <Button size="sm" variant="outline" @click="viewNota(nota.id)">
+                      <ExternalLink class="mr-1 h-4 w-4" />
+                      View
+                    </Button>
+                    <Button 
+                      v-if="isOwnProfile" 
+                      size="sm"
+                      variant="outline" 
+                      class="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      @click="confirmDelete(nota.id)"
+                    >
+                      <Trash2 class="mr-1 h-4 w-4" />
+                      Unpublish
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Table View (Enhanced) -->
+              <div v-else class="overflow-x-auto">
+                <table class="w-full border-collapse">
+                  <thead>
+                    <tr class="border-b">
+                      <th class="text-left py-3 px-4 font-medium">Title</th>
+                      <th class="text-left py-3 px-4 font-medium">Published</th>
+                      <th class="text-left py-3 px-4 font-medium">Updated</th>
+                      <th class="text-center py-3 px-4 font-medium">Views</th>
+                      <th class="text-center py-3 px-4 font-medium">Likes</th>
+                      <th class="text-right py-3 px-4 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="nota in processedNotas" :key="nota.id" class="border-b hover:bg-muted/50 transition-colors">
+                      <td class="py-3 px-4">
+                        <div class="font-medium">{{ nota.title }}</div>
+                        <!-- Show tags if available -->
+                        <div v-if="nota.tags && nota.tags.length > 0" class="flex flex-wrap gap-1 mt-1">
+                          <span 
+                            v-for="tag in nota.tags" 
+                            :key="tag"
+                            class="px-1.5 py-0.5 text-xs rounded-full bg-muted text-muted-foreground"
+                          >
+                            {{ tag }}
+                          </span>
+                        </div>
+                      </td>
+                      <td class="py-3 px-4 text-sm text-muted-foreground">
+                        {{ formatDate(nota.publishedAt) }}
+                      </td>
+                      <td class="py-3 px-4 text-sm text-muted-foreground">
+                        {{ formatDate(nota.updatedAt) }}
+                      </td>
+                      <td class="py-3 px-4 text-sm text-center text-muted-foreground">
+                        <span class="flex items-center justify-center">
+                          <Eye class="mr-1 h-3.5 w-3.5" /> {{ nota.viewCount || 0 }}
+                        </span>
+                      </td>
+                      <td class="py-3 px-4 text-sm text-center text-muted-foreground">
+                        <div class="flex items-center justify-center gap-2">
+                          <span class="flex items-center">
+                            <ThumbsUp class="mr-1 h-3 w-3 text-primary" /> {{ nota.likeCount || 0 }}
+                          </span>
+                          <span class="flex items-center">
+                            <ThumbsDown class="mr-1 h-3 w-3" /> {{ nota.dislikeCount || 0 }}
+                          </span>
+                        </div>
+                      </td>
+                      <td class="py-3 px-4 text-right">
+                        <div class="flex justify-end gap-2">
+                          <Button size="sm" variant="outline" @click="viewNota(nota.id)">
+                            <ExternalLink class="mr-1 h-4 w-4" />
+                            View
+                          </Button>
+                          <Button 
+                            v-if="isOwnProfile" 
+                            size="sm"
+                            variant="outline" 
+                            class="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            @click="confirmDelete(nota.id)"
+                          >
+                            <Trash2 class="mr-1 h-4 w-4" />
+                            Unpublish
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       <!-- Empty search/filter results -->
       <div v-if="publishedNotas.length > 0 && processedNotas.length === 0" class="text-center py-12">
