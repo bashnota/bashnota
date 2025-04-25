@@ -6,6 +6,14 @@ export interface UserProfile {
   emailVerified: boolean
   createdAt: string
   lastLoginAt: string
+  userTag?: string  // Added new field for user tag
+}
+
+// Adding new interface for user tag validation
+export interface UserTagValidation {
+  isValid: boolean
+  isAvailable: boolean
+  error?: string
 }
 
 export interface AuthState {

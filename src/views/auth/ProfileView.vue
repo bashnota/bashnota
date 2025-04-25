@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import UserTagEditor from '@/components/auth/UserTagEditor.vue'
 import {
   Card,
   CardContent,
@@ -13,7 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { Eye, EyeOff, Mail, Lock, User, ShieldCheck, Calendar, Clock } from 'lucide-vue-next'
+import { Mail, User, ShieldCheck, Calendar, Clock, AtSign } from 'lucide-vue-next'
 import { toast } from '@/lib/utils'
 import { formatDate } from '@/lib/utils'
 import { logger } from '@/services/logger'
@@ -170,6 +171,15 @@ const handleLogout = async () => {
               <Clock class="h-4 w-4 text-muted-foreground" />
               <span>{{ formatDateDisplay(currentUser.lastLoginAt) }}</span>
             </div>
+          </div>
+
+          <!-- User Tag -->
+          <div class="space-y-2">
+            <Label class="text-muted-foreground flex items-center gap-1">
+              <AtSign class="h-4 w-4 text-primary" />
+              User Tag
+            </Label>
+            <UserTagEditor />
           </div>
         </CardContent>
         <CardFooter class="flex flex-col space-y-4">

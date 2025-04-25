@@ -137,3 +137,5 @@ firebase.json
 .vscode/
 
 emulator-data/
+
+md_context/

@@ -14,6 +14,7 @@ admin.initializeApp({
 
 import notaRouter from './routes/nota'
 import imageRouter from './routes/image'
+import { migrateUserTags, checkUserTagMigrationNeeded } from './routes/userTags'
 
 // Create an Express app
 const app = express()
@@ -39,4 +40,6 @@ app.get('/', (req: Request, res: Response) => {
 app.use('/nota', notaRouter)
 app.use('/image', imageRouter)
 
+// Export the cloud functions
 export const api = onRequest(app)
+export { migrateUserTags, checkUserTagMigrationNeeded }

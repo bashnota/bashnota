@@ -106,7 +106,7 @@ const handleMouseMove = (event: MouseEvent) => {
 
     <!-- Main Content -->
     <div
-      class="flex-1 flex flex-col overflow-hidden transition-all duration-300 ease-in-out"
+      class="flex-1 flex flex-col overflow-hidden transition-all duration-300 ease-in-out max-h-[100vh]"
       :style="{ marginLeft: !isSidebarOpen ? `-${sidebarWidth}px` : '0' }"
     >
       <!-- Top Bar -->
@@ -134,7 +134,7 @@ const handleMouseMove = (event: MouseEvent) => {
 
       <!-- Router View -->
       <div class="flex-1 min-h-0 flex flex-col overflow-hidden">
-        <RouterView class="flex-1 min-h-0 flex flex-col overflow-hidden" />
+        <RouterView class="flex-1 min-h-0 flex flex-col overflow-auto pb-20" />
       </div>
     </div>
   </div>

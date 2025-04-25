@@ -2,18 +2,70 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // This rule allows anyone with your Firestore database reference to view, edit,
-    // and delete all data in your Firestore database. It is useful for getting
-    // started, but it is configured to expire after 30 days because it
-    // leaves your app open to attackers. At that time, all client
-    // requests to your Firestore database will be denied.
-    //
-    // Make sure to write security rules for your app before that time, or else
-    // all client requests to your Firestore database will be denied until you Update
-    // your rules
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isUserAuthenticated(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isValidUserTag(tag) {
+      return tag.matches('^[a-zA-Z0-9_]{3,30}$');
+    }
+    
+    // User collection rules
+    match /users/{userId} {
+      // Allow users to read and write their own data
+      allow read: if isUserAuthenticated(userId);
+      allow create: if isUserAuthenticated(userId);
+      allow update: if isUserAuthenticated(userId) && 
+                     (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['uid']));
+      allow delete: if isUserAuthenticated(userId);
+    }
+    
+    // UserTags collection rules
+    match /userTags/{tag} {
+      // Anyone can read a user tag to check availability or look up a user
+      allow read: if true;
+      
+      // Only the authenticated user can create/update/delete their own tag
+      allow create: if isAuthenticated() && 
+                     request.resource.data.uid == request.auth.uid &&
+                     isValidUserTag(tag);
+                     
+      allow update: if isAuthenticated() && 
+                     resource.data.uid == request.auth.uid &&
+                     request.resource.data.uid == request.auth.uid;
+                     
+      allow delete: if isAuthenticated() && 
+                     resource.data.uid == request.auth.uid;
+    }
+    
+    // Nota collection rules
+    match /notas/{notaId} {
+      // Allow users to read and write their own notas
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+    
+    // Published notas rules
+    match /publishedNotas/{notaId} {
+      // Anyone can read published notas
+      allow read: if true;
+      
+      // Only the author can create/update/delete their published nota
+      allow create: if isAuthenticated() && request.resource.data.authorId == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.authorId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.authorId == request.auth.uid;
+    }
+    
+    // Default deny all
     match /{document=**} {
-      allow read, write: if request.time < timestamp.date(2025, 4, 5);
+      allow read, write: if false;
     }
   }
 }
