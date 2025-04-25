@@ -33,6 +33,17 @@ const isFilterOpen = ref(false)
 const sortBy = ref<'date' | 'views' | 'title'>('date')
 const sortDirection = ref<'asc' | 'desc'>('desc')
 
+// Activity grid data
+const activityData = reactive({
+  // Stores count of publications by date - format: 'YYYY-MM-DD': count
+  byDate: {} as Record<string, number>,
+  // Max publications in a single day (for color intensity calculation)
+  maxCount: 0,
+  // Dates range for current month grid (past 4 weeks)
+  startDate: new Date(),
+  endDate: new Date()
+})
+
 // Statistics
 const stats = reactive({
   totalViews: 0,
@@ -179,6 +190,119 @@ const processedNotas = computed(() => {
   return result
 })
 
+// Calculate activity grid data from published notas
+const calculateActivityGrid = (notas: PublishedNota[]) => {
+  // Reset the activity data
+  activityData.byDate = {}
+  activityData.maxCount = 0
+  
+  // Set date range for the past 4 weeks (28 days)
+  const today = new Date()
+  activityData.endDate = new Date(today)
+  activityData.startDate = new Date(today)
+  activityData.startDate.setDate(today.getDate() - 27) // 28 days including today
+  
+  // Initialize all dates in the range with 0 count
+  let currentDate = new Date(activityData.startDate)
+  while (currentDate <= activityData.endDate) {
+    const dateKey = formatDateKey(currentDate)
+    activityData.byDate[dateKey] = 0
+    currentDate.setDate(currentDate.getDate() + 1)
+  }
+  
+  // Count publications for each date
+  notas.forEach(nota => {
+    const pubDate = new Date(nota.publishedAt)
+    // Only count if within our date range
+    if (pubDate >= activityData.startDate && pubDate <= activityData.endDate) {
+      const dateKey = formatDateKey(pubDate)
+      activityData.byDate[dateKey] = (activityData.byDate[dateKey] || 0) + 1
+      // Track max count for color scaling
+      if (activityData.byDate[dateKey] > activityData.maxCount) {
+        activityData.maxCount = activityData.byDate[dateKey]
+      }
+    }
+  })
+}
+
+// Format date to YYYY-MM-DD for activity grid
+const formatDateKey = (date: Date): string => {
+  return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`
+}
+
+// Get days of the week for grid labels
+const getDaysOfWeek = () => {
+  return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+}
+
+// Get month weeks (array of arrays containing dates for each week)
+const getMonthWeeks = computed(() => {
+  const weeks: string[][] = []
+  let currentDate = new Date(activityData.startDate)
+  let currentWeek: string[] = []
+  
+  // Start with appropriate day of week padding
+  const startDayOfWeek = currentDate.getDay()
+  for (let i = 0; i < startDayOfWeek; i++) {
+    currentWeek.push('')
+  }
+  
+  // Fill in the days
+  while (currentDate <= activityData.endDate) {
+    const dateKey = formatDateKey(currentDate)
+    currentWeek.push(dateKey)
+    
+    // Start a new week when we reach Saturday
+    if (currentDate.getDay() === 6) {
+      weeks.push([...currentWeek])
+      currentWeek = []
+    }
+    
+    // Move to next day
+    currentDate.setDate(currentDate.getDate() + 1)
+  }
+  
+  // Add the last week if it's not complete
+  if (currentWeek.length > 0) {
+    // Pad to end of week if needed
+    while (currentWeek.length < 7) {
+      currentWeek.push('')
+    }
+    weeks.push(currentWeek)
+  }
+  
+  return weeks
+})
+
+// Get color class based on activity count
+const getActivityColorClass = (count: number) => {
+  if (count === 0) return 'bg-muted/20'
+  
+  // Calculate intensity level (0-4) based on max count
+  const max = Math.max(activityData.maxCount, 4)
+  const level = Math.ceil((count / max) * 4)
+  
+  // Return appropriate color class based on level
+  switch (level) {
+    case 1: return 'bg-primary/20'
+    case 2: return 'bg-primary/40'
+    case 3: return 'bg-primary/60'
+    case 4: return 'bg-primary/80'
+    default: return 'bg-primary/20'
+  }
+}
+
+// Create title text for each activity cell
+const getActivityTitle = (dateKey: string) => {
+  if (!dateKey) return ''
+  
+  const count = activityData.byDate[dateKey] || 0
+  const date = new Date(dateKey)
+  const formattedDate = formatDate(date)
+  
+  return `${count} publication${count !== 1 ? 's' : ''} on ${formattedDate}`
+}
+
 // Load user's published notas
 const loadPublishedNotas = async () => {
   try {
@@ -204,6 +328,7 @@ const loadPublishedNotas = async () => {
     
     // Calculate statistics
     calculateStats(notas)
+    calculateActivityGrid(notas)
   } catch (err) {
     logger.error('Error loading published notas:', err)
     error.value = 'Failed to load published notas'
@@ -284,6 +409,9 @@ const calculateStats = (notas: PublishedNota[]) => {
   // Calculate like ratio
   const totalVotes = stats.totalLikes + stats.totalDislikes
   stats.likeRatio = totalVotes > 0 ? stats.totalLikes / totalVotes : undefined
+
+  // Calculate the activity grid data
+  calculateActivityGrid(notas)
 }
 
 // Set the date filter
@@ -598,6 +726,50 @@ const unpublishNota = async () => {
                         Ratio: {{ Math.round(stats.likeRatio * 100) }}%
                       </p>
                     </div>
+                  </div>
+                </div>
+
+                <!-- Activity Grid -->
+                <div class="bg-muted/30 rounded-md p-2.5">
+                  <div class="flex items-center justify-between mb-2">
+                    <p class="text-xs font-medium text-muted-foreground">Monthly Activity</p>
+                    <BarChart class="h-3.5 w-3.5 text-muted-foreground" />
+                  </div>
+                  <div class="grid grid-cols-8 gap-1 text-center text-[9px]">
+                    <!-- Empty cell for alignment -->
+                    <div></div>
+                    <!-- Days of the week labels -->
+                    <div v-for="day in getDaysOfWeek().slice(0, 7)" :key="day" class="text-muted-foreground">
+                      {{ day[0] }}
+                    </div>
+                    
+                    <!-- Weekly rows with activity cells -->
+                    <template v-for="(week, weekIndex) in getMonthWeeks" :key="'week-' + weekIndex">
+                      <!-- Week label (only on first cell in row) -->
+                      <div class="text-right pr-1 text-muted-foreground">
+                        {{ weekIndex + 1 }}
+                      </div>
+                      
+                      <!-- Activity cells -->
+                      <div 
+                        v-for="(dateKey, dayIndex) in week" 
+                        :key="'day-' + weekIndex + '-' + dayIndex" 
+                        :title="getActivityTitle(dateKey)"
+                        :class="[
+                          getActivityColorClass(activityData.byDate[dateKey] || 0),
+                          'h-4 w-4 rounded transition-colors cursor-help'
+                        ]"
+                      ></div>
+                    </template>
+                  </div>
+                  <div class="flex items-center justify-end gap-1 mt-2 text-[9px]">
+                    <span class="text-muted-foreground">Less</span>
+                    <div class="h-3 w-3 rounded bg-muted/20"></div>
+                    <div class="h-3 w-3 rounded bg-primary/20"></div>
+                    <div class="h-3 w-3 rounded bg-primary/40"></div>
+                    <div class="h-3 w-3 rounded bg-primary/60"></div>
+                    <div class="h-3 w-3 rounded bg-primary/80"></div>
+                    <span class="text-muted-foreground">More</span>
                   </div>
                 </div>
               </div>
