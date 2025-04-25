@@ -59,8 +59,68 @@ service cloud.firestore {
       
       // Only the author can create/update/delete their published nota
       allow create: if isAuthenticated() && request.resource.data.authorId == request.auth.uid;
-      allow update: if isAuthenticated() && resource.data.authorId == request.auth.uid;
+      allow update: if isAuthenticated() && (
+        // Full update for author
+        resource.data.authorId == request.auth.uid ||
+        // Limited update for statistics and votes
+        (
+          // For safety, restrict which fields can be updated by non-authors
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['viewCount', 'uniqueViewers', 'lastViewedAt', 'referrers', 'stats', 'likeCount', 'dislikeCount', 'votes']) &&
+          // User can only update their own vote in the votes map
+          (
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['votes']) ||
+            request.resource.data.votes.diff(resource.data.votes || {}).affectedKeys().hasOnly([request.auth.uid])
+          ) &&
+          request.auth != null
+        )
+      );
       allow delete: if isAuthenticated() && resource.data.authorId == request.auth.uid;
+    }
+    
+    // Published nota viewers tracking
+    match /publishedNotaViewers/{notaId} {
+      // Only authors can read viewer data (for privacy)
+      allow read: if isAuthenticated() && 
+                   exists(/databases/$(database)/documents/publishedNotas/$(notaId)) &&
+                   get(/databases/$(database)/documents/publishedNotas/$(notaId)).data.authorId == request.auth.uid;
+      
+      // Any authenticated user can create or update viewer data (for tracking views)
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && 
+                     // Only allow adding the current user to the viewers array
+                     (request.resource.data.viewers.hasAll(resource.data.viewers) &&
+                      request.resource.data.viewers.size() <= resource.data.viewers.size() + 1);
+    }
+    
+    // Nota votes collection rules
+    match /notaVotes/{voteId} {
+      // The vote ID format must be notaId_userId
+      function isValidVoteId() {
+        let parts = voteId.split('_');
+        return parts.size() == 2 && parts[1] == request.auth.uid;
+      }
+      
+      // Any authenticated user can read votes (to check their own vote status)
+      allow read: if isAuthenticated();
+      
+      // Only the authenticated user can create/update their own vote
+      allow create: if isAuthenticated() && 
+                     request.resource.data.userId == request.auth.uid &&
+                     isValidVoteId() &&
+                     // Validate vote type
+                     (request.resource.data.voteType == 'like' || request.resource.data.voteType == 'dislike');
+                     
+      allow update: if isAuthenticated() && 
+                     resource.data.userId == request.auth.uid &&
+                     request.resource.data.userId == request.auth.uid &&
+                     // Validate vote type
+                     (request.resource.data.voteType == 'like' || request.resource.data.voteType == 'dislike') &&
+                     // Can't change the nota ID
+                     request.resource.data.notaId == resource.data.notaId;
+                     
+      allow delete: if isAuthenticated() && 
+                     resource.data.userId == request.auth.uid;
     }
     
     // Default deny all

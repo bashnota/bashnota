@@ -15,12 +15,6 @@ import {
   Undo,
   Redo,
   MinusSquare,
-  Loader2,
-  PlayCircle,
-  Star,
-  Share2,
-  Cpu,
-  Download
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'

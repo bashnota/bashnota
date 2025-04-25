@@ -2,14 +2,17 @@
 import { ref, onMounted, computed, onBeforeMount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useNotaStore } from '@/stores/nota'
+import { useAuthStore } from '@/stores/auth'
 import { Button } from '@/components/ui/button'
-import { formatDate } from '@/lib/utils'
-import { Share2, ChevronLeft } from 'lucide-vue-next'
+import { formatDate, toast } from '@/lib/utils'
+import { Share2, ChevronLeft, ThumbsUp, ThumbsDown } from 'lucide-vue-next'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import NotaContentViewer from '@/components/editor/NotaContentViewer.vue'
 import { type PublishedNota } from '@/types/nota'
 import { logger } from '@/services/logger'
+import { statisticsService } from '@/services/statisticsService'
 import { convertPublicPageLinks } from '@/components/editor/extensions/PageLinkExtension'
+import VotersList from '@/components/nota/VotersList.vue'
 
 // Define extended PublishedNota type with optional fields we need
 interface ExtendedPublishedNota extends PublishedNota {
@@ -24,10 +27,18 @@ interface ExtendedPublishedNota extends PublishedNota {
 const route = useRoute()
 const router = useRouter()
 const notaStore = useNotaStore()
+const authStore = useAuthStore()
 const nota = ref<ExtendedPublishedNota | null>(null)
 const isLoading = ref(true)
 const error = ref<string | null>(null)
 const parentNota = ref<PublishedNota | null>(null)
+const viewRecorded = ref(false)
+
+// Voting state
+const likeCount = ref(0)
+const dislikeCount = ref(0)
+const userVote = ref<'like' | 'dislike' | null>(null)
+const isVoting = ref(false)
 
 // Meta information for SEO
 const metaDescription = ref('')
@@ -191,6 +202,11 @@ onMounted(async () => {
 
     nota.value = publishedNota as ExtendedPublishedNota
     
+    // Record view statistics (after a slight delay to ensure the page has loaded)
+    setTimeout(() => {
+      recordNotaView(notaId.value)
+    }, 2000)
+    
     // Get information about parent nota if this is a sub-page
     if (publishedNota.parentId) {
       try {
@@ -208,6 +224,9 @@ onMounted(async () => {
     setTimeout(() => {
       convertPublicPageLinks(document)
     }, 100)
+
+    // Load voting data
+    await loadVotingData()
   } catch (err) {
     logger.error('Error loading public nota:', err)
     error.value = 'Failed to load the nota'
@@ -215,6 +234,28 @@ onMounted(async () => {
     isLoading.value = false
   }
 })
+
+// Record view statistics for this nota
+const recordNotaView = async (id: string) => {
+  // Only record once per session
+  if (viewRecorded.value) return
+  
+  try {
+    // Get user ID if the user is logged in
+    const userId = authStore.currentUser?.uid || null
+    
+    // Get referrer if available
+    const referrer = document.referrer || null
+    
+    // Record the view
+    await statisticsService.recordView(id, userId, referrer)
+    
+    viewRecorded.value = true
+  } catch (error) {
+    // Don't show errors to users for stats tracking
+    logger.error('Failed to record view statistics:', error)
+  }
+}
 
 const goBack = async () => {
   if (parentNota.value) {
@@ -258,6 +299,66 @@ const getAuthorLink = computed(() => {
     return `/u/${nota.value.authorId}`
   }
 })
+
+// Initialize voting data
+const loadVotingData = async () => {
+  if (!notaId.value) return;
+  
+  try {
+    // Get the statistics which include vote counts
+    const stats = await statisticsService.getStatistics(notaId.value);
+    likeCount.value = stats.likeCount || 0;
+    dislikeCount.value = stats.dislikeCount || 0;
+    
+    // Get the user's vote if they're logged in
+    if (authStore.isAuthenticated && authStore.currentUser?.uid) {
+      const vote = await statisticsService.getUserVote(notaId.value, authStore.currentUser.uid);
+      userVote.value = vote;
+    }
+  } catch (error) {
+    logger.error('Failed to load voting data:', error);
+  }
+}
+
+// Handle user voting
+const handleVote = async (voteType: 'like' | 'dislike') => {
+  // Must be logged in to vote
+  if (!authStore.isAuthenticated || !authStore.currentUser?.uid) {
+    toast('Please log in to vote', '', 'destructive');
+    return;
+  }
+  
+  // Must have a valid nota
+  if (!notaId.value) return;
+  
+  try {
+    isVoting.value = true;
+    
+    // Record the vote
+    const result = await statisticsService.recordVote(
+      notaId.value,
+      authStore.currentUser.uid,
+      voteType
+    );
+    
+    // Update local state with the results
+    likeCount.value = result.likeCount;
+    dislikeCount.value = result.dislikeCount;
+    userVote.value = result.userVote;
+    
+    // Show feedback to the user
+    if (result.userVote === null) {
+      toast('Vote removed');
+    } else {
+      toast(`You ${result.userVote}d this nota`);
+    }
+  } catch (error) {
+    logger.error('Failed to record vote:', error);
+    toast('Failed to record your vote', '', 'destructive');
+  } finally {
+    isVoting.value = false;
+  }
+}
 </script>
 
 <template>
@@ -348,6 +449,31 @@ const getAuthorLink = computed(() => {
           </span>
         </div>
       </div>
+      <!-- Voting section -->
+      <div class="flex items-center gap-4 mt-4">
+        <Button
+          :variant="userVote === 'like' ? 'default' : 'outline'"
+          size="sm"
+          :disabled="isVoting"
+          @click="handleVote('like')"
+        >
+          <ThumbsUp class="mr-2 h-4 w-4" />
+          {{ likeCount }}
+        </Button>
+        <Button
+          :variant="userVote === 'dislike' ? 'default' : 'outline'"
+          size="sm"
+          :disabled="isVoting"
+          @click="handleVote('dislike')"
+        >
+          <ThumbsDown class="mr-2 h-4 w-4" />
+          {{ dislikeCount }}
+        </Button>
+        
+        <!-- Show voters list button -->
+        <VotersList :notaId="notaId" v-if="likeCount > 0 || dislikeCount > 0" />
+      </div>
+
 
       <hr class="border-t border-gray-200" />
 
