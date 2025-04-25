@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { formatDate } from '@/lib/utils'
-import { ExternalLink, Trash2, Clock, Search, Grid, List, Table, AlertCircle, CalendarDays, BarChart, Eye, Filter, DownloadCloud, ThumbsUp, ThumbsDown } from 'lucide-vue-next'
+import { ExternalLink, Trash2, Clock, Search, Grid, Table, AlertCircle, CalendarDays, BarChart, Eye, Filter, DownloadCloud, ThumbsUp, ThumbsDown, FileText } from 'lucide-vue-next'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import { type PublishedNota } from '@/types/nota'
@@ -25,13 +25,98 @@ const isLoading = ref(true)
 const error = ref<string | null>(null)
 const userId = ref<string | null>(null)
 const searchQuery = ref('')
-const viewType = ref<'grid' | 'list' | 'table'>('grid')
+const viewType = ref<'grid' | 'table'>('grid') // Removed 'list' option
 const isConfirmDeleteOpen = ref(false)
 const notaToDelete = ref<string | null>(null)
 const dateFilter = ref<'all' | 'today' | 'week' | 'month' | 'year'>('all')
 const isFilterOpen = ref(false)
 const sortBy = ref<'date' | 'views' | 'title'>('date')
 const sortDirection = ref<'asc' | 'desc'>('desc')
+
+// Pagination
+const currentPage = ref(1)
+const pageSize = ref(10)
+const pageSizeOptions = [5, 10, 20, 50]
+
+// Add pagination computed properties
+// Paginated notas based on current page and page size
+const paginatedNotas = computed(() => {
+  const startIndex = (currentPage.value - 1) * pageSize.value;
+  const endIndex = startIndex + pageSize.value;
+  return processedNotas.value.slice(startIndex, endIndex);
+});
+
+// Total number of pages
+const totalPages = computed(() => {
+  return Math.ceil(processedNotas.value.length / pageSize.value);
+});
+
+// Page numbers to display
+const pageNumbers = computed(() => {
+  const pages = [];
+  const maxPagesToShow = 5;
+
+  if (totalPages.value <= maxPagesToShow) {
+    // If we have fewer pages than max, show all
+    for (let i = 1; i <= totalPages.value; i++) {
+      pages.push(i);
+    }
+  } else {
+    // Always include first page
+    pages.push(1);
+    
+    // Calculate start and end page numbers
+    let startPage = Math.max(2, currentPage.value - 1);
+    let endPage = Math.min(totalPages.value - 1, currentPage.value + 1);
+    
+    // Adjust to show maxPagesToShow - 2 (accounting for first and last)
+    if (endPage - startPage < maxPagesToShow - 3) {
+      if (currentPage.value <= 3) {
+        endPage = Math.min(maxPagesToShow - 2, totalPages.value - 1);
+      } else {
+        startPage = Math.max(2, totalPages.value - maxPagesToShow + 2);
+      }
+    }
+    
+    // Add ellipsis if needed
+    if (startPage > 2) {
+      pages.push('...');
+    }
+    
+    // Add middle pages
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+    
+    // Add ellipsis if needed
+    if (endPage < totalPages.value - 1) {
+      pages.push('...');
+    }
+    
+    // Always include last page if more than 1 page
+    if (totalPages.value > 1) {
+      pages.push(totalPages.value);
+    }
+  }
+  
+  return pages;
+});
+
+// Change page
+const changePage = (page: number) => {
+  if (page >= 1 && page <= totalPages.value) {
+    currentPage.value = page;
+    // Scroll to top of content on page change
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+};
+
+// Change page size
+const changePageSize = (size: number) => {
+  pageSize.value = size;
+  // Reset to first page when changing page size
+  currentPage.value = 1;
+};
 
 // Activity grid data
 const activityData = reactive({
@@ -154,6 +239,29 @@ const getDateFilter = (filter: string) => {
     default:
       return () => true
   }
+}
+
+// Format date to a simplified format without "ago" or "about"
+const formatTimeDiff = (date: Date | string): string => {
+  const now = new Date()
+  const then = typeof date === 'string' ? new Date(date) : date
+  const diffMs = now.getTime() - then.getTime()
+  
+  // Convert to appropriate time unit
+  const diffSec = Math.floor(diffMs / 1000)
+  const diffMin = Math.floor(diffSec / 60)
+  const diffHour = Math.floor(diffMin / 60)
+  const diffDay = Math.floor(diffHour / 24)
+  const diffMonth = Math.floor(diffDay / 30)
+  const diffYear = Math.floor(diffDay / 365)
+  
+  // Return appropriate unit with value
+  if (diffYear > 0) return `${diffYear} ${diffYear === 1 ? 'year' : 'years'}`
+  if (diffMonth > 0) return `${diffMonth} ${diffMonth === 1 ? 'month' : 'months'}`
+  if (diffDay > 0) return `${diffDay} ${diffDay === 1 ? 'day' : 'days'}`
+  if (diffHour > 0) return `${diffHour} ${diffHour === 1 ? 'hour' : 'hours'}`
+  if (diffMin > 0) return `${diffMin} ${diffMin === 1 ? 'min' : 'mins'}`
+  return `${diffSec} ${diffSec === 1 ? 'sec' : 'secs'}`
 }
 
 // Sorted and filtered notas
@@ -547,67 +655,72 @@ const unpublishNota = async () => {
     notaToDelete.value = null
   }
 }
+
+// Change v-model to input event
+const handleSearchInput = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  searchQuery.value = target.value;
+}
+
+// Handler for page size change
+const handlePageSizeChange = (event: Event) => {
+  const target = event.target as HTMLSelectElement;
+  const newSize = parseInt(target.value, 10);
+  changePageSize(newSize);
+}
 </script>
 
 <template>
   <div class="container mx-auto py-8 px-4 overflow-auto">
-    <!-- Profile Header -->
+    <!-- Profile Header - Improved for Portfolio Style -->
     <header class="mb-8">
-      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div class="flex items-center gap-4">
+      <div class="bg-card border rounded-lg shadow-sm overflow-hidden">
+        <!-- Cover Image - Optional Background Pattern -->
+        <div class="h-32 bg-gradient-to-r from-primary/10 to-primary/5 flex items-center justify-center">
+          <!-- Optional Decorative Elements -->
+          <div class="opacity-10">
+            <div class="grid grid-cols-6 gap-2">
+              <div v-for="i in 24" :key="i" class="h-4 w-4 rounded-sm bg-primary"></div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- User Info Section -->
+        <div class="flex flex-col md:flex-row px-6 py-5 items-start md:items-end gap-4 -mt-12">
           <!-- User Avatar -->
-          <Avatar class="h-16 w-16">
-            <AvatarFallback class="text-lg">
+          <Avatar class="h-24 w-24 border-4 border-card ring-2 ring-background shadow-md">
+            <AvatarFallback class="text-2xl font-bold">
               {{ authorInitials || 'A' }}
             </AvatarFallback>
           </Avatar>
 
-          <!-- User info -->
-          <div>
-            <h1 class="text-3xl font-bold">{{ authorName }}'s Notas</h1>
-            <p class="text-muted-foreground mt-1">
-              <span v-if="userTag">@{{ userTag }} • </span>
-              Published documents and notes
-            </p>
+          <!-- User details -->
+          <div class="flex-1">
+            <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+              <div>
+                <h1 class="text-3xl font-bold">{{ authorName }}</h1>
+                <p class="text-muted-foreground">
+                  <span v-if="userTag" class="font-medium">@{{ userTag }}</span>
+                </p>
+              </div>
+              
+              <!-- Stats Summary -->
+              <div class="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+                <div class="flex items-center gap-1.5">
+                  <FileText class="h-4 w-4 text-muted-foreground" />
+                  <span><strong>{{ publishedNotas.length }}</strong> Publications</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <Eye class="h-4 w-4 text-muted-foreground" />
+                  <span><strong>{{ stats.totalViews }}</strong> Views</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <ThumbsUp class="h-4 w-4 text-muted-foreground" />
+                  <span><strong>{{ stats.totalLikes }}</strong> Likes</span>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-
-        <!-- Search and view controls -->
-        <div class="flex items-center gap-2 mt-2 md:mt-0">
-          <div class="relative w-full md:w-auto">
-            <Search class="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              :value="searchQuery"
-              @input="(event: Event) => searchQuery = (event.target as HTMLInputElement).value"
-              type="search"
-              placeholder="Search notas..."
-              class="pl-8 w-full md:w-[200px]"
-            />
-          </div>
-          <Button
-            variant="outline"
-            size="icon"
-            @click="viewType = 'grid'"
-            :class="{ 'bg-primary/10': viewType === 'grid' }"
-          >
-            <Grid class="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            @click="viewType = 'list'"
-            :class="{ 'bg-primary/10': viewType === 'list' }"
-          >
-            <List class="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            @click="viewType = 'table'"
-            :class="{ 'bg-primary/10': viewType === 'table' }"
-          >
-            <Table class="h-4 w-4" />
-          </Button>
         </div>
       </div>
     </header>
@@ -864,11 +977,45 @@ const unpublishNota = async () => {
             </CardHeader>
             
             <CardContent class="p-4 overflow-auto flex-1">
+              <!-- Search and View Controls Row -->
+              <div class="flex flex-col md:flex-row items-center justify-between gap-4 mb-4">
+                <!-- Search Field -->
+                <div class="relative w-full md:w-auto">
+                  <Search class="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    placeholder="Search publications..."
+                    class="pl-8 w-full md:w-[300px]"
+                    @input="handleSearchInput"
+                  />
+                </div>
+                
+                <!-- View Type Toggle -->
+                <div class="border rounded-md overflow-hidden flex">
+                  <button
+                    @click="viewType = 'grid'"
+                    class="p-1.5 flex items-center"
+                    :class="viewType === 'grid' ? 'bg-muted' : 'hover:bg-muted/50'"
+                    title="Grid view"
+                  >
+                    <Grid class="h-4 w-4" />
+                  </button>
+                  <button
+                    @click="viewType = 'table'"
+                    class="p-1.5 flex items-center"
+                    :class="viewType === 'table' ? 'bg-muted' : 'hover:bg-muted/50'"
+                    title="Table view"
+                  >
+                    <Table class="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
               <!-- Grid View -->
               <div v-if="viewType === 'grid'" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card v-for="nota in processedNotas" :key="nota.id" class="flex flex-col">
+                <Card v-for="nota in paginatedNotas" :key="nota.id" class="flex flex-col">
                   <CardHeader>
-                    <CardTitle class="line-clamp-2">{{ nota.title }}</CardTitle>
+                    <CardTitle class="truncate" :title="nota.title">{{ nota.title }}</CardTitle>
                   </CardHeader>
                   <CardContent class="flex-1">
                     <div class="flex flex-col gap-1 text-sm">
@@ -911,56 +1058,6 @@ const unpublishNota = async () => {
                 </Card>
               </div>
 
-              <!-- List View - Enhanced -->
-              <div v-else-if="viewType === 'list'" class="space-y-2">
-                <div v-for="nota in processedNotas" :key="nota.id" 
-                     class="flex flex-col sm:flex-row sm:items-center justify-between border rounded-md p-4 gap-4 hover:bg-muted/50 transition-colors">
-                  <div class="flex-1">
-                    <h3 class="font-medium text-lg">{{ nota.title }}</h3>
-                    <div class="flex flex-wrap gap-3 text-xs text-muted-foreground mt-1">
-                      <span class="flex items-center">
-                        <Clock class="mr-1 h-3 w-3" /> 
-                        Published: {{ formatDate(nota.publishedAt) }}
-                      </span>
-                      <span class="flex items-center">
-                        <Clock class="mr-1 h-3 w-3" /> 
-                        Updated: {{ formatDate(nota.updatedAt) }}
-                      </span>
-                      <span v-if="nota.viewCount !== undefined" class="flex items-center">
-                        <Eye class="mr-1 h-3 w-3" /> 
-                        {{ nota.viewCount }} views
-                      </span>
-                    </div>
-                    <!-- Show tags if available -->
-                    <div v-if="nota.tags && nota.tags.length > 0" class="flex flex-wrap gap-1 mt-2">
-                      <span 
-                        v-for="tag in nota.tags" 
-                        :key="tag"
-                        class="px-1.5 py-0.5 text-xs rounded-full bg-muted text-muted-foreground"
-                      >
-                        {{ tag }}
-                      </span>
-                    </div>
-                  </div>
-                  <div class="flex gap-2 mt-2 sm:mt-0">
-                    <Button size="sm" variant="outline" @click="viewNota(nota.id)">
-                      <ExternalLink class="mr-1 h-4 w-4" />
-                      View
-                    </Button>
-                    <Button 
-                      v-if="isOwnProfile" 
-                      size="sm"
-                      variant="outline" 
-                      class="text-destructive hover:text-destructive hover:bg-destructive/10"
-                      @click="confirmDelete(nota.id)"
-                    >
-                      <Trash2 class="mr-1 h-4 w-4" />
-                      Unpublish
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
               <!-- Table View (Enhanced) -->
               <div v-else class="overflow-x-auto">
                 <table class="w-full border-collapse">
@@ -975,9 +1072,9 @@ const unpublishNota = async () => {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="nota in processedNotas" :key="nota.id" class="border-b hover:bg-muted/50 transition-colors">
+                    <tr v-for="nota in paginatedNotas" :key="nota.id" class="border-b hover:bg-muted/50 transition-colors">
                       <td class="py-3 px-4">
-                        <div class="font-medium">{{ nota.title }}</div>
+                        <div class="font-medium max-w-[250px] truncate" :title="nota.title">{{ nota.title }}</div>
                         <!-- Show tags if available -->
                         <div v-if="nota.tags && nota.tags.length > 0" class="flex flex-wrap gap-1 mt-1">
                           <span 
@@ -990,10 +1087,10 @@ const unpublishNota = async () => {
                         </div>
                       </td>
                       <td class="py-3 px-4 text-sm text-muted-foreground">
-                        {{ formatDate(nota.publishedAt) }}
+                        {{ formatTimeDiff(nota.publishedAt) }}
                       </td>
                       <td class="py-3 px-4 text-sm text-muted-foreground">
-                        {{ formatDate(nota.updatedAt) }}
+                        {{ formatTimeDiff(nota.updatedAt) }}
                       </td>
                       <td class="py-3 px-4 text-sm text-center text-muted-foreground">
                         <span class="flex items-center justify-center">
@@ -1033,6 +1130,52 @@ const unpublishNota = async () => {
                 </table>
               </div>
             </CardContent>
+
+            <!-- Pagination Controls -->
+            <CardFooter class="flex items-center justify-between px-6 py-4">
+              <div class="flex items-center gap-2">
+                <span class="text-sm text-muted-foreground">Rows per page:</span>
+                <select 
+                  @change="handlePageSizeChange" 
+                  class="text-sm border rounded-md px-2 py-1"
+                >
+                  <option v-for="size in pageSizeOptions" :key="size" :value="size">
+                    {{ size }}
+                  </option>
+                </select>
+              </div>
+              <div class="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  :disabled="currentPage === 1" 
+                  @click="changePage(currentPage - 1)"
+                >
+                  Previous
+                </Button>
+                <div class="flex items-center gap-1">
+                  <Button 
+                    v-for="page in pageNumbers" 
+                    :key="page" 
+                    variant="outline" 
+                    size="sm" 
+                    :class="{ 'bg-primary/10': currentPage === page }"
+                    @click="typeof page === 'number' ? changePage(page) : null"
+                    :disabled="typeof page !== 'number'"
+                  >
+                    {{ page }}
+                  </Button>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  :disabled="currentPage === totalPages" 
+                  @click="changePage(currentPage + 1)"
+                >
+                  Next
+                </Button>
+              </div>
+            </CardFooter>
           </Card>
         </div>
       </div>
