@@ -783,6 +783,12 @@ export const useNotaStore = defineStore('nota', {
           throw new Error('Published nota not found or has no content')
         }
 
+        // Record clone action in statistics
+        const authStore = useAuthStore()
+        if (authStore.isAuthenticated && authStore.currentUser?.uid) {
+          statisticsService.recordClone(publishedNotaId, authStore.currentUser.uid)
+        }
+
         // Create a new nota with a new ID but copy the content
         const newNota: Nota = {
           id: nanoid(), // Generate a new UUID
@@ -798,7 +804,6 @@ export const useNotaStore = defineStore('nota', {
         if (publishedNota.citations && publishedNota.citations.length > 0) {
           newNota.citations = publishedNota.citations.map(citation => ({
             ...citation,
-            // Generate new IDs for each citation
             id: crypto.randomUUID()
           }))
         }

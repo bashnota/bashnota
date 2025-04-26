@@ -8,11 +8,11 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription }
 import { Input } from '@/components/ui/input'
 import { formatDate } from '@/lib/utils'
 import { ExternalLink, Trash2, Clock, Search, Grid, Table, AlertCircle, CalendarDays, BarChart, Eye, Filter, DownloadCloud, ThumbsUp, ThumbsDown, FileText } from 'lucide-vue-next'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import { type PublishedNota } from '@/types/nota'
 import { logger } from '@/services/logger'
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore'
+import { collection, query, where, getDocs, doc, getDoc, setDoc } from 'firebase/firestore'
 import { firestore } from '@/services/firebase'
 import { toast } from '@/lib/utils'
 
@@ -32,6 +32,7 @@ const dateFilter = ref<'all' | 'today' | 'week' | 'month' | 'year'>('all')
 const isFilterOpen = ref(false)
 const sortBy = ref<'date' | 'views' | 'title'>('date')
 const sortDirection = ref<'asc' | 'desc'>('desc')
+const userProfileImage = ref<string | null>(null)
 
 // Pagination
 const currentPage = ref(1)
@@ -141,7 +142,9 @@ const stats = reactive({
   totalLikes: 0,
   totalDislikes: 0,
   mostLiked: null as PublishedNota | null,
-  likeRatio: undefined as number | undefined
+  likeRatio: undefined as number | undefined,
+  totalClones: 0,
+  mostCloned: null as PublishedNota | null
 })
 
 // Check if the current logged-in user is viewing their own profile
@@ -459,6 +462,8 @@ const calculateStats = (notas: PublishedNota[]) => {
   stats.totalDislikes = 0
   stats.mostLiked = null
   stats.likeRatio = undefined
+  stats.totalClones = 0
+  stats.mostCloned = null
   
   // Find the current date boundaries
   const now = new Date()
@@ -502,6 +507,15 @@ const calculateStats = (notas: PublishedNota[]) => {
     // Find most liked
     if (!stats.mostLiked || likes > (stats.mostLiked.likeCount || 0)) {
       stats.mostLiked = nota
+    }
+
+    // Count clones
+    const clones = nota.cloneCount || 0
+    stats.totalClones += clones
+
+    // Find most cloned
+    if (!stats.mostCloned || clones > (stats.mostCloned.cloneCount || 0)) {
+      stats.mostCloned = nota
     }
   })
   
@@ -602,6 +616,20 @@ const resolveUserId = async () => {
       return
     }
     
+    // Load user profile image if available
+    if (userId.value) {
+      try {
+        const userDoc = await getDoc(doc(firestore, 'users', userId.value))
+        if (userDoc.exists()) {
+          userProfileImage.value = userDoc.data().photoURL || null
+          logger.log('User profile image URL:', userProfileImage.value)
+        }
+      } catch (err) {
+        logger.error('Error fetching user profile image:', err)
+        // Continue even if profile image fails to load
+      }
+    }
+    
     await loadPublishedNotas()
   } catch (err) {
     logger.error('Error resolving user ID:', err)
@@ -689,7 +717,10 @@ const handlePageSizeChange = (event: Event) => {
         <div class="flex flex-col md:flex-row px-6 py-5 items-start md:items-end gap-4 -mt-12">
           <!-- User Avatar -->
           <Avatar class="h-24 w-24 border-4 border-card ring-2 ring-background shadow-md">
-            <AvatarFallback class="text-2xl font-bold">
+            <template v-if="userProfileImage">
+              <img :src="userProfileImage" :alt="authorName" class="h-full w-full rounded-full object-cover" />
+            </template>
+            <AvatarFallback v-else class="text-2xl font-bold">
               {{ authorInitials || 'A' }}
             </AvatarFallback>
           </Avatar>
@@ -717,6 +748,10 @@ const handlePageSizeChange = (event: Event) => {
                 <div class="flex items-center gap-1.5">
                   <ThumbsUp class="h-4 w-4 text-muted-foreground" />
                   <span><strong>{{ stats.totalLikes }}</strong> Likes</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <FileText class="h-4 w-4 text-muted-foreground" />
+                  <span><strong>{{ stats.totalClones }}</strong> Clones</span>
                 </div>
               </div>
             </div>
@@ -839,6 +874,23 @@ const handlePageSizeChange = (event: Event) => {
                         Ratio: {{ Math.round(stats.likeRatio * 100) }}%
                       </p>
                     </div>
+                  </div>
+                </div>
+
+                <!-- Clone Stats -->
+                <div class="bg-muted/30 rounded-md p-2.5">
+                  <div class="flex items-center justify-between mb-1">
+                    <p class="text-xs font-medium text-muted-foreground">Clones</p>
+                    <FileText class="h-3.5 w-3.5 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <div class="flex items-center gap-1">
+                      <FileText class="h-3 w-3 text-primary" />
+                      <span class="text-xs font-medium">{{ stats.totalClones || 0 }} Total Clones</span>
+                    </div>
+                    <p v-if="stats.mostCloned" class="text-xs text-muted-foreground mt-1 line-clamp-1">
+                      Most cloned: {{ stats.mostCloned.title }} ({{ stats.mostCloned.cloneCount || 0 }})
+                    </p>
                   </div>
                 </div>
 
@@ -1072,6 +1124,7 @@ const handlePageSizeChange = (event: Event) => {
                       <th class="text-left py-3 px-4 font-medium">Updated</th>
                       <th class="text-center py-3 px-4 font-medium">Views</th>
                       <th class="text-center py-3 px-4 font-medium">Likes</th>
+                      <th class="text-center py-3 px-4 font-medium">Clones</th>
                       <th class="text-right py-3 px-4 font-medium">Actions</th>
                     </tr>
                   </thead>
@@ -1110,6 +1163,11 @@ const handlePageSizeChange = (event: Event) => {
                             <ThumbsDown class="mr-1 h-3 w-3" /> {{ nota.dislikeCount || 0 }}
                           </span>
                         </div>
+                      </td>
+                      <td class="py-3 px-4 text-sm text-center text-muted-foreground">
+                        <span class="flex items-center justify-center">
+                          <FileText class="mr-1 h-3.5 w-3.5" /> {{ nota.cloneCount || 0 }}
+                        </span>
                       </td>
                       <td class="py-3 px-4 text-right" @click.stop>
                         <div class="flex justify-end gap-2">
