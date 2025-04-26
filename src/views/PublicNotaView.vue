@@ -60,6 +60,9 @@ const userTag = computed(() => {
   return typeof tag === 'string' ? tag : (Array.isArray(tag) ? tag[0] : '');
 })
 
+// Clone count
+const cloneCount = ref(0)
+
 // Get a short description from the content (first 160 characters)
 const getMetaDescription = (content: string | null): string => {
   if (!content) {
@@ -329,6 +332,7 @@ const loadVotingData = async () => {
     const stats = await statisticsService.getStatistics(notaId.value);
     likeCount.value = stats.likeCount || 0;
     dislikeCount.value = stats.dislikeCount || 0;
+    cloneCount.value = stats.cloneCount || 0;
     
     // Get the user's vote if they're logged in
     if (authStore.isAuthenticated && authStore.currentUser?.uid) {
@@ -527,6 +531,12 @@ const handleContentRendered = () => {
             
             <!-- Show voters list button -->
             <VotersList :notaId="notaId" v-if="likeCount > 0 || dislikeCount > 0" />
+            
+            <!-- Clone count display -->
+            <div class="flex items-center gap-1 ml-2">
+              <FileText class="h-4 w-4 text-muted-foreground" />
+              <span class="text-sm">{{ cloneCount }} clone{{ cloneCount !== 1 ? 's' : '' }}</span>
+            </div>
           </div>
         </div>
 

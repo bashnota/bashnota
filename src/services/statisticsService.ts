@@ -223,6 +223,45 @@ export const statisticsService = {
   },
 
   /**
+   * Record a clone of a published nota
+   * @param notaId - The ID of the published nota
+   * @param userId - The ID of the user who cloned the nota
+   */
+  async recordClone(notaId: string, userId: string): Promise<void> {
+    try {
+      if (!notaId) return;
+
+      logger.info(`Recording clone for nota ${notaId} by user ${userId}`);
+      
+      const notaRef = doc(firestore, 'publishedNotas', notaId);
+      
+      // Get the nota document to check if it exists and get current data
+      const notaDoc = await getDoc(notaRef);
+      
+      if (!notaDoc.exists()) {
+        logger.error(`Published nota ${notaId} not found when recording clone`);
+        return;
+      }
+      
+      // Increment the clone count
+      await updateDoc(notaRef, {
+        cloneCount: increment(1),
+      });
+      
+      // Log the clone event
+      logAnalyticsEvent('nota_cloned', {
+        nota_id: notaId,
+        user_id: userId
+      });
+      
+      logger.info(`Clone recorded for nota ${notaId}`);
+    } catch (error) {
+      // Use non-blocking error handling for statistics
+      logger.error('Failed to record nota clone:', error);
+    }
+  },
+
+  /**
    * Checks if a user has already voted on a nota and returns their vote type
    * @param notaId - The ID of the published nota
    * @param userId - The ID of the user
@@ -361,7 +400,8 @@ export const statisticsService = {
           monthlyViews: {}
         },
         likeCount: data.likeCount || 0,
-        dislikeCount: data.dislikeCount || 0
+        dislikeCount: data.dislikeCount || 0,
+        cloneCount: data.cloneCount || 0
       };
     } catch (error) {
       logger.error('Failed to get nota statistics:', error);

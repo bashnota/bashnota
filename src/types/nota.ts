@@ -59,6 +59,7 @@ export interface PublishedNota {
   // Voting fields
   likeCount?: number
   dislikeCount?: number
+  cloneCount?: number
 }
 
 // User votes tracking

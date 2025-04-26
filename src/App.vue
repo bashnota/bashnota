@@ -124,8 +124,6 @@ const handleMouseMove = (event: MouseEvent) => {
             <BreadcrumbNav />
           </div>
           
-          <!-- Auth Header Component -->
-          <AuthHeader />
         </div>
       </div>
 
