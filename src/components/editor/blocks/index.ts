@@ -13,6 +13,10 @@ import MathExtension, {
   MathInput,
 } from './math-block'
 
+import TheoremExtension, {
+  TheoremBlock,
+} from './theorem-block'
+
 import Citation from './Citation.vue'
 import Bibliography from './Bibliography.vue'
 import SubNotaDialog from './SubNotaDialog.vue'
@@ -32,6 +36,10 @@ export {
   MathBlock,
   MathDisplay,
   MathInput,
+
+  // Theorem block components
+  TheoremExtension,
+  TheoremBlock,
   
   // Citation components
   Citation,
@@ -45,6 +53,7 @@ export {
 export const blockExtensions = {
   subfigure: SubfigureExtension,
   math: MathExtension,
+  theorem: TheoremExtension,
 }
 
-export default blockExtensions 
+export default blockExtensions

@@ -178,7 +178,7 @@ const handleTagsUpdate = async (tags: string[]) => {
 <template>
   <div class="bg-background flex flex-col flex-1 min-h-0 h-full">
     <!-- Main content area -->
-    <main class="flex-1 min-h-0 overflow-auto">
+    <main class="flex-1 min-h-0 overflow-hidden">
       <template v-if="isReady && nota">
         <NotaEditor
           :nota-id="id"
