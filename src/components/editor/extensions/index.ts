@@ -29,6 +29,7 @@ import GlobalDragHandle from './DragHandlePlugin'
 import { InlineAIGenerationExtension } from './InlineAIGenerationExtension'
 import { CitationExtension, BibliographyExtension } from './CitationExtension'
 import { VibeExtension } from './VibeExtension'
+import { TheoremExtension } from '../blocks/theorem-block'
 
 // Import command-related extensions
 import SlashCommands from './Commands'
@@ -116,6 +117,7 @@ export function getEditorExtensions() {
     CitationExtension,
     BibliographyExtension,
     VibeExtension,
+    TheoremExtension,
   ]
 }
 
@@ -179,5 +181,6 @@ export function getViewerExtensions() {
         class: 'bibliography-block',
       },
     }),
+    TheoremExtension,
   ]
 }

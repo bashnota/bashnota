@@ -393,6 +393,25 @@ function createAdvancedCommands(): CommandItem[] {
       },
     },
     {
+      title: 'Theorem',
+      category: 'Math',
+      icon: FunctionSquare,
+      keywords: ['theorem', 'lemma', 'proposition', 'corollary', 'definition', 'proof', 'math'],
+      command: ({ editor, range }: CommandArgs) => {
+        editor
+          .chain()
+          .focus()
+          .deleteRange(range)
+          .setTheorem({
+            title: '',
+            content: 'Let $f: \\mathbb{R} \\to \\mathbb{R}$ be a function. Then...',
+            proof: 'We can prove this by...',
+            type: 'theorem',
+          })
+          .run();
+      },
+    },
+    {
       title: 'YouTube Video',
       category: 'Media',
       icon: VideoIcon,
