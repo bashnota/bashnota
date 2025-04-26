@@ -73,6 +73,55 @@ export function useMathJax() {
     }
   }
 
+  // Render inline LaTeX within a text string
+  const renderLatexInline = (text: string) => {
+    if (!text) return ''
+    if (!isMathJaxLoaded.value) return text
+    
+    try {
+      // Process the string to find and replace LaTeX expressions
+      let result = text
+      let inlineRegex = /\$([^\$]+)\$/g
+      let displayRegex = /\$\$([^\$]+)\$\$/g
+      
+      // Replace display mode LaTeX ($$...$$)
+      result = result.replace(displayRegex, (match, latex) => {
+        try {
+          const output = window.MathJax.tex2svg(latex, { display: true })
+          // Convert the SVG node to a string
+          const tempDiv = document.createElement('div')
+          tempDiv.appendChild(output.cloneNode(true))
+          // Add a wrapper div with proper styling to avoid line breaks
+          return `<div class="mathjax-display-wrapper">${tempDiv.innerHTML}</div>`
+        } catch (err) {
+          logger.error('Error rendering display LaTeX:', err)
+          return `<span class="text-destructive">Invalid LaTeX: ${latex}</span>`
+        }
+      })
+      
+      // Replace inline mode LaTeX ($...$)
+      result = result.replace(inlineRegex, (match, latex) => {
+        try {
+          const output = window.MathJax.tex2svg(latex, { display: false })
+          // Convert the SVG node to a string
+          const tempDiv = document.createElement('div')
+          tempDiv.appendChild(output.cloneNode(true))
+          // Add a span wrapper with proper styling to keep inline math truly inline
+          return `<span class="mathjax-inline-wrapper" style="display:inline-flex;vertical-align:middle;">${tempDiv.innerHTML}</span>`
+        } catch (err) {
+          logger.error('Error rendering inline LaTeX:', err)
+          return `<span class="text-destructive">Invalid LaTeX: ${latex}</span>`
+        }
+      })
+      
+      return result
+    } catch (err) {
+      error.value = err instanceof Error ? err : new Error(String(err))
+      logger.error('Error rendering inline LaTeX:', err)
+      return text // Return original text on error
+    }
+  }
+
   onMounted(() => {
     try {
       initMathJax()
@@ -85,7 +134,8 @@ export function useMathJax() {
   return {
     isMathJaxLoaded,
     renderLatex,
+    renderLatexInline,
     initMathJax,
     error
   }
-} 
+}
