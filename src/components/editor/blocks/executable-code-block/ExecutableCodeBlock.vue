@@ -112,4 +112,19 @@ const updateOutput = (newOutput: string) => {
   background-color: rgba(155, 155, 155, 0.5);
   border-radius: 4px;
 }
+
+/* Ensure code blocks use proper theme colors */
+:deep(.cm-editor) {
+  color: var(--foreground);
+  background-color: var(--background);
+}
+
+:deep(.cm-gutters) {
+  background-color: var(--muted) !important;
+  border-right-color: var(--border) !important;
+}
+
+:deep(.cm-lineNumbers) {
+  color: var(--muted-foreground) !important;
+}
 </style>
