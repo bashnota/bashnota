@@ -41,6 +41,10 @@ import VibeSettings from '@/components/settings/VibeSettings.vue'
 import UserTagEditor from '@/components/auth/UserTagEditor.vue'
 import { logger } from '@/services/logger'
 import { useAuthStore } from '@/stores/auth'
+import { useTheme, useThemeColor, useDarkMode } from '@/composables/theme'
+import ThemeSelector from '@/components/layout/ThemeSelector.vue'
+import ThemeModeSelector from '@/components/layout/ThemeModeSelector.vue'
+import DarkIntensitySelector from '@/components/layout/DarkIntensitySelector.vue'
 
 // Use shortcuts from the store instead of duplicating them
 const shortcutsStore = useShortcutsStore()
@@ -50,13 +54,8 @@ const authStore = useAuthStore()
 // Get current user
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 
-// Theme settings
-const theme = ref('system')
-const availableThemes = [
-  { value: 'light', label: 'Light', icon: Palette },
-  { value: 'dark', label: 'Dark', icon: Palette },
-  { value: 'system', label: 'System', icon: Monitor },
-]
+// Use theme composable
+const { themeColor, themeMode, darkIntensity, isDark, setThemeColor, setThemeMode, setDarkIntensity } = useTheme()
 
 // Interface settings
 const interfaceSettings = ref({
@@ -128,12 +127,6 @@ const otherShortcuts = computed(() => {
 })
 
 onMounted(() => {
-  // Load saved theme preference
-  const savedTheme = localStorage.getItem('theme')
-  if (savedTheme) {
-    theme.value = savedTheme
-  }
-  
   // Load saved interface settings
   const savedInterfaceSettings = localStorage.getItem('interface-settings')
   if (savedInterfaceSettings) {
@@ -159,14 +152,20 @@ onMounted(() => {
 })
 
 // Update theme
-const updateTheme = (newTheme: string) => {
-  theme.value = newTheme
-  document.documentElement.classList.toggle('dark', newTheme === 'dark' || 
-    (newTheme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches))
-  localStorage.setItem('theme', newTheme)
+const updateThemeMode = (mode: string) => {
+  setThemeMode(mode as any)
   toast({
-    title: 'Theme Updated',
-    description: `Theme set to ${newTheme}`,
+    title: 'Theme Mode Updated',
+    description: `Theme mode set to ${mode}`,
+    variant: 'default'
+  })
+}
+
+const updateThemeColor = (color: string) => {
+  setThemeColor(color as any)
+  toast({
+    title: 'Theme Color Updated',
+    description: `Theme color set to ${color}`,
     variant: 'default'
   })
 }
@@ -210,8 +209,8 @@ const clearCache = () => {
 const resetAllSettings = () => {
   if (confirm('Are you sure you want to reset all settings to default?')) {
     // Reset theme
-    theme.value = 'system'
-    updateTheme('system')
+    setThemeMode('system')
+    setThemeColor('slate')
     
     // Reset interface settings
     interfaceSettings.value = {
@@ -241,10 +240,6 @@ const resetAllSettings = () => {
       variant: 'default'
     })
   }
-}
-
-function updateFontSize(newSize: number) {
-  editorSettings.value.fontSize = [newSize]
 }
 
 // Add this function to edit a shortcut
@@ -343,7 +338,7 @@ function formatShortcutKey(key: string) {
 </script>
 
 <template>
-  <div class="p-6 max-w-5xl mx-auto">
+  <div class="p-6 max-w-5xl mx-auto flex h-full overflow-hidden">
     <div class="space-y-8">
       <div class="flex items-center justify-between">
         <div>
@@ -406,7 +401,7 @@ function formatShortcutKey(key: string) {
         <TabsContent value="appearance" class="space-y-6">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- Theme Card -->
-            <Card class="overflow-hidden border-2 hover:border-primary/50 transition-all">
+            <Card class="border-2 hover:border-primary/50 transition-all">
               <CardHeader class="bg-muted/50">
                 <CardTitle class="flex items-center gap-2">
                   <Palette class="h-5 w-5 text-primary" />
@@ -415,48 +410,18 @@ function formatShortcutKey(key: string) {
                 <CardDescription>Customize the look and feel</CardDescription>
               </CardHeader>
               <CardContent class="pt-6">
-                <div class="space-y-4">
-                  <div class="space-y-2">
-                    <Label for="theme-select">Application Theme</Label>
-                    <Select v-model="theme" @update:modelValue="updateTheme">
-                      <SelectTrigger id="theme-select" class="w-full">
-                        <SelectValue :placeholder="theme" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem v-for="t in availableThemes" :key="t.value" :value="t.value" class="flex items-center gap-2">
-                          <component :is="t.icon" class="h-4 w-4 mr-2" />
-                          {{ t.label }}
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div class="pt-2">
-                    <div class="grid grid-cols-3 gap-2">
-                      <div 
-                        class="aspect-video rounded-md bg-white border-2 cursor-pointer transition-all hover:scale-105"
-                        :class="{ 'border-primary': theme === 'light', 'border-muted': theme !== 'light' }"
-                        @click="updateTheme('light')"
-                      ></div>
-                      <div 
-                        class="aspect-video rounded-md bg-slate-900 border-2 cursor-pointer transition-all hover:scale-105"
-                        :class="{ 'border-primary': theme === 'dark', 'border-muted': theme !== 'dark' }"
-                        @click="updateTheme('dark')"
-                      ></div>
-                      <div 
-                        class="aspect-video rounded-md bg-gradient-to-r from-white to-slate-900 border-2 cursor-pointer transition-all hover:scale-105"
-                        :class="{ 'border-primary': theme === 'system', 'border-muted': theme !== 'system' }"
-                        @click="updateTheme('system')"
-                      ></div>
-                    </div>
-                    <p class="text-xs text-muted-foreground mt-2">Click on a theme to apply it</p>
-                  </div>
+                <ThemeSelector />
+                <div class="mt-6">
+                  <ThemeModeSelector />
+                </div>
+                <div class="mt-6" v-if="isDark">
+                  <DarkIntensitySelector />
                 </div>
               </CardContent>
             </Card>
 
             <!-- Interface Card -->
-            <Card class="overflow-hidden border-2 hover:border-primary/50 transition-all">
+            <Card class="border-2 hover:border-primary/50 transition-all">
               <CardHeader class="bg-muted/50">
                 <CardTitle class="flex items-center gap-2">
                   <Settings class="h-5 w-5 text-primary" />
@@ -530,7 +495,7 @@ function formatShortcutKey(key: string) {
 
         <!-- Shortcuts Tab -->
         <TabsContent value="shortcuts" class="space-y-6">
-          <Card class="overflow-hidden border-2 hover:border-primary/50 transition-all">
+          <Card class=" border-2 hover:border-primary/50 transition-all">
             <CardHeader class="bg-muted/50">
               <CardTitle class="flex items-center gap-2">
                 <Keyboard class="h-5 w-5 text-primary" />
@@ -650,7 +615,7 @@ function formatShortcutKey(key: string) {
         <TabsContent value="editor" class="space-y-6">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- Text Editing Card -->
-            <Card class="overflow-hidden border-2 hover:border-primary/50 transition-all">
+            <Card class=" border-2 hover:border-primary/50 transition-all">
               <CardHeader class="bg-muted/50">
                 <CardTitle class="flex items-center gap-2">
                   <Code2 class="h-5 w-5 text-primary" />
@@ -722,7 +687,7 @@ function formatShortcutKey(key: string) {
             </Card>
 
             <!-- Code Editing Card -->
-            <Card class="overflow-hidden border-2 hover:border-primary/50 transition-all">
+            <Card class=" border-2 hover:border-primary/50 transition-all">
               <CardHeader class="bg-muted/50">
                 <CardTitle class="flex items-center gap-2">
                   <Cpu class="h-5 w-5 text-primary" />
@@ -799,7 +764,7 @@ function formatShortcutKey(key: string) {
         <TabsContent value="advanced" class="space-y-6">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- Profile Settings Card -->
-            <Card v-if="isAuthenticated" class="overflow-hidden border-2 hover:border-primary/50 transition-all">
+            <Card v-if="isAuthenticated" class=" border-2 hover:border-primary/50 transition-all">
               <CardHeader class="bg-muted/50">
                 <CardTitle class="flex items-center gap-2">
                   <User class="h-5 w-5 text-primary" />
@@ -813,7 +778,7 @@ function formatShortcutKey(key: string) {
             </Card>
             
             <!-- Data Management Card -->
-            <Card class="overflow-hidden border-2 hover:border-primary/50 transition-all">
+            <Card class="border-2 hover:border-primary/50 transition-all">
               <CardHeader class="bg-muted/50">
                 <CardTitle class="flex items-center gap-2">
                   <Database class="h-5 w-5 text-primary" />
@@ -847,7 +812,7 @@ function formatShortcutKey(key: string) {
             </Card>
 
             <!-- System Information Card -->
-            <Card class="overflow-hidden border-2 hover:border-primary/50 transition-all">
+            <Card class="border-2 hover:border-primary/50 transition-all">
               <CardHeader class="bg-muted/50">
                 <CardTitle class="flex items-center gap-2">
                   <Server class="h-5 w-5 text-primary" />
