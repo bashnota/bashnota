@@ -66,7 +66,7 @@ onMounted(() => {
             :class="{
               'bg-green-50 dark:bg-green-700 border-green-950': serverStatus?.success,
               'bg-red-50 dark:bg-red-700 border-red-950': serverStatus?.success === false,
-              'bg-blue-50 dark:bg-blue-700 border-blue-950': serverStatus === null
+              'bg-muted text-foreground': serverStatus === null
             }"
           >
             <Server class="w-6 h-6" />
@@ -81,7 +81,7 @@ onMounted(() => {
                 :class="{
                   'bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300': serverStatus?.success,
                   'bg-red-100 text-red-700 dark:bg-red-700/20 dark:text-red-300': serverStatus?.success === false,
-                  'bg-slate-100 text-slate-700 dark:bg-slate-700/20 dark:text-slate-300': serverStatus === null
+                  'bg-muted text-foreground': serverStatus === null
                 }"
               >
                 {{ serverStatus?.success ? 'Online' : serverStatus?.success === false ? 'Offline' : 'Checking...' }}
@@ -143,4 +143,4 @@ onMounted(() => {
       </CollapsibleContent>
     </Collapsible>
   </Card>
-</template> 
+</template>

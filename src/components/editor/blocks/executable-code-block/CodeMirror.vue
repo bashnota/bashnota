@@ -173,6 +173,7 @@ const extensions = computed(() => [
 .dark .cm-gutters {
   background-color: var(--muted, #1e293b) !important;
   border-right-color: var(--border, #334155) !important;
+  color: var(--muted-foreground) !important;
 }
 
 /* Custom scrollbar styles */
@@ -190,9 +191,8 @@ const extensions = computed(() => [
   border-radius: 4px;
 }
 
-.cm-scroller {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(155, 155, 155, 0.5) transparent;
+.dark .cm-scroller::-webkit-scrollbar-thumb {
+  background-color: rgba(200, 200, 200, 0.3);
 }
 
 /* Autocomplete menu styles */

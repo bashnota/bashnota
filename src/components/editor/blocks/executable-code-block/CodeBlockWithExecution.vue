@@ -596,7 +596,7 @@ const { shortcuts } = useCodeBlockShortcuts({
 <template>
   <div
     ref="codeBlockRef"
-    class="flex flex-col bg-slate-100 dark:bg-slate-900 rounded-lg overflow-hidden border shadow-sm transition-all duration-200"
+    class="flex flex-col bg-card text-card-foreground rounded-lg overflow-hidden border shadow-sm transition-all duration-200"
     :class="{ 'ring-2 ring-primary': hasUnsavedChanges }"
   >
     <!-- Toolbar -->

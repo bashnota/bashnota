@@ -1,29 +1,20 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { Sun, Moon } from 'lucide-vue-next'
+import { Sun, Moon, Laptop } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
+import { useTheme } from '@/composables/theme'
 
-const isDark = ref(false)
+const { themeMode, isDark, setThemeMode, toggleDarkMode } = useTheme()
 
-onMounted(() => {
-  // Check system preference and localStorage
-  const savedTheme = localStorage.getItem('theme')
-  if (savedTheme) {
-    isDark.value = savedTheme === 'dark'
-  } else {
-    isDark.value = window.matchMedia('(prefers-color-scheme: dark)').matches
-  }
-  updateTheme()
-})
-
-const toggleDarkMode = () => {
-  isDark.value = !isDark.value
-  updateTheme()
+// Function to determine which icon to display
+const getIcon = () => {
+  if (themeMode.value === 'system') return Laptop
+  return isDark.value ? Moon : Sun
 }
 
-const updateTheme = () => {
-  document.documentElement.classList.toggle('dark', isDark.value)
-  localStorage.setItem('theme', isDark.value ? 'dark' : 'light')
+// Function to get the tooltip text
+const getTooltip = () => {
+  if (themeMode.value === 'system') return 'System theme (click to change)'
+  return isDark.value ? 'Dark theme (click to change)' : 'Light theme (click to change)'
 }
 </script>
 
@@ -32,10 +23,9 @@ const updateTheme = () => {
     variant="ghost"
     size="icon"
     @click="toggleDarkMode"
-    :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
+    :title="getTooltip()"
     class="h-9 w-9 transition-colors hover:bg-accent hover:text-accent-foreground"
   >
-    <Sun v-if="!isDark" class="h-5 w-5" />
-    <Moon v-else class="h-5 w-5" />
+    <component :is="getIcon()" class="h-5 w-5" />
   </Button>
 </template>

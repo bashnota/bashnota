@@ -149,7 +149,7 @@ const handleAuthNavigation = () => {
 </script>
 
 <template>
-  <div class="w-full h-full flex flex-col border-e bg-slate-50 dark:bg-slate-900">
+  <div class="w-full h-full flex flex-col border-e bg-background text-foreground">
     <!-- Header -->
     <div class="p-2 border-b space-y-2">
       <!-- Logo and Controls -->

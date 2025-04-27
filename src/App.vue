@@ -110,7 +110,7 @@ const handleMouseMove = (event: MouseEvent) => {
       :style="{ marginLeft: !isSidebarOpen ? `-${sidebarWidth}px` : '0' }"
     >
       <!-- Top Bar -->
-      <div class="sticky top-0 z-10 border-b bg-slate-100 dark:bg-slate-900 backdrop-blur-sm">
+      <div class="sticky top-0 z-10 border-b bg-background text-foreground backdrop-blur-sm">
         <div class="flex items-center justify-between px-4 h-14">
           <div class="flex items-center gap-4">
             <Button
@@ -132,7 +132,7 @@ const handleMouseMove = (event: MouseEvent) => {
 
       <!-- Router View -->
       <div class="flex-1 min-h-0 flex flex-col overflow-auto">
-        <RouterView class="flex-1 min-h-0 flex flex-col overflow-hidden" />
+        <RouterView class="flex-1 h-full" />
       </div>
     </div>
   </div>

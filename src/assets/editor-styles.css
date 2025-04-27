@@ -56,15 +56,24 @@
 
 /* Code Blocks */
 .ProseMirror pre {
-  @apply my-4 p-4 bg-muted rounded-lg overflow-x-auto font-mono text-sm;
+  @apply my-4 p-4 bg-muted rounded-lg overflow-x-auto font-mono text-sm text-foreground;
 }
 
 .ProseMirror code {
-  @apply relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm;
+  @apply relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm text-foreground;
 }
 
 .ProseMirror pre code {
   @apply bg-transparent p-0;
+}
+
+/* Dark mode specific styling for code blocks */
+.dark .ProseMirror pre {
+  @apply bg-muted border border-muted-foreground/20;
+}
+
+.dark .ProseMirror code {
+  @apply bg-muted border-muted-foreground/20;
 }
 
 /* Empty State */
