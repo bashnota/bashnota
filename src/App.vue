@@ -132,7 +132,7 @@ const handleMouseMove = (event: MouseEvent) => {
 
       <!-- Router View -->
       <div class="flex-1 min-h-0 flex flex-col overflow-auto">
-        <RouterView class="flex-1 min-h-0 flex flex-col overflow-hidden" />
+        <RouterView class="flex-1 h-full" />
       </div>
     </div>
   </div>

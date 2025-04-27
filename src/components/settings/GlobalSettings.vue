@@ -338,7 +338,7 @@ function formatShortcutKey(key: string) {
 </script>
 
 <template>
-  <div class="p-6 max-w-5xl mx-auto flex h-full overflow-hidden">
+  <div class="p-6 max-w-5xl mx-auto flex h-full">
     <div class="space-y-8">
       <div class="flex items-center justify-between">
         <div>
