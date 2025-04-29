@@ -13,6 +13,7 @@ import { logger } from '@/services/logger'
 import { statisticsService } from '@/services/statisticsService'
 import { convertPublicPageLinks } from '@/components/editor/extensions/PageLinkExtension'
 import VotersList from '@/components/nota/VotersList.vue'
+import CommentSection from '@/components/comments/CommentSection.vue'
 
 // Define extended PublishedNota type with optional fields we need
 interface ExtendedPublishedNota extends PublishedNota {
@@ -578,6 +579,9 @@ const handleContentRendered = () => {
           </li>
         </ul>
       </footer>
+      
+      <!-- Comments Section -->
+      <CommentSection v-if="nota" :nota-id="notaId" />
     </article>
   </main>
 </template>
