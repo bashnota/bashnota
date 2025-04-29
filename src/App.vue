@@ -4,19 +4,22 @@ import AppSidebar from './components/layout/AppSidebar.vue'
 import BreadcrumbNav from './components/layout/BreadcrumbNav.vue'
 import AppTabs from './components/layout/AppTabs.vue'
 import AuthHeader from './components/auth/AuthHeader.vue'
-import { ref, onMounted, watch } from 'vue'
+import BashHub from './components/home/BashHub.vue'
+import { ref, onMounted, watch, onUnmounted } from 'vue'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import Toaster from '@/components/ui/toast/Toaster.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRoute } from 'vue-router'
-import { Menu } from 'lucide-vue-next'
+import { Menu, Home, Globe } from 'lucide-vue-next'
 import { logger } from '@/services/logger'
 
 const isSidebarOpen = ref(false)
 const sidebarWidth = ref(300)
 const isResizing = ref(false)
 const authStore = useAuthStore()
+const route = useRoute()
+const showBashHub = ref(false)
 
 onMounted(async () => {
   // Initialize auth state
@@ -45,6 +48,12 @@ onMounted(async () => {
     }
   }
 
+  // Load BashHub state from localStorage
+  const savedBashHubState = localStorage.getItem('bashhub-visible')
+  if (savedBashHubState) {
+    showBashHub.value = JSON.parse(savedBashHubState)
+  }
+
   // Listen for settings changes
   window.addEventListener('interface-settings-changed', ((event: CustomEvent) => {
     if (event.detail?.sidebarWidth && event.detail.sidebarWidth[0]) {
@@ -57,8 +66,18 @@ onMounted(async () => {
   document.addEventListener('mouseup', stopResize)
 })
 
+// Clean up event listeners on unmount
+onUnmounted(() => {
+  document.removeEventListener('mousemove', handleMouseMove)
+  document.removeEventListener('mouseup', stopResize)
+})
+
 watch(isSidebarOpen, (newState) => {
   localStorage.setItem('sidebar-state', JSON.stringify(newState))
+})
+
+watch(showBashHub, (newState) => {
+  localStorage.setItem('bashhub-visible', JSON.stringify(newState))
 })
 
 // Resize functionality
@@ -80,6 +99,11 @@ const handleMouseMove = (event: MouseEvent) => {
   const newWidth = Math.max(200, Math.min(400, event.clientX))
   sidebarWidth.value = newWidth
   localStorage.setItem('sidebar-width', newWidth.toString())
+}
+
+// Toggle between main view and BashHub
+const toggleBashHub = () => {
+  showBashHub.value = !showBashHub.value
 }
 </script>
 
@@ -124,15 +148,29 @@ const handleMouseMove = (event: MouseEvent) => {
             <BreadcrumbNav />
           </div>
           
+          <!-- BashHub Toggle Button -->
+          <div class="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              @click="toggleBashHub"
+              :class="{'bg-primary/10': showBashHub}"
+            >
+              <Globe v-if="showBashHub" class="h-4 w-4 mr-2" />
+              <Home v-else class="h-4 w-4 mr-2" />
+              {{ showBashHub ? 'Community Hub' : 'My Notas' }}
+            </Button>
+          </div>
         </div>
       </div>
 
-      <!-- Tabs Navigation -->
-      <AppTabs />
+      <!-- Tabs Navigation (only show when not in BashHub) -->
+      <AppTabs v-if="!showBashHub" />
 
-      <!-- Router View -->
+      <!-- Content Area: Switch between RouterView and BashHub -->
       <div class="flex-1 min-h-0 flex flex-col overflow-auto">
-        <RouterView class="flex-1 h-full" />
+        <RouterView v-if="!showBashHub" class="flex-1 h-full" />
+        <BashHub v-else class="flex-1 h-full" />
       </div>
     </div>
   </div>

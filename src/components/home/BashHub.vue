@@ -1,0 +1,242 @@
+<script setup lang="ts">
+import { ref, onMounted, watch, computed } from 'vue'
+import { useRouter } from 'vue-router'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { 
+  FileText, 
+  TrendingUp, 
+  Heart, 
+  Users, 
+  Search 
+} from 'lucide-vue-next'
+import { useBashhubData } from '@/composables/useBashhubData'
+import { useAuthStore } from '@/stores/auth'
+import NotaTab from './bashhub/NotaTab.vue'
+import ContributorTab from './bashhub/ContributorTab.vue'
+import type { PublishedNota } from '@/types/nota'
+import { logger } from '@/services/logger'
+import { toast } from '@/lib/utils'
+
+// Define tab types for type safety
+type TabType = 'latest' | 'popular' | 'most-voted' | 'top-contributors';
+
+// State
+const activeTab = ref<TabType>('latest')
+const searchQuery = ref('')
+const router = useRouter()
+const authStore = useAuthStore()
+
+// Data fetching using our composable
+const { 
+  items, 
+  isLoading, 
+  error, 
+  currentPage, 
+  hasMoreItems,
+  loadData,
+  nextPage,
+  prevPage,
+  resetPagination
+} = useBashhubData({ pageSize: 10 })
+
+// Filter items based on active tab type
+const publishedNotas = computed(() => {
+  if (activeTab.value === 'top-contributors') return []
+  return items.value as PublishedNota[]
+})
+
+const contributors = computed(() => {
+  if (activeTab.value !== 'top-contributors') return []
+  return items.value as Array<{ uid: string; name: string; tag?: string; count: number }>
+})
+
+// Tab configuration for better organization
+const tabConfig = {
+  'latest': {
+    icon: FileText,
+    title: 'Latest Notas',
+    emptyTitle: 'No Notas Found',
+    emptyDescription: 'Be the first to publish content in the community!'
+  },
+  'popular': {
+    icon: TrendingUp,
+    title: 'Popular Notas',
+    emptyTitle: 'No Popular Notas Found',
+    emptyDescription: 'Check back later for popular content!'
+  },
+  'most-voted': {
+    icon: Heart,
+    title: 'Most Voted Notas',
+    emptyTitle: 'No Highly Voted Notas Found',
+    emptyDescription: 'Be the first to vote on community content!'
+  }
+};
+
+// Load initial data
+onMounted(async () => {
+  await loadData(activeTab.value)
+})
+
+// Watch for tab changes to reload data
+watch(activeTab, async (newTabValue) => {
+  resetPagination()
+  await loadData(newTabValue)
+})
+
+// Handle search
+const handleSearch = async () => {
+  if (!searchQuery.value.trim()) return
+  resetPagination()
+  await loadData(activeTab.value)
+  // Note: In a real implementation, we would add search functionality to the Firestore queries
+}
+
+// Check if search is empty
+const isSearchEmpty = computed(() => !searchQuery.value.trim())
+
+// View nota details
+const viewNota = (nota: PublishedNota) => {
+  if (nota.authorId) {
+    router.push(`/@${nota.authorId}/${nota.id}`)
+  } else {
+    router.push(`/p/${nota.id}`)
+  }
+}
+
+// Clone a nota
+const cloneNota = async (nota: PublishedNota, event: Event) => {
+  event.stopPropagation()
+  if (!authStore.isAuthenticated) {
+    router.push('/login')
+    return
+  }
+  
+  try {
+    // Import the nota store to access cloning functionality
+    const notaStore = await import('@/stores/nota').then(m => m.useNotaStore())
+    
+    // Clone the nota using the existing functionality
+    const clonedNota = await notaStore.clonePublishedNota(nota.id)
+    
+    if (clonedNota) {
+      // Show success message
+      toast(`"${nota.title}" has been added to your notas`, 'Nota cloned successfully', 'default')
+      
+      // Navigate to the cloned nota
+      router.push(`/nota/${clonedNota.id}`)
+    }
+  } catch (err) {
+    logger.error('Error cloning nota:', err)
+    toast('Please try again later', 'Failed to clone nota', 'destructive')
+  }
+}
+</script>
+
+<template>
+  <div class="container mx-auto py-6 max-w-6xl">
+    <header class="mb-6">
+      <h1 class="text-3xl font-bold tracking-tight mb-2">BashHub</h1>
+      <p class="text-muted-foreground">Discover and explore notas from the community</p>
+    </header>
+
+    <!-- Search -->
+    <div class="flex mb-6 gap-2">
+      <Input 
+        v-model="searchQuery" 
+        placeholder="Search notas..." 
+        class="max-w-md"
+        @keyup.enter="handleSearch"
+      />
+      <Button @click="handleSearch" :disabled="isSearchEmpty">
+        <Search class="h-4 w-4 mr-2" />
+        Search
+      </Button>
+    </div>
+
+    <!-- Tabs -->
+    <Tabs v-model="activeTab" class="w-full mb-6">
+      <TabsList class="grid grid-cols-4 w-full max-w-md">
+        <TabsTrigger value="latest">Latest</TabsTrigger>
+        <TabsTrigger value="popular">Popular</TabsTrigger>
+        <TabsTrigger value="most-voted">Most Voted</TabsTrigger>
+        <TabsTrigger value="top-contributors">Top Contributors</TabsTrigger>
+      </TabsList>
+
+      <!-- Latest Notas Tab -->
+      <TabsContent value="latest">
+        <NotaTab 
+          :is-active="activeTab === 'latest'"
+          type="latest"
+          :title="tabConfig.latest.title"
+          :empty-icon="tabConfig.latest.icon"
+          :empty-title="tabConfig.latest.emptyTitle"
+          :empty-description="tabConfig.latest.emptyDescription"
+          :items="publishedNotas"
+          :is-loading="isLoading"
+          :error="error"
+          :current-page="currentPage"
+          :has-more-items="hasMoreItems"
+          @prev="prevPage"
+          @next="nextPage"
+          @view-nota="viewNota"
+          @clone-nota="cloneNota"
+        />
+      </TabsContent>
+
+      <!-- Popular Notas Tab -->
+      <TabsContent value="popular">
+        <NotaTab 
+          :is-active="activeTab === 'popular'"
+          type="popular"
+          :title="tabConfig.popular.title"
+          :empty-icon="tabConfig.popular.icon"
+          :empty-title="tabConfig.popular.emptyTitle"
+          :empty-description="tabConfig.popular.emptyDescription"
+          :items="publishedNotas"
+          :is-loading="isLoading"
+          :error="error"
+          :current-page="currentPage"
+          :has-more-items="hasMoreItems"
+          @prev="prevPage"
+          @next="nextPage"
+          @view-nota="viewNota"
+          @clone-nota="cloneNota"
+        />
+      </TabsContent>
+
+      <!-- Most Voted Notas Tab -->
+      <TabsContent value="most-voted">
+        <NotaTab 
+          :is-active="activeTab === 'most-voted'"
+          type="most-voted"
+          :title="tabConfig['most-voted'].title"
+          :empty-icon="tabConfig['most-voted'].icon"
+          :empty-title="tabConfig['most-voted'].emptyTitle"
+          :empty-description="tabConfig['most-voted'].emptyDescription"
+          :items="publishedNotas"
+          :is-loading="isLoading"
+          :error="error"
+          :current-page="currentPage"
+          :has-more-items="hasMoreItems"
+          @prev="prevPage"
+          @next="nextPage"
+          @view-nota="viewNota"
+          @clone-nota="cloneNota"
+        />
+      </TabsContent>
+
+      <!-- Top Contributors Tab -->
+      <TabsContent value="top-contributors">
+        <ContributorTab 
+          :is-active="activeTab === 'top-contributors'"
+          title="Top Contributors"
+          :contributors="contributors"
+          :is-loading="isLoading"
+          :error="error"
+        />
+      </TabsContent>
+    </Tabs>
+  </div>
+</template>
