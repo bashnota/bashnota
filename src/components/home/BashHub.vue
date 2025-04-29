@@ -9,7 +9,9 @@ import {
   TrendingUp, 
   Heart, 
   Users, 
-  Search 
+  Search,
+  LayoutGrid,
+  List
 } from 'lucide-vue-next'
 import { useBashhubData } from '@/composables/useBashhubData'
 import { useAuthStore } from '@/stores/auth'
@@ -21,9 +23,12 @@ import { toast } from '@/lib/utils'
 
 // Define tab types for type safety
 type TabType = 'latest' | 'popular' | 'most-voted' | 'top-contributors';
+// Define view types
+type ViewType = 'grid' | 'list';
 
 // State
 const activeTab = ref<TabType>('latest')
+const viewMode = ref<ViewType>('list') // Default to list view
 const searchQuery = ref('')
 const router = useRouter()
 const authStore = useAuthStore()
@@ -132,6 +137,11 @@ const cloneNota = async (nota: PublishedNota, event: Event) => {
     toast('Please try again later', 'Failed to clone nota', 'destructive')
   }
 }
+
+// Toggle view mode (grid/list)
+const toggleViewMode = (mode: ViewType) => {
+  viewMode.value = mode
+}
 </script>
 
 <template>
@@ -153,6 +163,28 @@ const cloneNota = async (nota: PublishedNota, event: Event) => {
         <Search class="h-4 w-4 mr-2" />
         Search
       </Button>
+      
+      <!-- View Toggle Buttons (when not on contributors tab) -->
+      <div v-if="activeTab !== 'top-contributors'" class="ml-auto flex gap-1">
+        <Button 
+          variant="outline" 
+          size="icon" 
+          :class="{ 'bg-primary/10': viewMode === 'list' }"
+          @click="toggleViewMode('list')"
+          title="List view"
+        >
+          <List class="h-4 w-4" />
+        </Button>
+        <Button 
+          variant="outline" 
+          size="icon" 
+          :class="{ 'bg-primary/10': viewMode === 'grid' }"
+          @click="toggleViewMode('grid')"
+          title="Grid view"
+        >
+          <LayoutGrid class="h-4 w-4" />
+        </Button>
+      </div>
     </div>
 
     <!-- Tabs -->
@@ -178,6 +210,7 @@ const cloneNota = async (nota: PublishedNota, event: Event) => {
           :error="error"
           :current-page="currentPage"
           :has-more-items="hasMoreItems"
+          :view-mode="viewMode"
           @prev="prevPage"
           @next="nextPage"
           @view-nota="viewNota"
@@ -199,6 +232,7 @@ const cloneNota = async (nota: PublishedNota, event: Event) => {
           :error="error"
           :current-page="currentPage"
           :has-more-items="hasMoreItems"
+          :view-mode="viewMode"
           @prev="prevPage"
           @next="nextPage"
           @view-nota="viewNota"
@@ -220,6 +254,7 @@ const cloneNota = async (nota: PublishedNota, event: Event) => {
           :error="error"
           :current-page="currentPage"
           :has-more-items="hasMoreItems"
+          :view-mode="viewMode"
           @prev="prevPage"
           @next="nextPage"
           @view-nota="viewNota"

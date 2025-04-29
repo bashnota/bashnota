@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import NotaCard from './NotaCard.vue'
+import NotaListItem from './NotaListItem.vue'
 import Pagination from './Pagination.vue'
 import EmptyState from './EmptyState.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
@@ -19,6 +20,7 @@ interface NotaTabProps {
   error: string | null
   currentPage: number
   hasMoreItems: boolean
+  viewMode: 'grid' | 'list'
 }
 
 const props = defineProps<NotaTabProps>()
@@ -38,6 +40,8 @@ const showContent = computed(() => !props.isLoading && !props.error && props.ite
 const showInitialLoading = computed(() => props.isLoading && props.items.length === 0)
 const showPaginationLoading = computed(() => props.isLoading && props.items.length > 0)
 const showError = computed(() => !!props.error)
+const isGridView = computed(() => props.viewMode === 'grid')
+const isListView = computed(() => props.viewMode === 'list')
 
 // Handle viewing a specific nota
 const handleViewNota = (nota: PublishedNota) => {
@@ -72,9 +76,21 @@ const handleCloneNota = (nota: PublishedNota, event: Event) => {
       :description="emptyDescription" 
     />
     
-    <!-- Content state -->
-    <div v-else-if="showContent" class="grid gap-4 md:grid-cols-2">
+    <!-- Content state - Grid View -->
+    <div v-else-if="showContent && isGridView" class="grid gap-4 md:grid-cols-2">
       <NotaCard 
+        v-for="nota in items"
+        :key="nota.id"
+        :nota="nota"
+        :is-authenticated="authStore.isAuthenticated"
+        @view="handleViewNota(nota)"
+        @clone="handleCloneNota(nota, $event)"
+      />
+    </div>
+
+    <!-- Content state - List View -->
+    <div v-else-if="showContent && isListView" class="flex flex-col gap-2">
+      <NotaListItem 
         v-for="nota in items"
         :key="nota.id"
         :nota="nota"
@@ -91,6 +107,7 @@ const handleCloneNota = (nota: PublishedNota, event: Event) => {
       :has-more-items="hasMoreItems"
       @prev="emit('prev')"
       @next="emit('next')"
+      class="mt-4"
     />
 
     <!-- Loading indicator for pagination -->
