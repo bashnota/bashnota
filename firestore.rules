@@ -66,7 +66,7 @@ service cloud.firestore {
         (
           // For safety, restrict which fields can be updated by non-authors
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['viewCount', 'uniqueViewers', 'lastViewedAt', 'referrers', 'stats', 'likeCount', 'dislikeCount', 'votes']) &&
+            .hasOnly(['viewCount', 'uniqueViewers', 'lastViewedAt', 'referrers', 'stats', 'likeCount', 'dislikeCount', 'votes', 'commentCount']) &&
           // User can only update their own vote in the votes map
           (
             !request.resource.data.diff(resource.data).affectedKeys().hasAny(['votes']) ||
@@ -121,6 +121,43 @@ service cloud.firestore {
                      
       allow delete: if isAuthenticated() && 
                      resource.data.userId == request.auth.uid;
+    }
+    
+    // Comments collection rules
+    match /comments/{commentId} {
+      // Anyone can read comments on published notas
+      allow read: if true;
+      
+      // Only authenticated users can create comments
+      allow create: if isAuthenticated() && 
+                    request.resource.data.authorId == request.auth.uid &&
+                    exists(/databases/$(database)/documents/publishedNotas/$(request.resource.data.notaId));
+      
+      // Update rules: authors can update their own comments
+      allow update: if isAuthenticated() && (
+        // Option 1: comment author can update their own comment content
+        (resource.data.authorId == request.auth.uid &&
+         request.resource.data.authorId == request.auth.uid &&
+         request.resource.data.notaId == resource.data.notaId) ||
+        
+        // Option 2: any authenticated user can update the votes and counts
+        (request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['votes', 'likeCount', 'dislikeCount', 'replyCount']) &&
+         // User can only update their own vote in the votes map
+         (
+           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['votes']) ||
+           request.resource.data.votes.diff(resource.data.votes || {}).affectedKeys().hasOnly([request.auth.uid])
+         ))
+      );
+      
+      // Delete rules: comment author or nota author can delete comments
+      allow delete: if isAuthenticated() && (
+        // Comment author can delete their own comment
+        resource.data.authorId == request.auth.uid ||
+        // Nota author can delete any comment on their nota
+        (exists(/databases/$(database)/documents/publishedNotas/$(resource.data.notaId)) &&
+         get(/databases/$(database)/documents/publishedNotas/$(resource.data.notaId)).data.authorId == request.auth.uid)
+      );
     }
     
     // Default deny all
