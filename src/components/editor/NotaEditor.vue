@@ -577,7 +577,11 @@ onMounted(() => {
   // Add event listener for activating AI Assistant
   window.addEventListener('activate-ai-assistant', ((event: CustomEvent) => {
     if (event.detail) {
-      toggleSidebar('ai')
+      // Always open the AI sidebar when triggered from an inline AI generation block
+      sidebars.ai.isOpen = true;
+      
+      // No need to toggle here since we always want to open it
+      // This prevents the sidebar from closing when clicking on the same block multiple times
     }
   }) as EventListener)
 

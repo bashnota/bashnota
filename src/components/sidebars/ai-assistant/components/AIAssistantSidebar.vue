@@ -28,7 +28,7 @@ const props = defineProps<{
   hideHeader?: boolean
 }>()
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'keepOpen'])
 
 // AI Settings store
 const aiSettings = useAISettingsStore()
@@ -392,25 +392,99 @@ const handleCloseMentionSearch = () => {
   closeMentionSearch()
 }
 
+// Handle model change
+const handleModelChange = (modelId: string) => {
+  try {
+    // Update the preferred provider in the AI settings store
+    aiSettings.setPreferredProvider(modelId)
+    
+    // Show toast notification
+    const provider = aiSettings.providers.find(p => p.id === modelId)
+    toast({
+      title: "AI Model Changed",
+      description: `Now using ${provider?.name || 'new model'}`,
+      variant: "default"
+    })
+  } catch (error) {
+    logger.error('Error changing AI model:', error)
+    toast({
+      title: "Error",
+      description: "Failed to change AI model",
+      variant: "destructive" 
+    })
+  }
+}
+
 // Listen for "activate-ai-assistant" event from InlineAIGeneration components
 onMounted(() => {
-  window.addEventListener('activate-ai-assistant', ((event: CustomEvent) => {
-    if (event.detail && event.detail.block) {
-      // Use the conversation history if it exists in the event
-      if (event.detail.conversationHistory) {
-        // Set the active block
-        activeAIBlock.value = event.detail.block;
-        // Use the conversation history from the event
-        conversationHistory.value = event.detail.conversationHistory;
-      } else {
-        // Fall back to loading from block if no history provided
-        loadConversationFromBlock(event.detail.block);
-      }
-    }
-  }) as EventListener)
+  // Create a prefixed logger for easier debugging
+  const sidebarLogger = logger.createPrefixedLogger('AIAssistantSidebar');
   
-  document.addEventListener('mousedown', handleOutsideClick)
-})
+  window.addEventListener('activate-ai-assistant', ((event: CustomEvent) => {
+    sidebarLogger.debug('Received activate-ai-assistant event:', event.detail);
+    
+    if (event.detail && event.detail.block) {
+      // Track if we're loading a new conversation or the same one
+      const isNewConversation = !activeAIBlock.value || 
+                              activeAIBlock.value.node !== event.detail.block.node;
+      
+      sidebarLogger.debug('Is new conversation:', isNewConversation, 
+                     'Current block:', activeAIBlock.value ? activeAIBlock.value.node.attrs : 'none',
+                     'New block:', event.detail.block.node.attrs);
+      
+      if (isNewConversation) {
+        // If this is a new conversation, load the history
+        if (event.detail.conversationHistory && event.detail.conversationHistory.length > 0) {
+          sidebarLogger.debug('Conversation history provided in event, length:', 
+                         event.detail.conversationHistory.length,
+                         'Content:', event.detail.conversationHistory);
+          
+          // Set the active block
+          activeAIBlock.value = event.detail.block;
+          // Set the conversation history from the event
+          conversationHistory.value = event.detail.conversationHistory;
+          
+          // Log that we've loaded the conversation history
+          logger.info('Loaded conversation history from AI block', {
+            messageCount: event.detail.conversationHistory.length
+          });
+          
+          // Ensure proper UI state based on the loaded conversation
+          if (isContinuing.value) {
+            // Reset continuing state if it was active
+            isContinuing.value = false;
+          }
+          
+          // Clear the prompt input to prepare for new input
+          promptInput.value = '';
+          
+          // Scroll to the bottom of the conversation after a short delay
+          setTimeout(() => {
+            scrollToBottom();
+          }, 100);
+        } else {
+          // Fall back to loading from block if no history provided
+          sidebarLogger.debug('No conversation history in event, falling back to loadConversationFromBlock');
+          loadConversationFromBlock(event.detail.block);
+          sidebarLogger.debug('After loadConversationFromBlock, history length:', 
+                         conversationHistory.value.length,
+                         'Content:', conversationHistory.value);
+        }
+        
+        // Emit event to indicate sidebar should stay open
+        emit('keepOpen', true);
+      } else {
+        sidebarLogger.debug('Same conversation, not reloading history. Current history length:', 
+                       conversationHistory.value.length);
+      }
+      // We don't do anything if it's the same conversation, this allows the normal sidebar toggle to work
+    } else {
+      sidebarLogger.warn('Received activate-ai-assistant event without valid detail or block');
+    }
+  }) as EventListener);
+  
+  document.addEventListener('mousedown', handleOutsideClick);
+});
 
 // Clean up event listeners
 onBeforeUnmount(() => {
@@ -508,11 +582,11 @@ onMounted(() => {
             />
           </ScrollArea>
           
-          <!-- Conversation History - scrollable with fixed max-height -->
-          <div v-else class="conversation-container h-full flex flex-col">
+          <!-- Conversation Container - With Fixed Message Input -->
+          <div v-else class="h-full flex flex-col">
             <!-- Scrollable conversation history area -->
             <div 
-              class="flex-1 overflow-y-auto h-full"
+              class="flex-1 overflow-y-auto min-h-0"
               ref="scrollAreaViewportRef"
             >
               <div class="p-4 space-y-4 bg-gradient-to-b from-background to-muted/10">
@@ -530,8 +604,8 @@ onMounted(() => {
               </div>
             </div>
   
-            <!-- Input Area - fixed at bottom, separated from scrollable content -->
-            <div class="border-t p-3 bg-background flex-shrink-0 shadow-[0_-2px_5px_rgba(0,0,0,0.03)]">
+            <!-- Fixed Message Input Area -->
+            <div class="border-t p-3 bg-background flex-shrink-0 z-10 shadow-[0_-2px_5px_rgba(0,0,0,0.05)]">
               <!-- Editing Response -->
               <div v-if="isEditing">
                 <Textarea
@@ -583,6 +657,7 @@ onMounted(() => {
                   @select-mention="handleMentionSelection"
                   @update-mention-search="handleUpdateMentionQuery"
                   @close-mention-search="handleCloseMentionSearch"
+                  @change-model="handleModelChange"
                   ref="textareaRef"
                 />
                 
@@ -625,18 +700,6 @@ onMounted(() => {
   padding: 0.5em;
   margin: 0.5em 0;
   overflow-x: auto;
-}
-
-/* When in a conversation, the content area needs a minimum width */
-.conversation-container {
-  min-width: 300px;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  flex: 1 1 auto;
 }
 
 /* Mention search styling */
