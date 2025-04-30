@@ -43,7 +43,7 @@ onMounted(() => {
   // Add user message if prompt exists
   if (props.node.attrs.prompt) {
     const userMsg = {
-      role: 'user', 
+      role: 'user' as 'user', 
       content: props.node.attrs.prompt, 
       timestamp: props.node.attrs.lastUpdated ? new Date(props.node.attrs.lastUpdated) : new Date(), 
       id: generateUniqueId()
@@ -55,7 +55,7 @@ onMounted(() => {
   // Add assistant message if result exists
   if (props.node.attrs.result) {
     const assistantMsg = {
-      role: 'assistant', 
+      role: 'assistant' as 'assistant', 
       content: props.node.attrs.result, 
       timestamp: props.node.attrs.lastUpdated ? new Date(props.node.attrs.lastUpdated) : new Date(),
       id: generateUniqueId()
@@ -116,7 +116,7 @@ watch(() => props.node.attrs.result, (newResult) => {
     if (!hasResult) {
       // Add the new result to the conversation history
       const newMsg = { 
-        role: 'assistant', 
+        role: 'assistant' as 'assistant', 
         content: newResult, 
         timestamp: new Date(),
         id: generateUniqueId()
