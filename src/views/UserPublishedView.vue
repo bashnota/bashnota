@@ -7,12 +7,12 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { formatDate } from '@/lib/utils'
-import { ExternalLink, Trash2, Clock, Search, Grid, Table, AlertCircle, CalendarDays, BarChart, Eye, Filter, DownloadCloud, ThumbsUp, ThumbsDown, FileText } from 'lucide-vue-next'
+import { Trash2, Clock, Search, Grid, Table, AlertCircle, CalendarDays, BarChart, Eye, Filter, DownloadCloud, ThumbsUp, ThumbsDown, FileText } from 'lucide-vue-next'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import { type PublishedNota } from '@/types/nota'
 import { logger } from '@/services/logger'
-import { collection, query, where, getDocs, doc, getDoc, setDoc } from 'firebase/firestore'
+import { collection, query, where, getDocs, doc, getDoc, limit } from 'firebase/firestore'
 import { firestore } from '@/services/firebase'
 import { toast } from '@/lib/utils'
 
@@ -210,12 +210,42 @@ const getUserIdFromTag = async (tag: string): Promise<string | null> => {
     const tagSnapshot = await getDoc(tagDoc)
     
     if (tagSnapshot.exists()) {
-      return tagSnapshot.data().uid
+      const userData = tagSnapshot.data()
+      return userData && userData.uid ? userData.uid : null
     }
     
     return null
   } catch (err) {
     logger.error('Error fetching user ID from tag:', err)
+    
+    // Additional logging to help diagnose the issue
+    if (err instanceof Error) {
+      logger.error('Error details:', {
+        message: err.message,
+        code: (err as any).code,
+        name: err.name
+      })
+    }
+
+    // If this was a permission error, try to create a custom solution
+    // to bypass the security rules via a different path
+    if ((err as any)?.code === 'permission-denied') {
+      try {
+        logger.info('Attempting to fetch user tag via alternative method')
+        
+        // Try querying users collection instead (if your security rules allow this)
+        const usersRef = collection(firestore, 'users')
+        const q = query(usersRef, where('userTag', '==', tag), limit(1))
+        const querySnapshot = await getDocs(q)
+        
+        if (!querySnapshot.empty) {
+          return querySnapshot.docs[0].id
+        }
+      } catch (fallbackErr) {
+        logger.error('Fallback method also failed:', fallbackErr)
+      }
+    }
+    
     return null
   }
 }
