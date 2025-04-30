@@ -1,16 +1,14 @@
 <script setup lang="ts">
-import { RouterView } from 'vue-router'
+import { RouterView, useRouter, useRoute } from 'vue-router'
 import AppSidebar from './components/layout/AppSidebar.vue'
 import BreadcrumbNav from './components/layout/BreadcrumbNav.vue'
 import AppTabs from './components/layout/AppTabs.vue'
 import AuthHeader from './components/auth/AuthHeader.vue'
-import BashHub from './components/home/BashHub.vue'
-import { ref, onMounted, watch, onUnmounted } from 'vue'
+import { ref, onMounted, watch, onUnmounted, computed } from 'vue'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import Toaster from '@/components/ui/toast/Toaster.vue'
 import { useAuthStore } from '@/stores/auth'
-import { useRoute } from 'vue-router'
 import { Menu, Home, Globe } from 'lucide-vue-next'
 import { logger } from '@/services/logger'
 
@@ -19,7 +17,10 @@ const sidebarWidth = ref(300)
 const isResizing = ref(false)
 const authStore = useAuthStore()
 const route = useRoute()
-const showBashHub = ref(false)
+const router = useRouter()
+
+// Check if we're in BashHub view
+const isInBashHub = computed(() => route.name === 'bashhub')
 
 onMounted(async () => {
   // Initialize auth state
@@ -48,12 +49,6 @@ onMounted(async () => {
     }
   }
 
-  // Load BashHub state from localStorage
-  const savedBashHubState = localStorage.getItem('bashhub-visible')
-  if (savedBashHubState) {
-    showBashHub.value = JSON.parse(savedBashHubState)
-  }
-
   // Listen for settings changes
   window.addEventListener('interface-settings-changed', ((event: CustomEvent) => {
     if (event.detail?.sidebarWidth && event.detail.sidebarWidth[0]) {
@@ -74,10 +69,6 @@ onUnmounted(() => {
 
 watch(isSidebarOpen, (newState) => {
   localStorage.setItem('sidebar-state', JSON.stringify(newState))
-})
-
-watch(showBashHub, (newState) => {
-  localStorage.setItem('bashhub-visible', JSON.stringify(newState))
 })
 
 // Resize functionality
@@ -103,7 +94,11 @@ const handleMouseMove = (event: MouseEvent) => {
 
 // Toggle between main view and BashHub
 const toggleBashHub = () => {
-  showBashHub.value = !showBashHub.value
+  if (isInBashHub.value) {
+    router.push('/')
+  } else {
+    router.push('/bashhub')
+  }
 }
 </script>
 
@@ -154,23 +149,22 @@ const toggleBashHub = () => {
               variant="outline"
               size="sm"
               @click="toggleBashHub"
-              :class="{'bg-primary/10': showBashHub}"
+              :class="{'bg-primary/10': isInBashHub}"
             >
-              <Globe v-if="showBashHub" class="h-4 w-4 mr-2" />
+              <Globe v-if="isInBashHub" class="h-4 w-4 mr-2" />
               <Home v-else class="h-4 w-4 mr-2" />
-              {{ showBashHub ? 'Community Hub' : 'My Notas' }}
+              {{ isInBashHub ? 'Community Hub' : 'My Notas' }}
             </Button>
           </div>
         </div>
       </div>
 
       <!-- Tabs Navigation (only show when not in BashHub) -->
-      <AppTabs v-if="!showBashHub" />
+      <AppTabs v-if="!isInBashHub" />
 
-      <!-- Content Area: Switch between RouterView and BashHub -->
+      <!-- Content Area: Use RouterView for all routes -->
       <div class="flex-1 min-h-0 flex flex-col overflow-auto">
-        <RouterView v-if="!showBashHub" class="flex-1 h-full" />
-        <BashHub v-else class="flex-1 h-full" />
+        <RouterView class="flex-1 h-full" />
       </div>
     </div>
   </div>
