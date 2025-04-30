@@ -22,7 +22,7 @@ import VotesContributorTab from './bashhub/VotesContributorTab.vue'
 import type { PublishedNota } from '@/types/nota'
 import { logger } from '@/services/logger'
 import { toast } from '@/lib/utils'
-import { doc, getDoc } from 'firebase/firestore'
+import { doc, getDoc, collection, query, where, limit, getDocs } from 'firebase/firestore'
 import { firestore } from '@/services/firebase'
 
 // Define tab types for type safety
@@ -115,18 +115,33 @@ const isSearchEmpty = computed(() => !searchQuery.value.trim())
 // Get user tag from user ID
 const getUserTagFromId = async (userId: string): Promise<string | null> => {
   try {
-    // Query the users collection directly to get the user document
-    const userDoc = await getDoc(doc(firestore, 'users', userId))
+    // Try the userTags collection first, which has public read access
+    // Instead of querying the users collection directly (which has restricted access),
+    // we'll query the userTags collection to find tags where uid matches our userId
+    const userTagsRef = collection(firestore, 'userTags')
+    const q = query(userTagsRef, where('uid', '==', userId), limit(1))
+    const querySnapshot = await getDocs(q)
     
-    if (userDoc.exists() && userDoc.data().userTag) {
-      // If the user has a tag in their document, return it
-      return userDoc.data().userTag
+    if (!querySnapshot.empty) {
+      // The document ID is the user tag
+      return querySnapshot.docs[0].id
     }
     
-    // If not found in users collection or no userTag, return null
+    // If no tag is found, return null
     return null
   } catch (err) {
     logger.error('Error fetching user tag from ID:', err)
+    
+    // Additional logging to help diagnose the issue
+    if (err instanceof Error) {
+      logger.error('Error details:', {
+        message: err.message,
+        code: (err as any).code,
+        name: err.name
+      })
+    }
+    
+    // Return null on error
     return null
   }
 }
@@ -134,26 +149,26 @@ const getUserTagFromId = async (userId: string): Promise<string | null> => {
 // View nota details
 const viewNota = async (nota: PublishedNota) => {
   if (!nota.authorId) {
-    // No author ID available, use generic link
-    router.push(`/p/${nota.id}`)
+    logger.error('Cannot view nota: No author ID available')
     return
   }
 
   try {
-    // If not, try to get the author's tag from their ID
+    // Try to get the author's tag from their ID - only proceed if tag is available
     const authorTag = await getUserTagFromId(nota.authorId)
     
     if (authorTag) {
-      // If we found a tag, use it for the URL
+      // Only navigate if we found a tag
       router.push(`/@${authorTag}/${nota.id}`)
     } else {
-      // Fall back to legacy user ID format
-      router.push(`/u/${nota.authorId}/${nota.id}`)
+      // If no tag is found, log the error but don't navigate
+      logger.error(`Cannot view nota: No user tag found for user ID ${nota.authorId}`)
+      toast('Unable to view this nota', 'User tag required', 'destructive')
     }
   } catch (error) {
-    // In case of any error, fall back to the generic format
+    // Log the error but don't navigate anywhere
     logger.error('Error resolving author tag:', error)
-    router.push(`/p/${nota.id}`)
+    toast('Unable to view this nota', 'Error loading user information', 'destructive')
   }
 }
 
