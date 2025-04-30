@@ -12,17 +12,15 @@ import { useAIGeneration } from '../../ai-assistant/composables/useAIGeneration'
 import { useMentions } from '../../ai-assistant/composables/useMentions'
 
 // Import components
-import { BaseSidebar, SidebarHeader, KeyboardShortcut } from '@/components/ui/sidebars'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import ConversationHistory from './ConversationHistory.vue'
 import ConversationInput from './ConversationInput.vue'
 import ActionBar from './ActionBar.vue'
 import EmptyState from './EmptyState.vue'
-import FullscreenWrapper from './FullscreenWrapper.vue'
 import ChatList from './ChatList.vue'
-import {ScrollArea} from '@/components/ui/scroll-area'
 
 // Import the icons
-import { Maximize2, Minimize2, List as ListIcon, ArrowLeft as ArrowLeftIcon } from 'lucide-vue-next'
+import { List as ListIcon, ArrowLeft as ArrowLeftIcon } from 'lucide-vue-next'
 
 const props = defineProps<{
   editor: any
@@ -30,7 +28,7 @@ const props = defineProps<{
   hideHeader?: boolean
 }>()
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'keepOpen'])
 
 // AI Settings store
 const aiSettings = useAISettingsStore()
@@ -85,23 +83,6 @@ const {
 
 // Reference to the textarea for mention search
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
-
-// Add fullscreen state
-const isFullscreen = ref(false)
-
-// Functions for handling fullscreen
-const enterFullscreen = () => {
-  isFullscreen.value = true
-}
-
-const exitFullscreen = () => {
-  isFullscreen.value = false
-}
-
-// Toggle fullscreen function
-const toggleFullscreen = () => {
-  isFullscreen.value = !isFullscreen.value
-}
 
 // Computed properties
 const hasResult = computed(() => {
@@ -295,11 +276,6 @@ const insertToDocument = () => {
       props.editor.chain().focus().insertContent(text).run()
     }
     
-    // Exit fullscreen mode after inserting
-    if (isFullscreen.value) {
-      isFullscreen.value = false
-    }
-    
     toast({
       title: 'Inserted',
       description: 'Text inserted into document',
@@ -336,11 +312,6 @@ const insertSelectionToDocument = () => {
     } else {
       // Normal insertion for other contexts
       props.editor.chain().focus().insertContent(selectedText.value).run()
-    }
-    
-    // Exit fullscreen mode after inserting
-    if (isFullscreen.value) {
-      isFullscreen.value = false
     }
     
     toast({
@@ -382,11 +353,6 @@ const insertMessageToDocument = (text: string) => {
       props.editor.chain().focus().insertContent(text).run()
     }
     
-    // Exit fullscreen mode after inserting
-    if (isFullscreen.value) {
-      isFullscreen.value = false
-    }
-    
     toast({
       title: 'Inserted',
       description: 'Text inserted into document',
@@ -426,26 +392,99 @@ const handleCloseMentionSearch = () => {
   closeMentionSearch()
 }
 
+// Handle model change
+const handleModelChange = (modelId: string) => {
+  try {
+    // Update the preferred provider in the AI settings store
+    aiSettings.setPreferredProvider(modelId)
+    
+    // Show toast notification
+    const provider = aiSettings.providers.find(p => p.id === modelId)
+    toast({
+      title: "AI Model Changed",
+      description: `Now using ${provider?.name || 'new model'}`,
+      variant: "default"
+    })
+  } catch (error) {
+    logger.error('Error changing AI model:', error)
+    toast({
+      title: "Error",
+      description: "Failed to change AI model",
+      variant: "destructive" 
+    })
+  }
+}
+
 // Listen for "activate-ai-assistant" event from InlineAIGeneration components
 onMounted(() => {
+  // Create a prefixed logger for easier debugging
+  const sidebarLogger = logger.createPrefixedLogger('AIAssistantSidebar');
   
   window.addEventListener('activate-ai-assistant', ((event: CustomEvent) => {
+    sidebarLogger.debug('Received activate-ai-assistant event:', event.detail);
+    
     if (event.detail && event.detail.block) {
-      // Use the conversation history if it exists in the event
-      if (event.detail.conversationHistory) {
-        // Set the active block
-        activeAIBlock.value = event.detail.block;
-        // Use the conversation history from the event
-        conversationHistory.value = event.detail.conversationHistory;
+      // Track if we're loading a new conversation or the same one
+      const isNewConversation = !activeAIBlock.value || 
+                              activeAIBlock.value.node !== event.detail.block.node;
+      
+      sidebarLogger.debug('Is new conversation:', isNewConversation, 
+                     'Current block:', activeAIBlock.value ? activeAIBlock.value.node.attrs : 'none',
+                     'New block:', event.detail.block.node.attrs);
+      
+      if (isNewConversation) {
+        // If this is a new conversation, load the history
+        if (event.detail.conversationHistory && event.detail.conversationHistory.length > 0) {
+          sidebarLogger.debug('Conversation history provided in event, length:', 
+                         event.detail.conversationHistory.length,
+                         'Content:', event.detail.conversationHistory);
+          
+          // Set the active block
+          activeAIBlock.value = event.detail.block;
+          // Set the conversation history from the event
+          conversationHistory.value = event.detail.conversationHistory;
+          
+          // Log that we've loaded the conversation history
+          logger.info('Loaded conversation history from AI block', {
+            messageCount: event.detail.conversationHistory.length
+          });
+          
+          // Ensure proper UI state based on the loaded conversation
+          if (isContinuing.value) {
+            // Reset continuing state if it was active
+            isContinuing.value = false;
+          }
+          
+          // Clear the prompt input to prepare for new input
+          promptInput.value = '';
+          
+          // Scroll to the bottom of the conversation after a short delay
+          setTimeout(() => {
+            scrollToBottom();
+          }, 100);
+        } else {
+          // Fall back to loading from block if no history provided
+          sidebarLogger.debug('No conversation history in event, falling back to loadConversationFromBlock');
+          loadConversationFromBlock(event.detail.block);
+          sidebarLogger.debug('After loadConversationFromBlock, history length:', 
+                         conversationHistory.value.length,
+                         'Content:', conversationHistory.value);
+        }
+        
+        // Emit event to indicate sidebar should stay open
+        emit('keepOpen', true);
       } else {
-        // Fall back to loading from block if no history provided
-        loadConversationFromBlock(event.detail.block);
+        sidebarLogger.debug('Same conversation, not reloading history. Current history length:', 
+                       conversationHistory.value.length);
       }
+      // We don't do anything if it's the same conversation, this allows the normal sidebar toggle to work
+    } else {
+      sidebarLogger.warn('Received activate-ai-assistant event without valid detail or block');
     }
-  }) as EventListener)
+  }) as EventListener);
   
-  document.addEventListener('mousedown', handleOutsideClick)
-})
+  document.addEventListener('mousedown', handleOutsideClick);
+});
 
 // Clean up event listeners
 onBeforeUnmount(() => {
@@ -502,26 +541,11 @@ onMounted(() => {
 </script>
 
 <template>
-  <FullscreenWrapper 
-    :is-fullscreen="isFullscreen"
-    @exit-fullscreen="exitFullscreen"
-    @enter-fullscreen="enterFullscreen"
-    class="h-full w-full flex flex-col"
-  >
+  <div class="h-full w-full flex flex-col overflow-hidden">
     <!-- Content container with proper width styling -->
-    <div class="sidebar-content-wrapper h-full w-full flex flex-col" :style="{ '--min-width': '320px' }">
-      <!-- Header (only shown if not hidden) -->
-      <SidebarHeader 
-        v-if="!props.hideHeader"
-        title="AI Assistant"
-        :provider-name="selectedProvider?.name || 'AI'" 
-        :is-loading="isLoading"
-        :is-fullscreen="isFullscreen"
-        @close="emit('close')"
-        @toggle-fullscreen="toggleFullscreen"
-        class="flex-shrink-0"
-      >
-        <!-- Add chat list toggle button in the header -->
+    <div class="h-full w-full flex flex-col">
+      <!-- Header actions for chat list toggle -->
+      <div v-if="!hideHeader" class="px-4 py-2 flex items-center justify-between border-b">
         <Button 
           variant="ghost" 
           size="icon"
@@ -532,10 +556,7 @@ onMounted(() => {
           <ListIcon v-if="!showChatList" class="h-4 w-4" />
           <ArrowLeftIcon v-else class="h-4 w-4" />
         </Button>
-      </SidebarHeader>
-      
-      <!-- Add a spacer when header is hidden to maintain layout -->
-      <div v-else class="h-2 flex-shrink-0"></div>
+      </div>
       
       <div class="flex-1 flex flex-col h-full min-h-0 relative overflow-hidden">
         <!-- Empty State when no active conversation -->
@@ -561,11 +582,11 @@ onMounted(() => {
             />
           </ScrollArea>
           
-          <!-- Conversation History - scrollable with fixed max-height -->
-          <div v-else class="conversation-container h-full flex flex-col">
+          <!-- Conversation Container - With Fixed Message Input -->
+          <div v-else class="h-full flex flex-col">
             <!-- Scrollable conversation history area -->
             <div 
-              class="flex-1 overflow-y-auto h-full"
+              class="flex-1 overflow-y-auto min-h-0"
               ref="scrollAreaViewportRef"
             >
               <div class="p-4 space-y-4 bg-gradient-to-b from-background to-muted/10">
@@ -583,8 +604,8 @@ onMounted(() => {
               </div>
             </div>
   
-            <!-- Input Area - fixed at bottom, separated from scrollable content -->
-            <div class="border-t p-3 bg-background flex-shrink-0 shadow-[0_-2px_5px_rgba(0,0,0,0.03)]">
+            <!-- Fixed Message Input Area -->
+            <div class="border-t p-3 bg-background flex-shrink-0 z-10 shadow-[0_-2px_5px_rgba(0,0,0,0.05)]">
               <!-- Editing Response -->
               <div v-if="isEditing">
                 <Textarea
@@ -636,6 +657,7 @@ onMounted(() => {
                   @select-mention="handleMentionSelection"
                   @update-mention-search="handleUpdateMentionQuery"
                   @close-mention-search="handleCloseMentionSearch"
+                  @change-model="handleModelChange"
                   ref="textareaRef"
                 />
                 
@@ -660,7 +682,7 @@ onMounted(() => {
         </template>
       </div>
     </div>
-  </FullscreenWrapper>
+  </div>
 </template>
 
 <style scoped>
@@ -678,30 +700,6 @@ onMounted(() => {
   padding: 0.5em;
   margin: 0.5em 0;
   overflow-x: auto;
-}
-
-/* Content area layout */
-.sidebar-content-wrapper {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-width: 0;
-  width: 100%;
-  max-width: 100%;
-  overflow: hidden;
-  flex: 1 1 auto;
-}
-
-/* When in a conversation, the content area needs a minimum width */
-.conversation-container {
-  min-width: var(--min-width, 320px);
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  flex: 1 1 auto;
 }
 
 /* Mention search styling */

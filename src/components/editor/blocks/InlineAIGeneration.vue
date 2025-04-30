@@ -8,34 +8,84 @@ import {
   BrainCircuit
 } from 'lucide-vue-next'
 import { useAISettingsStore } from '@/stores/aiSettingsStore'
+import { logger } from '@/services/logger'
+
+// Create a prefixed logger for easier debugging
+const aiLogger = logger.createPrefixedLogger('InlineAIGeneration')
 
 const props = defineProps(nodeViewProps)
 
 const aiSettings = useAISettingsStore()
 
 // Store the conversation history in this component so it can be passed to the sidebar
-const conversationHistory = ref<{ role: 'user' | 'assistant', content: string, timestamp?: Date, id?: string }[]>([
-  { role: 'user', content: props.node.attrs.prompt || '', timestamp: new Date(), id: generateUniqueId() },
-  { role: 'assistant', content: props.node.attrs.result || '', timestamp: new Date(), id: generateUniqueId() }
-])
+const conversationHistory = ref<{ role: 'user' | 'assistant', content: string, timestamp?: Date, id?: string }[]>([])
 
 // Generate a unique ID for each message
 function generateUniqueId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substring(2);
 }
 
-// Reset loading state on mount to ensure it's not stuck
+// Initialize conversation history based on existing content
 onMounted(() => {
+  aiLogger.debug('Component mounted, node attributes:', props.node.attrs)
+  
+  // Reset loading state if needed
   if (props.node.attrs.isLoading) {
     props.updateAttributes({
       isLoading: false,
       error: ''
     })
   }
+  
+  // Initialize conversation history with existing data
+  const initialHistory = [];
+  
+  // Add user message if prompt exists
+  if (props.node.attrs.prompt) {
+    const userMsg = {
+      role: 'user' as 'user', 
+      content: props.node.attrs.prompt, 
+      timestamp: props.node.attrs.lastUpdated ? new Date(props.node.attrs.lastUpdated) : new Date(), 
+      id: generateUniqueId()
+    };
+    initialHistory.push(userMsg);
+    aiLogger.debug('Added user message to initial history:', userMsg)
+  }
+  
+  // Add assistant message if result exists
+  if (props.node.attrs.result) {
+    const assistantMsg = {
+      role: 'assistant' as 'assistant', 
+      content: props.node.attrs.result, 
+      timestamp: props.node.attrs.lastUpdated ? new Date(props.node.attrs.lastUpdated) : new Date(),
+      id: generateUniqueId()
+    };
+    initialHistory.push(assistantMsg);
+    aiLogger.debug('Added assistant message to initial history:', assistantMsg)
+  }
+  
+  // If the block already has stored conversation history, use that instead
+  if (props.node.attrs.conversation && props.node.attrs.conversation.length > 0) {
+    const mappedHistory = props.node.attrs.conversation.map((msg: any) => ({
+      ...msg,
+      timestamp: msg.timestamp ? new Date(msg.timestamp) : undefined,
+      id: msg.id || generateUniqueId()
+    }));
+    conversationHistory.value = mappedHistory;
+    aiLogger.debug('Using existing conversation history from node attributes, length:', mappedHistory.length)
+  } else if (initialHistory.length > 0) {
+    // Otherwise use our constructed history
+    conversationHistory.value = initialHistory;
+    aiLogger.debug('Using constructed history from prompt/result, length:', initialHistory.length)
+  } else {
+    aiLogger.debug('No history to initialize - empty conversation')
+  }
 })
 
 // Trigger the global AI Assistant sidebar when this component is clicked
 const activateAIAssistant = () => {
+  aiLogger.debug('Activating AI Assistant with conversation history:', conversationHistory.value)
+  
   // Create a custom event with this component instance and properly structured data
   window.dispatchEvent(
     new CustomEvent('activate-ai-assistant', {
@@ -49,12 +99,14 @@ const activateAIAssistant = () => {
     })
   )
   
-  // Also log a message to confirm event was dispatched
-  console.log('AI Assistant activation event dispatched with conversation history:', conversationHistory.value)
+  // Log a message to confirm event was dispatched
+  aiLogger.info('AI Assistant activation event dispatched with conversation history, message count:', conversationHistory.value.length)
 }
 
 // Add to conversation history when result changes
 watch(() => props.node.attrs.result, (newResult) => {
+  aiLogger.debug('Result changed:', newResult ? newResult.substring(0, 50) + '...' : 'empty')
+  
   if (newResult) {
     // Check if this result is already in the conversation
     const hasResult = conversationHistory.value.some(
@@ -63,12 +115,16 @@ watch(() => props.node.attrs.result, (newResult) => {
     
     if (!hasResult) {
       // Add the new result to the conversation history
-      conversationHistory.value.push({ 
-        role: 'assistant', 
+      const newMsg = { 
+        role: 'assistant' as 'assistant', 
         content: newResult, 
         timestamp: new Date(),
         id: generateUniqueId()
-      })
+      };
+      conversationHistory.value.push(newMsg)
+      aiLogger.debug('Added new assistant message to history:', newMsg.id)
+    } else {
+      aiLogger.debug('Result already exists in conversation history, not adding duplicate')
     }
   }
 }, { immediate: true })

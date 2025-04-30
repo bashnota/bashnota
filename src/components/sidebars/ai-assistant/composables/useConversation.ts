@@ -1,6 +1,7 @@
 import { ref, computed, watch } from 'vue'
 import { nanoid } from 'nanoid'
 import { useAISettingsStore } from '@/stores/aiSettingsStore'
+import { logger } from '@/services/logger'
 
 export interface ConversationMessage {
   id: string
@@ -118,6 +119,10 @@ export function useConversation(editor: any, notaId: string) {
   const loadConversationFromBlock = (block: AIBlock) => {
     if (!block) return
     
+    // Create a logger for debugging this function
+    const convLogger = logger.createPrefixedLogger('useConversation');
+    convLogger.debug('Loading conversation from block:', block.node.attrs);
+    
     // Set active block
     activeAIBlock.value = block
     
@@ -129,14 +134,23 @@ export function useConversation(editor: any, notaId: string) {
     isContinuing.value = false
     
     // Load conversation history from block
-    if (block.node.attrs.conversation) {
+    if (block.node.attrs.conversation && Array.isArray(block.node.attrs.conversation) && block.node.attrs.conversation.length > 0) {
       // Convert ISO strings back to Date objects
-      conversationHistory.value = block.node.attrs.conversation.map((msg: any) => ({
-        ...msg,
-        timestamp: msg.timestamp ? new Date(msg.timestamp) : undefined
-      }))
+      convLogger.debug('Block has stored conversation history, length:', block.node.attrs.conversation.length);
+      const processedHistory = block.node.attrs.conversation.map((msg: any) => {
+        const processedMsg = {
+          ...msg,
+          id: msg.id || `${msg.role}-${Date.now()}`,
+          timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date()
+        };
+        convLogger.debug('Processed message:', processedMsg);
+        return processedMsg;
+      });
+      conversationHistory.value = processedHistory;
+      convLogger.info('Loaded conversation history from block.node.attrs.conversation, message count:', conversationHistory.value.length);
     } else if (block.node.attrs.prompt) {
       // Create a basic conversation if only prompt exists
+      convLogger.debug('No stored conversation history, creating from prompt/result');
       conversationHistory.value = [
         {
           id: `user-${Date.now()}`,
@@ -155,6 +169,12 @@ export function useConversation(editor: any, notaId: string) {
           timestamp: block.node.attrs.lastUpdated ? new Date(block.node.attrs.lastUpdated) : new Date()
         })
       }
+      
+      convLogger.info('Created conversation history from prompt/result, message count:', conversationHistory.value.length);
+    } else {
+      // No conversation history or prompt
+      convLogger.warn('No conversation history or prompt found in block');
+      conversationHistory.value = [];
     }
     
     // Set loading state

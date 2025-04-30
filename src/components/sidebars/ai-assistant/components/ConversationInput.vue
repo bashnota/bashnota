@@ -2,9 +2,24 @@
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { SparklesIcon, SendIcon, LoaderIcon, FileText, AlertTriangleIcon } from 'lucide-vue-next'
-import { ref, nextTick, watch, onMounted } from 'vue'
+import { 
+  SparklesIcon, 
+  SendIcon, 
+  LoaderIcon, 
+  FileText, 
+  AlertTriangleIcon,
+  BrainCircuitIcon
+} from 'lucide-vue-next'
+import { ref, nextTick, watch, onMounted, computed } from 'vue'
 import MentionSearch from './MentionSearch.vue'
+import { useAISettingsStore } from '@/stores/aiSettingsStore'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 const props = defineProps<{
   promptInput: string
@@ -29,7 +44,8 @@ const emit = defineEmits([
   'checkMentions',
   'selectMention',
   'updateMentionSearch',
-  'closeMentionSearch'
+  'closeMentionSearch',
+  'changeModel'
 ])
 
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
@@ -38,6 +54,23 @@ const localFollowUpPrompt = ref(props.followUpPrompt)
 const mentionPosition = ref<{ top: number; left: number } | null>(null)
 const isTyping = ref(false)
 const typingTimeout = ref<number | null>(null)
+
+// Access AI Settings store
+const aiSettingsStore = useAISettingsStore()
+const modelOptions = computed(() => aiSettingsStore.providers)
+const selectedModel = ref(aiSettingsStore.settings.preferredProviderId)
+
+// Watch for changes in the AI settings store's preferred provider
+watch(() => aiSettingsStore.settings.preferredProviderId, (newProviderId) => {
+  selectedModel.value = newProviderId
+})
+
+// Function to change AI model
+const changeModel = (modelId: string) => {
+  selectedModel.value = modelId
+  aiSettingsStore.setPreferredProvider(modelId)
+  emit('changeModel', modelId)
+}
 
 // Watch for changes in props to update local refs
 watch(() => props.promptInput, (newVal) => {
@@ -251,6 +284,25 @@ onMounted(() => {
 
 <template>
   <div class="relative conversation-input">
+    <!-- AI Model Selector -->
+    <div class="mb-2">
+      <Select :value="selectedModel" @update:value="changeModel">
+        <SelectTrigger class="w-full h-8 text-sm flex items-center">
+          <div class="flex items-center gap-2">
+            <BrainCircuitIcon class="h-3.5 w-3.5" />
+            <SelectValue placeholder="Select model" />
+          </div>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem v-for="model in modelOptions" :key="model.id" :value="model.id">
+            <div class="flex items-center gap-2">
+              <span class="font-medium">{{ model.name }}</span>
+            </div>
+          </SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+
     <!-- New Prompt Input -->
     <div v-if="!isContinuing" class="relative prompt-container">
       <div class="textarea-wrapper">
@@ -306,8 +358,8 @@ onMounted(() => {
             :disabled="isPromptEmpty || isLoading"
           >
             <LoaderIcon v-if="isLoading" class="h-3.5 w-3.5 mr-1.5 animate-spin" />
-            <SparklesIcon v-else class="h-3.5 w-3.5 mr-1.5" />
-            Generate
+            <SendIcon v-else class="h-3.5 w-3.5 mr-1.5" />
+            Send
           </Button>
         </div>
       </div>
@@ -349,6 +401,16 @@ onMounted(() => {
           Send
         </Button>
       </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div v-if="isLoading" class="loading-indicator">
+      <div class="typing-indicator">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+      <p class="text-xs text-muted-foreground">{{ selectedModel === 'claude' ? 'Claude' : selectedModel === 'gpt4' ? 'GPT-4' : 'AI' }} is thinking...</p>
     </div>
 
     <!-- New Mention Search using the MentionSearch component -->
@@ -453,6 +515,67 @@ kbd {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* Loading indicator styling */
+.loading-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px;
+  background-color: hsl(var(--primary) / 0.05);
+  border-radius: 6px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    background-color: hsl(var(--primary) / 0.05);
+  }
+  50% {
+    background-color: hsl(var(--primary) / 0.1);
+  }
+}
+
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.typing-indicator span {
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: hsl(var(--primary));
+  animation: typingDots 1.4s infinite ease-in-out;
+}
+
+.typing-indicator span:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.typing-indicator span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-indicator span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typingDots {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
   }
 }
 </style>
