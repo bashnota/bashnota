@@ -12,17 +12,15 @@ import { useAIGeneration } from '../../ai-assistant/composables/useAIGeneration'
 import { useMentions } from '../../ai-assistant/composables/useMentions'
 
 // Import components
-import { BaseSidebar, SidebarHeader, KeyboardShortcut } from '@/components/ui/sidebars'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import ConversationHistory from './ConversationHistory.vue'
 import ConversationInput from './ConversationInput.vue'
 import ActionBar from './ActionBar.vue'
 import EmptyState from './EmptyState.vue'
-import FullscreenWrapper from './FullscreenWrapper.vue'
 import ChatList from './ChatList.vue'
-import {ScrollArea} from '@/components/ui/scroll-area'
 
 // Import the icons
-import { Maximize2, Minimize2, List as ListIcon, ArrowLeft as ArrowLeftIcon } from 'lucide-vue-next'
+import { List as ListIcon, ArrowLeft as ArrowLeftIcon } from 'lucide-vue-next'
 
 const props = defineProps<{
   editor: any
@@ -85,23 +83,6 @@ const {
 
 // Reference to the textarea for mention search
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
-
-// Add fullscreen state
-const isFullscreen = ref(false)
-
-// Functions for handling fullscreen
-const enterFullscreen = () => {
-  isFullscreen.value = true
-}
-
-const exitFullscreen = () => {
-  isFullscreen.value = false
-}
-
-// Toggle fullscreen function
-const toggleFullscreen = () => {
-  isFullscreen.value = !isFullscreen.value
-}
 
 // Computed properties
 const hasResult = computed(() => {
@@ -295,11 +276,6 @@ const insertToDocument = () => {
       props.editor.chain().focus().insertContent(text).run()
     }
     
-    // Exit fullscreen mode after inserting
-    if (isFullscreen.value) {
-      isFullscreen.value = false
-    }
-    
     toast({
       title: 'Inserted',
       description: 'Text inserted into document',
@@ -336,11 +312,6 @@ const insertSelectionToDocument = () => {
     } else {
       // Normal insertion for other contexts
       props.editor.chain().focus().insertContent(selectedText.value).run()
-    }
-    
-    // Exit fullscreen mode after inserting
-    if (isFullscreen.value) {
-      isFullscreen.value = false
     }
     
     toast({
@@ -380,11 +351,6 @@ const insertMessageToDocument = (text: string) => {
     } else {
       // Normal insertion for other contexts
       props.editor.chain().focus().insertContent(text).run()
-    }
-    
-    // Exit fullscreen mode after inserting
-    if (isFullscreen.value) {
-      isFullscreen.value = false
     }
     
     toast({
@@ -428,7 +394,6 @@ const handleCloseMentionSearch = () => {
 
 // Listen for "activate-ai-assistant" event from InlineAIGeneration components
 onMounted(() => {
-  
   window.addEventListener('activate-ai-assistant', ((event: CustomEvent) => {
     if (event.detail && event.detail.block) {
       // Use the conversation history if it exists in the event
@@ -502,26 +467,11 @@ onMounted(() => {
 </script>
 
 <template>
-  <FullscreenWrapper 
-    :is-fullscreen="isFullscreen"
-    @exit-fullscreen="exitFullscreen"
-    @enter-fullscreen="enterFullscreen"
-    class="h-full w-full flex flex-col"
-  >
+  <div class="h-full w-full flex flex-col overflow-hidden">
     <!-- Content container with proper width styling -->
-    <div class="sidebar-content-wrapper h-full w-full flex flex-col" :style="{ '--min-width': '320px' }">
-      <!-- Header (only shown if not hidden) -->
-      <SidebarHeader 
-        v-if="!props.hideHeader"
-        title="AI Assistant"
-        :provider-name="selectedProvider?.name || 'AI'" 
-        :is-loading="isLoading"
-        :is-fullscreen="isFullscreen"
-        @close="emit('close')"
-        @toggle-fullscreen="toggleFullscreen"
-        class="flex-shrink-0"
-      >
-        <!-- Add chat list toggle button in the header -->
+    <div class="h-full w-full flex flex-col">
+      <!-- Header actions for chat list toggle -->
+      <div v-if="!hideHeader" class="px-4 py-2 flex items-center justify-between border-b">
         <Button 
           variant="ghost" 
           size="icon"
@@ -532,10 +482,7 @@ onMounted(() => {
           <ListIcon v-if="!showChatList" class="h-4 w-4" />
           <ArrowLeftIcon v-else class="h-4 w-4" />
         </Button>
-      </SidebarHeader>
-      
-      <!-- Add a spacer when header is hidden to maintain layout -->
-      <div v-else class="h-2 flex-shrink-0"></div>
+      </div>
       
       <div class="flex-1 flex flex-col h-full min-h-0 relative overflow-hidden">
         <!-- Empty State when no active conversation -->
@@ -660,7 +607,7 @@ onMounted(() => {
         </template>
       </div>
     </div>
-  </FullscreenWrapper>
+  </div>
 </template>
 
 <style scoped>
@@ -680,21 +627,9 @@ onMounted(() => {
   overflow-x: auto;
 }
 
-/* Content area layout */
-.sidebar-content-wrapper {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-width: 0;
-  width: 100%;
-  max-width: 100%;
-  overflow: hidden;
-  flex: 1 1 auto;
-}
-
 /* When in a conversation, the content area needs a minimum width */
 .conversation-container {
-  min-width: var(--min-width, 320px);
+  min-width: 300px;
   width: 100%;
   height: 100%;
   overflow: hidden;
