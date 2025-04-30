@@ -21,6 +21,7 @@ interface ContributorData {
   name: string
   tag?: string
   count: number
+  totalVotes?: number
 }
 
 interface UseBashhubDataOptions {
@@ -34,7 +35,7 @@ interface BashhubQueryResult<T> {
   currentPage: Ref<number>
   lastVisible: Ref<DocumentSnapshot | null>
   hasMoreItems: Ref<boolean>
-  loadData: (type: 'latest' | 'popular' | 'most-voted' | 'top-contributors') => Promise<void>
+  loadData: (type: 'latest' | 'popular' | 'most-voted' | 'top-contributors' | 'top-voted-contributors') => Promise<void>
   nextPage: () => Promise<void>
   prevPage: () => Promise<void>
   resetPagination: () => void
@@ -51,7 +52,7 @@ export function useBashhubData({ pageSize = 10 }: UseBashhubDataOptions = {}): B
   const currentPage = ref(1)
   const lastVisible = ref<DocumentSnapshot | null>(null)
   const hasMoreItems = ref(true)
-  const currentTab = ref<'latest' | 'popular' | 'most-voted' | 'top-contributors'>('latest')
+  const currentTab = ref<'latest' | 'popular' | 'most-voted' | 'top-contributors' | 'top-voted-contributors'>('latest')
 
   // Reset pagination state
   const resetPagination = () => {
@@ -66,6 +67,7 @@ export function useBashhubData({ pageSize = 10 }: UseBashhubDataOptions = {}): B
    */
   const loadNotas = async () => {
     try {
+      isLoading.value = true
       const notasRef = collection(firestore, 'publishedNotas')
 
       // Skip if we're at the end
@@ -144,6 +146,8 @@ export function useBashhubData({ pageSize = 10 }: UseBashhubDataOptions = {}): B
     } catch (err) {
       logger.error('Error loading notas:', err)
       throw err
+    } finally {
+      isLoading.value = false
     }
   }
 
@@ -152,6 +156,7 @@ export function useBashhubData({ pageSize = 10 }: UseBashhubDataOptions = {}): B
    */
   const loadTopContributors = async () => {
     try {
+      isLoading.value = true
       // Get all published notas (limit to a reasonable number to avoid excessive reads)
       const notasRef = collection(firestore, 'publishedNotas')
       const notasQuery = query(
@@ -196,13 +201,82 @@ export function useBashhubData({ pageSize = 10 }: UseBashhubDataOptions = {}): B
     } catch (err) {
       logger.error('Error loading top contributors:', err)
       throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  /**
+   * Load top contributors by total votes
+   */
+  const loadTopVotedContributors = async () => {
+    try {
+      isLoading.value = true
+      // Get all published notas (limit to a reasonable number to avoid excessive reads)
+      const notasRef = collection(firestore, 'publishedNotas')
+      const notasQuery = query(
+        notasRef,
+        where('isPublic', '==', true),
+        where('isSubPage', '==', false),
+        limit(100) // Limit to avoid excessive reads
+      )
+      
+      const querySnapshot = await getDocs(notasQuery)
+      
+      // Count votes by author
+      const authorData: Record<string, { 
+        count: number, 
+        totalVotes: number, 
+        name: string, 
+        tag?: string 
+      }> = {}
+      
+      querySnapshot.forEach(doc => {
+        const data = doc.data()
+        const authorId = data.authorId
+        
+        if (!authorData[authorId]) {
+          authorData[authorId] = { 
+            count: 0,
+            totalVotes: 0, 
+            name: data.authorName || 'Anonymous',
+            tag: data.authorTag
+          }
+        }
+        
+        // Count the nota
+        authorData[authorId].count++
+        
+        // Add votes to the total
+        const votes = data.likeCount || 0
+        authorData[authorId].totalVotes += votes
+      })
+      
+      // Convert to array and sort by total votes
+      const votedContributors = Object.entries(authorData)
+        .map(([uid, data]) => ({ 
+          uid, 
+          name: data.name, 
+          tag: data.tag, 
+          count: data.count,
+          totalVotes: data.totalVotes
+        }))
+        .sort((a, b) => b.totalVotes - a.totalVotes)
+        .slice(0, pageSize)
+
+      items.value = votedContributors
+    } catch (err) {
+      logger.error('Error loading top voted contributors:', err)
+      throw err
+    } finally {
+      isLoading.value = false
     }
   }
 
   /**
    * Load data based on the specified tab
    */
-  const loadData = async (type: 'latest' | 'popular' | 'most-voted' | 'top-contributors') => {
+  const loadData = async (type: 'latest' | 'popular' | 'most-voted' | 'top-contributors' | 'top-voted-contributors') => {
     try {
       currentTab.value = type
       isLoading.value = true
@@ -210,6 +284,8 @@ export function useBashhubData({ pageSize = 10 }: UseBashhubDataOptions = {}): B
 
       if (type === 'top-contributors') {
         await loadTopContributors()
+      } else if (type === 'top-voted-contributors') {
+        await loadTopVotedContributors() 
       } else {
         await loadNotas()
       }
@@ -225,7 +301,7 @@ export function useBashhubData({ pageSize = 10 }: UseBashhubDataOptions = {}): B
    * Load the next page of results
    */
   const nextPage = async () => {
-    if (!hasMoreItems.value || currentTab.value === 'top-contributors') return
+    if (!hasMoreItems.value || ['top-contributors', 'top-voted-contributors'].includes(currentTab.value)) return
     currentPage.value++
     await loadNotas()
   }
@@ -234,7 +310,7 @@ export function useBashhubData({ pageSize = 10 }: UseBashhubDataOptions = {}): B
    * Load the previous page of results
    */
   const prevPage = async () => {
-    if (currentPage.value <= 1 || currentTab.value === 'top-contributors') return
+    if (currentPage.value <= 1 || ['top-contributors', 'top-voted-contributors'].includes(currentTab.value)) return
     currentPage.value--
     resetPagination()
     

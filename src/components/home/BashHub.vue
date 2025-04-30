@@ -11,18 +11,22 @@ import {
   Users, 
   Search,
   LayoutGrid,
-  List
+  List,
+  Award
 } from 'lucide-vue-next'
 import { useBashhubData } from '@/composables/useBashhubData'
 import { useAuthStore } from '@/stores/auth'
 import NotaTab from './bashhub/NotaTab.vue'
 import ContributorTab from './bashhub/ContributorTab.vue'
+import VotesContributorTab from './bashhub/VotesContributorTab.vue'
 import type { PublishedNota } from '@/types/nota'
 import { logger } from '@/services/logger'
 import { toast } from '@/lib/utils'
+import { doc, getDoc } from 'firebase/firestore'
+import { firestore } from '@/services/firebase'
 
 // Define tab types for type safety
-type TabType = 'latest' | 'popular' | 'most-voted' | 'top-contributors';
+type TabType = 'latest' | 'popular' | 'most-voted' | 'top-contributors' | 'top-voted-contributors';
 // Define view types
 type ViewType = 'grid' | 'list';
 
@@ -48,13 +52,19 @@ const {
 
 // Filter items based on active tab type
 const publishedNotas = computed(() => {
-  if (activeTab.value === 'top-contributors') return []
+  if (['top-contributors', 'top-voted-contributors'].includes(activeTab.value)) return []
   return items.value as PublishedNota[]
 })
 
 const contributors = computed(() => {
-  if (activeTab.value !== 'top-contributors') return []
-  return items.value as Array<{ uid: string; name: string; tag?: string; count: number }>
+  if (activeTab.value !== 'top-contributors' && activeTab.value !== 'top-voted-contributors') return []
+  return items.value as Array<{ 
+    uid: string; 
+    name: string; 
+    tag?: string; 
+    count: number;
+    totalVotes?: number;
+  }>
 })
 
 // Tab configuration for better organization
@@ -101,11 +111,48 @@ const handleSearch = async () => {
 // Check if search is empty
 const isSearchEmpty = computed(() => !searchQuery.value.trim())
 
+// Utility functions
+// Get user tag from user ID
+const getUserTagFromId = async (userId: string): Promise<string | null> => {
+  try {
+    // Query the users collection directly to get the user document
+    const userDoc = await getDoc(doc(firestore, 'users', userId))
+    
+    if (userDoc.exists() && userDoc.data().userTag) {
+      // If the user has a tag in their document, return it
+      return userDoc.data().userTag
+    }
+    
+    // If not found in users collection or no userTag, return null
+    return null
+  } catch (err) {
+    logger.error('Error fetching user tag from ID:', err)
+    return null
+  }
+}
+
 // View nota details
-const viewNota = (nota: PublishedNota) => {
-  if (nota.authorId) {
-    router.push(`/@${nota.authorId}/${nota.id}`)
-  } else {
+const viewNota = async (nota: PublishedNota) => {
+  if (!nota.authorId) {
+    // No author ID available, use generic link
+    router.push(`/p/${nota.id}`)
+    return
+  }
+
+  try {
+    // If not, try to get the author's tag from their ID
+    const authorTag = await getUserTagFromId(nota.authorId)
+    
+    if (authorTag) {
+      // If we found a tag, use it for the URL
+      router.push(`/@${authorTag}/${nota.id}`)
+    } else {
+      // Fall back to legacy user ID format
+      router.push(`/u/${nota.authorId}/${nota.id}`)
+    }
+  } catch (error) {
+    // In case of any error, fall back to the generic format
+    logger.error('Error resolving author tag:', error)
     router.push(`/p/${nota.id}`)
   }
 }
@@ -165,7 +212,7 @@ const toggleViewMode = (mode: ViewType) => {
       </Button>
       
       <!-- View Toggle Buttons (when not on contributors tab) -->
-      <div v-if="activeTab !== 'top-contributors'" class="ml-auto flex gap-1">
+      <div v-if="!['top-contributors', 'top-voted-contributors'].includes(activeTab)" class="ml-auto flex gap-1">
         <Button 
           variant="outline" 
           size="icon" 
@@ -189,11 +236,12 @@ const toggleViewMode = (mode: ViewType) => {
 
     <!-- Tabs -->
     <Tabs v-model="activeTab" class="w-full mb-6">
-      <TabsList class="grid grid-cols-4 w-full max-w-md">
+      <TabsList class="grid grid-cols-5 w-full max-w-md">
         <TabsTrigger value="latest">Latest</TabsTrigger>
         <TabsTrigger value="popular">Popular</TabsTrigger>
         <TabsTrigger value="most-voted">Most Voted</TabsTrigger>
-        <TabsTrigger value="top-contributors">Top Contributors</TabsTrigger>
+        <TabsTrigger value="top-contributors">Contributors</TabsTrigger>
+        <TabsTrigger value="top-voted-contributors">Voted Users</TabsTrigger>
       </TabsList>
 
       <!-- Latest Notas Tab -->
@@ -267,6 +315,17 @@ const toggleViewMode = (mode: ViewType) => {
         <ContributorTab 
           :is-active="activeTab === 'top-contributors'"
           title="Top Contributors"
+          :contributors="contributors"
+          :is-loading="isLoading"
+          :error="error"
+        />
+      </TabsContent>
+
+      <!-- Top Voted Contributors Tab -->
+      <TabsContent value="top-voted-contributors">
+        <VotesContributorTab 
+          :is-active="activeTab === 'top-voted-contributors'"
+          title="Most Voted Users"
           :contributors="contributors"
           :is-loading="isLoading"
           :error="error"
