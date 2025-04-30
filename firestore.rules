@@ -15,6 +15,12 @@ service cloud.firestore {
       return tag.matches('^[a-zA-Z0-9_]{3,30}$');
     }
     
+    // Check if a user already has a tag
+    function userAlreadyHasTag(uid) {
+      return exists(/databases/$(database)/documents/userTags) && 
+             getAfter(/databases/$(database)/documents/userTags).where('uid', '==', uid).size() > 0;
+    }
+    
     // User collection rules
     match /users/{userId} {
       // Allow users to read and write their own data
@@ -31,9 +37,12 @@ service cloud.firestore {
       allow read: if true;
       
       // Only the authenticated user can create/update/delete their own tag
+      // Add validation to ensure the user doesn't already have a tag
       allow create: if isAuthenticated() && 
                      request.resource.data.uid == request.auth.uid &&
-                     isValidUserTag(tag);
+                     isValidUserTag(tag) &&
+                     // Check that no other document in userTags collection has this UID
+                     !exists(/databases/$(database)/documents/userTags.where('uid', '==', request.auth.uid));
                      
       allow update: if isAuthenticated() && 
                      resource.data.uid == request.auth.uid &&

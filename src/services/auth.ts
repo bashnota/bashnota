@@ -153,14 +153,10 @@ export class AuthService {
         const oldTagDoc = await getDoc(oldTagRef)
         
         if (oldTagDoc.exists()) {
-          // Delete the old tag document - previously we just nullified the uid
-          // Now we'll properly delete it to ensure it's available for others
-          await setDoc(oldTagRef, { 
-            uid: null,
-            available: true,
-            deletedAt: new Date().toISOString(),
-            previousOwner: userId
-          }, { merge: true })
+          // Completely delete the old tag document instead of just marking it as available
+          const { deleteDoc } = await import('firebase/firestore')
+          await deleteDoc(oldTagRef)
+          console.log(`Previous user tag "${oldTag}" has been deleted`)
         }
       }
       
