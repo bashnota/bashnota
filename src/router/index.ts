@@ -25,6 +25,11 @@ const router = createRouter({
       name: 'settings',
       component: () => import('@/views/SettingsView.vue'),
     },
+    {
+      path: '/bashhub',
+      name: 'bashhub',
+      component: () => import('@/views/BashHubView.vue'),
+    },
     // Auth routes
     {
       path: '/login',
