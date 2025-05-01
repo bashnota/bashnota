@@ -17,8 +17,8 @@ service cloud.firestore {
     
     // Check if a user already has a tag
     function userAlreadyHasTag(uid) {
-      return exists(/databases/$(database)/documents/userTags) && 
-             getAfter(/databases/$(database)/documents/userTags).where('uid', '==', uid).size() > 0;
+      return exists(/databases/$(database)/documents/userTags) &&
+             exists(/databases/$(database)/documents/userTags/$(uid));
     }
     
     // User collection rules
@@ -41,8 +41,8 @@ service cloud.firestore {
       allow create: if isAuthenticated() && 
                      request.resource.data.uid == request.auth.uid &&
                      isValidUserTag(tag) &&
-                     // Check that no other document in userTags collection has this UID
-                     !exists(/databases/$(database)/documents/userTags.where('uid', '==', request.auth.uid));
+                     // Check that there's no document in userTags collection with this UID
+                     !exists(/databases/$(database)/documents/userTags/$(request.auth.uid));
                      
       allow update: if isAuthenticated() && 
                      resource.data.uid == request.auth.uid &&
