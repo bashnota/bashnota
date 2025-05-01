@@ -15,11 +15,15 @@ import {
   Undo,
   Redo,
   MinusSquare,
+  Eye,
+  EyeOff,
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import type { FunctionalComponent } from 'vue'
+import { ref, onMounted } from 'vue'
+import { toggleRenderMathState } from './extensions/MarkdownExtension'
 
 const emit = defineEmits([
   'run-all',
@@ -29,12 +33,35 @@ const emit = defineEmits([
   'export-nota',
 ])
 
-defineProps<{
+const props = defineProps<{
   editor: Editor | null
   canRunAll?: boolean
   isExecutingAll?: boolean
   isFavorite?: boolean
 }>()
+
+// State to track whether math is rendered or not
+const isRenderingMath = ref(true)
+
+// Function to toggle math rendering
+const toggleMathRendering = () => {
+  if (props.editor) {
+    // This will toggle the state and force a redraw
+    toggleRenderMathState(props.editor)
+    
+    // Update our local state to keep button in sync
+    isRenderingMath.value = !isRenderingMath.value
+  }
+}
+
+// Initialize state on mount
+onMounted(() => {
+  // Check window object for the current state
+  if (typeof window !== 'undefined' && window) {
+    // @ts-ignore - accessing custom property from window
+    isRenderingMath.value = window['markdownAndKatexRenderState'] ?? true
+  }
+})
 
 // Toolbar groups for better organization
 const headingLevels: { icon: FunctionalComponent; level: 1 | 2 | 3 }[] = [
@@ -158,6 +185,23 @@ const headingLevels: { icon: FunctionalComponent; level: 1 | 2 | 3 }[] = [
         </Button>
         <Button variant="ghost" size="sm" @click="editor.chain().focus().setHorizontalRule().run()">
           <MinusSquare class="h-4 w-4" />
+        </Button>
+      </div>
+
+      <Separator orientation="vertical" class="mx-1 h-6" />
+      
+      <!-- Math Rendering Toggle -->
+      <div class="flex items-center">
+        <Button
+          variant="ghost"
+          size="sm"
+          @click="toggleMathRendering"
+          :title="isRenderingMath ? 'Show LaTeX source code' : 'Show rendered math'"
+          :class="{ 'bg-muted': !isRenderingMath }"
+        >
+          <Eye v-if="isRenderingMath" class="h-4 w-4" />
+          <EyeOff v-else class="h-4 w-4" />
+          <span class="ml-1 hidden sm:inline">{{ isRenderingMath ? 'Hide Math Source' : 'Show Math Rendered' }}</span>
         </Button>
       </div>
       

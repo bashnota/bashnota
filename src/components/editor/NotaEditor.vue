@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import { TagsInput } from '@/components/ui/tags-input'
-import { RotateCw, CheckCircle, Star, Share2, Download, PlayCircle, Loader2, Save, Clock, Sparkles, Book, Server, Tag } from 'lucide-vue-next'
+import { RotateCw, CheckCircle, Star, Share2, Download, PlayCircle, Loader2, Save, Clock, Sparkles, Book, Server, Tag} from 'lucide-vue-next'
 import { useNotaStore } from '@/stores/nota'
 import { useJupyterStore } from '@/stores/jupyterStore'
 import EditorToolbar from './EditorToolbar.vue'
@@ -778,6 +778,12 @@ provide(EQUATION_COUNTER_KEY, {
   },
   reset: resetEquationCounter
 })
+
+// Add renderMath state for toggling math rendering
+const renderMath = ref(true)
+
+// Expose this state to components
+provide('renderMath', renderMath)
 
 // Function to update citation numbers
 const updateCitationNumbers = () => {
