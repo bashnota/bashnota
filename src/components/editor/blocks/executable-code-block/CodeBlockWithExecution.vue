@@ -27,6 +27,7 @@ import {
   Cpu,
   RotateCw,
   Trash2,
+  Link2,
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import CodeMirror from './CodeMirror.vue'
@@ -36,6 +37,7 @@ import PopoverContent from '@/components/ui/popover/PopoverContent.vue'
 import FullScreenCodeBlock from './FullScreenCodeBlock.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
 import OutputRenderer from './OutputRenderer.vue'
+import { toast } from '@/lib/utils'
 
 // Types
 interface Props {
@@ -102,7 +104,15 @@ const isCodeCopied = ref(false)
 
 // Computed
 const isReadyToExecute = computed(() => {
-  return !executionInProgress.value && selectedServer.value && selectedServer.value !== 'none' && selectedKernel.value
+  // Always allow execution in shared mode
+  if (isSharedSessionMode.value) {
+    return !executionInProgress.value
+  }
+  
+  // In manual mode, require server and kernel
+  return !executionInProgress.value && selectedServer.value && 
+         selectedServer.value !== 'none' && 
+         selectedKernel.value
 })
 
 const availableServers = computed<JupyterServer[]>(() => {
@@ -133,6 +143,10 @@ const rootNotaId = computed(() => {
   return store.getRootNotaId(currentNota.parentId)
 })
 
+// Shared session mode
+const isSharedSessionMode = computed(() => codeExecutionStore.sharedSessionMode)
+const sharedSessionId = computed(() => codeExecutionStore.sharedSessionId)
+
 // Utils
 const showConsoleMessage = (
   title: string,
@@ -151,6 +165,30 @@ const showConsoleMessage = (
 
 // Add this after component refs
 const loadSavedPreferences = async () => {
+  // If in shared session mode, check if we should use the shared session
+  if (isSharedSessionMode.value && sharedSessionId.value) {
+    const session = codeExecutionStore.kernelSessions.get(sharedSessionId.value)
+    if (session) {
+      selectedSession.value = sharedSessionId.value
+      emit('update:session-id', sharedSessionId.value)
+      
+      // Get the session's server configuration
+      if (session.serverConfig) {
+        const serverId = `${session.serverConfig.ip}:${session.serverConfig.port}`
+        handleServerSelect(serverId)
+      }
+      
+      // Get the session's kernel name
+      if (session.kernelName) {
+        handleKernelSelect(session.kernelName)
+      }
+      
+      showConsoleMessage('Info', `Using shared session for code block`, 'success')
+      return
+    }
+  }
+
+  // Otherwise, use individual preferences
   const currentNota = store.getCurrentNota(props.notaId)
   const preferences = currentNota?.config?.kernelPreferences?.[props.id]
   
@@ -292,7 +330,7 @@ onMounted(async () => {
   // Ensure jupyterStore is loaded and refreshed
   await refreshJupyterServers()
   
-  // Load saved preferences
+  // Load shared session if in shared mode or individual preferences otherwise
   await loadSavedPreferences()
   
   if (codeBlockRef.value && !props.isReadOnly) {
@@ -334,6 +372,31 @@ watch(
       selectedSession.value = newSessionId
     }
   },
+)
+
+// Watch for shared session mode changes
+watch(
+  () => isSharedSessionMode.value,
+  async (newValue) => {
+    if (newValue && sharedSessionId.value) {
+      // When switching to shared mode, apply the shared session
+      const session = codeExecutionStore.kernelSessions.get(sharedSessionId.value)
+      if (session) {
+        selectedSession.value = sharedSessionId.value
+        emit('update:session-id', sharedSessionId.value)
+        
+        // Set server and kernel from the shared session
+        if (session.serverConfig) {
+          const serverId = `${session.serverConfig.ip}:${session.serverConfig.port}`
+          handleServerSelect(serverId)
+        }
+        
+        if (session.kernelName) {
+          handleKernelSelect(session.kernelName)
+        }
+      }
+    }
+  }
 )
 
 const refreshSessionsAndKernels = async (server: JupyterServer) => {
@@ -420,16 +483,18 @@ watch(selectedServer, async (newServer) => {
         }
       }
 
-      // Save server and kernel preference
-      store.updateNotaConfig(props.notaId, (config) => {
-        if (!config.kernelPreferences) config.kernelPreferences = {}
-        config.kernelPreferences[props.id] = {
-          serverId: newServer,
-          kernelName: selectedKernel.value,
-          blockId: props.id,
-          lastUsed: new Date().toISOString()
-        }
-      })
+      // Save server and kernel preference (only when not in shared mode)
+      if (!isSharedSessionMode.value) {
+        store.updateNotaConfig(props.notaId, (config) => {
+          if (!config.kernelPreferences) config.kernelPreferences = {}
+          config.kernelPreferences[props.id] = {
+            serverId: newServer,
+            kernelName: selectedKernel.value,
+            blockId: props.id,
+            lastUsed: new Date().toISOString()
+          }
+        })
+      }
     } catch (error) {
       logger.error('Failed to fetch kernels/sessions:', error)
       showConsoleMessage('Error', 'Failed to fetch kernels/sessions', 'error')
@@ -439,7 +504,7 @@ watch(selectedServer, async (newServer) => {
 
 // Watch for kernel changes to save preference
 watch(selectedKernel, async (newKernel) => {
-  if (newKernel && selectedServer.value && selectedServer.value !== 'none') {
+  if (newKernel && selectedServer.value && selectedServer.value !== 'none' && !isSharedSessionMode.value) {
     store.updateNotaConfig(props.notaId, (config) => {
       if (!config.kernelPreferences) config.kernelPreferences = {}
       config.kernelPreferences[props.id] = {
@@ -466,21 +531,23 @@ const handleServerChange = async (value: string) => {
   isServerOpen.value = false
   isKernelOpen.value = true // Automatically open kernel selector after server selection
   
-  // Only store minimal server reference in kernel preferences
-  store.updateNotaConfig(props.notaId, (config) => {
-    if (!config.kernelPreferences) config.kernelPreferences = {}
-    if (!config.kernelPreferences[props.id]) {
-      config.kernelPreferences[props.id] = {
-        serverId: value, // Store just the server ID reference, not the server details
-        kernelName: selectedKernel.value,
-        blockId: props.id,
-        lastUsed: new Date().toISOString()
+  // Only store minimal server reference in kernel preferences if not in shared mode
+  if (!isSharedSessionMode.value) {
+    store.updateNotaConfig(props.notaId, (config) => {
+      if (!config.kernelPreferences) config.kernelPreferences = {}
+      if (!config.kernelPreferences[props.id]) {
+        config.kernelPreferences[props.id] = {
+          serverId: value, // Store just the server ID reference, not the server details
+          kernelName: selectedKernel.value,
+          blockId: props.id,
+          lastUsed: new Date().toISOString()
+        }
+      } else {
+        config.kernelPreferences[props.id].serverId = value
+        config.kernelPreferences[props.id].lastUsed = new Date().toISOString()
       }
-    } else {
-      config.kernelPreferences[props.id].serverId = value
-      config.kernelPreferences[props.id].lastUsed = new Date().toISOString()
-    }
-  })
+    })
+  }
 }
 
 const handleKernelChange = (value: string) => {
@@ -522,6 +589,11 @@ const createNewSession = async () => {
     emit('update:session-id', sessionId)
     isSessionOpen.value = false
     
+    // If this is in shared mode and we created a new session, set it as the shared session
+    if (isSharedSessionMode.value) {
+      codeExecutionStore.sharedSessionId = sessionId
+    }
+    
     // Refresh sessions list
     const sessions = await jupyterService.getActiveSessions(server)
     availableSessions.value = sessions
@@ -539,22 +611,46 @@ const executeCode = async () => {
   // Ensure servers are loaded before execution
   await refreshJupyterServers();
   
-  if (!selectedServer.value || selectedServer.value === 'none') {
-    isServerOpen.value = true; // Open server selector
-    showConsoleMessage('Error', 'Please select a server first', 'error')
-    return
-  }
-  if (!selectedKernel.value) {
-    isServerOpen.value = true; // Open kernel selector too
-    showConsoleMessage('Error', 'Please select a kernel first', 'error')
-    return
+  // If not in shared mode, validate server and kernel selections
+  if (!isSharedSessionMode.value) {
+    if (!selectedServer.value || selectedServer.value === 'none') {
+      isServerOpen.value = true; // Open server selector
+      showConsoleMessage('Error', 'Please select a server first', 'error')
+      return
+    }
+    if (!selectedKernel.value) {
+      isServerOpen.value = true; // Open kernel selector too
+      showConsoleMessage('Error', 'Please select a kernel first', 'error')
+      return
+    }
   }
   
   executionInProgress.value = true
   try {
-    // If no session is selected, create a new one
-    if (!selectedSession.value) {
-      await createNewSession()
+    // If in shared mode, ensure we're using the shared session
+    if (isSharedSessionMode.value) {
+      // Get or create shared session
+      const sessionId = await codeExecutionStore.ensureSharedSession();
+      
+      // Apply shared session to this cell
+      await codeExecutionStore.applySharedSessionToCell(props.id);
+      
+      // Update the UI with the shared session
+      selectedSession.value = sessionId;
+      
+      // Get shared session info for UI feedback
+      const session = codeExecutionStore.kernelSessions.get(sessionId);
+      if (session?.serverConfig) {
+        const serverId = `${session.serverConfig.ip}:${session.serverConfig.port}`;
+        selectedServer.value = serverId;
+      }
+      if (session?.kernelName) {
+        selectedKernel.value = session.kernelName;
+      }
+    } 
+    // If not in shared mode and no session is selected, create a new one
+    else if (!selectedSession.value) {
+      await createNewSession();
       if (!selectedSession.value) {
         throw new Error('Failed to create session')
       }
@@ -583,7 +679,20 @@ const saveChanges = () => {
 }
 
 const copyCode = () => {
-  // Implementation
+  if (navigator.clipboard && codeValue.value) {
+    navigator.clipboard.writeText(codeValue.value)
+      .then(() => {
+        isCodeCopied.value = true
+        setTimeout(() => {
+          isCodeCopied.value = false
+        }, 2000)
+        toast('Code copied to clipboard')
+      })
+      .catch(err => {
+        logger.error('Failed to copy code:', err)
+        toast('Failed to copy code')
+      })
+  }
 }
 
 // Initialize code block shortcuts
@@ -597,7 +706,7 @@ const { shortcuts } = useCodeBlockShortcuts({
   <div
     ref="codeBlockRef"
     class="flex flex-col bg-card text-card-foreground rounded-lg overflow-hidden border shadow-sm transition-all duration-200"
-    :class="{ 'ring-2 ring-primary': hasUnsavedChanges }"
+    :class="{ 'ring-2 ring-primary': hasUnsavedChanges, 'ring-2 ring-primary/40': isSharedSessionMode && cell?.sessionId === sharedSessionId }"
   >
     <!-- Toolbar -->
     <div
@@ -605,7 +714,7 @@ const { shortcuts } = useCodeBlockShortcuts({
     >
       <!-- Left toolbar group -->
       <div class="flex items-center gap-2 flex-wrap">
-        <!-- Session Selector - Hide when readonly -->
+        <!-- Session Selector - Hide when readonly or in shared mode -->
         <template v-if="!isReadOnly">
           <Popover v-model:open="isSessionOpen">
             <PopoverTrigger as-child>
@@ -613,13 +722,18 @@ const { shortcuts } = useCodeBlockShortcuts({
                 variant="outline"
                 size="sm"
                 class="gap-2 h-8 relative"
-                :class="{ 'bg-amber-500/20 hover:bg-amber-500/30': !selectedSession }"
-                :title="selectedSession ? `Current Session: ${availableSessions.find(s => s.id === selectedSession)?.name || selectedSession}` : 'Select Session'"
+                :class="{ 
+                  'bg-amber-500/20 hover:bg-amber-500/30': !selectedSession,
+                  'bg-blue-500/20 hover:bg-blue-500/30': isSharedSessionMode && selectedSession
+                }"
+                :title="isSharedSessionMode ? 'Using shared session mode' : selectedSession ? `Current Session: ${availableSessions.find(s => s.id === selectedSession)?.name || selectedSession}` : 'Select Session'"
                 aria-label="Session management"
+                :disabled="isSharedSessionMode"
               >
-                <Layers class="h-4 w-4" />
+                <Layers class="h-4 w-4" v-if="!isSharedSessionMode" />
+                <Link2 class="h-4 w-4" v-else />
                 <span class="text-xs ml-1 max-w-[100px] truncate" v-if="selectedSession">
-                  {{ availableSessions.find(s => s.id === selectedSession)?.name || selectedSession }}
+                  {{ isSharedSessionMode ? 'Shared Session' : availableSessions.find(s => s.id === selectedSession)?.name || selectedSession }}
                 </span>
                 <span
                   v-if="selectedSession"
@@ -786,13 +900,17 @@ const { shortcuts } = useCodeBlockShortcuts({
                 :class="{
                   'bg-amber-500/20 hover:bg-amber-500/30':
                     !selectedServer || selectedServer === 'none' || !selectedKernel || selectedKernel === 'none',
+                  'bg-blue-500/20 hover:bg-blue-500/30': isSharedSessionMode
                 }"
                 :title="
-                  selectedServer && selectedServer !== 'none' && selectedKernel && selectedKernel !== 'none'
-                    ? `${selectedServer} - ${selectedKernel}`
+                  isSharedSessionMode
+                    ? 'Using shared server & kernel'
+                    : selectedServer && selectedServer !== 'none' && selectedKernel && selectedKernel !== 'none'
+                      ? `${selectedServer} - ${selectedKernel}`
                     : 'Select Server & Kernel'
                 "
                 aria-label="Select server and kernel"
+                :disabled="isSharedSessionMode"
               >
                 <Server class="h-4 w-4" />
                 <Box v-if="selectedServer && selectedServer !== 'none'" class="h-4 w-4 ml-1" />
@@ -864,6 +982,15 @@ const { shortcuts } = useCodeBlockShortcuts({
 
       <!-- Right toolbar group -->
       <div class="flex items-center gap-2">
+        <!-- Shared Session Indicator -->
+        <div
+          v-if="isSharedSessionMode"
+          class="text-xs text-muted-foreground flex items-center gap-1.5 mr-2"
+        >
+          <Link2 class="h-3.5 w-3.5 text-blue-500" />
+          <span>Shared Session</span>
+        </div>
+
         <!-- Keyboard shortcuts (hidden in readonly) -->
         <div
           v-if="!isReadOnly"
@@ -939,6 +1066,7 @@ const { shortcuts } = useCodeBlockShortcuts({
     <div
       v-if="
         !isReadOnly &&
+        !isSharedSessionMode && 
         (!selectedServer ||
           selectedServer === 'none' ||
           !selectedKernel ||
@@ -952,6 +1080,17 @@ const { shortcuts } = useCodeBlockShortcuts({
       </span>
       <span v-else-if="!selectedKernel || selectedKernel === 'none'">
         Select a kernel to run this code block
+      </span>
+    </div>
+    
+    <!-- Shared Mode Info Banner -->
+    <div
+      v-else-if="!isReadOnly && isSharedSessionMode && !selectedSession"
+      class="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800 border-b p-2 flex items-center text-xs text-blue-600 dark:text-blue-400"
+    >
+      <Link2 class="h-3 w-3 mr-2" />
+      <span>
+        Using shared kernel mode. Press Run to automatically join the shared session.
       </span>
     </div>
 

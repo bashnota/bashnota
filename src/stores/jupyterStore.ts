@@ -3,10 +3,12 @@ import { ref } from 'vue'
 import type { JupyterServer, KernelSpec } from '@/types/jupyter'
 import { toast } from '@/lib/utils'
 import { logger } from '@/services/logger'
+import { JupyterService } from '@/services/jupyterService'
 
 export const useJupyterStore = defineStore('jupyter', () => {
   const jupyterServers = ref<JupyterServer[]>([])
   const kernels = ref<Record<string, KernelSpec[]>>({})
+  const jupyterService = new JupyterService()
 
   // Load servers from localStorage
   const loadServers = () => {
@@ -76,6 +78,33 @@ export const useJupyterStore = defineStore('jupyter', () => {
     saveServers()
   }
 
+  // Get available kernels for a server
+  const getAvailableKernels = async (server: JupyterServer) => {
+    try {
+      const serverKey = `${server.ip}:${server.port}`
+      
+      // If we already have kernels cached, return them
+      if (kernels.value[serverKey]) {
+        logger.log(`Using cached kernels for ${serverKey}`);
+        return kernels.value[serverKey];
+      }
+      
+      logger.log(`Fetching kernels for server: ${serverKey}`);
+      const availableKernels = await jupyterService.getAvailableKernels(server);
+      
+      if (availableKernels) {
+        // Cache the kernels
+        updateKernels(server, availableKernels);
+        return availableKernels;
+      }
+      
+      return [];
+    } catch (error) {
+      logger.error('Failed to get available kernels:', error);
+      return [];
+    }
+  }
+
   // Initialize store
   loadServers()
 
@@ -86,6 +115,7 @@ export const useJupyterStore = defineStore('jupyter', () => {
     removeServer,
     updateKernels,
     loadServers,
-    saveServers
+    saveServers,
+    getAvailableKernels
   }
-}) 
+})

@@ -35,6 +35,7 @@ export interface NotaConfig {
   savedSessions: Array<{
     id: string
     name: string
+    isShared?: boolean
   }>
   settings?: {
     autoSave: boolean
@@ -43,6 +44,9 @@ export interface NotaConfig {
     fontSize?: number
     lineNumbers?: boolean
   }
+  // New properties for shared session feature
+  sharedSessionMode?: boolean
+  sharedSessionId?: string | null
 }
 
 export interface KernelSpec {
