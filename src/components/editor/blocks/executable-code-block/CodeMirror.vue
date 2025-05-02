@@ -9,7 +9,7 @@ import { html } from '@codemirror/lang-html'
 import { css } from '@codemirror/lang-css'
 import { json } from '@codemirror/lang-json'
 import { EditorView, lineNumbers } from '@codemirror/view'
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, watch, onUnmounted } from 'vue'
 
 const props = defineProps<{
   modelValue: string
@@ -18,6 +18,9 @@ const props = defineProps<{
   maxHeight?: string
   language?: string
   fullScreen?: boolean
+  autofocus?: boolean
+  runningStatus?: 'idle' | 'running' | 'error' | 'success'
+  isPublished?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -25,16 +28,14 @@ const emit = defineEmits<{
 }>()
 
 const isDark = ref(false)
+const editorElement = ref<HTMLElement | null>(null)
 
-// Computed property for v-model
-const code = computed({
-  get: () => props.modelValue,
-  set: (value) => emit('update:modelValue', value),
-})
-
-// Get language extension based on language prop
-const getLanguageExtension = computed(() => {
-  switch (props.language?.toLowerCase()) {
+// Determine colorization extension for known languages
+const languageExtension = computed(() => {
+  if (!props.language) return null
+  
+  const lang = props.language.toLowerCase()
+  switch (lang) {
     case 'python':
     case 'py':
       return python()
@@ -44,8 +45,12 @@ const getLanguageExtension = computed(() => {
     case 'ts':
       return javascript()
     case 'html':
+    case 'xml':
+    case 'svg':
       return html()
     case 'css':
+    case 'scss':
+    case 'less':
       return css()
     case 'json':
       return json()
@@ -53,154 +58,247 @@ const getLanguageExtension = computed(() => {
     case 'md':
       return markdown()
     default:
-      return python() // Default to Python
+      return null
   }
 })
 
-onMounted(() => {
-  const savedTheme = localStorage.getItem('theme')
-  isDark.value =
-    savedTheme === 'dark' ||
-    (savedTheme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-
-  const observer = new MutationObserver(() => {
-    const newTheme = localStorage.getItem('theme')
-    isDark.value =
-      newTheme === 'dark' ||
-      (newTheme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-  })
-
-  observer.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ['class'],
-  })
+// Computed property for v-model
+const code = computed({
+  get: () => props.modelValue,
+  set: (value) => emit('update:modelValue', value),
 })
 
-// Basic setup for CodeMirror with line numbers
-const extensions = computed(() => [
-  EditorView.lineWrapping,
-  lineNumbers(),
-  getLanguageExtension.value,
-  isDark.value ? basicDark : basicLight,
-  props.readonly ? EditorView.editable.of(false) : [],
-  EditorView.theme({
-    "&": {
-      height: props.fullScreen ? "100%" : "auto",
-      maxHeight: props.fullScreen ? "none" : (props.maxHeight || "300px")
-    },
-    ".cm-gutters": {
-      position: "sticky",
-      left: 0,
-      backgroundColor: "var(--muted, #f1f5f9)",
-      borderRight: "1px solid var(--border, #e2e8f0)",
-      minHeight: "100%",
-      boxSizing: "border-box",
-      zIndex: 1
-    },
-    ".cm-lineNumbers": {
-      minWidth: "3em",
-      color: "var(--muted-foreground, #64748b)",
-      fontSize: "0.85em",
-      fontFamily: "monospace"
-    },
-    ".cm-content": {
-      minHeight: "100%"
-    }
+// Determine if we should use dark mode theme
+const checkDarkMode = () => {
+  if (typeof window !== 'undefined') {
+    // Check for dark mode preference
+    isDark.value = window.matchMedia?.('(prefers-color-scheme: dark)').matches || 
+                  document.documentElement.classList.contains('dark')
+  }
+}
+
+// Set up editor extensions
+const extensions = computed(() => {
+  const exts = [
+    lineNumbers(),
+    EditorView.lineWrapping,
+    isDark.value ? basicDark : basicLight,
+  ]
+
+  // Add language extension if available
+  if (languageExtension.value) {
+    exts.push(languageExtension.value)
+  }
+
+  // Add readonly extension if needed
+  if (props.readonly || props.disabled) {
+    exts.push(EditorView.editable.of(false))
+  }
+
+  return exts
+})
+
+// Watch for dark mode changes
+const darkModeMediaQuery = ref<MediaQueryList | null>(null)
+
+onMounted(() => {
+  checkDarkMode()
+  
+  // Listen for system theme changes
+  if (typeof window !== 'undefined' && window.matchMedia) {
+    darkModeMediaQuery.value = window.matchMedia('(prefers-color-scheme: dark)')
+    darkModeMediaQuery.value.addEventListener('change', checkDarkMode)
+  }
+
+  // Also listen for class changes on documentElement for theme toggles
+  const observer = new MutationObserver(mutations => {
+    mutations.forEach(mutation => {
+      if (mutation.attributeName === 'class') {
+        checkDarkMode()
+      }
+    })
   })
-])
+  
+  observer.observe(document.documentElement, { attributes: true })
+
+  // Set initial focus if autofocus is true and not readonly/disabled
+  if (props.autofocus && !props.readonly && !props.disabled && editorElement.value) {
+    const cmEditor = editorElement.value.querySelector('.cm-editor')
+    if (cmEditor) {
+      (cmEditor as HTMLElement).focus()
+    }
+  }
+})
+
+// Clean up event listeners
+onUnmounted(() => {
+  if (darkModeMediaQuery.value) {
+    darkModeMediaQuery.value.removeEventListener('change', checkDarkMode)
+  }
+})
+
+// Watch for running status changes to update UI
+watch(() => props.runningStatus, (newStatus) => {
+  if (!editorElement.value) return
+  
+  const editor = editorElement.value.querySelector('.cm-editor')
+  if (!editor) return
+  
+  // Add/remove status classes
+  editor.classList.remove('running', 'error', 'success')
+  
+  if (newStatus === 'running') {
+    editor.classList.add('running')
+  } else if (newStatus === 'error') {
+    editor.classList.add('error')
+  } else if (newStatus === 'success') {
+    editor.classList.add('success')
+  }
+}, { immediate: true })
+
+// Apply visual effects to disabled state
+const containerClasses = computed(() => {
+  return {
+    'h-full': props.fullScreen,
+    'disabled': props.disabled,
+    'readonly': props.readonly,
+    'published': props.isPublished,
+  }
+})
 </script>
 
 <template>
-  <div class="rounded-md border border-input bg-background code-mirror-container" :class="{ 'h-full': fullScreen }">
+  <div 
+    ref="editorElement"
+    class="codemirror-container relative" 
+    :class="containerClasses"
+    :style="{ maxHeight: maxHeight }"
+  >
     <Codemirror
       v-model="code"
       :extensions="extensions"
       :disabled="disabled"
-      placeholder="Enter Python code here..."
-      :style="{ 
-        maxHeight: props.fullScreen ? 'none' : (props.maxHeight || '300px'), 
-        overflow: 'auto',
-        height: props.fullScreen ? '100%' : 'auto'
+      :indent-with-tab="true"
+      placeholder="Enter code here..."
+      :style="{ height: fullScreen ? '100%' : 'auto' }"
+      :class="{
+        'cm-readonly': readonly,
+        'cm-disabled': disabled,
+        'cm-published': isPublished,
       }"
-      class="h-full"
     />
+    
+    <!-- Disabled overlay for better user feedback -->
+    <div 
+      v-if="disabled" 
+      class="absolute inset-0 bg-muted/20 backdrop-blur-[1px] pointer-events-none flex items-center justify-center z-10">
+      <div class="text-sm text-muted-foreground bg-background/90 px-3 py-1.5 rounded-md shadow">
+        Code execution in progress...
+      </div>
+    </div>
+    
+    <!-- Readonly indicator when in published mode -->
+    <div 
+      v-if="readonly && isPublished" 
+      class="absolute top-2 right-2 text-xs bg-muted/60 text-muted-foreground px-2 py-1 rounded-md">
+      Read-only
+    </div>
   </div>
 </template>
 
 <style>
-/* Base styles for editor */
-.code-mirror-container {
-  display: flex;
-  flex-direction: column;
+.codemirror-container {
+  font-size: 0.9rem;
+  border-radius: 0.375rem;
+  overflow: hidden;
+  position: relative;
 }
 
 .cm-editor {
   height: 100%;
-  position: relative;
-  display: flex;
-  flex-direction: column;
+  border-radius: inherit;
+}
+
+/* Style for readonly editor */
+.cm-readonly .cm-content {
+  caret-color: transparent;
+}
+
+.cm-readonly.cm-focused {
+  outline: none !important;
+}
+
+/* Style for disabled editor */
+.cm-disabled {
+  opacity: 0.75;
+}
+
+.codemirror-container.disabled {
+  cursor: not-allowed;
 }
 
 .cm-scroller {
-  overflow: auto !important;
-  height: 100% !important;
-  position: relative;
-  flex: 1;
-}
-
-.cm-content {
-  min-height: 100%;
-  padding-bottom: 50px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  padding: 0.5rem 0;
 }
 
 .cm-gutters {
-  position: sticky !important;
-  left: 0 !important;
-  height: auto !important;
-  min-height: 100% !important;
-  z-index: 1 !important;
-  background-color: var(--muted, #f1f5f9) !important;
-  border-right: 1px solid var(--border, #e2e8f0) !important;
+  border-right-color: var(--border);
+  background-color: var(--muted);
+  color: var(--muted-foreground);
+  /* Ensure gutters take full height */
+  height: 100% !important;
 }
 
-.cm-lineNumbers {
-  color: var(--muted-foreground, #64748b) !important;
-  font-size: 0.85em !important;
-  font-family: monospace !important;
-  min-width: 3em !important;
+/* Transitions for the status changes */
+.cm-editor {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.dark .cm-gutters {
-  background-color: var(--muted, #1e293b) !important;
-  border-right-color: var(--border, #334155) !important;
-  color: var(--muted-foreground) !important;
+/* Running state with subtle animation */
+.cm-editor.running {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary-light);
+  animation: pulse-border 2s infinite alternate;
 }
 
-/* Custom scrollbar styles */
-.cm-scroller::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+/* Error state */
+.cm-editor.error {
+  border-color: var(--destructive);
+  box-shadow: 0 0 0 1px var(--destructive-light);
 }
 
-.cm-scroller::-webkit-scrollbar-track {
-  background: transparent;
+/* Success state with fade out transition */
+.cm-editor.success {
+  border-color: var(--success);
+  box-shadow: 0 0 0 1px var(--success-light);
+  animation: success-fade 2s forwards;
 }
 
-.cm-scroller::-webkit-scrollbar-thumb {
-  background-color: rgba(155, 155, 155, 0.5);
-  border-radius: 4px;
+/* Published mode styles */
+.codemirror-container.published .cm-editor {
+  background-color: var(--card);
+  border: 1px solid var(--border);
 }
 
-.dark .cm-scroller::-webkit-scrollbar-thumb {
-  background-color: rgba(200, 200, 200, 0.3);
+/* Animations */
+@keyframes pulse-border {
+  0% {
+    box-shadow: 0 0 0 0 var(--primary-alpha);
+  }
+  100% {
+    box-shadow: 0 0 0 4px var(--primary-alpha);
+  }
 }
 
-/* Autocomplete menu styles */
-.cm-tooltip {
-  @apply border border-border bg-popover text-popover-foreground shadow-md !important;
-}
-
-.cm-tooltip .cm-completionLabel {
-  @apply text-sm;
+@keyframes success-fade {
+  0%, 50% {
+    border-color: var(--success);
+    box-shadow: 0 0 0 1px var(--success-light);
+  }
+  100% {
+    border-color: var(--border);
+    box-shadow: none;
+  }
 }
 </style>
