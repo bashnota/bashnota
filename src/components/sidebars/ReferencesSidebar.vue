@@ -510,6 +510,14 @@ const formatCitationDisplay = (citation: CitationEntry) => {
           />
         </div>
 
+        <!-- "Add Another Reference" button at the top when references exist -->
+        <div v-if="filteredCitations.length > 0" class="flex justify-center pb-4">
+          <Button @click="openAddDialog" size="sm" variant="outline" class="w-full">
+            <Plus class="w-4 h-4 mr-2" />
+            Add Another Reference
+          </Button>
+        </div>
+
         <!-- No references message -->
         <div v-if="filteredCitations.length === 0" class="flex flex-col items-center justify-center py-8">
           <BookIcon class="h-12 w-12 text-muted-foreground/20 mb-4" />
@@ -715,7 +723,18 @@ const formatCitationDisplay = (citation: CitationEntry) => {
           <TabsContent value="bibtex">
             <div class="space-y-4">
               <div class="flex flex-col gap-2">
-                <Label for="bibtex">BibTeX</Label>
+                <div class="flex justify-between items-center">
+                  <Label for="bibtex">BibTeX</Label>
+                  <Button 
+                    variant="default" 
+                    size="sm" 
+                    @click="parseBibTex"
+                    class="bg-primary text-primary-foreground gap-1.5"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-text"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>
+                    Parse BibTeX
+                  </Button>
+                </div>
                 <Textarea 
                   id="bibtex" 
                   v-model="bibtexInput" 
@@ -723,10 +742,19 @@ const formatCitationDisplay = (citation: CitationEntry) => {
                   class="min-h-[200px] font-mono text-sm"
                 />
               </div>
-              <div class="text-xs text-muted-foreground">
-                <p>Paste a BibTeX entry to automatically fill in the citation details.</p>
-                <p class="mt-1">Example:</p>
-                <pre class="bg-muted p-2 rounded text-xs mt-1">@article{smith2023,
+              
+              <!-- Helpful text about import -->
+              <div class="p-3 border rounded-lg bg-muted/50">
+                <h4 class="text-sm font-medium mb-1">How to use BibTeX import</h4>
+                <ol class="text-xs text-muted-foreground space-y-1 ml-4 list-decimal">
+                  <li>Paste BibTeX content from your reference manager or academic database</li>
+                  <li>Click the <strong>Parse BibTeX</strong> button to extract reference data</li>
+                  <li>Review the extracted data in the Manual Entry tab</li>
+                  <li>Click Save to add the reference to your document</li>
+                </ol>
+                <div class="mt-3 text-xs text-muted-foreground">
+                  <p class="mb-1">Example BibTeX format:</p>
+                  <pre class="bg-muted p-2 rounded text-xs">@article{smith2023,
   author = {Smith, John and Doe, Jane},
   title = {Example Paper Title},
   journal = {Journal of Science},
@@ -735,14 +763,18 @@ const formatCitationDisplay = (citation: CitationEntry) => {
   number = {2},
   pages = {123--145}
 }</pre>
+                </div>
               </div>
-              <Button 
-                variant="outline" 
-                @click="parseBibTex"
-                class="mt-4"
-              >
-                Parse BibTeX
-              </Button>
+              
+              <!-- Floating action button for parsing -->
+              <div class="fixed bottom-20 right-8 z-10">
+                <Button 
+                  @click="parseBibTex"
+                  class="shadow-lg bg-primary text-primary-foreground hover:bg-primary/90 rounded-full w-12 h-12 flex items-center justify-center"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-wand-2"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>
+                </Button>
+              </div>
             </div>
           </TabsContent>
         </Tabs>
