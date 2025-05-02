@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import { TagsInput } from '@/components/ui/tags-input'
-import { RotateCw, CheckCircle, Star, Share2, Download, PlayCircle, Loader2, Save, Clock, Sparkles, Book, Server, Tag} from 'lucide-vue-next'
+import { RotateCw, CheckCircle, Star, Share2, Download, PlayCircle, Loader2, Save, Clock, Sparkles, Book, Server, Tag, Link2 } from 'lucide-vue-next'
 import { useNotaStore } from '@/stores/nota'
 import { useJupyterStore } from '@/stores/jupyterStore'
 import EditorToolbar from './EditorToolbar.vue'
@@ -147,6 +147,34 @@ const citationStore = useCitationStore()
 const router = useRouter()
 const autoSaveEnabled = ref(true)
 const showVersionHistory = ref(false)
+
+// New ref for tracking if shared session mode toggle is in progress
+const isTogglingSharedMode = ref(false)
+
+// Add method to toggle shared session mode
+const toggleSharedSessionMode = async () => {
+  if (isTogglingSharedMode.value) return
+  
+  isTogglingSharedMode.value = true
+  try {
+    const isEnabled = await codeExecutionStore.toggleSharedSessionMode(props.notaId)
+    const message = isEnabled 
+      ? 'Shared kernel session mode enabled. All code blocks will use the same session.'
+      : 'Manual session mode enabled. Each code block can use its own session.'
+    toast(message)
+    
+    // Force reload of cells to ensure they are associated with the right session
+    if (editor.value) {
+      // Register the code cells with the updated mode settings
+      codeExecutionStore.registerCodeCells(editor.value.getJSON(), props.notaId)
+    }
+  } catch (error) {
+    logger.error('Failed to toggle shared session mode:', error)
+    toast('Failed to toggle shared session mode')
+  } finally {
+    isTogglingSharedMode.value = false
+  }
+}
 
 const { sidebars, toggleSidebar, closeAllSidebars } = useSidebarManager()
 
@@ -927,6 +955,22 @@ defineExpose({
                 <rect x="9" y="3" width="6" height="4" rx="1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 <path d="M9 12h6M9 16h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
+            </Button>
+
+            <!-- Add shared session mode toggle button -->
+            <Button
+              variant="ghost"
+              size="sm"
+              class="flex items-center gap-2"
+              @click="toggleSharedSessionMode"
+              :class="{ 'bg-muted': codeExecutionStore.sharedSessionMode, 'opacity-80': isTogglingSharedMode }"
+              :title="codeExecutionStore.sharedSessionMode ? 'Shared kernel session enabled (Click to disable)' : 'Enable shared kernel session for all code blocks'"
+            >
+              <Link2 
+                class="h-4 w-4" 
+                :class="{ 'text-primary': codeExecutionStore.sharedSessionMode }"
+              />
+              <span v-if="isTogglingSharedMode" class="h-3 w-3 animate-spin rounded-full border-2 border-solid border-current border-r-transparent"></span>
             </Button>
           </div>
 

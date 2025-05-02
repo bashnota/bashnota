@@ -59,18 +59,38 @@ export class CodeExecutionService {
   }
 
   async createKernel(serverConfig: JupyterServer, kernelName: string): Promise<string> {
-    const response = await fetch(this.getUrlWithToken(serverConfig, '/api/kernels'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: kernelName }),
-    })
+    try {
+      const url = this.getUrlWithToken(serverConfig, '/api/kernels');
+      logger.log(`Creating kernel '${kernelName}' at ${url}`);
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: kernelName }),
+      });
 
-    if (!response.ok) {
-      throw new Error(`Failed to create kernel: ${response.statusText}`)
+      const responseText = await response.text();
+      
+      if (!response.ok) {
+        logger.error(`Failed to create kernel: Status ${response.status}`, responseText);
+        throw new Error(`Failed to create kernel: ${response.status} ${response.statusText}${responseText ? ` - ${responseText}` : ''}`);
+      }
+
+      try {
+        const data = JSON.parse(responseText);
+        logger.log(`Successfully created kernel with ID: ${data.id}`);
+        return data.id;
+      } catch (parseError) {
+        logger.error('Failed to parse kernel creation response:', responseText, parseError);
+        throw new Error('Invalid response format from Jupyter server');
+      }
+    } catch (error) {
+      logger.error('Error in kernel creation:', error);
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error(`Failed to create kernel: ${String(error)}`);
     }
-
-    const data = await response.json()
-    return data.id
   }
 
   async deleteKernel(serverConfig: JupyterServer, kernelId: string): Promise<void> {

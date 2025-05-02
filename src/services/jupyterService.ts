@@ -274,61 +274,53 @@ export class JupyterService {
     return result
   }
 
-  async testConnection(server: JupyterServer) {
+  async testConnection(server: JupyterServer): Promise<{ success: boolean; message: string }> {
     try {
-      // First, validate the server parameters
-      if (!server.ip) {
-        return {
-          success: false,
-          message: 'Server IP is required',
-        }
-      }
+      const protocol = server.ip.startsWith('http') ? '' : 'http://';
+      const baseUrl = `${protocol}${server.ip}:${server.port}`;
+      const url = server.token ? `${baseUrl}/api?token=${server.token}` : `${baseUrl}/api`;
       
-      if (!server.port) {
-        return {
-          success: false,
-          message: 'Server port is required',
-        }
-      }
+      logger.log(`Testing connection to Jupyter server at ${baseUrl}`);
       
-      // Test the API endpoint
-      try {
-        const response = await axios.get(this.getUrlWithToken(server, '/kernels'))
-        return {
-          success: true,
-          version: response.data.version,
-          message: 'Connected successfully',
-        }
-      } catch (error) {
-        let message = 'Connection failed'
-        
-        if (axios.isAxiosError(error)) {
-          if (error.code === 'ECONNREFUSED') {
-            message = 'Server is not reachable. Check IP and port settings.'
-          } else if (error.response?.status === 403) {
-            message = 'Authentication failed. Please check your token.'
-          } else if (error.response?.status === 401) {
-            message = 'Unauthorized. Please check your credentials.'
-          } else if (error.code === 'ETIMEDOUT') {
-            message = 'Connection timed out. Check if server is running.'
-          } else if (error.code === 'ENOTFOUND') {
-            message = 'Host not found. Check your server address.'
-          } else if (error.message) {
-            message = `Connection error: ${error.message}`
-          }
-          logger.error('Connection error:', error.message)
-        }
-        
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        // Add timeout to prevent long waiting periods
+        signal: AbortSignal.timeout(5000)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        logger.error(`Connection test failed (${response.status}):`, errorText);
         return {
           success: false,
-          message,
-        }
+          message: `Connection failed: ${response.status} ${response.statusText}`
+        };
       }
+
+      const data = await response.json();
+      logger.log('Connection test successful', data);
+      
+      return {
+        success: true,
+        message: 'Connection successful'
+      };
     } catch (error) {
+      let errorMessage = 'Connection failed';
+      
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        errorMessage = 'Could not connect to server. Please check the server address, port, and ensure the server is running.';
+      } else if (error instanceof DOMException && error.name === 'TimeoutError') {
+        errorMessage = 'Connection timed out. Server might be overloaded or unreachable.';
+      } else if (error instanceof Error) {
+        errorMessage = `Connection error: ${error.message}`;
+      }
+      
+      logger.error('Jupyter connection test error:', error);
       return {
         success: false,
-        message: 'An unexpected error occurred while testing the connection',
-      }
+        message: errorMessage
+      };
     }
   }
 

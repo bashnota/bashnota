@@ -4,6 +4,7 @@ import AppSidebar from './components/layout/AppSidebar.vue'
 import BreadcrumbNav from './components/layout/BreadcrumbNav.vue'
 import AppTabs from './components/layout/AppTabs.vue'
 import AuthHeader from './components/auth/AuthHeader.vue'
+import ServerSelectionDialogWrapper from './components/editor/jupyter/ServerSelectionDialogWrapper.vue'
 import { ref, onMounted, watch, onUnmounted, computed } from 'vue'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -168,7 +169,12 @@ const toggleBashHub = () => {
       </div>
     </div>
   </div>
+  
+  <!-- Toast notifications -->
   <Toaster />
+  
+  <!-- Global components that need to be available anywhere -->
+  <ServerSelectionDialogWrapper />
 </template>
 
 <style>
