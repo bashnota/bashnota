@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { useCodeExecution } from '@/composables/useCodeExecution'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
@@ -38,6 +38,7 @@ import FullScreenCodeBlock from './FullScreenCodeBlock.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
 import OutputRenderer from './OutputRenderer.vue'
 import { toast } from '@/lib/utils'
+import { useRoute } from 'vue-router'
 
 // Types
 interface Props {
@@ -51,6 +52,9 @@ interface Props {
   notaId: string
   kernelPreference?: KernelConfig | null
   isReadOnly?: boolean
+  isExecuting?: boolean
+  isPublished?: boolean
+  runningStatus?: 'idle' | 'running' | 'error' | 'success'
 }
 
 // Define props
@@ -86,7 +90,6 @@ const {
   // Methods
   handleServerSelect,
   handleKernelSelect,
-  handleSessionSelect,
   toggleCodeVisibility,
 } = useCodeBlockToolbar({
   isReadOnly: props.isReadOnly,
@@ -103,16 +106,34 @@ const executionInProgress = ref(false)
 const isCodeCopied = ref(false)
 
 // Computed
+
+// Enhanced readyToExecute with more visual feedback
 const isReadyToExecute = computed(() => {
+  // If currently executing, we're not ready
+  if (props.isExecuting || executionInProgress.value) {
+    return false;
+  }
+  
   // Always allow execution in shared mode
   if (isSharedSessionMode.value) {
-    return !executionInProgress.value
+    return true;
   }
   
   // In manual mode, require server and kernel
-  return !executionInProgress.value && selectedServer.value && 
+  return selectedServer.value && 
          selectedServer.value !== 'none' && 
-         selectedKernel.value
+         selectedKernel.value;
+})
+
+// New computed property for execution state classes
+const codeBlockClasses = computed(() => {
+  return { 
+    'ring-2 ring-primary': hasUnsavedChanges.value, 
+    'ring-2 ring-primary/40': isSharedSessionMode.value && cell?.value?.sessionId === sharedSessionId.value,
+    'executing-block': props.isExecuting || executionInProgress.value,
+    'error-block': cell?.value?.hasError,
+    'published-block': props.isPublished,
+  };
 })
 
 const availableServers = computed<JupyterServer[]>(() => {
@@ -135,13 +156,6 @@ const codeExecutionStore = useCodeExecutionStore()
 const jupyterStore = useJupyterStore()
 const executionService = new CodeExecutionService()
 const jupyterService = new JupyterService()
-
-// Computed properties
-const rootNotaId = computed(() => {
-  const currentNota = store.getCurrentNota(props.notaId)
-  if (!currentNota?.parentId) return props.notaId
-  return store.getRootNotaId(currentNota.parentId)
-})
 
 // Shared session mode
 const isSharedSessionMode = computed(() => codeExecutionStore.sharedSessionMode)
@@ -605,8 +619,9 @@ const createNewSession = async () => {
   }
 }
 
+// Update executeCode method to handle isExecuting prop
 const executeCode = async () => {
-  if (executionInProgress.value) return
+  if (props.isExecuting || executionInProgress.value) return;
   
   // Ensure servers are loaded before execution
   await refreshJupyterServers();
@@ -700,13 +715,82 @@ const { shortcuts } = useCodeBlockShortcuts({
   onExecute: executeCode,
   onToggleFullscreen: () => { isFullScreen.value = true }
 })
+
+// Track disabled state changes with debugging
+const route = useRoute()
+const isDisabled = computed(() => {
+  // Add direct console logging to help debug this issue
+  logger.log(`[CodeBlock ${props.id}] isDisabled computed:`, {
+    readonly: props.isReadOnly,
+    executionInProgress: executionInProgress.value,
+    isPublished: props.isPublished,
+    route: route.path
+  })
+  
+  // In published view, we never want to show the execution in progress state
+  if (props.isPublished) {
+    logger.log(`[CodeBlock ${props.id}] Published mode detected, disabling execution controls`)
+    return true // Force disabled state for published content
+  }
+  
+  return props.isReadOnly || executionInProgress.value
+})
+
+// Watch for execution state changes
+watch(() => executionInProgress.value, (newValue, oldValue) => {
+  logger.debug(`[CodeBlock ${props.id}] Execution state changed from ${oldValue} to ${newValue}`, {
+    readonly: props.isReadOnly,
+    isPublished: props.isPublished,
+    inStore: !!cell.value,
+    storeExecuting: cell.value?.isExecuting
+  })
+}, { immediate: true })
+
+const syncExecutionStateWithStore = () => {
+  if (cell.value) {
+    const storeState = !!cell.value.isExecuting
+
+    // In published mode, always ensure execution state is false regardless of store
+    if (props.isPublished) {
+      logger.debug(`[CodeBlock ${props.id}] Published mode detected, forcing execution state to false`)
+      executionInProgress.value = false
+      return
+    }
+    
+    // If store state is different from local state, log it
+    if (storeState !== executionInProgress.value) {
+      logger.debug(`[CodeBlock ${props.id}] Store execution state (${storeState}) differs from local state (${executionInProgress.value})`)
+      
+      // Update local state to match store (only when not in published mode)
+      executionInProgress.value = storeState
+    }
+  }
+}
+
+// Watch for changes to the cell in the store to update local execution state
+watch(cell, () => {
+  syncExecutionStateWithStore()
+}, { deep: true })
+
+onMounted(() => {
+  // Initialization debugging
+  logger.debug(`[CodeBlock ${props.id}] Mounted`, {
+    isPublished: props.isPublished,
+    readonly: props.isReadOnly,
+    hasSessionId: !!props.sessionId,
+    route: route.path
+  })
+  
+  // Check if we need to initialize execution state from store
+  syncExecutionStateWithStore()
+})
 </script>
 
 <template>
   <div
     ref="codeBlockRef"
     class="flex flex-col bg-card text-card-foreground rounded-lg overflow-hidden border shadow-sm transition-all duration-200"
-    :class="{ 'ring-2 ring-primary': hasUnsavedChanges, 'ring-2 ring-primary/40': isSharedSessionMode && cell?.sessionId === sharedSessionId }"
+    :class="codeBlockClasses"
   >
     <!-- Toolbar -->
     <div
@@ -724,11 +808,12 @@ const { shortcuts } = useCodeBlockShortcuts({
                 class="gap-2 h-8 relative"
                 :class="{ 
                   'bg-amber-500/20 hover:bg-amber-500/30': !selectedSession,
-                  'bg-blue-500/20 hover:bg-blue-500/30': isSharedSessionMode && selectedSession
+                  'bg-blue-500/20 hover:bg-blue-500/30': isSharedSessionMode && selectedSession,
+                  'opacity-70': isExecuting
                 }"
                 :title="isSharedSessionMode ? 'Using shared session mode' : selectedSession ? `Current Session: ${availableSessions.find(s => s.id === selectedSession)?.name || selectedSession}` : 'Select Session'"
                 aria-label="Session management"
-                :disabled="isSharedSessionMode"
+                :disabled="isSharedSessionMode || isExecuting"
               >
                 <Layers class="h-4 w-4" v-if="!isSharedSessionMode" />
                 <Link2 class="h-4 w-4" v-else />
@@ -884,6 +969,7 @@ const { shortcuts } = useCodeBlockShortcuts({
           @click="toggleCodeVisibility"
           :title="isCodeVisible ? 'Hide Code' : 'Show Code'"
           aria-label="Toggle code visibility"
+          :disabled="isExecuting && !isPublished"
         >
           <Eye v-if="!isCodeVisible" class="h-4 w-4" />
           <EyeOff v-else class="h-4 w-4" />
@@ -900,7 +986,8 @@ const { shortcuts } = useCodeBlockShortcuts({
                 :class="{
                   'bg-amber-500/20 hover:bg-amber-500/30':
                     !selectedServer || selectedServer === 'none' || !selectedKernel || selectedKernel === 'none',
-                  'bg-blue-500/20 hover:bg-blue-500/30': isSharedSessionMode
+                  'bg-blue-500/20 hover:bg-blue-500/30': isSharedSessionMode,
+                  'opacity-70': isExecuting
                 }"
                 :title="
                   isSharedSessionMode
@@ -910,7 +997,7 @@ const { shortcuts } = useCodeBlockShortcuts({
                     : 'Select Server & Kernel'
                 "
                 aria-label="Select server and kernel"
-                :disabled="isSharedSessionMode"
+                :disabled="isSharedSessionMode || isExecuting"
               >
                 <Server class="h-4 w-4" />
                 <Box v-if="selectedServer && selectedServer !== 'none'" class="h-4 w-4 ml-1" />
@@ -982,9 +1069,18 @@ const { shortcuts } = useCodeBlockShortcuts({
 
       <!-- Right toolbar group -->
       <div class="flex items-center gap-2">
-        <!-- Shared Session Indicator -->
+        <!-- Execution Status Indicator - hide in published mode -->
         <div
-          v-if="isSharedSessionMode"
+          v-if="(isExecuting || cell?.isExecuting) && !isPublished"
+          class="flex items-center text-xs text-primary gap-1 mr-2 px-2 py-0.5 rounded-full bg-primary/10"
+        >
+          <Loader2 class="h-3.5 w-3.5 animate-spin" />
+          <span>Executing...</span>
+        </div>
+
+        <!-- Shared Session Indicator - hide in published mode -->
+        <div
+          v-else-if="isSharedSessionMode && !isPublished"
           class="text-xs text-muted-foreground flex items-center gap-1.5 mr-2"
         >
           <Link2 class="h-3.5 w-3.5 text-blue-500" />
@@ -993,7 +1089,7 @@ const { shortcuts } = useCodeBlockShortcuts({
 
         <!-- Keyboard shortcuts (hidden in readonly) -->
         <div
-          v-if="!isReadOnly"
+          v-if="!isReadOnly && !isExecuting"
           class="hidden md:flex items-center text-xs text-muted-foreground mr-1 gap-2"
         >
           <div class="flex items-center">
@@ -1008,7 +1104,7 @@ const { shortcuts } = useCodeBlockShortcuts({
 
         <!-- Save Changes Button (hidden in readonly) -->
         <Button
-          v-if="!isReadOnly && hasUnsavedChanges"
+          v-if="!isReadOnly && hasUnsavedChanges && !isExecuting"
           variant="outline"
           size="sm"
           @click="saveChanges"
@@ -1039,13 +1135,13 @@ const { shortcuts } = useCodeBlockShortcuts({
           size="sm"
           :disabled="!isReadyToExecute"
           @click="executeCode"
-          class="h-8"
-          :title="cell?.isExecuting ? 'Executing...' : 'Run Code'"
+          class="h-8 min-w-[80px]"
+          :title="isExecuting || cell?.isExecuting ? 'Executing...' : 'Run Code'"
           aria-label="Run code"
         >
-          <Loader2 class="w-4 h-4 animate-spin mr-2" v-if="cell?.isExecuting" />
+          <Loader2 class="w-4 h-4 animate-spin mr-2" v-if="isExecuting || cell?.isExecuting" />
           <Play class="w-4 h-4 mr-2" v-else />
-          Run
+          {{ isExecuting || cell?.isExecuting ? 'Running...' : 'Run' }}
         </Button>
 
         <!-- Fullscreen Button (always available, even in readonly) -->
@@ -1056,17 +1152,20 @@ const { shortcuts } = useCodeBlockShortcuts({
           @click="isFullScreen = true"
           title="Full Screen Mode"
           aria-label="Full screen mode"
+          :disabled="isExecuting && !isPublished"
         >
           <Maximize2 class="h-4 w-4" />
         </Button>
       </div>
     </div>
 
-    <!-- Warning Banner (hidden in readonly) -->
+    <!-- Warning Banner (hidden in readonly and public mode) -->
     <div
       v-if="
         !isReadOnly &&
+        !isPublished &&
         !isSharedSessionMode && 
+        !isExecuting &&
         (!selectedServer ||
           selectedServer === 'none' ||
           !selectedKernel ||
@@ -1083,9 +1182,9 @@ const { shortcuts } = useCodeBlockShortcuts({
       </span>
     </div>
     
-    <!-- Shared Mode Info Banner -->
+    <!-- Shared Mode Info Banner - hidden in public mode -->
     <div
-      v-else-if="!isReadOnly && isSharedSessionMode && !selectedSession"
+      v-else-if="!isReadOnly && !isPublished && isSharedSessionMode && !selectedSession && !isExecuting"
       class="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800 border-b p-2 flex items-center text-xs text-blue-600 dark:text-blue-400"
     >
       <Link2 class="h-3 w-3 mr-2" />
@@ -1094,8 +1193,20 @@ const { shortcuts } = useCodeBlockShortcuts({
       </span>
     </div>
 
+    <!-- Executing Banner - hidden in public mode -->
+    <div
+      v-else-if="!isPublished && (isExecuting || cell?.isExecuting)"
+      class="bg-primary/5 dark:bg-primary/20 border-primary/20 dark:border-primary/30 border-b p-2 flex items-center justify-between text-xs text-primary-foreground"
+    >
+      <div class="flex items-center">
+        <Loader2 class="h-3 w-3 animate-spin mr-2" />
+        <span>Executing code...</span>
+      </div>
+    </div>
+
     <!-- Code Editor -->
     <div v-show="isCodeVisible" class="relative group">
+      <!-- Copy button overlay -->
       <div class="absolute right-2 top-2 z-10 opacity-0 transition-opacity group-hover:opacity-100">
         <Button
           variant="ghost"
@@ -1104,6 +1215,7 @@ const { shortcuts } = useCodeBlockShortcuts({
           class="h-8 w-8 p-0"
           title="Copy code to clipboard"
           aria-label="Copy code"
+          :disabled="isExecuting && !isPublished"
         >
           <Copy v-if="!isCodeCopied" class="h-4 w-4" />
           <Check v-else class="h-4 w-4" />
@@ -1113,8 +1225,10 @@ const { shortcuts } = useCodeBlockShortcuts({
       <CodeMirror
         v-model="codeValue"
         :language="language"
-        :disabled="cell?.isExecuting || isReadOnly"
+        :disabled="(cell?.isExecuting || isExecuting) && !isPublished"
         :readonly="isReadOnly"
+        :runningStatus="isPublished ? 'idle' : runningStatus"
+        :isPublished="isPublished"
         @update:modelValue="updateCode"
         maxHeight="300px"
         aria-label="Code editor"
@@ -1135,6 +1249,9 @@ const { shortcuts } = useCodeBlockShortcuts({
         :showControls="true"
         :isCollapsible="true"
         :maxHeight="'300px'"
+        :isLoading="isExecuting && !isPublished"
+        :originalCode="codeValue"
+        :isPublished="isPublished"
         @copy="copyOutput"
       />
     </div>
@@ -1147,8 +1264,9 @@ const { shortcuts } = useCodeBlockShortcuts({
       :outputType="cell?.hasError ? 'error' : undefined"
       :language="language"
       v-model:isOpen="isFullScreen"
-      :is-executing="cell?.isExecuting"
+      :is-executing="isExecuting && !isPublished"
       :is-read-only="isReadOnly"
+      :is-published="isPublished"
       @execute="executeCode"
     />
   </div>
@@ -1191,5 +1309,24 @@ div[v-html]::-webkit-scrollbar-thumb {
   .flex-wrap {
     flex-wrap: wrap;
   }
+}
+
+/* Enhance styles for different states */
+.executing-block {
+  @apply border-primary/30;
+  box-shadow: 0 0 0 2px rgba(var(--primary), 0.1);
+}
+
+.error-block {
+  @apply border-destructive/30;
+}
+
+.published-block {
+  @apply border shadow-sm;
+}
+
+/* Transition for status changes */
+.flex-col {
+  transition: all 0.3s ease;
 }
 </style>

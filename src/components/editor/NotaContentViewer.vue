@@ -25,6 +25,7 @@ const props = defineProps<{
   content: string | null
   readonly?: boolean
   citations?: any[] // Add citations prop
+  isPublished?: boolean // Add isPublished prop
 }>()
 
 // Define emits
@@ -70,12 +71,14 @@ const registerCodeCells = (content: any) => {
     const { attrs, content } = block
     const code = content ? content.map((c: any) => c.text).join('\n') : ''
 
+    // Add isPublished flag to cell data when registering
     codeExecutionStore.addCell({
       id: attrs.id,
       code,
       kernelName: attrs.kernelName,
       output: attrs.output,
       sessionId: attrs.sessionId,
+      isPublished: props.isPublished || false
     })
   })
 }

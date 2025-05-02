@@ -412,8 +412,8 @@ const executionTime = computed(() => {
       </div>
     </div>
     
-    <!-- Loading state -->
-    <div v-if="props.isLoading" class="output-loading">
+    <!-- Loading state - never show in published mode -->
+    <div v-if="props.isLoading && !props.isPublished" class="output-loading">
       <Loader2 class="loading-icon animate-spin" />
       <div class="loading-text">Executing code...</div>
     </div>

@@ -188,9 +188,9 @@ const containerClasses = computed(() => {
       }"
     />
     
-    <!-- Disabled overlay for better user feedback -->
+    <!-- Disabled overlay - Don't show when in published mode -->
     <div 
-      v-if="disabled" 
+      v-if="disabled && !isPublished" 
       class="absolute inset-0 bg-muted/20 backdrop-blur-[1px] pointer-events-none flex items-center justify-center z-10">
       <div class="text-sm text-muted-foreground bg-background/90 px-3 py-1.5 rounded-md shadow">
         Code execution in progress...

@@ -562,6 +562,7 @@ const handleContentRendered = () => {
         <NotaContentViewer 
           :content="nota.content" 
           :citations="nota.citations" 
+          :isPublished="true" 
           readonly 
           @content-rendered="handleContentRendered"
         />
