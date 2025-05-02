@@ -10,6 +10,7 @@ export interface CodeCell {
   isExecuting: boolean
   hasError: boolean
   error: Error | null
+  isPublished?: boolean // Flag to indicate this is a cell in a published nota
 }
 
 export interface KernelSession {

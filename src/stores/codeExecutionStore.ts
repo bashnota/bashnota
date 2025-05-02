@@ -350,7 +350,10 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
   }
 
   // Register code cells (keep existing logic)
-  const registerCodeCells = (content: any, notaId: string) => {
+  const registerCodeCells = (content: any, notaId: string, isPublished = false) => {
+    // Add direct console logging for debugging
+    console.log(`[CodeExecStore] Registering code cells for nota ${notaId}, isPublished=${isPublished}`)
+    
     const findCodeBlocks = (node: any): any[] => {
       const blocks = []
       if (node.type === 'executableCodeBlock') {
@@ -366,6 +369,8 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
 
     const codeBlocks = findCodeBlocks(content)
     const servers = jupyterStore.jupyterServers || []
+    
+    console.log(`[CodeExecStore] Found ${codeBlocks.length} code blocks in nota ${notaId}`)
 
     codeBlocks.forEach((block) => {
       const { attrs, content } = block
@@ -386,6 +391,8 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
         }
       }
 
+      console.log(`[CodeExecStore] Registering code block ${attrs.id}, isPublished=${isPublished}`)
+      
       addCell({
         id: attrs.id,
         code,
@@ -393,10 +400,13 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
         kernelName: attrs.kernelName,
         output: attrs.output,
         sessionId: attrs.sessionId,
+        isPublished: isPublished // Set the isPublished flag based on the parameter
       })
 
       // If in shared session mode, apply shared session to this cell
-      if (sharedSessionMode.value && !attrs.sessionId) {
+      // but ONLY if not published
+      if (sharedSessionMode.value && !attrs.sessionId && !isPublished) {
+        console.log(`[CodeExecStore] Applying shared session to block ${attrs.id}`)
         applySharedSessionToCell(attrs.id)
       }
     })
@@ -447,16 +457,19 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
   }
 
   // Cell Management
-  function addCell(cell: Omit<CodeCell, 'isExecuting' | 'hasError' | 'error'>) {
+  function addCell(cell: Omit<CodeCell, 'isExecuting' | 'hasError' | 'error'> & { isPublished?: boolean }) {
     cells.value.set(cell.id, {
       ...cell,
       isExecuting: false,
       hasError: false,
       error: null,
+      // Save isPublished flag in the cell data so components can use it to handle display differently
+      isPublished: cell.isPublished || false
     })
 
     // If in shared session mode and cell doesn't have a session, add it to the shared session
-    if (sharedSessionMode.value && !cell.sessionId) {
+    // Don't add published cells to the shared session as they're only for display
+    if (sharedSessionMode.value && !cell.sessionId && !cell.isPublished) {
       applySharedSessionToCell(cell.id)
     }
   }
