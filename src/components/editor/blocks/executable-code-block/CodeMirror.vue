@@ -9,6 +9,7 @@ import { html } from '@codemirror/lang-html'
 import { css } from '@codemirror/lang-css'
 import { json } from '@codemirror/lang-json'
 import { EditorView, lineNumbers } from '@codemirror/view'
+import { indentUnit } from '@codemirror/language'
 import { computed, ref, onMounted, watch, onUnmounted } from 'vue'
 
 const props = defineProps<{
@@ -21,6 +22,9 @@ const props = defineProps<{
   autofocus?: boolean
   runningStatus?: 'idle' | 'running' | 'error' | 'success'
   isPublished?: boolean
+  indentWithTab?: boolean
+  preserveIndent?: boolean
+  tabSize?: number
 }>()
 
 const emit = defineEmits<{
@@ -83,6 +87,7 @@ const extensions = computed(() => {
     lineNumbers(),
     EditorView.lineWrapping,
     isDark.value ? basicDark : basicLight,
+    indentUnit.of(' '.repeat(props.tabSize || 4))
   ]
 
   // Add language extension if available
@@ -90,9 +95,27 @@ const extensions = computed(() => {
     exts.push(languageExtension.value)
   }
 
-  // Add readonly extension if needed
+  // Add readonly/disabled extensions
   if (props.readonly || props.disabled) {
     exts.push(EditorView.editable.of(false))
+    // Add a custom extension to preserve indentation
+    exts.push(EditorView.theme({
+      '&.cm-disabled, &.cm-readonly': {
+        opacity: props.isPublished ? '1' : '0.7',
+        backgroundColor: props.isPublished ? 'var(--card)' : 'var(--muted)',
+        cursor: 'not-allowed'
+      },
+      '&.cm-disabled .cm-content, &.cm-readonly .cm-content': {
+        cursor: 'not-allowed',
+        userSelect: 'none'
+      },
+      '&.cm-disabled .cm-line, &.cm-readonly .cm-line': {
+        whiteSpace: 'pre'
+      },
+      '&.cm-disabled .cm-gutter, &.cm-readonly .cm-gutter': {
+        opacity: '1'
+      }
+    }))
   }
 
   return exts
@@ -178,7 +201,8 @@ const containerClasses = computed(() => {
       v-model="code"
       :extensions="extensions"
       :disabled="disabled"
-      :indent-with-tab="true"
+      :indent-with-tab="indentWithTab !== false"
+      :tab-size="tabSize || 4"
       placeholder="Enter code here..."
       :style="{ height: fullScreen ? '100%' : 'auto' }"
       :class="{
@@ -222,6 +246,7 @@ const containerClasses = computed(() => {
 /* Style for readonly editor */
 .cm-readonly .cm-content {
   caret-color: transparent;
+  white-space: pre !important;
 }
 
 .cm-readonly.cm-focused {
@@ -231,6 +256,29 @@ const containerClasses = computed(() => {
 /* Style for disabled editor */
 .cm-disabled {
   opacity: 0.75;
+}
+
+.cm-disabled .cm-content {
+  cursor: not-allowed;
+  user-select: none;
+  white-space: pre !important;
+}
+
+.cm-disabled .cm-line,
+.cm-readonly .cm-line {
+  white-space: pre !important;
+}
+
+/* Published mode specific styles */
+.cm-published.cm-readonly .cm-content,
+.cm-published.cm-disabled .cm-content {
+  white-space: pre !important;
+  opacity: 1;
+}
+
+.cm-published.cm-readonly .cm-line,
+.cm-published.cm-disabled .cm-line {
+  white-space: pre !important;
 }
 
 .codemirror-container.disabled {

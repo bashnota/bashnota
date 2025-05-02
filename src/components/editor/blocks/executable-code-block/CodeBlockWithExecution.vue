@@ -1236,7 +1236,6 @@ onMounted(() => {
         :preserve-indent="true"
         :tab-size="4"
         :line-numbers="true"
-        :auto-format="false"
       />
     </div>
 

@@ -235,12 +235,17 @@ function stopExecutionTimer() {
       >
         <CodeMirror
           :modelValue="code"
-          :language="language"
           @update:modelValue="onCodeUpdate"
-          :fullScreen="true"
-          :readonly="isReadOnly"
+          :language="language"
           :disabled="isExecuting"
-          aria-label="Code editor"
+          :readonly="isReadOnly"
+          :fullScreen="true"
+          :runningStatus="isExecuting ? 'running' : 'idle'"
+          :isPublished="isPublished"
+          :autofocus="true"
+          :indent-with-tab="true"
+          :preserve-indent="true"
+          :tab-size="4"
         />
         
         <!-- Overlay for executing state -->
