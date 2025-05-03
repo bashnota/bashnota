@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { Button } from '@/components/ui/button'
-import { Plus, Sparkles, Code2, FileText, MessagesSquare } from 'lucide-vue-next'
+import { Plus, Sparkles, Code2, FileText, MessagesSquare, LogIn, UserPlus } from 'lucide-vue-next'
 import { Card, CardContent } from '@/components/ui/card'
+import { useAuthStore } from '@/stores/auth'
+import { useRouter } from 'vue-router'
+
+const authStore = useAuthStore()
+const router = useRouter()
 
 defineEmits<{
   (e: 'create-nota'): void
@@ -10,6 +15,16 @@ defineEmits<{
 // Function to open Discord in a new tab
 const openDiscord = () => {
   window.open('https://discord.com/invite/2Gs2MTPGWd', '_blank')
+}
+
+// Handle login navigation
+const handleLogin = () => {
+  router.push('/login')
+}
+
+// Handle register navigation
+const handleRegister = () => {
+  router.push('/register')
 }
 </script>
 
@@ -21,7 +36,9 @@ const openDiscord = () => {
         <div class="space-y-2">
           <div class="inline-flex items-center rounded-full border bg-background/95 px-3 py-1 text-sm">
             <Sparkles class="mr-2 h-3.5 w-3.5 text-primary flex-shrink-0" />
-            <span class="text-muted-foreground truncate">Welcome to your smart workspace</span>
+            <span class="text-muted-foreground truncate">
+              {{ authStore.isAuthenticated ? 'Welcome back to your smart workspace' : 'Welcome to your smart workspace' }}
+            </span>
           </div>
           <h1 class="text-2xl sm:text-4xl font-bold tracking-tight">
             <div class="flex items-center gap-4">
@@ -31,7 +48,7 @@ const openDiscord = () => {
                 class="h-12 w-auto text-primary animate-pulse-subtle hover:animate-wiggle" 
               />
               <div>
-                Welcome to 
+                {{ authStore.isAuthenticated ? `Welcome back, ${authStore.currentUser?.displayName || 'User'}!` : 'Welcome to' }}
                 <span class="text-primary">BashNota</span>
               </div>
             </div>
@@ -51,8 +68,6 @@ const openDiscord = () => {
         </p>
       </div>
 
-
-
       <!-- Bottom Action -->
       <div class="mt-6 flex gap-3">
         <Button 
@@ -65,16 +80,31 @@ const openDiscord = () => {
           New Nota
         </Button>
         
-        <Button
-          @click="openDiscord"
-          size="lg"
-          variant="outline"
-          class="group relative overflow-hidden"
-        >
-          <div class="absolute inset-0 bg-primary opacity-0 group-hover:opacity-10 transition-opacity"></div>
-          <MessagesSquare class="h-5 w-5 mr-2 flex-shrink-0" />
-          Join our Discord
-        </Button>
+        <template v-if="authStore.isAuthenticated">
+          <Button
+            @click="openDiscord"
+            size="lg"
+            variant="outline"
+            class="group relative overflow-hidden"
+          >
+            <div class="absolute inset-0 bg-primary opacity-0 group-hover:opacity-10 transition-opacity"></div>
+            <MessagesSquare class="h-5 w-5 mr-2 flex-shrink-0" />
+            Join our Discord
+          </Button>
+        </template>
+        
+        <template v-else>
+          <Button
+            @click="handleLogin"
+            size="lg"
+            variant="outline"
+            class="group relative overflow-hidden"
+          >
+            <div class="absolute inset-0 bg-primary opacity-0 group-hover:opacity-10 transition-opacity"></div>
+            <LogIn class="h-5 w-5 mr-2 flex-shrink-0" />
+            Sign in / Register
+          </Button>
+        </template>
       </div>
     </div>
   </div>
