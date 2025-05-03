@@ -26,6 +26,7 @@ import { useEquationCounter, EQUATION_COUNTER_KEY } from '@/composables/useEquat
 import { useCitationStore } from '@/stores/citationStore'
 import { logger } from '@/services/logger'
 import MetadataSidebar from '@/components/sidebars/MetadataSidebar.vue'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
 
 // Define sidebar types for better type checking
 type SidebarPosition = 'left' | 'right';
@@ -916,91 +917,133 @@ defineExpose({
         <!-- Editor Info Bar -->
         <div class="flex items-center justify-between px-4 py-2 text-sm text-muted-foreground border-t">
           <div class="flex items-center gap-2">
-            <Button variant="ghost" size="sm" class="flex items-center gap-2"
-              @click="toggleSidebar('references')"
-              :class="{ 'bg-muted': sidebars.references.isOpen }" title="References (Ctrl+Shift+Alt+R)">
-              <BookIcon class="h-4 w-4" />
-            </Button>
+            <!-- Sidebars Dropdown -->
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" class="flex items-center gap-2">
+                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  </svg>
+                  <span>Sidebars</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem @click="toggleSidebar('references')" :class="{ 'bg-muted': sidebars.references.isOpen }">
+                  <BookIcon class="h-4 w-4 mr-2" />
+                  <span>References</span>
+                  <span class="ml-auto text-xs text-muted-foreground">Ctrl+Shift+Alt+R</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem @click="toggleSidebar('jupyter')" :class="{ 'bg-muted': sidebars.jupyter.isOpen }">
+                  <ServerIcon class="h-4 w-4 mr-2" />
+                  <span>Jupyter Servers</span>
+                  <span class="ml-auto text-xs text-muted-foreground">Ctrl+Shift+Alt+J</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem @click="toggleSidebar('ai')" :class="{ 'bg-muted': sidebars.ai.isOpen }">
+                  <BrainIcon class="h-4 w-4 mr-2" />
+                  <span>AI Assistant</span>
+                  <span class="ml-auto text-xs text-muted-foreground">Ctrl+Shift+Alt+I</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem @click="toggleSidebar('metadata')" :class="{ 'bg-muted': sidebars.metadata.isOpen }">
+                  <Tag class="h-4 w-4 mr-2" />
+                  <span>Metadata</span>
+                  <span class="ml-auto text-xs text-muted-foreground">Ctrl+Shift+Alt+L</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem @click="toggleSidebar('favorites')" :class="{ 'bg-muted': sidebars.favorites.isOpen }">
+                  <Star class="h-4 w-4 mr-2" />
+                  <span>Favorite Blocks</span>
+                  <span class="ml-auto text-xs text-muted-foreground">Ctrl+Shift+Alt+V</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem @click="toggleSidebar('toc')" :class="{ 'bg-muted': sidebars.toc.isOpen }">
+                  <svg class="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <rect x="9" y="3" width="6" height="4" rx="1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M9 12h6M9 16h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  <span>Table of Contents</span>
+                  <span class="ml-auto text-xs text-muted-foreground">Ctrl+Shift+Alt+O</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-            <Button variant="ghost" size="sm" class="flex items-center gap-2"
-              @click="toggleSidebar('jupyter')"
-              :class="{ 'bg-muted': sidebars.jupyter.isOpen }" title="Jupyter Servers (Ctrl+Shift+Alt+J)">
-              <ServerIcon class="h-4 w-4" />
-            </Button>
-
-            <Button variant="ghost" size="sm" class="flex items-center gap-2"
-              @click="toggleSidebar('ai')"
-              :class="{ 'bg-muted': sidebars.ai.isOpen }" title="AI Assistant (Ctrl+Shift+Alt+I)">
-              <BrainIcon class="h-4 w-4" />
-            </Button>
-
-            <Button variant="ghost" size="sm" class="flex items-center gap-2"
-              @click="toggleSidebar('metadata')"
-              :class="{ 'bg-muted': sidebars.metadata.isOpen }" title="Metadata (Ctrl+Shift+Alt+L)">
-              <Tag class="h-4 w-4" />
-            </Button>
-            
-            <Button variant="ghost" size="sm" class="flex items-center gap-2"
-              @click="toggleSidebar('favorites')"
-              :class="{ 'bg-muted': sidebars.favorites.isOpen }" title="Favorite Blocks (Ctrl+Shift+Alt+V)">
-              <Star class="h-4 w-4" />
-            </Button>
-
-            <Button variant="ghost" size="sm" class="flex items-center gap-2"
-              @click="toggleSidebar('toc')"
-              :class="{ 'bg-muted': sidebars.toc.isOpen }" title="Table of Contents (Ctrl+Shift+Alt+O)">
-              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <rect x="9" y="3" width="6" height="4" rx="1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M9 12h6M9 16h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </Button>
-
-            <!-- Add shared session mode toggle button -->
-            <Button
-              variant="ghost"
-              size="sm"
-              class="flex items-center gap-2"
-              @click="toggleSharedSessionMode"
-              :class="{ 'bg-muted': codeExecutionStore.sharedSessionMode, 'opacity-80': isTogglingSharedMode }"
-              :title="codeExecutionStore.sharedSessionMode ? 'Shared kernel session enabled (Click to disable)' : 'Enable shared kernel session for all code blocks'"
-            >
-              <Link2 
-                class="h-4 w-4" 
-                :class="{ 'text-primary': codeExecutionStore.sharedSessionMode }"
-              />
-              <span v-if="isTogglingSharedMode" class="h-3 w-3 animate-spin rounded-full border-2 border-solid border-current border-r-transparent"></span>
-            </Button>
+            <!-- Session Mode Dropdown -->
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" class="flex items-center gap-2">
+                  <Link2 class="h-4 w-4" :class="{ 'text-primary': codeExecutionStore.sharedSessionMode }" />
+                  <span>Session Mode</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem @click="toggleSharedSessionMode" :class="{ 'bg-muted': codeExecutionStore.sharedSessionMode }">
+                  <Link2 class="h-4 w-4 mr-2" :class="{ 'text-primary': codeExecutionStore.sharedSessionMode }" />
+                  <span>{{ codeExecutionStore.sharedSessionMode ? 'Disable' : 'Enable' }} Shared Session</span>
+                  <span class="ml-auto text-xs text-muted-foreground">
+                    {{ codeExecutionStore.sharedSessionMode ? 'All blocks share one session' : 'Each block has its own session' }}
+                  </span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           <!-- Action Buttons -->
           <div class="flex items-center gap-2">
-            <Button variant="ghost" size="icon" title="Save Version" @click="saveVersion" :disabled="isSavingVersion">
-              <span v-if="isSavingVersion"
-                class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent"></span>
-              <Save v-else class="w-4 h-4" />
-            </Button>
-            <Button variant="ghost" size="icon" title="History" @click="showVersionHistory = true">
-              <Clock class="w-4 h-4" />
-            </Button>
+            <!-- Version Control Dropdown -->
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" class="flex items-center gap-2">
+                  <Clock class="w-4 h-4" />
+                  <span>Version Control</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem @click="saveVersion" :disabled="isSavingVersion">
+                  <Save class="w-4 h-4 mr-2" />
+                  <span>Save Version</span>
+                  <span v-if="isSavingVersion" class="ml-auto">
+                    <span class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent"></span>
+                  </span>
+                </DropdownMenuItem>
+                <DropdownMenuItem @click="showVersionHistory = true">
+                  <Clock class="w-4 h-4 mr-2" />
+                  <span>View History</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-            <!-- Action Buttons -->
-            <Button v-if="canRunAll" variant="ghost" size="icon" title="Run All" :disabled="isExecutingAll"
-              @click="$emit('run-all')">
-              <Loader2 v-if="isExecutingAll" class="w-4 h-4 animate-spin" />
-              <PlayCircle v-else class="w-4 h-4" />
-            </Button>
-            <Button variant="ghost" size="icon" title="Star" @click="$emit('toggle-favorite')"
-              :class="{ 'text-yellow-500': isFavorite }">
-              <Star class="w-4 h-4" :fill="isFavorite ? 'currentColor' : 'none'" />
-            </Button>
-            <Button variant="ghost" size="icon" title="Share" @click="$emit('share')">
-              <Share2 class="w-4 h-4" />
-            </Button>
-            <Button variant="ghost" size="icon" title="Export" @click="$emit('export-nota')">
-              <Download class="w-4 h-4" />
-            </Button>
-            <span>{{ wordCount }} words</span>
+            <!-- Actions Dropdown -->
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" class="flex items-center gap-2">
+                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  </svg>
+                  <span>Actions</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem v-if="canRunAll" @click="$emit('run-all')" :disabled="isExecutingAll">
+                  <PlayCircle class="w-4 h-4 mr-2" />
+                  <span>Run All</span>
+                  <span v-if="isExecutingAll" class="ml-auto">
+                    <Loader2 class="w-4 h-4 animate-spin" />
+                  </span>
+                </DropdownMenuItem>
+                <DropdownMenuItem @click="$emit('toggle-favorite')">
+                  <Star class="w-4 h-4 mr-2" :fill="isFavorite ? 'currentColor' : 'none'" />
+                  <span>{{ isFavorite ? 'Remove from Favorites' : 'Add to Favorites' }}</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem @click="$emit('share')">
+                  <Share2 class="w-4 h-4 mr-2" />
+                  <span>Share</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem @click="$emit('export-nota')">
+                  <Download class="w-4 h-4 mr-2" />
+                  <span>Export</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <span class="text-sm text-muted-foreground">{{ wordCount }} words</span>
           </div>
         </div>
       </div>
