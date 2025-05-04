@@ -73,7 +73,7 @@ const headingLevels: { icon: FunctionalComponent; level: 1 | 2 | 3 }[] = [
 
 <template>
   <div v-if="editor" class="border-b">
-    <div class="flex flex-wrap items-center gap-1 p-1">
+    <div v-memo="[editor.isActive('heading'), editor.isActive('bold'), editor.isActive('italic'), editor.isActive('code'), editor.isActive('bulletList'), editor.isActive('orderedList'), editor.isActive('codeBlock'), editor.isActive('blockquote')]" class="flex flex-wrap items-center gap-1 p-1">
       <!-- History Group -->
       <div class="flex items-center">
         <Button

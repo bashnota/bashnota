@@ -27,6 +27,9 @@ import { useCitationStore } from '@/stores/citationStore'
 import { logger } from '@/services/logger'
 import MetadataSidebar from '@/components/sidebars/MetadataSidebar.vue'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
+import SidebarsDropdown from './SidebarsDropdown.vue'
+import SessionModeDropdown from './SessionModeDropdown.vue'
+import TopBarActions from './TopBarActions.vue'
 
 // Define sidebar types for better type checking
 type SidebarPosition = 'left' | 'right';
@@ -263,9 +266,70 @@ const editorSettings = reactive({
 // Get our shared extensions from the extensions module
 const editorExtensions = getEditorExtensions()
 
+// Add debounced save function
+const debouncedSave = ref<number | null>(null)
+
+// Function to save editor content
+const saveEditorContent = async () => {
+  // Before saving, sync the title from the first block
+  if (editor.value && currentNota.value) {
+    const json = editor.value.getJSON()
+    if (
+      json.content &&
+      json.content.length > 0 &&
+      json.content[0].type === 'heading' &&
+      json.content[0].attrs?.level === 1 &&
+      json.content[0].content &&
+      json.content[0].content[0]?.text
+    ) {
+      const newTitle = json.content[0].content[0].text.trim()
+      if (newTitle && newTitle !== currentNota.value.title) {
+        currentNota.value.title = newTitle
+      }
+    }
+  }
+  if (!editor.value) return
+
+  try {
+    emit('saving', true)
+    const content = editor.value.getJSON()
+
+    // Register/update code cells on content change
+    registerCodeCells(content)
+
+    // Save sessions whenever content updates
+    codeExecutionStore.saveSessions(props.notaId)
+
+    return notaStore
+      .saveNota({
+        id: props.notaId,
+        content: JSON.stringify(content),
+        updatedAt: new Date(),
+      })
+      .finally(() => {
+        emit('saving', false)
+      })
+  } catch (error) {
+    logger.error('Error saving content:', error)
+    emit('saving', false)
+    return Promise.reject(error)
+  }
+}
+
+// Debounced save function
+const debouncedSaveContent = () => {
+  if (debouncedSave.value) {
+    clearTimeout(debouncedSave.value)
+  }
+  debouncedSave.value = window.setTimeout(() => {
+    saveEditorContent()
+    debouncedSave.value = null
+  }, 1000) // 1 second delay
+}
+
+// Update editor options to use debounced save
 const editor = useEditor({
   content: content.value,
-
   extensions: editorExtensions,
   editorProps: {
     attributes: {
@@ -340,7 +404,7 @@ const editor = useEditor({
     })
     isLoading.value = false
   },
-  onUpdate: () => saveEditorContent(),
+  onUpdate: () => debouncedSaveContent(),
 })
 
 // Use a single unified width for all sidebars, but don't set a default
@@ -451,53 +515,6 @@ function applyEditorSettings(settings = editorSettings) {
 
 const isSaving = ref(false)
 const showSaved = ref(false)
-
-// Function to save editor content
-const saveEditorContent = async () => {
-  // Before saving, sync the title from the first block
-  if (editor.value && currentNota.value) {
-    const json = editor.value.getJSON()
-    if (
-      json.content &&
-      json.content.length > 0 &&
-      json.content[0].type === 'heading' &&
-      json.content[0].attrs?.level === 1 &&
-      json.content[0].content &&
-      json.content[0].content[0]?.text
-    ) {
-      const newTitle = json.content[0].content[0].text.trim()
-      if (newTitle && newTitle !== currentNota.value.title) {
-        currentNota.value.title = newTitle
-      }
-    }
-  }
-  if (!editor.value) return
-
-  try {
-    emit('saving', true)
-    const content = editor.value.getJSON()
-
-    // Register/update code cells on content change
-    registerCodeCells(content)
-
-    // Save sessions whenever content updates
-    codeExecutionStore.saveSessions(props.notaId)
-
-    return notaStore
-      .saveNota({
-        id: props.notaId,
-        content: JSON.stringify(content),
-        updatedAt: new Date(),
-      })
-      .finally(() => {
-        emit('saving', false)
-      })
-  } catch (error) {
-    logger.error('Error saving content:', error)
-    emit('saving', false)
-    return Promise.reject(error)
-  }
-}
 
 // Handle keyboard shortcuts for inserting blocks and toggling sidebars
 const handleKeyboardShortcuts = (event: KeyboardEvent) => {
@@ -721,6 +738,9 @@ onUnmounted(() => {
   window.removeEventListener('toggle-references', (() => { }) as EventListener)
   window.removeEventListener('activate-ai-assistant', (() => { }) as EventListener)
   codeExecutionStore.cleanup()
+  if (debouncedSave.value) {
+    clearTimeout(debouncedSave.value)
+  }
 })
 
 const isSavingVersion = ref(false)
@@ -909,80 +929,54 @@ defineExpose({
     <div class="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
       <!-- Editor Toolbar -->
       <div class="border-b bg-background sticky top-0 z-10">
-        <EditorToolbar v-if="editor" :editor="editor" class="px-4 py-2" :can-run-all="canRunAll"
-          :is-executing-all="isExecutingAll" @run-all="$emit('run-all')" :is-favorite="isFavorite"
-          @toggle-favorite="$emit('toggle-favorite')" @share="$emit('share')" @open-config="$emit('open-config')"
-          @export-nota="$emit('export-nota')" />
+        <div class="flex items-center justify-between px-4 py-2">
+          <EditorToolbar 
+            v-if="editor" 
+            v-memo="[editor, canRunAll, isExecutingAll, isFavorite]"
+            :editor="editor" 
+            class="flex-1" 
+            :can-run-all="canRunAll"
+            :is-executing-all="isExecutingAll" 
+            @run-all="$emit('run-all')" 
+            :is-favorite="isFavorite"
+            @toggle-favorite="$emit('toggle-favorite')" 
+            @open-config="$emit('open-config')"
+            @export-nota="$emit('export-nota')" 
+          />
+        </div>
 
         <!-- Editor Info Bar -->
-        <div class="flex items-center justify-between px-4 py-2 text-sm text-muted-foreground border-t">
+        <div v-memo="[wordCount, isSaving, showSaved]" class="flex items-center justify-between px-4 py-2 text-sm text-muted-foreground border-t">
           <div class="flex items-center gap-2">
-            <!-- Sidebars Dropdown -->
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" class="flex items-center gap-2">
-                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                  </svg>
-                  <span>Sidebars</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem @click="toggleSidebar('references')" :class="{ 'bg-muted': sidebars.references.isOpen }">
-                  <BookIcon class="h-4 w-4 mr-2" />
-                  <span>References</span>
-                  <span class="ml-auto text-xs text-muted-foreground">Ctrl+Shift+Alt+R</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem @click="toggleSidebar('jupyter')" :class="{ 'bg-muted': sidebars.jupyter.isOpen }">
-                  <ServerIcon class="h-4 w-4 mr-2" />
-                  <span>Jupyter Servers</span>
-                  <span class="ml-auto text-xs text-muted-foreground">Ctrl+Shift+Alt+J</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem @click="toggleSidebar('ai')" :class="{ 'bg-muted': sidebars.ai.isOpen }">
-                  <BrainIcon class="h-4 w-4 mr-2" />
-                  <span>AI Assistant</span>
-                  <span class="ml-auto text-xs text-muted-foreground">Ctrl+Shift+Alt+I</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem @click="toggleSidebar('metadata')" :class="{ 'bg-muted': sidebars.metadata.isOpen }">
-                  <Tag class="h-4 w-4 mr-2" />
-                  <span>Metadata</span>
-                  <span class="ml-auto text-xs text-muted-foreground">Ctrl+Shift+Alt+L</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem @click="toggleSidebar('favorites')" :class="{ 'bg-muted': sidebars.favorites.isOpen }">
-                  <Star class="h-4 w-4 mr-2" />
-                  <span>Favorite Blocks</span>
-                  <span class="ml-auto text-xs text-muted-foreground">Ctrl+Shift+Alt+V</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem @click="toggleSidebar('toc')" :class="{ 'bg-muted': sidebars.toc.isOpen }">
-                  <svg class="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    <rect x="9" y="3" width="6" height="4" rx="1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    <path d="M9 12h6M9 16h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                  <span>Table of Contents</span>
-                  <span class="ml-auto text-xs text-muted-foreground">Ctrl+Shift+Alt+O</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <!-- Table of Contents Button -->
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              class="flex items-center gap-2"
+              @click="toggleSidebar('toc')"
+            >
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <rect x="9" y="3" width="6" height="4" rx="1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M9 12h6M9 16h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span>Table of Contents</span>
+            </Button>
 
-            <!-- Session Mode Dropdown -->
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" class="flex items-center gap-2">
-                  <Link2 class="h-4 w-4" :class="{ 'text-primary': codeExecutionStore.sharedSessionMode }" />
-                  <span>Session Mode</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem @click="toggleSharedSessionMode" :class="{ 'bg-muted': codeExecutionStore.sharedSessionMode }">
-                  <Link2 class="h-4 w-4 mr-2" :class="{ 'text-primary': codeExecutionStore.sharedSessionMode }" />
-                  <span>{{ codeExecutionStore.sharedSessionMode ? 'Disable' : 'Enable' }} Shared Session</span>
-                  <span class="ml-auto text-xs text-muted-foreground">
-                    {{ codeExecutionStore.sharedSessionMode ? 'All blocks share one session' : 'Each block has its own session' }}
-                  </span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <!-- Session Mode Button -->
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              class="flex items-center gap-2"
+              @click="toggleSharedSessionMode"
+              :disabled="isTogglingSharedMode"
+            >
+              <Sparkles class="w-4 h-4" />
+              <span>{{ codeExecutionStore.sharedSessionMode ? 'Shared Session' : 'Manual Session' }}</span>
+              <span v-if="isTogglingSharedMode" class="ml-auto">
+                <span class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent"></span>
+              </span>
+            </Button>
           </div>
 
           <!-- Action Buttons -->
@@ -1032,10 +1026,6 @@ defineExpose({
                   <Star class="w-4 h-4 mr-2" :fill="isFavorite ? 'currentColor' : 'none'" />
                   <span>{{ isFavorite ? 'Remove from Favorites' : 'Add to Favorites' }}</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem @click="$emit('share')">
-                  <Share2 class="w-4 h-4 mr-2" />
-                  <span>Share</span>
-                </DropdownMenuItem>
                 <DropdownMenuItem @click="$emit('export-nota')">
                   <Download class="w-4 h-4 mr-2" />
                   <span>Export</span>
@@ -1057,7 +1047,7 @@ defineExpose({
               <!-- The title is now the first block inside the editor -->
               <editor-content :editor="editor" />
               <!-- Tags and Save Status below title -->
-              <div class="flex items-center gap-4 mt-2">
+              <div v-memo="[currentNota?.tags, isSaving, showSaved]" class="flex items-center gap-4 mt-2">
                 <TagsInput v-if="currentNota" v-model="currentNota.tags" class="w-full border-none" />
                 <div class="flex items-center text-xs text-muted-foreground transition-opacity duration-200"
                   :class="{ 'opacity-0': !isSaving && !showSaved }">
@@ -1172,5 +1162,38 @@ defineExpose({
 body.sidebar-resizing {
   cursor: ew-resize !important;
   user-select: none !important;
+}
+
+/* Add these styles at the end of the file */
+.dropdown-content {
+  transform-origin: var(--radix-dropdown-menu-content-transform-origin);
+  animation: scaleIn 0.1s ease-out;
+  will-change: transform, opacity;
+}
+
+.dropdown-content-open {
+  animation: scaleIn 0.1s ease-out;
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Optimize dropdown menu performance */
+[data-radix-popper-content-wrapper] {
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+}
+
+[data-radix-popper-content-wrapper] > * {
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
 }
 </style>

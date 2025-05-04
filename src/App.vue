@@ -3,8 +3,8 @@ import { RouterView, useRouter, useRoute } from 'vue-router'
 import AppSidebar from './components/layout/AppSidebar.vue'
 import BreadcrumbNav from './components/layout/BreadcrumbNav.vue'
 import AppTabs from './components/layout/AppTabs.vue'
-import AuthHeader from './components/auth/AuthHeader.vue'
 import ServerSelectionDialogWrapper from './components/editor/jupyter/ServerSelectionDialogWrapper.vue'
+import TopBarActions from './components/editor/TopBarActions.vue'
 import { ref, onMounted, watch, onUnmounted, computed } from 'vue'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -12,6 +12,15 @@ import Toaster from '@/components/ui/toast/Toaster.vue'
 import { useAuthStore } from '@/stores/auth'
 import { Menu, Home, Globe } from 'lucide-vue-next'
 import { logger } from '@/services/logger'
+
+// Define sidebar types
+type SidebarId = 'toc' | 'references' | 'jupyter' | 'ai' | 'metadata' | 'favorites';
+
+interface SidebarState {
+  isOpen: boolean;
+}
+
+type SidebarsState = Record<SidebarId, SidebarState>;
 
 const isSidebarOpen = ref(false)
 const sidebarWidth = ref(300)
@@ -22,6 +31,20 @@ const router = useRouter()
 
 // Check if we're in BashHub view
 const isInBashHub = computed(() => route.name === 'bashhub')
+
+// Add props for TopBarActions with proper typing
+const sidebars = ref<SidebarsState>({
+  toc: { isOpen: false },
+  references: { isOpen: false },
+  jupyter: { isOpen: false },
+  ai: { isOpen: false },
+  metadata: { isOpen: false },
+  favorites: { isOpen: false }
+})
+
+const toggleSidebar = (id: SidebarId) => {
+  sidebars.value[id].isOpen = !sidebars.value[id].isOpen
+}
 
 onMounted(async () => {
   // Initialize auth state
@@ -144,7 +167,7 @@ const toggleBashHub = () => {
             <BreadcrumbNav />
           </div>
           
-          <!-- BashHub Toggle Button -->
+          <!-- Top Bar Actions -->
           <div class="flex items-center gap-2">
             <Button
               variant="outline"
@@ -156,6 +179,11 @@ const toggleBashHub = () => {
               <Home v-else class="h-4 w-4 mr-2" />
               {{ isInBashHub ? 'Community Hub' : 'My Notas' }}
             </Button>
+            <TopBarActions
+              :sidebars="sidebars"
+              :on-toggle-sidebar="toggleSidebar"
+              :on-share="() => {}"
+            />
           </div>
         </div>
       </div>
