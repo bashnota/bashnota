@@ -15,12 +15,6 @@ service cloud.firestore {
       return tag.matches('^[a-zA-Z0-9_]{3,30}$');
     }
     
-    // Check if a user already has a tag
-    function userAlreadyHasTag(uid) {
-      return exists(/databases/$(database)/documents/userTags) &&
-             exists(/databases/$(database)/documents/userTags/$(uid));
-    }
-    
     // User collection rules
     match /users/{userId} {
       // Allow users to read and write their own data
@@ -42,7 +36,7 @@ service cloud.firestore {
                      request.resource.data.uid == request.auth.uid &&
                      isValidUserTag(tag) &&
                      // Check that there's no document in userTags collection with this UID
-                     !exists(/databases/$(database)/documents/userTags/$(request.auth.uid));
+                     !existsAfter(/databases/$(database)/documents/userTags/$(request.auth.uid));
                      
       allow update: if isAuthenticated() && 
                      resource.data.uid == request.auth.uid &&
@@ -78,10 +72,13 @@ service cloud.firestore {
             .hasOnly(['viewCount', 'uniqueViewers', 'lastViewedAt', 'referrers', 'stats', 'likeCount', 'dislikeCount', 'votes', 'commentCount']) &&
           // User can only update their own vote in the votes map
           (
-            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['votes']) ||
-            request.resource.data.votes.diff(resource.data.votes || {}).affectedKeys().hasOnly([request.auth.uid])
-          ) &&
-          request.auth != null
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['votes']) || 
+            (resource.data.votes == null && 
+             ('votes' in request.resource.data) && 
+             request.resource.data.votes.keys().hasOnly([request.auth.uid])) ||
+            (resource.data.votes != null && 
+             request.resource.data.votes.diff(resource.data.votes).affectedKeys().hasOnly([request.auth.uid]))
+          )
         )
       );
       allow delete: if isAuthenticated() && resource.data.authorId == request.auth.uid;
@@ -155,7 +152,11 @@ service cloud.firestore {
          // User can only update their own vote in the votes map
          (
            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['votes']) ||
-           request.resource.data.votes.diff(resource.data.votes || {}).affectedKeys().hasOnly([request.auth.uid])
+           (resource.data.votes == null && 
+            ('votes' in request.resource.data) && 
+            request.resource.data.votes.keys().hasOnly([request.auth.uid])) ||
+           (resource.data.votes != null && 
+            request.resource.data.votes.diff(resource.data.votes).affectedKeys().hasOnly([request.auth.uid]))
          ))
       );
       
