@@ -139,7 +139,7 @@ watch(
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <Share2 class="h-5 w-5" />
-          Share Nota
+          Publish Nota
         </DialogTitle>
         <DialogDescription>
           Publish your nota to make it accessible via a public link
@@ -147,8 +147,17 @@ watch(
       </DialogHeader>
 
       <div class="space-y-6 py-4">
+        <!-- No nota selected message -->
+        <div v-if="!notaId" class="flex flex-col items-center gap-4 py-4">
+          <div class="bg-amber-50 text-amber-800 p-4 rounded-md text-center">
+            <p class="font-medium">No nota selected</p>
+            <p class="text-sm mt-1">Please open a nota first before publishing</p>
+          </div>
+          <Button @click="handleClose">Close</Button>
+        </div>
+
         <!-- Login required message -->
-        <div v-if="!isAuthenticated" class="flex flex-col items-center gap-4 py-4">
+        <div v-else-if="!isAuthenticated" class="flex flex-col items-center gap-4 py-4">
           <div class="bg-amber-50 text-amber-800 p-4 rounded-md text-center">
             <p class="font-medium">You need to be logged in to publish</p>
             <p class="text-sm mt-1">Please log in or create an account to share your nota</p>
@@ -156,7 +165,7 @@ watch(
           <Button @click="$router.push('/login')">Login</Button>
         </div>
 
-        <!-- Publishing toggle (only when authenticated) -->
+        <!-- Publishing toggle (only when authenticated and nota selected) -->
         <div v-else class="flex items-center justify-between">
           <div class="space-y-0.5">
             <div class="flex items-center gap-2">
@@ -287,7 +296,8 @@ watch(
         </div>
       </div>
 
-      <DialogFooter>
+      <!-- Only show footer if a nota is selected -->
+      <DialogFooter v-if="notaId">
         <Button @click="handleClose">Close</Button>
       </DialogFooter>
     </DialogContent>

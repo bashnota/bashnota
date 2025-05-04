@@ -5,6 +5,7 @@ import BreadcrumbNav from './components/layout/BreadcrumbNav.vue'
 import AppTabs from './components/layout/AppTabs.vue'
 import ServerSelectionDialogWrapper from './components/editor/jupyter/ServerSelectionDialogWrapper.vue'
 import TopBarActions from './components/editor/TopBarActions.vue'
+import PublishNotaModal from './components/editor/PublishNotaModal.vue'
 import { ref, onMounted, watch, onUnmounted, computed } from 'vue'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -29,6 +30,16 @@ const authStore = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 
+// Publish modal state
+const showPublishModal = ref(false)
+const currentNotaId = computed(() => {
+  // Extract nota ID from route if available
+  if (route.name === 'nota' && route.params.id) {
+    return String(route.params.id)
+  }
+  return ''
+})
+
 // Check if we're in BashHub view
 const isInBashHub = computed(() => route.name === 'bashhub')
 
@@ -44,6 +55,16 @@ const sidebars = ref<SidebarsState>({
 
 const toggleSidebar = (id: SidebarId) => {
   sidebars.value[id].isOpen = !sidebars.value[id].isOpen
+}
+
+// Function to open publish modal
+const openPublishModal = () => {
+  console.log('[DEBUG] openPublishModal called');
+  console.log('[DEBUG] Current nota ID:', currentNotaId.value);
+  
+  // Always open the modal, regardless of nota ID
+  console.log('[DEBUG] Setting showPublishModal to true');
+  showPublishModal.value = true;
 }
 
 onMounted(async () => {
@@ -182,7 +203,7 @@ const toggleBashHub = () => {
             <TopBarActions
               :sidebars="sidebars"
               :on-toggle-sidebar="toggleSidebar"
-              :on-share="() => {}"
+              :on-share="openPublishModal"
             />
           </div>
         </div>
@@ -203,6 +224,12 @@ const toggleBashHub = () => {
   
   <!-- Global components that need to be available anywhere -->
   <ServerSelectionDialogWrapper />
+  
+  <!-- Share Nota Dialog -->
+  <PublishNotaModal 
+    v-model:open="showPublishModal" 
+    :nota-id="currentNotaId" 
+  />
 </template>
 
 <style>
