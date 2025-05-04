@@ -556,6 +556,7 @@ const handleKeyboardShortcuts = (event: KeyboardEvent) => {
           attrs: { latex: '' },
         })
         .run(),
+    d: () => editor.value!.chain().focus().setMermaid({ content: 'graph TD;\nA-->B;' }).run(),
     y: () =>
       editor.value!.chain().focus().setYoutube('https://www.youtube.com/watch?v=dQw4w9WgXcQ').run(),
     f: () => editor.value!.chain().focus().setSubfigure().run(),

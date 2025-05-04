@@ -22,6 +22,7 @@ import { ExecutableCodeBlockExtension } from './ExecutableCodeBlockExtension'
 import { TableExtension } from './TableExtension'
 import { MathExtension } from './MathExtension'
 import { MarkdownExtension } from './MarkdownExtension'
+import { Mermaid } from './mermaid'
 import { Youtube } from './youtube'
 import { SubfigureExtension } from '../blocks'
 import GlobalDragHandle from './DragHandlePlugin'
@@ -96,6 +97,11 @@ export function getEditorExtensions() {
       shouldShow: () => true,
     }),
     MarkdownExtension,
+    Mermaid.configure({
+      HTMLAttributes: {
+        class: 'mermaid-block',
+      },
+    }),
     Youtube,
     SubfigureExtension,
     TaskList,
@@ -155,6 +161,11 @@ export function getViewerExtensions() {
     }),
     MathExtension,
     MarkdownExtension,
+    Mermaid.configure({
+      HTMLAttributes: {
+        class: 'mermaid-block',
+      },
+    }),
     Youtube,
     SubfigureExtension,
     TaskList,
