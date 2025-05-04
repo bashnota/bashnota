@@ -981,6 +981,27 @@ defineExpose({
 
           <!-- Action Buttons -->
           <div class="flex items-center gap-2">
+            <!-- Run All Button -->
+            <Button v-if="canRunAll" variant="ghost" size="sm" class="flex items-center gap-2" @click="$emit('run-all')" :disabled="isExecutingAll">
+              <PlayCircle class="w-4 h-4" />
+              <span>Run All</span>
+              <span v-if="isExecutingAll" class="ml-auto">
+                <Loader2 class="w-4 h-4 animate-spin" />
+              </span>
+            </Button>
+            
+            <!-- Favorite Button -->
+            <Button variant="ghost" size="sm" class="flex items-center gap-2" @click="$emit('toggle-favorite')">
+              <Star class="w-4 h-4" :fill="isFavorite ? 'currentColor' : 'none'" />
+              <span>{{ isFavorite ? 'Unfavorite' : 'Favorite' }}</span>
+            </Button>
+            
+            <!-- Export Button -->
+            <Button variant="ghost" size="sm" class="flex items-center gap-2" @click="$emit('export-nota')">
+              <Download class="w-4 h-4" />
+              <span>Export</span>
+            </Button>
+
             <!-- Version Control Dropdown -->
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -1004,36 +1025,7 @@ defineExpose({
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <!-- Actions Dropdown -->
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" class="flex items-center gap-2">
-                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                  </svg>
-                  <span>Actions</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem v-if="canRunAll" @click="$emit('run-all')" :disabled="isExecutingAll">
-                  <PlayCircle class="w-4 h-4 mr-2" />
-                  <span>Run All</span>
-                  <span v-if="isExecutingAll" class="ml-auto">
-                    <Loader2 class="w-4 h-4 animate-spin" />
-                  </span>
-                </DropdownMenuItem>
-                <DropdownMenuItem @click="$emit('toggle-favorite')">
-                  <Star class="w-4 h-4 mr-2" :fill="isFavorite ? 'currentColor' : 'none'" />
-                  <span>{{ isFavorite ? 'Remove from Favorites' : 'Add to Favorites' }}</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem @click="$emit('export-nota')">
-                  <Download class="w-4 h-4 mr-2" />
-                  <span>Export</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <span class="text-sm text-muted-foreground">{{ wordCount }} words</span>
+            <span class="text-sm text-muted-foreground ml-2">{{ wordCount }} words</span>
           </div>
         </div>
       </div>
