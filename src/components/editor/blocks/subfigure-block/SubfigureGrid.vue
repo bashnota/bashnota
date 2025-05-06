@@ -59,38 +59,60 @@ const gridColumns = computed(() => {
   return props.gridColumns || 2
 })
 
+// Memoize subfigure labels to prevent recalculation
+const subfigureLabels = new Map<number, string>()
+
 // Helper methods
 const getSubfigureLabel = (index: number) => {
+  // Return cached label if available
+  if (subfigureLabels.has(index)) {
+    return subfigureLabels.get(index)!
+  }
+  
   // Handle null or undefined mainLabel
   if (!props.mainLabel) {
-    return `Figure X${String.fromCharCode(97 + index)}`;
+    const label = `Figure X${String.fromCharCode(97 + index)}`;
+    subfigureLabels.set(index, label);
+    return label;
   }
   
   // Extract the figure number from the main label if it exists and matches the pattern
   const mainFigureMatch = props.mainLabel.match(/^Figure (\d+)$/);
   const mainFigureNumber = mainFigureMatch?.[1];
   
+  let label: string;
   if (mainFigureNumber) {
     // If we have a main figure number, create subfigure label with the letter suffix
     // Example: "Figure 1a", "Figure 1b", etc.
-    return `Figure ${mainFigureNumber}${String.fromCharCode(97 + index)}`;
+    label = `Figure ${mainFigureNumber}${String.fromCharCode(97 + index)}`;
   } else {
     // If there's a custom main label but no extractable number, append the letter
-    return `${props.mainLabel}${String.fromCharCode(97 + index)}`;
+    label = `${props.mainLabel}${String.fromCharCode(97 + index)}`;
   }
+  
+  // Cache the label
+  subfigureLabels.set(index, label);
+  return label;
 }
 
 // Update methods
 const updateSubfigure = (index: number, updatedSubfig: SubfigureData) => {
-  const newSubfigures = [...props.subfigures]
-  newSubfigures[index] = updatedSubfig
-  emit('update:subfigures', newSubfigures)
+  // Only emit if the subfigure actually changed
+  if (JSON.stringify(props.subfigures[index]) !== JSON.stringify(updatedSubfig)) {
+    const newSubfigures = [...props.subfigures]
+    newSubfigures[index] = updatedSubfig
+    emit('update:subfigures', newSubfigures)
+  }
 }
 
 const removeSubfigure = (index: number) => {
   const newSubfigures = [...props.subfigures]
   newSubfigures.splice(index, 1)
   emit('update:subfigures', newSubfigures)
+  // Clear cached labels for all subfigures after the removed one
+  for (let i = index; i < subfigureLabels.size; i++) {
+    subfigureLabels.delete(i)
+  }
 }
 
 // Handle multiple files uploaded at once

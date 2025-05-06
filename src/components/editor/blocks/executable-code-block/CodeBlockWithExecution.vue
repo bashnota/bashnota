@@ -710,11 +710,6 @@ const copyCode = () => {
   }
 }
 
-// Initialize code block shortcuts
-const { shortcuts } = useCodeBlockShortcuts({
-  onExecute: executeCode,
-  onToggleFullscreen: () => { isFullScreen.value = true }
-})
 
 // Track disabled state changes with debugging
 const route = useRoute()
