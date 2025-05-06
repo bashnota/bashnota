@@ -131,13 +131,13 @@ const isOnlySubfigure = computed(() => {
 
 // Watch for external changes
 watch(
-  () => props.subfigure,
+  () => props.subfigure.caption,
   (newValue) => {
-    if (newValue.caption !== localCaption.value) {
-      localCaption.value = newValue.caption || ''
+    if (newValue !== localCaption.value) {
+      localCaption.value = newValue || ''
     }
   },
-  { deep: true, immediate: true }
+  { immediate: true }
 )
 
 // Image preview methods

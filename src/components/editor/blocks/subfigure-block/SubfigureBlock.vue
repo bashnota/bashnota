@@ -81,6 +81,12 @@ const figureNumber = computed(() => {
   const pos = typeof props.getPos === 'function' ? props.getPos() : null;
   if (pos === null) return 1;
   
+  // Cache the count in a WeakMap to avoid recalculating
+  const cacheKey = `${doc.content.size}-${pos}`;
+  if (figureNumberCache.has(cacheKey)) {
+    return figureNumberCache.get(cacheKey)!;
+  }
+  
   // Find all subfigure nodes before this one
   doc.descendants((node, nodePos) => {
     if (nodePos >= pos) {
@@ -94,9 +100,13 @@ const figureNumber = computed(() => {
     return true;
   });
   
-  // Return the figure number (1-based)
+  // Cache the result
+  figureNumberCache.set(cacheKey, count + 1);
   return count + 1;
 })
+
+// Cache for figure numbers
+const figureNumberCache = new Map<string, number>();
 
 // Calculate auto-generated figure label
 const autoFigureLabel = computed(() => {
@@ -189,23 +199,25 @@ onMounted(() => {
     })
   }
   
-  // Always trigger auto-numbering by setting label to empty string
-  props.updateAttributes({
-    label: '',  // Empty string will trigger auto-label
-  })
+  // Only set label to empty if it's not already set
+  if (props.node.attrs.label === undefined) {
+    props.updateAttributes({
+      label: '',  // Empty string will trigger auto-label
+    })
+  }
   
   window.addEventListener('keydown', handleKeydown)
 })
 
 // Watch for position changes and update figure label if needed
 watch(figureNumber, (newNumber) => {
-  // Update the caption data if we're using auto-numbering (empty label)
-  if (!attrs.value.label && !isReadOnly.value) {
+  // Only update if we're using auto-numbering and the number has actually changed
+  if (!attrs.value.label && !isReadOnly.value && newNumber !== figureNumber.value) {
     props.updateAttributes({
       label: '',  // Keep it empty to maintain auto-numbering
     })
   }
-})
+}, { immediate: false }) // Don't run on mount
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
