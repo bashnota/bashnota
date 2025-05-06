@@ -219,13 +219,4 @@ const effectiveLabel = computed(() => {
     return autoFigureLabel.value;
   }
 })
-
-// Track when the effective label changes
-watch(effectiveLabel, (newLabel) => {
-  // Trigger an update of subfigure labels when the main label changes
-  if (hasVisibleSubfigures.value) {
-    const subfigures = [...attrs.value.subfigures];
-    updateSubfigures(subfigures);
-  }
-})
 </script>

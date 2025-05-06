@@ -204,6 +204,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
     // If turning off, just disable and return
     if (sharedSessionMode.value) {
       sharedSessionMode.value = false;
+      sharedSessionId.value = null;
       await saveSessions(notaId);
       return false;
     }
@@ -211,26 +212,9 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
     // Turn on shared mode
     sharedSessionMode.value = true;
     
-    // Check if we already have a valid shared session
-    const sessionId = sharedSessionId.value;
-    const session = sessionId ? kernelSessions.value.get(sessionId) : undefined;
-    
-    if (session?.serverConfig && Object.keys(session.serverConfig).length > 0 && session.kernelName) {
-      // We already have a configured shared session, just save and return
-      logger.log('Using existing shared session configuration');
-      await saveSessions(notaId);
-      return true;
-    }
-    
-    // We need to configure the shared session - open the server selection dialog
-    return new Promise((resolve) => {
-      // Store the resolution function and nota ID
-      serverDialogState.resolveFn = resolve;
-      serverDialogState.notaId = notaId;
-      
-      // Show the server selection dialog
-      serverDialogState.isOpen = true;
-    });
+    // Save the mode change
+    await saveSessions(notaId);
+    return true;
   }
 
   // Get or create a shared session
@@ -315,44 +299,64 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
     return sharedSessionId.value;
   }
 
-  // Apply shared session settings to a cell
-  async function applySharedSessionToCell(cellId: string): Promise<void> {
-    if (!sharedSessionMode.value) return
-
-    const sessionId = await ensureSharedSession()
+  // Apply shared session to a cell
+  const applySharedSessionToCell = (cellId: string) => {
+    logger.log(`[CodeExecStore] Applying shared session to cell ${cellId}`);
+    
+    // Get the cell
     const cell = cells.value.get(cellId)
-    const session = kernelSessions.value.get(sessionId)
-
-    if (cell && session) {
-      // Add cell to shared session
-      if (!cell.sessionId || cell.sessionId !== sessionId) {
-        // Remove from previous session if needed
-        if (cell.sessionId && cell.sessionId !== sessionId) {
-          removeCellFromSession(cellId, cell.sessionId)
-        }
-
-        // Add to shared session
-        addCellToSession(cellId, sessionId)
-        
-        // Update cell with session's server config and kernel name if available
-        if (session.serverConfig && Object.keys(session.serverConfig).length > 0) {
-          cell.serverConfig = session.serverConfig
-        }
-        
-        if (session.kernelName) {
-          cell.kernelName = session.kernelName
-        }
-        
-        // Update the cell
-        cells.value.set(cellId, { ...cell })
-      }
+    if (!cell) {
+      logger.warn(`[CodeExecStore] Cell ${cellId} not found when applying shared session`);
+      return
     }
+
+    // If cell already has the shared session, skip
+    if (cell.sessionId === sharedSessionId.value) {
+      logger.log(`[CodeExecStore] Cell ${cellId} already has shared session ${sharedSessionId.value}`);
+      return;
+    }
+
+    // If cell has a different session, don't change it
+    if (cell.sessionId && cell.sessionId !== sharedSessionId.value) {
+      logger.log(`[CodeExecStore] Cell ${cellId} has different session ${cell.sessionId}, not changing`);
+      return;
+    }
+
+    // If no shared session exists, create one
+    if (!sharedSessionId.value) {
+      logger.log(`[CodeExecStore] Creating new shared session for cell ${cellId}`);
+      const sessionId = `session-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`
+      sharedSessionId.value = sessionId
+      
+      // Ensure we have a valid server config
+      const serverConfig = cell.serverConfig || {
+        ip: 'localhost',
+        port: '8888',
+        token: ''
+      }
+      
+      kernelSessions.value.set(sessionId, {
+        id: sessionId,
+        serverConfig,
+        kernelName: cell.kernelName,
+        kernelId: '',  // Will be set when kernel is created
+        cells: [],
+        name: `Shared Session ${sessionId}`
+      })
+    }
+
+    // Update cell with shared session
+    logger.log(`[CodeExecStore] Updating cell ${cellId} with shared session ${sharedSessionId.value}`);
+    cells.value.set(cellId, {
+      ...cell,
+      sessionId: sharedSessionId.value
+    })
   }
 
   // Register code cells (keep existing logic)
   const registerCodeCells = (content: any, notaId: string, isPublished = false) => {
     // Add direct console logging for debugging
-    console.log(`[CodeExecStore] Registering code cells for nota ${notaId}, isPublished=${isPublished}`)
+    logger.log(`[CodeExecStore] Registering code cells for nota ${notaId}, isPublished=${isPublished}`);
     
     const findCodeBlocks = (node: any): any[] => {
       const blocks = []
@@ -370,11 +374,22 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
     const codeBlocks = findCodeBlocks(content)
     const servers = jupyterStore.jupyterServers || []
     
-    console.log(`[CodeExecStore] Found ${codeBlocks.length} code blocks in nota ${notaId}`)
+    logger.log(`[CodeExecStore] Found ${codeBlocks.length} code blocks in nota ${notaId}`)
+
+    // Track which cells we've processed to avoid duplicates
+    const processedCells = new Set<string>();
+    // Track which sessions we've created to avoid duplicates
+    const createdSessions = new Map<string, string>();
 
     codeBlocks.forEach((block) => {
       const { attrs, content } = block
       const code = content ? content.map((c: any) => c.text).join('\n') : ''
+
+      // Skip if we've already processed this cell
+      if (processedCells.has(attrs.id)) {
+        return;
+      }
+      processedCells.add(attrs.id);
 
       const serverID = attrs.serverID ? getURLWithoutProtocol(attrs.serverID).split(':') : null
       const server = serverID
@@ -391,23 +406,29 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
         }
       }
 
-      console.log(`[CodeExecStore] Registering code block ${attrs.id}, isPublished=${isPublished}`)
+      logger.log(`[CodeExecStore] Registering code block ${attrs.id}, isPublished=${isPublished}`);
       
-      addCell({
+      // Only update cell if it doesn't exist or has changed
+      const existingCell = cells.value.get(attrs.id);
+      const newCell = {
         id: attrs.id,
         code,
         serverConfig: server,
         kernelName: attrs.kernelName,
         output: attrs.output,
         sessionId: attrs.sessionId,
-        isPublished: isPublished // Set the isPublished flag based on the parameter
-      })
+        isPublished: isPublished
+      };
 
-      // If in shared session mode, apply shared session to this cell
-      // but ONLY if not published
-      if (sharedSessionMode.value && !attrs.sessionId && !isPublished) {
-        console.log(`[CodeExecStore] Applying shared session to block ${attrs.id}`)
-        applySharedSessionToCell(attrs.id)
+      if (!existingCell || JSON.stringify(existingCell) !== JSON.stringify(newCell)) {
+        addCell(newCell);
+
+        // If in shared session mode, apply shared session to this cell
+        // but ONLY if not published and not already in a session
+        if (sharedSessionMode.value && !attrs.sessionId && !isPublished) {
+          logger.log(`[CodeExecStore] Applying shared session to block ${attrs.id}`);
+          applySharedSessionToCell(attrs.id);
+        }
       }
     })
   }
@@ -537,104 +558,94 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
       kernelName: cell.kernelName
     })
 
-    // Verify or set serverConfig and kernelName for cells in shared mode
+    // Handle shared session mode at execution time
     if (sharedSessionMode.value) {
-      const sharedSession = kernelSessions.value.get(sharedSessionId.value || '')
-      
-      // Check if shared session exists but has invalid configuration
-      if (sharedSession) {
-        // Try to repair the session if it has missing or invalid configuration
-        if (!sharedSession.kernelName || sharedSession.kernelName === 'none' || 
-            !sharedSession.serverConfig || Object.keys(sharedSession.serverConfig).length === 0) {
-          
-          logger.warn('Shared session has invalid configuration, attempting to repair');
-          
-          try {
-            // Get the first available server
-            const servers = jupyterStore.jupyterServers || [];
-            if (servers.length > 0) {
-              const server = servers[0];
-              logger.log(`Using server ${server.ip}:${server.port} to repair shared session`);
-              
-              // Test connection first
-              const jupyterService = new JupyterService();
-              const testResult = await jupyterService.testConnection(server);
-              
-              if (testResult.success) {
-                // Get available kernels
-                const availableKernels = await jupyterService.getAvailableKernels(server);
-                
-                if (availableKernels && availableKernels.length > 0) {
-                  // Prefer Python kernel if available, otherwise use first kernel
-                  const pythonKernel = availableKernels.find(k => 
-                    k.spec?.language?.toLowerCase() === 'python' || 
-                    k.name.toLowerCase().includes('python')
-                  ) || availableKernels[0];
-                  
-                  // Update session with server config and kernel
-                  sharedSession.serverConfig = server;
-                  sharedSession.kernelName = pythonKernel.name;
-                  kernelSessions.value.set(sharedSessionId.value!, { ...sharedSession });
-                  
-                  logger.log(`Repaired shared session with server ${server.ip}:${server.port} and kernel ${pythonKernel.name}`);
-                  
-                  // Now also create the kernel if it doesn't exist
-                  if (!sharedSession.kernelId) {
-                    await createKernelSession(server, pythonKernel.name, sharedSessionId.value!);
-                    logger.log('Created new kernel for shared session');
-                  }
-                  
-                  // Update the cell if it's part of the shared session
-                  if (cell.sessionId === sharedSessionId.value) {
-                    cell.serverConfig = server;
-                    cell.kernelName = pythonKernel.name;
-                    cells.value.set(cellId, { ...cell });
-                    logger.log('Updated cell with repaired shared session configuration');
-                  }
-                } else {
-                  throw new Error('No kernels available on the server');
-                }
-              } else {
-                throw new Error(`Server connection failed: ${testResult.message}`);
-              }
-            } else {
-              throw new Error('No servers available to repair shared session');
-            }
-          } catch (error) {
-            logger.error('Failed to repair shared session:', error);
-            cell.hasError = true;
-            cell.error = error instanceof Error ? error : new Error('Failed to repair shared session');
-            cell.output = 'Error: Failed to repair shared session. Try disabling and re-enabling shared mode.';
-            cells.value.set(cellId, { ...cell });
-            return;
-          }
-        }
-
-        // Check if cell belongs to shared session and needs to be updated with the session's config
-        if (cell.sessionId === sharedSessionId.value) {
-          // Ensure cell has the shared session's config
-          cell.serverConfig = sharedSession.serverConfig;
-          cell.kernelName = sharedSession.kernelName;
-          cells.value.set(cellId, { ...cell });
-        }
-      } else if (sharedSessionId.value) {
-        // Shared session doesn't exist but we have a session ID - try to recreate it
-        logger.warn('Shared session ID exists but session is missing, recreating');
-        try {
-          await ensureSharedSession();
-          // Try again with the newly created session
-          return executeCell(cellId);
-        } catch (error) {
-          logger.error('Failed to recreate shared session:', error);
+      // If no shared session exists yet, create one
+      if (!sharedSessionId.value) {
+        logger.log(`Creating new shared session for execution`);
+        const sessionId = `session-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`
+        sharedSessionId.value = sessionId
+        
+        // Get available servers
+        const servers = jupyterStore.jupyterServers || [];
+        if (servers.length === 0) {
+          logger.error('No Jupyter servers available for shared session');
           cell.hasError = true;
-          cell.error = error instanceof Error ? error : new Error('Shared session missing');
-          cell.output = 'Error: Shared session could not be recreated. Try disabling and re-enabling shared mode.';
+          cell.error = new Error('No Jupyter servers available');
+          cell.output = 'Error: No Jupyter servers available. Please add a server first.';
           cells.value.set(cellId, { ...cell });
           return;
         }
+
+        // Try each server until we find one that works
+        let selectedServer = null;
+        let selectedKernel = null;
+
+        for (const server of servers) {
+          try {
+            // Test connection
+            const jupyterService = new JupyterService();
+            const testResult = await jupyterService.testConnection(server);
+            
+            if (!testResult.success) {
+              logger.warn(`Server ${server.ip}:${server.port} connection test failed`);
+              continue;
+            }
+
+            // Get available kernels
+            const availableKernels = await jupyterStore.getAvailableKernels(server);
+            if (availableKernels && availableKernels.length > 0) {
+              // Prefer Python kernel if available
+              selectedKernel = availableKernels.find(k => 
+                k.spec?.language?.toLowerCase() === 'python' || 
+                k.name.toLowerCase().includes('python')
+              ) || availableKernels[0];
+              
+              selectedServer = server;
+              break;
+            }
+          } catch (error) {
+            logger.warn(`Error testing server ${server.ip}:${server.port}:`, error);
+            continue;
+          }
+        }
+
+        if (!selectedServer || !selectedKernel) {
+          logger.error('Could not find a working server with available kernels');
+          cell.hasError = true;
+          cell.error = new Error('No working servers with kernels available');
+          cell.output = 'Error: Could not find a working server with available kernels.';
+          cells.value.set(cellId, { ...cell });
+          return;
+        }
+
+        // Create the shared session
+        kernelSessions.value.set(sessionId, {
+          id: sessionId,
+          serverConfig: selectedServer,
+          kernelName: selectedKernel.name,
+          kernelId: '',  // Will be set when kernel is created
+          cells: [],
+          name: `Shared Session ${sessionId}`
+        });
+
+        logger.log(`Created shared session with server ${selectedServer.ip}:${selectedServer.port} and kernel ${selectedKernel.name}`);
       }
+
+      // Get the shared session
+      const session = kernelSessions.value.get(sharedSessionId.value);
+      if (!session) {
+        logger.error('Shared session not found after creation');
+        return;
+      }
+
+      // Update cell with shared session info
+      cell.sessionId = sharedSessionId.value;
+      cell.serverConfig = session.serverConfig;
+      cell.kernelName = session.kernelName;
+      cells.value.set(cellId, { ...cell });
     }
-    
+
     // Verify cell has required configuration
     if (!cell.serverConfig) {
       logger.error(`Cannot execute cell: No server configuration for cell ${cellId}`);

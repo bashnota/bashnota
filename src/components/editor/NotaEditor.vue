@@ -26,6 +26,7 @@ import { useEquationCounter, EQUATION_COUNTER_KEY } from '@/composables/useEquat
 import { useCitationStore } from '@/stores/citationStore'
 import { logger } from '@/services/logger'
 import MetadataSidebar from '@/components/sidebars/MetadataSidebar.vue'
+import { useDebounceFn } from '@vueuse/core'
 
 // Define sidebar types for better type checking
 type SidebarPosition = 'left' | 'right';
@@ -151,30 +152,38 @@ const showVersionHistory = ref(false)
 // New ref for tracking if shared session mode toggle is in progress
 const isTogglingSharedMode = ref(false)
 
-// Add method to toggle shared session mode
-const toggleSharedSessionMode = async () => {
-  if (isTogglingSharedMode.value) return
+// Add ref to track last saved content
+const lastSavedContent = ref<string>('')
+
+// Add debounced save function
+const debouncedSave = useDebounceFn(async () => {
+  if (!editor.value) return;
   
-  isTogglingSharedMode.value = true
   try {
-    const isEnabled = await codeExecutionStore.toggleSharedSessionMode(props.notaId)
-    const message = isEnabled 
-      ? 'Shared kernel session mode enabled. All code blocks will use the same session.'
-      : 'Manual session mode enabled. Each code block can use its own session.'
-    toast(message)
-    
-    // Force reload of cells to ensure they are associated with the right session
-    if (editor.value) {
-      // Register the code cells with the updated mode settings
-      codeExecutionStore.registerCodeCells(editor.value.getJSON(), props.notaId)
+    emit('saving', true);
+    const content = editor.value.getJSON();
+
+    // Only register code cells if content has changed
+    const currentContent = JSON.stringify(content);
+    if (currentContent !== lastSavedContent.value) {
+      lastSavedContent.value = currentContent;
+      registerCodeCells(content, props.notaId);
     }
+
+    // Save sessions whenever content updates
+    await codeExecutionStore.saveSessions(props.notaId);
+
+    await notaStore.saveNota({
+      id: props.notaId,
+      content: JSON.stringify(content),
+      updatedAt: new Date(),
+    });
   } catch (error) {
-    logger.error('Failed to toggle shared session mode:', error)
-    toast('Failed to toggle shared session mode')
+    logger.error('Error saving content:', error);
   } finally {
-    isTogglingSharedMode.value = false
+    emit('saving', false);
   }
-}
+}, 1000);
 
 const { sidebars, toggleSidebar, closeAllSidebars } = useSidebarManager()
 
@@ -207,7 +216,7 @@ const content = computed(() => {
   return doc
 })
 
-const registerCodeCells = (content: any) => {
+const registerCodeCells = (content: any, notaId: string) => {
   // Find all executable code blocks in the content
   const findCodeBlocks = (node: any): any[] => {
     const blocks = []
@@ -264,7 +273,6 @@ const editorExtensions = getEditorExtensions()
 
 const editor = useEditor({
   content: content.value,
-
   extensions: editorExtensions,
   editorProps: {
     attributes: {
@@ -320,7 +328,9 @@ const editor = useEditor({
     codeExecutionStore.loadSavedSessions(props.notaId)
 
     // Then register code cells which will associate them with sessions
-    registerCodeCells(editor.getJSON())
+    const content = editor.getJSON()
+    lastSavedContent.value = JSON.stringify(content)
+    registerCodeCells(content, props.notaId)
 
     // Update citation numbers
     updateCitationNumbers()
@@ -339,7 +349,10 @@ const editor = useEditor({
     })
     isLoading.value = false
   },
-  onUpdate: () => saveEditorContent(),
+  onUpdate: () => {
+    // Use debounced save to prevent too frequent updates
+    debouncedSave()
+  },
 })
 
 // Use a single unified width for all sidebars, but don't set a default
@@ -451,69 +464,41 @@ function applyEditorSettings(settings = editorSettings) {
 const isSaving = ref(false)
 const showSaved = ref(false)
 
-// Function to save editor content
-const saveEditorContent = async () => {
-  // Before saving, sync the title from the first block
-  if (editor.value && currentNota.value) {
-    const json = editor.value.getJSON()
-    if (
-      json.content &&
-      json.content.length > 0 &&
-      json.content[0].type === 'heading' &&
-      json.content[0].attrs?.level === 1 &&
-      json.content[0].content &&
-      json.content[0].content[0]?.text
-    ) {
-      const newTitle = json.content[0].content[0].text.trim()
-      if (newTitle && newTitle !== currentNota.value.title) {
-        currentNota.value.title = newTitle
-      }
-    }
-  }
-  if (!editor.value) return
-
+// Optimize toggleSharedSessionMode
+const toggleSharedSessionMode = async () => {
+  if (isTogglingSharedMode.value) return;
+  
+  isTogglingSharedMode.value = true;
   try {
-    emit('saving', true)
-    const content = editor.value.getJSON()
-
-    // Register/update code cells on content change
-    registerCodeCells(content)
-
-    // Save sessions whenever content updates
-    codeExecutionStore.saveSessions(props.notaId)
-
-    return notaStore
-      .saveNota({
-        id: props.notaId,
-        content: JSON.stringify(content),
-        updatedAt: new Date(),
-      })
-      .finally(() => {
-        emit('saving', false)
-      })
+    const isEnabled = await codeExecutionStore.toggleSharedSessionMode(props.notaId);
+    const message = isEnabled 
+      ? 'Shared kernel session mode enabled. All code blocks will use the same session.'
+      : 'Manual session mode enabled. Each code block can use its own session.';
+    toast(message);
   } catch (error) {
-    logger.error('Error saving content:', error)
-    emit('saving', false)
-    return Promise.reject(error)
+    logger.error('Failed to toggle shared session mode:', error);
+    toast('Failed to toggle shared session mode');
+  } finally {
+    isTogglingSharedMode.value = false;
   }
-}
+};
 
 // Handle keyboard shortcuts for inserting blocks and toggling sidebars
 const handleKeyboardShortcuts = (event: KeyboardEvent) => {
   // Check if editor is initialized
-  if (!editor.value) return
+  if (!editor.value) return;
 
   // Skip if target is a CodeMirror editor
   if (event.target instanceof HTMLElement) {
-    const isCodeMirrorFocused = event.target.closest('.cm-editor') !== null
-    if (isCodeMirrorFocused) return
+    const isCodeMirrorFocused = event.target.closest('.cm-editor') !== null;
+    if (isCodeMirrorFocused) return;
   }
 
   // Only process Ctrl+Shift+Alt combinations
-  if (!(event.ctrlKey && event.shiftKey && event.altKey)) return
+  if (!(event.ctrlKey && event.shiftKey && event.altKey)) return;
 
   // Prevent default browser behavior
-  event.preventDefault()
+  event.preventDefault();
 
   // Map of key to insertion functions
   const insertionMap: Record<string, () => void> = {
@@ -547,7 +532,7 @@ const handleKeyboardShortcuts = (event: KeyboardEvent) => {
     g: () => editor.value!.chain().focus().insertDrawIo().run(),
     b: () => {
       if (currentNota.value?.id) {
-        editor.value!.chain().focus().insertNotaTable(currentNota.value.id).run()
+        editor.value!.chain().focus().insertNotaTable(currentNota.value.id).run();
       }
     },
     a: () => editor.value!.chain().focus().insertInlineAIGeneration().run(),
@@ -560,12 +545,12 @@ const handleKeyboardShortcuts = (event: KeyboardEvent) => {
               const node = editor.value!.schema.nodes.paragraph.create(
                 null,
                 editor.value!.schema.text('New text block')
-              )
-              tr.insert(tr.doc.content.size, node)
+              );
+              tr.insert(tr.doc.content.size, node);
             }
-            return true
+            return true;
           })
-          .run()
+          .run();
       }
     },
     
@@ -576,13 +561,13 @@ const handleKeyboardShortcuts = (event: KeyboardEvent) => {
     v: () => toggleSidebar('favorites'), // v for favorites
     o: () => toggleSidebar('toc'),      // o for outline/toc
     l: () => toggleSidebar('metadata'),  // l for labels/metadata
-  }
+  };
 
-  const key = event.key.toLowerCase()
+  const key = event.key.toLowerCase();
   if (insertionMap[key]) {
-    insertionMap[key]()
+    insertionMap[key]();
   }
-}
+};
 
 onMounted(() => {
   // Add keyboard shortcut event listener
@@ -769,7 +754,7 @@ const insertSubNotaLink = (subNotaId: string, subNotaTitle: string) => {
       .run()
 
     // Save the content after inserting the link
-    saveEditorContent()
+    debouncedSave()
   }
 }
 
