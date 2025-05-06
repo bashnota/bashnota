@@ -18,7 +18,7 @@ service cloud.firestore {
     // User collection rules
     match /users/{userId} {
       // Allow users to read and write their own data
-      allow read: if isUserAuthenticated(userId);
+      allow read: if isAuthenticated();
       allow create: if isUserAuthenticated(userId);
       allow update: if isUserAuthenticated(userId) && 
                      (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['uid']));
