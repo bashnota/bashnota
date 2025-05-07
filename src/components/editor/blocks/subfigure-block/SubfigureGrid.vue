@@ -3,9 +3,10 @@
     class="grid gap-6"
     :class="{
       'grid-cols-1': layout === 'vertical',
-      'horizontal-layout': layout === 'horizontal'
+      'horizontal-layout': layout === 'horizontal',
+      'grid-layout': layout === 'grid'
     }"
-    :style="layout === 'grid' ? { gridTemplateColumns: `repeat(${gridColumns}, 1fr)` } : {}"
+    :style="gridStyle"
   >
     <SubfigureItem
       v-for="(subfig, index) in subfigures"
@@ -46,7 +47,7 @@ const props = defineProps<{
   isLocked: boolean
   isReadOnly: boolean
   mainLabel: string
-  gridColumns?: number
+  gridColumns: number
 }>()
 
 const emit = defineEmits<{
@@ -54,13 +55,18 @@ const emit = defineEmits<{
   'unlock': []
 }>()
 
-// Generate the appropriate class for grid columns
-const gridColumns = computed(() => {
-  return props.gridColumns || 2
-})
-
 // Memoize subfigure labels to prevent recalculation
 const subfigureLabels = new Map<number, string>()
+
+// Compute grid style based on layout and columns
+const gridStyle = computed(() => {
+  if (props.layout === 'grid') {
+    return {
+      gridTemplateColumns: `repeat(${props.gridColumns}, 1fr)`
+    }
+  }
+  return {}
+})
 
 // Helper methods
 const getSubfigureLabel = (index: number) => {
@@ -71,28 +77,22 @@ const getSubfigureLabel = (index: number) => {
   
   // Handle null or undefined mainLabel
   if (!props.mainLabel) {
-    const label = `Figure X${String.fromCharCode(97 + index)}`;
-    subfigureLabels.set(index, label);
-    return label;
+    const label = `Figure X${String.fromCharCode(97 + index)}`
+    subfigureLabels.set(index, label)
+    return label
   }
   
   // Extract the figure number from the main label if it exists and matches the pattern
-  const mainFigureMatch = props.mainLabel.match(/^Figure (\d+)$/);
-  const mainFigureNumber = mainFigureMatch?.[1];
+  const mainFigureMatch = props.mainLabel.match(/^Figure (\d+)$/)
+  const mainFigureNumber = mainFigureMatch?.[1]
   
-  let label: string;
-  if (mainFigureNumber) {
-    // If we have a main figure number, create subfigure label with the letter suffix
-    // Example: "Figure 1a", "Figure 1b", etc.
-    label = `Figure ${mainFigureNumber}${String.fromCharCode(97 + index)}`;
-  } else {
-    // If there's a custom main label but no extractable number, append the letter
-    label = `${props.mainLabel}${String.fromCharCode(97 + index)}`;
-  }
+  const label = mainFigureNumber
+    ? `Figure ${mainFigureNumber}${String.fromCharCode(97 + index)}`
+    : `${props.mainLabel}${String.fromCharCode(97 + index)}`
   
   // Cache the label
-  subfigureLabels.set(index, label);
-  return label;
+  subfigureLabels.set(index, label)
+  return label
 }
 
 // Update methods
@@ -146,9 +146,20 @@ const addMultipleSubfigures = async (files: File[]) => {
   grid-template-columns: 1fr;
 }
 
+.grid-layout {
+  grid-auto-rows: minmax(200px, auto);
+  grid-gap: 1.5rem;
+}
+
 @media (min-width: 768px) {
   .horizontal-layout {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 767px) {
+  .grid-layout {
+    grid-template-columns: 1fr !important;
   }
 }
 </style> 

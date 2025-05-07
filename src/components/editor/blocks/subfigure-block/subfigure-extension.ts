@@ -4,6 +4,12 @@ import { NodeSelection } from '@tiptap/pm/state'
 import SubfigureBlock from './SubfigureBlock.vue'
 import type { ImageFit } from '../../extensions/types'
 
+// Constants for validation
+const VALID_LAYOUTS = ['horizontal', 'vertical', 'grid'] as const
+const VALID_OBJECT_FITS = ['contain', 'cover', 'fill', 'none', 'scale-down'] as const
+const MIN_GRID_COLUMNS = 1
+const MAX_GRID_COLUMNS = 4
+
 export interface SubFigure {
   src: string
   caption?: string
@@ -15,13 +21,30 @@ export interface SubfigureOptions {
 
 export interface SubfigureAttributes {
   subfigures: SubFigure[]
-  layout: 'horizontal' | 'vertical' | 'grid'
+  layout: typeof VALID_LAYOUTS[number]
   unifiedSize: boolean
-  objectFit: 'contain' | 'cover' | 'fill' | 'none' | 'scale-down'
+  objectFit: typeof VALID_OBJECT_FITS[number]
   isLocked: boolean
   caption: string
   label: string
   gridColumns: number
+}
+
+// Validation functions
+export const validateSubfigure = (subfig: SubFigure): boolean => {
+  return typeof subfig.src === 'string' && subfig.src.length > 0
+}
+
+export const validateLayout = (layout: string): layout is typeof VALID_LAYOUTS[number] => {
+  return VALID_LAYOUTS.includes(layout as any)
+}
+
+export const validateObjectFit = (fit: string): fit is typeof VALID_OBJECT_FITS[number] => {
+  return VALID_OBJECT_FITS.includes(fit as any)
+}
+
+export const validateGridColumns = (columns: number): boolean => {
+  return Number.isInteger(columns) && columns >= MIN_GRID_COLUMNS && columns <= MAX_GRID_COLUMNS
 }
 
 declare module '@tiptap/core' {
@@ -61,8 +84,14 @@ export const SubfigureExtension = Node.create<SubfigureOptions>({
       subfigures: {
         default: [],
         parseHTML: (element) => {
-          const subfiguresData = element.getAttribute('data-subfigures')
-          return subfiguresData ? JSON.parse(subfiguresData) : []
+          try {
+            const subfiguresData = element.getAttribute('data-subfigures')
+            const parsed = subfiguresData ? JSON.parse(subfiguresData) : []
+            return Array.isArray(parsed) ? parsed.filter(validateSubfigure) : []
+          } catch (error) {
+            console.error('Error parsing subfigures:', error)
+            return []
+          }
         },
         renderHTML: (attributes) => {
           if (attributes.subfigures?.length) {
@@ -73,12 +102,20 @@ export const SubfigureExtension = Node.create<SubfigureOptions>({
       },
       layout: {
         default: 'horizontal',
+        parseHTML: (element) => {
+          const layout = element.getAttribute('data-layout') || 'horizontal'
+          return validateLayout(layout) ? layout : 'horizontal'
+        },
       },
       unifiedSize: {
         default: true,
       },
       objectFit: {
         default: 'contain',
+        parseHTML: (element) => {
+          const fit = element.getAttribute('data-object-fit') || 'contain'
+          return validateObjectFit(fit) ? fit : 'contain'
+        },
       },
       isLocked: {
         default: false,
@@ -91,6 +128,10 @@ export const SubfigureExtension = Node.create<SubfigureOptions>({
       },
       gridColumns: {
         default: 2,
+        parseHTML: (element) => {
+          const columns = parseInt(element.getAttribute('data-grid-columns') || '2', 10)
+          return validateGridColumns(columns) ? columns : 2
+        },
       },
     }
   },
@@ -207,14 +248,21 @@ export const SubfigureExtension = Node.create<SubfigureOptions>({
   addCommands() {
     return {
       setSubfigure: (options = {}) => ({ commands }) => {
+        // Validate and sanitize options
+        const sanitizedOptions = {
+          subfigures: Array.isArray(options.subfigures) ? options.subfigures.filter(validateSubfigure) : [],
+          layout: validateLayout(options.layout || 'horizontal') ? options.layout : 'horizontal',
+          unifiedSize: typeof options.unifiedSize === 'boolean' ? options.unifiedSize : true,
+          objectFit: validateObjectFit(options.objectFit || 'contain') ? options.objectFit : 'contain',
+          isLocked: typeof options.isLocked === 'boolean' ? options.isLocked : false,
+          caption: typeof options.caption === 'string' ? options.caption : '',
+          label: typeof options.label === 'string' ? options.label : '',
+          gridColumns: validateGridColumns(options.gridColumns || 2) ? options.gridColumns : 2,
+        }
+
         return commands.insertContent({
           type: this.name,
-          attrs: {
-            subfigures: [],
-            layout: 'horizontal',
-            gridColumns: 2,
-            ...options,
-          },
+          attrs: sanitizedOptions,
         })
       },
       updateSubfigure: (options) => ({ commands, editor }) => {
@@ -223,7 +271,16 @@ export const SubfigureExtension = Node.create<SubfigureOptions>({
         const { selection } = tr
         
         if (selection instanceof NodeSelection && selection.node.type.name === this.name) {
-          return commands.updateAttributes(this.name, options)
+          // Validate and sanitize update options
+          const sanitizedOptions = {
+            ...options,
+            layout: options.layout && validateLayout(options.layout) ? options.layout : undefined,
+            objectFit: options.objectFit && validateObjectFit(options.objectFit) ? options.objectFit : undefined,
+            gridColumns: options.gridColumns && validateGridColumns(options.gridColumns) ? options.gridColumns : undefined,
+            subfigures: options.subfigures ? options.subfigures.filter(validateSubfigure) : undefined,
+          }
+
+          return commands.updateAttributes(this.name, sanitizedOptions)
         }
 
         return false
