@@ -15,21 +15,22 @@
         </Button>
       </div>
 
-      <!-- Grid Columns Control - only visible when grid layout is selected -->
+      <!-- Column selector - only visible in grid layout -->
       <div v-if="modelValue.layout === 'grid'" class="flex items-center gap-2">
         <span class="text-sm text-muted-foreground">Columns:</span>
-        <Select
-          :model-value="modelValue.gridColumns.toString()"
-          @update:model-value="updateGridColumns"
-          class="w-20"
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem v-for="n in 4" :key="n" :value="n.toString()">{{ n }}</SelectItem>
-          </SelectContent>
-        </Select>
+        <div class="flex items-center gap-1 bg-muted p-1 rounded-md">
+          <Button
+            v-for="cols in [1, 2, 3, 4]"
+            :key="cols"
+            variant="ghost"
+            size="sm"
+            class="h-8 w-8"
+            :class="{ 'bg-background': modelValue.gridColumns === cols }"
+            @click="updateGridColumns(cols)"
+          >
+            {{ cols }}
+          </Button>
+        </div>
       </div>
 
       <div class="flex items-center gap-2">
@@ -66,13 +67,6 @@ import {
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 
 type LayoutType = 'horizontal' | 'vertical' | 'grid'
 
@@ -104,18 +98,20 @@ const layoutIcons = {
 
 // Update methods
 const updateLayout = (layout: LayoutType) => {
-  emit('update:modelValue', { ...props.modelValue, layout })
+  emit('update:modelValue', { 
+    ...props.modelValue, 
+    layout,
+    // Reset grid columns to 2 when switching to grid layout
+    gridColumns: layout === 'grid' ? props.modelValue.gridColumns || 2 : 2
+  })
+}
+
+const updateGridColumns = (columns: number) => {
+  emit('update:modelValue', { ...props.modelValue, gridColumns: columns })
 }
 
 const updateUnifiedSize = (value: boolean) => {
   emit('update:modelValue', { ...props.modelValue, unifiedSize: value })
-}
-
-const updateGridColumns = (value: string) => {
-  emit('update:modelValue', { 
-    ...props.modelValue, 
-    gridColumns: parseInt(value) 
-  })
 }
 
 const toggleLock = () => {

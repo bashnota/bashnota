@@ -7,11 +7,10 @@
         :style="imageStyle"
         :class="[
           'w-full rounded-md',
-          isReadOnly ? '' : 'transition-transform hover:scale-102 cursor-zoom-in',
           { 'h-48': unifiedSize },
+          'cursor-pointer hover:opacity-90 transition-opacity'
         ]"
-        @dblclick="handleDoubleClick"
-        @click="handleImageClick"
+        @click="showPreview = true"
       />
       <UploadZone
         v-else-if="!isReadOnly"
@@ -71,11 +70,10 @@
 
     <!-- Image Preview Modal -->
     <ImagePreviewModal
-      :is-open="isPreviewOpen"
-      @update:is-open="isPreviewOpen = $event"
+      v-model="showPreview"
       :image-src="subfigure.src"
-      :image-alt="defaultLabel"
-      :image-caption="subfigure.caption || defaultLabel"
+      :caption="subfigure.caption || defaultLabel"
+      :image-fit="objectFit"
     />
   </div>
 </template>
@@ -86,7 +84,7 @@ import { TrashIcon, LockIcon } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import UploadZone from '@/components/UploadZone.vue'
-import ImagePreviewModal from '@/components/ImagePreviewModal.vue'
+import ImagePreviewModal from './ImagePreviewModal.vue'
 import { logger } from '@/services/logger'
 
 type ObjectFitType = 'contain' | 'cover' | 'fill' | 'none' | 'scale-down'
@@ -117,7 +115,7 @@ const emit = defineEmits<{
 // Local state
 const localCaption = ref(props.subfigure.caption || '')
 const isEditingCaption = ref(false)
-const isPreviewOpen = ref(false)
+const showPreview = ref(false)
 
 // Computed properties
 const imageStyle = computed(() => ({
@@ -139,17 +137,6 @@ watch(
   },
   { immediate: true }
 )
-
-// Image preview methods
-const handleImageClick = (event: MouseEvent) => {
-  // Always allow preview, even when locked
-  event.preventDefault()
-  event.stopPropagation()
-  
-  // If in edit mode and locked, a single click should open the preview
-  // Double click will still trigger the unlock event separately
-  isPreviewOpen.value = true
-}
 
 // Caption methods
 const startEditingCaption = () => {
@@ -241,24 +228,6 @@ const handleFileUpload = async (file: File) => {
     reader.readAsDataURL(file)
   } catch (error) {
     logger.error('Error uploading subfigure:', error)
-  }
-}
-
-// Event handlers
-const handleDoubleClick = (event: MouseEvent) => {
-  if (props.isReadOnly) return
-
-  event.preventDefault()
-  event.stopPropagation()
-
-  // Close the preview if it's open
-  if (isPreviewOpen.value) {
-    isPreviewOpen.value = false
-  }
-
-  // Unlock if locked
-  if (props.isLocked) {
-    emit('unlock')
   }
 }
 </script>
