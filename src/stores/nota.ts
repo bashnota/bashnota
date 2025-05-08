@@ -565,6 +565,12 @@ export const useNotaStore = defineStore('nota', {
               }
             }
           }
+        } else {
+          // If not including sub-pages, get existing published sub-pages
+          const publishedNota = await this.getPublishedNota(id).catch(() => null)
+          if (publishedNota?.publishedSubPages) {
+            publishedSubPageIds.push(...publishedNota.publishedSubPages)
+          }
         }
 
         // Process the content with the list of published sub-pages
