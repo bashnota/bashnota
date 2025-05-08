@@ -1,5 +1,6 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
+import { createHead } from '@vueuse/head'
 import './assets/index.css'
 import App from './App.vue'
 import router from './router'
@@ -13,9 +14,11 @@ import '@/stores/jupyterStore'
 
 const app = createApp(App)
 const pinia = createPinia()
+const head = createHead()
 
 app.use(pinia)
 app.use(router)
+app.use(head)
 
 // Log page views when routes change
 router.afterEach((to) => {
