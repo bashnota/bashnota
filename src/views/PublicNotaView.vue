@@ -14,6 +14,7 @@ import { statisticsService } from '@/services/statisticsService'
 import { convertPublicPageLinks } from '@/components/editor/extensions/PageLinkExtension'
 import VotersList from '@/components/nota/VotersList.vue'
 import CommentSection from '@/components/comments/CommentSection.vue'
+import { useHead } from '@vueuse/head'
 
 // Define extended PublishedNota type with optional fields we need
 interface ExtendedPublishedNota extends PublishedNota {
@@ -45,6 +46,8 @@ const isVoting = ref(false)
 const metaDescription = ref('')
 const pageTitle = ref('Published Note')
 const canonicalUrl = ref('')
+const metaKeywords = ref('')
+const metaImage = ref('')
 
 // Create a computed property to check if we should show breadcrumbs
 const showBreadcrumbs = computed(() => {
@@ -60,6 +63,9 @@ const userTag = computed(() => {
   const tag = route.params.userTag;
   return typeof tag === 'string' ? tag : (Array.isArray(tag) ? tag[0] : '');
 })
+
+// Add origin URL computed property
+const originUrl = computed(() => typeof window !== 'undefined' ? window.location.origin : '')
 
 // Clone count
 const cloneCount = ref(0)
@@ -90,10 +96,67 @@ const getMetaDescription = (content: string | null): string => {
     }
 
     // Clean up and limit to 160 characters
-    return extractedText.trim().replace(/\s+/g, ' ').substring(0, 157) + '...'
+    const description = extractedText.trim().replace(/\s+/g, ' ').substring(0, 157) + '...'
+    return description || 'Read this published note on BashNota - a powerful note-taking app for developers.'
   } catch (e) {
     // Fallback if parsing fails
     return 'Read this published note on BashNota - a powerful note-taking app for developers.'
+  }
+}
+
+// Extract keywords from content and tags
+const getMetaKeywords = (nota: ExtendedPublishedNota): string => {
+  const keywords = new Set<string>()
+  
+  // Add tags as keywords
+  if (nota.tags && nota.tags.length > 0) {
+    nota.tags.forEach(tag => keywords.add(tag))
+  }
+  
+  // Add title words as keywords
+  if (nota.title) {
+    nota.title.split(' ').forEach(word => {
+      if (word.length > 3) keywords.add(word.toLowerCase())
+    })
+  }
+  
+  // Add author name as keyword
+  if (nota.authorName) {
+    keywords.add(nota.authorName)
+  }
+  
+  return Array.from(keywords).join(', ')
+}
+
+// Extract first image from content for social sharing
+const getMetaImage = (content: string | null): string => {
+  if (!content) return ''
+  
+  try {
+    const contentObj = JSON.parse(content)
+    let imageUrl = ''
+    
+    // Helper function to find first image
+    const findImage = (node: any) => {
+      if (node.type === 'image' && node.attrs?.src) {
+        // Ensure the image URL is absolute
+        const src = node.attrs.src
+        imageUrl = src.startsWith('http') ? src : `${originUrl.value}${src}`
+        return true
+      }
+      if (node.content && Array.isArray(node.content)) {
+        return node.content.some(findImage)
+      }
+      return false
+    }
+    
+    if (contentObj.content && Array.isArray(contentObj.content)) {
+      contentObj.content.some(findImage)
+    }
+    
+    return imageUrl
+  } catch (e) {
+    return ''
   }
 }
 
@@ -108,85 +171,60 @@ const getPublicLink = (id: string): string => {
 // Update meta tags when nota changes
 watch(() => nota.value, (newNota) => {
   if (newNota) {
-    pageTitle.value = `${newNota.title} | BashNota`
-    metaDescription.value = getMetaDescription(newNota.content)
-    canonicalUrl.value = getPublicLink(newNota.id)
-    
-    // Set meta tags in document head
-    updateMetaTags()
+    const title = `${newNota.title} | BashNota`
+    const description = getMetaDescription(newNota.content)
+    const canonicalUrl = getPublicLink(newNota.id)
+    const keywords = getMetaKeywords(newNota)
+    const image = getMetaImage(newNota.content)
+
+    useHead({
+      title,
+      meta: [
+        // Primary meta tags
+        { name: 'description', content: description },
+        { name: 'keywords', content: keywords },
+        { name: 'language', content: 'en' },
+        { name: 'robots', content: 'index, follow' },
+        { name: 'author', content: newNota.authorName },
+
+        // Open Graph tags
+        { property: 'og:title', content: title },
+        { property: 'og:description', content: description },
+        { property: 'og:type', content: 'article' },
+        { property: 'og:url', content: canonicalUrl },
+        { property: 'og:site_name', content: 'BashNota' },
+        { property: 'og:locale', content: 'en_US' },
+        { property: 'article:published_time', content: new Date(newNota.publishedAt).toISOString() },
+        { property: 'article:modified_time', content: new Date(newNota.updatedAt).toISOString() },
+        { property: 'article:author', content: newNota.authorName },
+
+        // Twitter card tags
+        { name: 'twitter:card', content: image ? 'summary_large_image' : 'summary' },
+        { name: 'twitter:title', content: title },
+        { name: 'twitter:description', content: description },
+        { name: 'twitter:site', content: '@bashnota' },
+        { name: 'twitter:creator', content: `@${newNota.authorName}` },
+      ],
+      link: [
+        { rel: 'canonical', href: canonicalUrl }
+      ]
+    })
+
+    // Add image meta tags if image is available
+    if (image) {
+      useHead({
+        meta: [
+          { property: 'og:image', content: image },
+          { property: 'og:image:alt', content: newNota.title },
+          { property: 'og:image:width', content: '1200' },
+          { property: 'og:image:height', content: '630' },
+          { name: 'twitter:image', content: image },
+          { name: 'twitter:image:alt', content: newNota.title }
+        ]
+      })
+    }
   }
 }, { immediate: true })
-
-// Update the document's meta tags
-const updateMetaTags = () => {
-  if (!nota.value) return
-
-  // Set document title
-  document.title = pageTitle.value
-
-  // Helper function to create or update meta tags
-  const setMetaTag = (name: string, content: string) => {
-    let meta = document.querySelector(`meta[name="${name}"]`) as HTMLMetaElement
-    if (!meta) {
-      meta = document.createElement('meta')
-      meta.name = name
-      document.head.appendChild(meta)
-    }
-    meta.content = content
-  }
-
-  // Set primary meta tags
-  setMetaTag('description', metaDescription.value)
-
-  // Set Open Graph meta tags
-  const setOgMetaTag = (property: string, content: string) => {
-    let meta = document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement
-    if (!meta) {
-      meta = document.createElement('meta')
-      meta.setAttribute('property', property)
-      document.head.appendChild(meta)
-    }
-    meta.content = content
-  }
-
-  setOgMetaTag('og:title', nota.value.title)
-  setOgMetaTag('og:description', metaDescription.value)
-  setOgMetaTag('og:type', 'article')
-  setOgMetaTag('og:url', canonicalUrl.value)
-  
-  // Set Twitter card tags
-  setMetaTag('twitter:card', 'summary')
-  setMetaTag('twitter:title', nota.value.title)
-  setMetaTag('twitter:description', metaDescription.value)
-
-  // Set article metadata
-  setMetaTag('article:published_time', new Date(nota.value.publishedAt).toISOString())
-  setMetaTag('article:modified_time', new Date(nota.value.updatedAt).toISOString())
-  setMetaTag('article:author', nota.value.authorName)
-
-  // Set canonical URL
-  let canonicalElement = document.querySelector('link[rel="canonical"]') as HTMLLinkElement
-  if (!canonicalElement) {
-    canonicalElement = document.createElement('link')
-    canonicalElement.rel = 'canonical'
-    document.head.appendChild(canonicalElement)
-  }
-  canonicalElement.href = canonicalUrl.value
-}
-
-// Clean up meta tags when component is unmounted
-onBeforeMount(() => {
-  // Reset the document title when leaving
-  const originalTitle = 'BashNota'
-  document.title = originalTitle
-  
-  // Remove added meta tags
-  document.querySelector('meta[name="description"]')?.remove()
-  document.querySelector('link[rel="canonical"]')?.remove()
-  document.querySelectorAll('meta[property^="og:"]').forEach(el => el.remove())
-  document.querySelectorAll('meta[name^="twitter:"]').forEach(el => el.remove())
-  document.querySelectorAll('meta[name^="article:"]').forEach(el => el.remove())
-})
 
 onMounted(async () => {
   try {
@@ -417,10 +455,37 @@ const handleContentRendered = () => {
       <meta itemprop="description" :content="metaDescription">
       <meta itemprop="datePublished" :content="new Date(nota.publishedAt).toISOString()">
       <meta itemprop="dateModified" :content="new Date(nota.updatedAt).toISOString()">
+      <meta itemprop="keywords" :content="metaKeywords">
+      <meta itemprop="wordCount" :content="nota.content ? JSON.parse(nota.content).content?.length || 0 : 0">
+      <meta itemprop="inLanguage" content="en-US">
+      <meta itemprop="isAccessibleForFree" content="true">
+      <meta itemprop="license" content="https://creativecommons.org/licenses/by/4.0/">
+      
       <div itemprop="author" itemscope itemtype="https://schema.org/Person">
         <meta itemprop="name" :content="nota.authorName">
+        <meta itemprop="url" :content="`${originUrl}/@${nota.authorId}`">
       </div>
+      
+      <div itemprop="publisher" itemscope itemtype="https://schema.org/Organization">
+        <meta itemprop="name" content="BashNota">
+        <meta itemprop="url" :content="originUrl">
+        <div itemprop="logo" itemscope itemtype="https://schema.org/ImageObject">
+          <meta itemprop="url" :content="`${originUrl}/logo.png`">
+        </div>
+      </div>
+      
       <meta itemprop="url" :content="canonicalUrl">
+      
+      <!-- Citations structured data if available -->
+      <div v-if="nota.citations && nota.citations.length > 0" itemprop="citation" itemscope itemtype="https://schema.org/CreativeWork">
+        <meta v-for="(citation, index) in nota.citations" :key="index" itemprop="citation" :content="citation.title">
+      </div>
+      
+      <!-- Image structured data if available -->
+      <div v-if="metaImage" itemprop="image" itemscope itemtype="https://schema.org/ImageObject">
+        <meta itemprop="url" :content="metaImage">
+        <meta itemprop="caption" :content="nota.title">
+      </div>
 
       <!-- Breadcrumbs for sub-pages -->
       <nav v-if="showBreadcrumbs" aria-label="Breadcrumb" class="flex items-center text-sm mb-4">
