@@ -5,7 +5,7 @@ import { useNotaStore } from '@/stores/nota'
 import { useAuthStore } from '@/stores/auth'
 import { Button } from '@/components/ui/button'
 import { formatDate, toast } from '@/lib/utils'
-import { Share2, ChevronLeft, ChevronUp, ChevronDown, FileText } from 'lucide-vue-next'
+import { Share2, ChevronLeft, ChevronUp, ChevronDown, FileText, FileCode } from 'lucide-vue-next'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import NotaContentViewer from '@/components/editor/NotaContentViewer.vue'
 import { type PublishedNota } from '@/types/nota'
@@ -15,6 +15,7 @@ import { convertPublicPageLinks } from '@/components/editor/extensions/PageLinkE
 import VotersList from '@/components/nota/VotersList.vue'
 import CommentSection from '@/components/comments/CommentSection.vue'
 import { useHead } from '@vueuse/head'
+import CitationDialog from '@/components/nota/CitationDialog.vue'
 
 // Define extended PublishedNota type with optional fields we need
 interface ExtendedPublishedNota extends PublishedNota {
@@ -429,6 +430,19 @@ const handleContentRendered = () => {
   convertPublicPageLinks(document)
   logger.debug('Content rendered, converting public page links. Current path:', window.location.pathname)
 }
+
+// Reference to citation dialog component with type
+const citationDialogRef = ref<InstanceType<typeof CitationDialog> | null>(null)
+
+// Method to open citation dialog
+const openCitationDialog = () => {
+  // Use nextTick to ensure the component is fully available
+  setTimeout(() => {
+    if (citationDialogRef.value) {
+      citationDialogRef.value.openDialog()
+    }
+  }, 0)
+}
 </script>
 
 <template>
@@ -512,6 +526,21 @@ const handleContentRendered = () => {
             <FileText class="mr-2 h-4 w-4" />
             Clone
           </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            @click="openCitationDialog"
+            title="Cite this nota"
+          >
+            <FileCode class="mr-2 h-4 w-4" />
+            Cite
+          </Button>
+          <CitationDialog 
+            v-if="nota" 
+            :nota="nota"
+            :showTrigger="false"
+            ref="citationDialogRef"
+          />
           <Button variant="outline" size="sm" @click="shareNota">
             <Share2 class="mr-2 h-4 w-4" />
             Share
