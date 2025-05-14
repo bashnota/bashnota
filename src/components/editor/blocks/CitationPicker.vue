@@ -64,7 +64,7 @@ const filteredCitations = computed(() => {
 
   // Apply year filter
   if (yearFilter.value !== 'all') {
-    filtered = filtered.filter(citation => citation.year === yearFilter.value)
+    filtered = filtered.filter(citation => citation.year.toString() === yearFilter.value)
   }
 
   // Apply type filter
@@ -122,7 +122,7 @@ const searchServices = {
     icon: '🔍',
     search: async (query: string) => {
       try {
-        const response = await fetch(`https://api.crossref.org/works?query=${encodeURIComponent(query)}&rows=10&mailto=your-email@example.com`)
+        const response = await fetch(`https://api.crossref.org/works?query=${encodeURIComponent(query)}&rows=10`)
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
         const data = await response.json()
         return data.message.items.map((item: any) => ({
@@ -139,7 +139,6 @@ const searchServices = {
         }))
       } catch (error) {
         console.error('Crossref search error:', error)
-        toast('Error searching Crossref. Please try again.', 'Error', 'destructive')
         return []
       }
     }
@@ -149,42 +148,57 @@ const searchServices = {
     icon: '🎓',
     search: async (query: string) => {
       try {
-        const response = await fetch(`https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(query)}&limit=10&fields=title,authors,year,venue,doi,url`)
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
+        const response = await fetch(`https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(query)}&limit=10&fields=title,authors,year,venue,url,paperId`, {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          method: 'GET'
+        })
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => null)
+          throw new Error(`HTTP error! status: ${response.status}${errorData ? ` - ${JSON.stringify(errorData)}` : ''}`)
+        }
         const data = await response.json()
+        if (!data.data || !Array.isArray(data.data)) {
+          throw new Error('Invalid response format from Semantic Scholar')
+        }
         return data.data.map((item: any) => ({
-          key: item.paperId,
+          key: item.paperId || `ss-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           title: item.title || '',
           authors: item.authors?.map((a: any) => a.name) || [],
           year: item.year || '',
           journal: item.venue || '',
-          doi: item.doi || '',
           url: item.url || ''
         }))
       } catch (error) {
         console.error('Semantic Scholar search error:', error)
-        toast('Error searching Semantic Scholar. Please try again.', 'Error', 'destructive')
+        toast('Failed to search Semantic Scholar. Please try again.', 'Error', 'destructive')
         return []
       }
+    }
+  },
+  googleScholar: {
+    name: 'Google Scholar',
+    icon: '📚',
+    search: async (query: string) => {
+      // Note: This is a placeholder. Google Scholar doesn't have a public API.
+      // You would need to implement a proxy server to handle this.
+      return []
     }
   }
 }
 
 const performSearch = async () => {
-  if (!searchQuery.value.trim()) {
-    toast('Please enter a search query', 'Warning')
-    return
-  }
+  if (!searchQuery.value.trim()) return
   
   isSearching.value = true
+  searchResults.value = []
+  
   try {
     const service = searchServices[activeSearchTab.value as keyof typeof searchServices]
     const results = await service.search(searchQuery.value)
     searchResults.value = results
-    
-    if (results.length === 0) {
-      toast('No results found. Try a different search term.', 'Info')
-    }
   } catch (error) {
     console.error('Search error:', error)
     searchResults.value = []
@@ -363,7 +377,7 @@ onUnmounted(() => {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Years</SelectItem>
-            <SelectItem v-for="year in availableYears" :key="year" :value="year">
+            <SelectItem v-for="year in availableYears" :key="year" :value="year.toString()">
               {{ year }}
             </SelectItem>
           </SelectContent>
