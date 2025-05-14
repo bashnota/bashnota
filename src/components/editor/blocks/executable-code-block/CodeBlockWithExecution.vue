@@ -1316,13 +1316,14 @@ const runningStatus = computed(() => {
     />
 
     <ExecutionStatus
+      v-if="!isPublished"
       :status="runningStatus"
       :execution-time="currentExecutionTime"
       :progress="executionProgress"
     />
 
     <ErrorDisplay
-      v-if="errorMessage"
+      v-if="errorMessage && !isPublished"
       :error="errorMessage"
       :code="codeValue"
       @retry="handleRetry"
