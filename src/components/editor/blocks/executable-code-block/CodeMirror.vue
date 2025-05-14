@@ -87,7 +87,35 @@ const extensions = computed(() => {
     lineNumbers(),
     EditorView.lineWrapping,
     isDark.value ? basicDark : basicLight,
-    indentUnit.of(' '.repeat(props.tabSize || 4))
+    indentUnit.of(' '.repeat(props.tabSize || 4)),
+    // Add scrollbar configuration
+    EditorView.theme({
+      '&': {
+        height: '100%',
+        overflow: 'auto'
+      },
+      '.cm-scroller': {
+        overflow: 'auto',
+        scrollbarWidth: 'thin',
+        scrollbarColor: 'var(--scrollbar-thumb) var(--scrollbar-track)'
+      },
+      '.cm-scroller::-webkit-scrollbar': {
+        width: '8px',
+        height: '8px'
+      },
+      '.cm-scroller::-webkit-scrollbar-track': {
+        background: 'var(--scrollbar-track)',
+        borderRadius: '4px'
+      },
+      '.cm-scroller::-webkit-scrollbar-thumb': {
+        background: 'var(--scrollbar-thumb)',
+        borderRadius: '4px',
+        border: '2px solid var(--scrollbar-track)'
+      },
+      '.cm-scroller::-webkit-scrollbar-thumb:hover': {
+        background: 'var(--scrollbar-thumb-hover)'
+      }
+    })
   ]
 
   // Add language extension if available
@@ -236,11 +264,22 @@ const containerClasses = computed(() => {
   border-radius: 0.375rem;
   overflow: hidden;
   position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .cm-editor {
   height: 100%;
   border-radius: inherit;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.cm-scroller {
+  flex: 1;
+  overflow: auto;
 }
 
 /* Style for readonly editor */
@@ -249,8 +288,17 @@ const containerClasses = computed(() => {
   white-space: pre !important;
 }
 
-.cm-readonly.cm-focused {
-  outline: none !important;
+/* Custom scrollbar variables */
+:root {
+  --scrollbar-track: rgba(0, 0, 0, 0.1);
+  --scrollbar-thumb: rgba(0, 0, 0, 0.2);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.3);
+}
+
+.dark {
+  --scrollbar-track: rgba(255, 255, 255, 0.1);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
 }
 
 /* Style for disabled editor */
@@ -283,11 +331,6 @@ const containerClasses = computed(() => {
 
 .codemirror-container.disabled {
   cursor: not-allowed;
-}
-
-.cm-scroller {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
-  padding: 0.5rem 0;
 }
 
 .cm-gutters {
