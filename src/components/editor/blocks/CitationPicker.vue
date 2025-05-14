@@ -3,9 +3,10 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useCitationStore } from '@/stores/citationStore'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Search, BookIcon, Loader2, X } from 'lucide-vue-next'
+import { Search, BookIcon, Loader2, X, ChevronUp, ChevronDown } from 'lucide-vue-next'
 import type { CitationEntry } from '@/types/nota'
 import { toast } from '@/lib/utils'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 
 const props = defineProps<{
   notaId: string
@@ -26,26 +27,78 @@ const activeSearchTab = ref('crossref')
 const searchInput = ref<HTMLInputElement | null>(null)
 const citationStyle = ref('numeric') // numeric, author-year, or custom
 const citationFormat = ref('short') // short, full, or custom
+const sortField = ref<'authors' | 'year' | 'title' | 'key'>('authors')
+const sortDirection = ref<'asc' | 'desc'>('asc')
+const typeFilter = ref('all')
+const yearFilter = ref<string>('all')
 
 // Get citations for the current nota
 const citations = computed(() => citationStore.getCitationsByNotaId(props.notaId))
 
-// Filter citations based on search query
-const filteredCitations = computed(() => {
-  if (!searchQuery.value.trim()) {
-    return citations.value
-  }
-  
-  const query = searchQuery.value.toLowerCase().trim()
-  return citations.value.filter(citation => {
-    return (
-      (citation.title || '').toLowerCase().includes(query) ||
-      citation.key.toLowerCase().includes(query) ||
-      (citation.authors || []).some(author => author.toLowerCase().includes(query)) ||
-      (citation.journal || '').toLowerCase().includes(query) ||
-      (citation.publisher || '').toLowerCase().includes(query)
-    )
+// Available years for filtering
+const availableYears = computed(() => {
+  const years = new Set<string>()
+  citations.value.forEach(citation => {
+    if (citation.year) years.add(citation.year)
   })
+  return Array.from(years).sort((a, b) => parseInt(b) - parseInt(a))
+})
+
+// Filter and sort citations
+const filteredCitations = computed(() => {
+  let filtered = citations.value
+
+  // Apply search filter
+  if (searchQuery.value.trim()) {
+    const query = searchQuery.value.toLowerCase().trim()
+    filtered = filtered.filter(citation => {
+      return (
+        (citation.title || '').toLowerCase().includes(query) ||
+        citation.key.toLowerCase().includes(query) ||
+        (citation.authors || []).some(author => author.toLowerCase().includes(query)) ||
+        (citation.journal || '').toLowerCase().includes(query) ||
+        (citation.publisher || '').toLowerCase().includes(query)
+      )
+    })
+  }
+
+  // Apply year filter
+  if (yearFilter.value !== 'all') {
+    filtered = filtered.filter(citation => citation.year === yearFilter.value)
+  }
+
+  // Apply type filter
+  if (typeFilter.value !== 'all') {
+    filtered = filtered.filter(citation => {
+      if (typeFilter.value === 'journal') return !!citation.journal
+      if (typeFilter.value === 'book') return !!citation.publisher
+      return true
+    })
+  }
+
+  // Apply sorting
+  filtered.sort((a, b) => {
+    let comparison = 0
+    switch (sortField.value) {
+      case 'authors':
+        const aAuthor = a.authors?.[0]?.split(' ').pop() || ''
+        const bAuthor = b.authors?.[0]?.split(' ').pop() || ''
+        comparison = aAuthor.localeCompare(bAuthor)
+        break
+      case 'year':
+        comparison = parseInt(b.year || '0') - parseInt(a.year || '0')
+        break
+      case 'title':
+        comparison = (a.title || '').localeCompare(b.title || '')
+        break
+      case 'key':
+        comparison = a.key.localeCompare(b.key)
+        break
+    }
+    return sortDirection.value === 'asc' ? comparison : -comparison
+  })
+
+  return filtered
 })
 
 // Format citation based on style and format
@@ -236,6 +289,24 @@ const handleInput = (event: Event) => {
   searchQuery.value = target.value
 }
 
+// Add new methods for sorting and filtering
+const toggleSort = (field: 'authors' | 'year' | 'title' | 'key') => {
+  if (sortField.value === field) {
+    sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortField.value = field
+    sortDirection.value = 'asc'
+  }
+}
+
+const clearFilters = () => {
+  searchQuery.value = ''
+  yearFilter.value = 'all'
+  typeFilter.value = 'all'
+  sortField.value = 'authors'
+  sortDirection.value = 'asc'
+}
+
 onMounted(() => {
   document.addEventListener('keydown', handleKeyDown)
   // Focus the search input
@@ -281,6 +352,36 @@ onUnmounted(() => {
         >
           <Search v-if="!isSearching" class="h-4 w-4" />
           <Loader2 v-else class="h-4 w-4 animate-spin" />
+        </Button>
+      </div>
+
+      <!-- Filters -->
+      <div class="flex items-center gap-2 mt-2">
+        <Select v-model="yearFilter" class="w-24">
+          <SelectTrigger>
+            <SelectValue placeholder="Year" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Years</SelectItem>
+            <SelectItem v-for="year in availableYears" :key="year" :value="year">
+              {{ year }}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select v-model="typeFilter" class="w-24">
+          <SelectTrigger>
+            <SelectValue placeholder="Type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="journal">Journal</SelectItem>
+            <SelectItem value="book">Book</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Button variant="ghost" size="sm" @click="clearFilters" class="ml-auto">
+          Clear Filters
         </Button>
       </div>
     </div>
@@ -350,33 +451,46 @@ onUnmounted(() => {
         </div>
       </div>
       
-      <!-- No results found -->
-      <div v-else-if="searchQuery && !isSearching" class="p-4 text-center text-sm text-muted-foreground">
-        <p>No results found for "{{ searchQuery }}"</p>
-        <p class="text-xs mt-1">Try a different search term</p>
-      </div>
-      
       <!-- Citation list -->
-      <div v-else class="p-1 space-y-1">
-        <div
-          v-for="(citation, index) in filteredCitations"
-          :key="citation.id"
-          class="p-2 rounded-md border hover:bg-accent cursor-pointer"
-          :class="{ 'bg-accent': index === selectedIndex }"
-          @click="handleSelect(citation)"
-        >
-          <div class="flex items-center justify-between">
-            <div class="font-medium text-sm truncate flex-1">{{ citation.title }}</div>
-            <div class="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-primary/10 text-primary">
-              [{{ index + 1 }}]
-            </div>
+      <div v-else class="p-1">
+        <!-- Sort headers -->
+        <div class="flex items-center gap-2 px-2 py-1 text-xs font-medium text-muted-foreground border-b">
+          <div class="flex-1 cursor-pointer" @click="toggleSort('authors')">
+            Authors
+            <ChevronUp v-if="sortField === 'authors' && sortDirection === 'asc'" class="h-3 w-3 inline" />
+            <ChevronDown v-if="sortField === 'authors' && sortDirection === 'desc'" class="h-3 w-3 inline" />
           </div>
-          <div class="flex flex-col mt-1">
-            <div class="text-xs text-muted-foreground">
-              {{ citation.authors?.join(', ') }} ({{ citation.year }})
-            </div>
-            <div v-if="citation.journal" class="text-xs italic text-muted-foreground">
-              {{ citation.journal }}
+          <div class="w-16 cursor-pointer" @click="toggleSort('year')">
+            Year
+            <ChevronUp v-if="sortField === 'year' && sortDirection === 'asc'" class="h-3 w-3 inline" />
+            <ChevronDown v-if="sortField === 'year' && sortDirection === 'desc'" class="h-3 w-3 inline" />
+          </div>
+          <div class="w-16 text-right">Ref</div>
+        </div>
+
+        <div class="space-y-1">
+          <div
+            v-for="(citation, index) in filteredCitations"
+            :key="citation.id"
+            class="p-2 rounded-md border hover:bg-accent cursor-pointer"
+            :class="{ 'bg-accent': index === selectedIndex }"
+            @click="handleSelect(citation)"
+          >
+            <div class="flex items-center justify-between">
+              <div class="flex-1">
+                <div class="font-medium text-sm truncate">{{ citation.title }}</div>
+                <div class="text-xs text-muted-foreground">
+                  {{ citation.authors?.join(', ') }}
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="text-xs text-muted-foreground w-16 text-right">
+                  {{ citation.year }}
+                </div>
+                <div class="px-1.5 py-0.5 text-xs rounded-full bg-primary/10 text-primary">
+                  [{{ index + 1 }}]
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -388,6 +502,14 @@ onUnmounted(() => {
 <style scoped>
 .citation-picker {
   @apply bg-background border-border;
+}
+
+.sort-header {
+  @apply cursor-pointer hover:text-foreground transition-colors;
+}
+
+.sort-header.active {
+  @apply text-foreground;
 }
 </style>
  

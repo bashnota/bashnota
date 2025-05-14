@@ -9,6 +9,7 @@ import type { CitationEntry } from '@/types/nota'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { toast } from '@/lib/utils'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 
 const props = defineProps({
   node: {
@@ -32,6 +33,7 @@ const props = defineProps({
 const router = useRouter()
 const citationStore = useCitationStore()
 const citationKey = computed(() => props.node.attrs.citationKey)
+const citationNumber = computed(() => props.node.attrs.citationNumber || '?')
 const showDetailsTooltip = ref(false)
 const copiedFormat = ref<string | null>(null)
 const tooltipPosition = ref({ x: 0, y: 0 })
@@ -56,12 +58,19 @@ const citation = computed(() => {
   return citationStore.getCitationByKey(citationKey.value, notaId.value)
 })
 
-const formatAuthors = (authors: string[], full = false) => {
+// Format authors based on style
+const formatAuthors = (authors: string[]): string => {
   if (!authors || authors.length === 0) return ''
+  
   if (authors.length === 1) return authors[0]
-  if (authors.length === 2) return `${authors[0]} and ${authors[1]}`
-  if (full) return authors.slice(0, -1).join(', ') + ', and ' + authors[authors.length - 1]
+  if (authors.length === 2) return `${authors[0]} & ${authors[1]}`
   return `${authors[0]} et al.`
+}
+
+// Format citation
+const formatCitation = (citation: CitationEntry | null): string => {
+  if (!citation) return `[${citationNumber.value}]`
+  return `[${citationNumber.value}]`
 }
 
 const tooltipContent = computed(() => {
@@ -155,20 +164,21 @@ onUnmounted(() => {
   document.removeEventListener('click', handleOutsideClick)
 })
 
-const formatCitation = (style: string): string => {
+// Enhanced citation formatting for different styles
+const formatCitationForStyle = (style: string): string => {
   if (!citation.value) return 'Citation not found'
   
   const c = citation.value
   
   switch (style) {
     case 'apa':
-      return `${formatAuthors(c.authors, true)} (${c.year}). ${c.title}${c.title.endsWith('.') ? '' : '.'} ${c.journal ? `${c.journal}` : ''}${c.volume ? `, ${c.volume}` : ''}${c.number ? `(${c.number})` : ''}${c.pages ? `, ${c.pages}` : ''}.${c.doi ? ` https://doi.org/${c.doi}` : ''}${c.url && !c.doi ? ` Retrieved from ${c.url}` : ''}`
+      return `${formatAuthors(c.authors)} (${c.year}). ${c.title}${c.title.endsWith('.') ? '' : '.'} ${c.journal ? `${c.journal}` : ''}${c.volume ? `, ${c.volume}` : ''}${c.number ? `(${c.number})` : ''}${c.pages ? `, ${c.pages}` : ''}.${c.doi ? ` https://doi.org/${c.doi}` : ''}${c.url && !c.doi ? ` Retrieved from ${c.url}` : ''}`
     
     case 'mla':
-      return `${formatAuthors(c.authors, true)}. "${c.title}"${c.title.endsWith('?') || c.title.endsWith('!') ? '' : '.'} ${c.journal ? `${c.journal}` : ''}${c.volume ? `, vol. ${c.volume}` : ''}${c.number ? `, no. ${c.number}` : ''}, ${c.year}${c.pages ? `, pp. ${c.pages}` : ''}.${c.doi ? ` DOI: ${c.doi}` : ''}${c.url && !c.doi ? ` ${c.url}` : ''}`
+      return `${formatAuthors(c.authors)}. "${c.title}"${c.title.endsWith('?') || c.title.endsWith('!') ? '' : '.'} ${c.journal ? `${c.journal}` : ''}${c.volume ? `, vol. ${c.volume}` : ''}${c.number ? `, no. ${c.number}` : ''}, ${c.year}${c.pages ? `, pp. ${c.pages}` : ''}.${c.doi ? ` DOI: ${c.doi}` : ''}${c.url && !c.doi ? ` ${c.url}` : ''}`
     
     case 'chicago':
-      return `${formatAuthors(c.authors, true)}. "${c.title}"${c.title.endsWith('?') || c.title.endsWith('!') ? '' : '.'} ${c.journal ? `${c.journal}` : ''}${c.volume ? ` ${c.volume}` : ''}${c.number ? `, no. ${c.number}` : ''} (${c.year})${c.pages ? `: ${c.pages}` : ''}.${c.publisher ? ` ${c.publisher}.` : ''}${c.doi ? ` https://doi.org/${c.doi}` : ''}${c.url && !c.doi ? ` ${c.url}` : ''}`
+      return `${formatAuthors(c.authors)} ("${c.title}", ${c.year})${c.journal ? `, ${c.journal}` : ''}${c.volume ? `, ${c.volume}` : ''}${c.number ? `, no. ${c.number}` : ''}${c.pages ? `, pp. ${c.pages}` : ''}.${c.publisher ? `, ${c.publisher}.` : ''}${c.doi ? `, https://doi.org/${c.doi}` : ''}${c.url && !c.doi ? `, ${c.url}` : ''}`
     
     case 'bibtex':
       return `@article{${c.key},
@@ -179,12 +189,12 @@ const formatCitation = (style: string): string => {
 }`
       
     default:
-      return tooltipContent.value
+      return formatCitation(c)
   }
 }
 
 const copyToClipboard = (format: string) => {
-  const text = formatCitation(format)
+  const text = formatCitationForStyle(format)
   navigator.clipboard.writeText(text)
   copiedFormat.value = format
   
@@ -347,189 +357,196 @@ const importCitation = async (citation: CitationEntry) => {
       ]" 
       @click.stop.prevent="toggleDetailsTooltip"
     >
-      [{{ node.attrs.citationNumber || '?' }}]
+      {{ formatCitation(citation) }}
     </span>
     
     <!-- Enhanced citation details tooltip that shows on click -->
     <div v-if="showDetailsTooltip" 
          class="citation-details-tooltip" 
          :style="`position: fixed; top: ${tooltipPosition.y}px; left: ${tooltipPosition.x}px; z-index: 100;`">
-      <div class="citation-card p-4 bg-white rounded-md border shadow-lg min-w-64 max-w-sm">
+      <div class="citation-card bg-white rounded-md border shadow-lg min-w-64 max-w-sm flex flex-col h-[300px]">
         <!-- Header with close button -->
-        <div class="flex justify-between items-center mb-2">
-          <div class="flex items-center gap-2">
-            <span class="font-medium">Citation [{{ node.attrs.citationNumber || '?' }}]</span>
+        <div class="flex justify-between items-center px-3 py-2 border-b shrink-0">
+          <div class="flex items-center gap-1">
+            <span class="font-medium text-sm">Citation</span>
             <span v-if="citation" class="text-xs text-muted-foreground">
               {{ citation.key }}
             </span>
           </div>
-          <Button variant="ghost" size="sm" class="h-6 w-6 p-0" @click.stop="closeTooltip">
-            <X class="h-4 w-4" />
+          <Button variant="ghost" size="sm" class="h-5 w-5 p-0" @click.stop="closeTooltip">
+            <X class="h-3 w-3" />
           </Button>
         </div>
         
-        <!-- Citation content -->
-        <div v-if="citation" class="space-y-3">
-          <!-- Citation details -->
-          <div class="space-y-2 text-sm">
-            <div class="font-medium">{{ citation.title }}</div>
-            <div v-if="citation.journal" class="italic text-muted-foreground">
-              {{ citation.journal }}
-              <span v-if="citation.volume"> {{ citation.volume }}</span>
-              <span v-if="citation.number">({{ citation.number }})</span>
-              <span v-if="citation.pages">: {{ citation.pages }}</span>
-            </div>
-            <div v-else-if="citation.publisher" class="text-muted-foreground">
-              {{ citation.publisher }}
-            </div>
-            <div v-if="citation.year" class="text-muted-foreground">
-              Published in {{ citation.year }}
-            </div>
-          </div>
-          
-          <!-- External links -->
-          <div v-if="citation.doi || citation.url" class="flex gap-3 pt-2">
-            <a 
-              v-if="citation.doi" 
-              :href="`https://doi.org/${citation.doi}`" 
-              target="_blank" 
-              class="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
-              @click.stop
-            >
-              <Link class="h-3 w-3" />
-              <span>DOI: {{ citation.doi }}</span>
-            </a>
-            
-            <a 
-              v-if="citation.url" 
-              :href="citation.url" 
-              target="_blank" 
-              class="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
-              @click.stop
-            >
-              <ExternalLink class="h-3 w-3" />
-              <span>View online</span>
-            </a>
-          </div>
-          
-          <!-- Copy options -->
-          <div class="pt-2 border-t border-border">
-            <div class="text-sm font-medium mb-2">Copy citation as:</div>
-            <div class="flex flex-wrap gap-2">
-              <Button 
-                v-for="format in ['apa', 'mla', 'chicago', 'bibtex']" 
-                :key="format"
-                variant="outline" 
-                size="sm" 
-                class="text-xs"
-                @click.stop="copyToClipboard(format)"
-              >
-                <span>{{ format.toUpperCase() }}</span>
-                <Copy v-if="copiedFormat !== format" class="ml-1 h-3 w-3" />
-                <ClipboardCheck v-else class="ml-1 h-3 w-3 text-green-600" />
-              </Button>
-            </div>
-          </div>
-          
-          <!-- Footer -->
-          <div class="flex justify-between pt-2 border-t border-border">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              @click.stop="jumpToReferences"
-            >
-              <span>Go to References</span>
-            </Button>
-          </div>
-        </div>
-        
-        <div v-else class="space-y-4">
-          <!-- Search panel -->
-          <div v-if="showSearchPanel" class="space-y-4">
-            <Tabs v-model="activeSearchTab" class="w-full">
-              <TabsList class="grid grid-cols-3 mb-4">
-                <TabsTrigger v-for="(service, key) in searchServices" 
-                           :key="key" 
-                           :value="key"
-                           class="flex items-center gap-1">
-                  <span>{{ service.icon }}</span>
-                  <span>{{ service.name }}</span>
-                </TabsTrigger>
-              </TabsList>
+        <!-- Scrollable content -->
+        <div class="flex-1 overflow-y-auto">
+          <div class="p-3">
+            <!-- Citation content -->
+            <div v-if="citation" class="space-y-2">
+              <!-- Citation details -->
+              <div class="space-y-1 text-sm">
+                <div class="font-medium">{{ citation.title }}</div>
+                <div v-if="citation.journal" class="italic text-muted-foreground text-xs">
+                  {{ citation.journal }}
+                  <span v-if="citation.volume"> {{ citation.volume }}</span>
+                  <span v-if="citation.number">({{ citation.number }})</span>
+                  <span v-if="citation.pages">: {{ citation.pages }}</span>
+                </div>
+                <div v-else-if="citation.publisher" class="text-muted-foreground text-xs">
+                  {{ citation.publisher }}
+                </div>
+                <div v-if="citation.year" class="text-muted-foreground text-xs">
+                  Published in {{ citation.year }}
+                </div>
+              </div>
               
-              <TabsContent v-for="(service, key) in searchServices" 
-                          :key="key" 
-                          :value="key"
-                          class="space-y-4">
-                <div class="flex gap-2">
-                  <Input
-                    v-model="searchQuery"
-                    placeholder="Search for papers..."
-                    class="flex-1"
-                    @keyup.enter="performSearch"
-                  />
+              <!-- External links -->
+              <div v-if="citation.doi || citation.url" class="flex gap-2 pt-1">
+                <a 
+                  v-if="citation.doi" 
+                  :href="`https://doi.org/${citation.doi}`" 
+                  target="_blank" 
+                  class="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                  @click.stop
+                >
+                  <Link class="h-3 w-3" />
+                  <span>DOI: {{ citation.doi }}</span>
+                </a>
+                
+                <a 
+                  v-if="citation.url" 
+                  :href="citation.url" 
+                  target="_blank" 
+                  class="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                  @click.stop
+                >
+                  <ExternalLink class="h-3 w-3" />
+                  <span>View online</span>
+                </a>
+              </div>
+              
+              <!-- Copy options -->
+              <div class="pt-1 border-t border-border">
+                <div class="text-xs font-medium mb-1">Copy citation as:</div>
+                <div class="flex flex-wrap gap-1">
                   <Button 
+                    v-for="format in ['apa', 'mla', 'chicago', 'bibtex']" 
+                    :key="format"
                     variant="outline" 
-                    size="icon"
-                    :disabled="isSearching"
-                    @click="performSearch"
+                    size="sm" 
+                    class="text-xs h-6 px-2"
+                    @click.stop="copyToClipboard(format)"
                   >
-                    <Search v-if="!isSearching" class="h-4 w-4" />
-                    <Loader2 v-else class="h-4 w-4 animate-spin" />
+                    <span>{{ format.toUpperCase() }}</span>
+                    <Copy v-if="copiedFormat !== format" class="ml-1 h-3 w-3" />
+                    <ClipboardCheck v-else class="ml-1 h-3 w-3 text-green-600" />
                   </Button>
                 </div>
-                
-                <!-- Search results -->
-                <div v-if="searchResults.length > 0" class="space-y-2 max-h-60 overflow-y-auto">
-                  <div v-for="result in searchResults" 
-                       :key="result.key"
-                       class="p-2 rounded-md border hover:bg-accent cursor-pointer"
-                       @click="importCitation(result)">
-                    <div class="font-medium text-sm">{{ result.title }}</div>
-                    <div class="text-xs text-muted-foreground">
-                      {{ formatAuthors(result.authors) }} ({{ result.year }})
+              </div>
+            </div>
+            
+            <div v-else class="space-y-3">
+              <!-- Search panel -->
+              <div v-if="showSearchPanel" class="space-y-3">
+                <Tabs v-model="activeSearchTab" class="w-full">
+                  <TabsList class="grid grid-cols-3 mb-2">
+                    <TabsTrigger v-for="(service, key) in searchServices" 
+                               :key="key" 
+                               :value="key"
+                               class="flex items-center gap-1 text-xs">
+                      <span>{{ service.icon }}</span>
+                      <span>{{ service.name }}</span>
+                    </TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent v-for="(service, key) in searchServices" 
+                              :key="key" 
+                              :value="key"
+                              class="space-y-2">
+                    <div class="flex gap-2">
+                      <Input
+                        v-model="searchQuery"
+                        placeholder="Search for papers..."
+                        class="flex-1 h-8 text-sm"
+                        @keyup.enter="performSearch"
+                      />
+                      <Button 
+                        variant="outline" 
+                        size="icon"
+                        class="h-8 w-8"
+                        :disabled="isSearching"
+                        @click="performSearch"
+                      >
+                        <Search v-if="!isSearching" class="h-3 w-3" />
+                        <Loader2 v-else class="h-3 w-3 animate-spin" />
+                      </Button>
                     </div>
-                    <div v-if="result.journal" class="text-xs italic text-muted-foreground">
-                      {{ result.journal }}
+                    
+                    <!-- Search results -->
+                    <div v-if="searchResults.length > 0" class="space-y-1 max-h-40 overflow-y-auto">
+                      <div v-for="result in searchResults" 
+                           :key="result.key"
+                           class="p-2 rounded-md border hover:bg-accent cursor-pointer"
+                           @click="importCitation(result)">
+                        <div class="font-medium text-xs">{{ result.title }}</div>
+                        <div class="text-xs text-muted-foreground">
+                          {{ formatAuthors(result.authors) }} ({{ result.year }})
+                        </div>
+                        <div v-if="result.journal" class="text-xs italic text-muted-foreground">
+                          {{ result.journal }}
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                    
+                    <!-- Empty state -->
+                    <div v-else-if="searchQuery" class="text-center py-2 text-muted-foreground">
+                      <p class="text-xs">No results found</p>
+                      <p class="text-xs">Try a different search term</p>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </div>
+              
+              <!-- Empty state with search option -->
+              <div v-else class="py-2 text-center space-y-2">
+                <p class="text-xs text-muted-foreground">
+                  Citation not found. The key "{{ citationKey }}" might be missing or invalid.
+                </p>
+                <div class="flex flex-col gap-1">
+                  <Button 
+                    variant="default" 
+                    size="sm" 
+                    class="h-7 text-xs"
+                    @click.stop="showSearchPanel = true"
+                  >
+                    <Search class="h-3 w-3 mr-1" />
+                    Search for Citation
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    class="h-7 text-xs"
+                    @click.stop="createNewCitation"
+                  >
+                    <Edit class="h-3 w-3 mr-1" />
+                    Create New Citation
+                  </Button>
                 </div>
-                
-                <!-- Empty state -->
-                <div v-else-if="searchQuery" class="text-center py-4 text-muted-foreground">
-                  <p>No results found</p>
-                  <p class="text-xs">Try a different search term</p>
-                </div>
-              </TabsContent>
-            </Tabs>
-          </div>
-          
-          <!-- Empty state with search option -->
-          <div v-else class="py-4 text-center space-y-4">
-            <p class="text-muted-foreground">
-              Citation not found. The key "{{ citationKey }}" might be missing or invalid.
-            </p>
-            <div class="flex flex-col gap-2">
-              <Button 
-                variant="default" 
-                size="sm" 
-                @click.stop="showSearchPanel = true"
-                class="w-full"
-              >
-                <Search class="h-4 w-4 mr-2" />
-                Search for Citation
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                @click.stop="createNewCitation"
-                class="w-full"
-              >
-                <Edit class="h-4 w-4 mr-2" />
-                Create New Citation
-              </Button>
+              </div>
             </div>
           </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-3 py-2 border-t bg-muted/5 shrink-0">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            class="h-7 text-xs w-full"
+            @click.stop="jumpToReferences"
+          >
+            <span>Go to References</span>
+          </Button>
         </div>
       </div>
     </div>
@@ -568,6 +585,13 @@ const importCitation = async (citation: CitationEntry) => {
 .citation-card {
   @apply bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-lg rounded-lg;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.citation-card .overflow-y-auto {
+  max-height: calc(80vh - 120px); /* Account for header and footer */
 }
 
 @keyframes fadeIn {
