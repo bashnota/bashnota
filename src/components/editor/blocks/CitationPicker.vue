@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Search, BookIcon, Loader2, X } from 'lucide-vue-next'
 import type { CitationEntry } from '@/types/nota'
+import { toast } from '@/lib/utils'
 
 const props = defineProps<{
   notaId: string
@@ -23,6 +24,8 @@ const isSearching = ref(false)
 const searchResults = ref<CitationEntry[]>([])
 const activeSearchTab = ref('crossref')
 const searchInput = ref<HTMLInputElement | null>(null)
+const citationStyle = ref('numeric') // numeric, author-year, or custom
+const citationFormat = ref('short') // short, full, or custom
 
 // Get citations for the current nota
 const citations = computed(() => citationStore.getCitationsByNotaId(props.notaId))
@@ -45,14 +48,29 @@ const filteredCitations = computed(() => {
   })
 })
 
-// Search services
+// Format citation based on style and format
+const formatCitation = (citation: CitationEntry) => {
+  if (citationFormat.value === 'short') {
+    return `[${citation.key}]`
+  }
+  
+  if (citationStyle.value === 'author-year') {
+    const authors = citation.authors?.slice(0, 2).join(' & ') || ''
+    return `${authors} (${citation.year})`
+  }
+  
+  return `[${citation.key}]`
+}
+
+// Search services with improved error handling and rate limiting
 const searchServices = {
   crossref: {
     name: 'Crossref',
     icon: '🔍',
     search: async (query: string) => {
       try {
-        const response = await fetch(`https://api.crossref.org/works?query=${encodeURIComponent(query)}&rows=10`)
+        const response = await fetch(`https://api.crossref.org/works?query=${encodeURIComponent(query)}&rows=10&mailto=your-email@example.com`)
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
         const data = await response.json()
         return data.message.items.map((item: any) => ({
           key: item.DOI,
@@ -68,6 +86,7 @@ const searchServices = {
         }))
       } catch (error) {
         console.error('Crossref search error:', error)
+        toast('Error searching Crossref. Please try again.', 'Error', 'destructive')
         return []
       }
     }
@@ -77,7 +96,8 @@ const searchServices = {
     icon: '🎓',
     search: async (query: string) => {
       try {
-        const response = await fetch(`https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(query)}&limit=10`)
+        const response = await fetch(`https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(query)}&limit=10&fields=title,authors,year,venue,doi,url`)
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
         const data = await response.json()
         return data.data.map((item: any) => ({
           key: item.paperId,
@@ -90,6 +110,7 @@ const searchServices = {
         }))
       } catch (error) {
         console.error('Semantic Scholar search error:', error)
+        toast('Error searching Semantic Scholar. Please try again.', 'Error', 'destructive')
         return []
       }
     }
@@ -97,27 +118,20 @@ const searchServices = {
 }
 
 const performSearch = async () => {
-  console.log('performSearch called')
-  console.log('searchQuery ref value:', searchQuery.value)
-  console.log('searchInput ref value:', searchInput.value?.value)
-  
   if (!searchQuery.value.trim()) {
-    console.log('No search query provided')
+    toast('Please enter a search query', 'Warning')
     return
   }
-  
-  console.log('Performing search with query:', searchQuery.value)
-  console.log('Using service:', activeSearchTab.value)
   
   isSearching.value = true
   try {
     const service = searchServices[activeSearchTab.value as keyof typeof searchServices]
-    console.log('Searching with service:', service.name)
-    
     const results = await service.search(searchQuery.value)
-    console.log('Search results:', results)
-    
     searchResults.value = results
+    
+    if (results.length === 0) {
+      toast('No results found. Try a different search term.', 'Info')
+    }
   } catch (error) {
     console.error('Search error:', error)
     searchResults.value = []
@@ -128,18 +142,12 @@ const performSearch = async () => {
 
 const handleSearchButtonClick = (event: MouseEvent, service: string) => {
   event.preventDefault()
-  console.log('Search button clicked for service:', service)
-  console.log('Current searchQuery ref value:', searchQuery.value)
-  console.log('Current input value:', searchInput.value?.value)
   activeSearchTab.value = service
   performSearch()
 }
 
 const handleSearch = (event: MouseEvent) => {
   event.preventDefault()
-  console.log('Search button clicked')
-  console.log('Current searchQuery ref value:', searchQuery.value)
-  console.log('Current input value:', searchInput.value?.value)
   performSearch()
 }
 
@@ -148,14 +156,10 @@ const handleClose = (event: MouseEvent) => {
   emit('close')
 }
 
-const handleJumpToReferences = (event: MouseEvent) => {
-  event.preventDefault()
-  jumpToReferences()
-}
-
 const handleSelect = (citation: CitationEntry) => {
   const index = citations.value.findIndex(c => c.key === citation.key)
   props.onSelect(citation, index)
+  emit('close')
 }
 
 const handleSearchSelect = async (citation: CitationEntry) => {
@@ -175,41 +179,51 @@ const handleSearchSelect = async (citation: CitationEntry) => {
       doi: citation.doi
     })
     
-    // Call onSelect with the new citation and its index
     if (newCitation) {
       const index = citations.value.length // New citation will be at the end
       props.onSelect(newCitation, index)
       emit('close')
+      toast('Citation added successfully', 'Success')
     }
   } catch (error) {
     console.error('Error importing citation:', error)
+    toast('Failed to add citation. Please try again.', 'Error', 'destructive')
   }
 }
 
+const handleJumpToReferences = (event: MouseEvent) => {
+  event.preventDefault()
+  jumpToReferences()
+}
+
 const jumpToReferences = () => {
-  // Toggle reference sidebar open
   const event = new CustomEvent('toggle-references', { detail: { open: true } })
   window.dispatchEvent(event)
   emit('close')
 }
 
-// Keyboard navigation
+// Keyboard navigation with improved UX
 const handleKeyDown = (e: KeyboardEvent) => {
   if (e.key === 'ArrowDown') {
     e.preventDefault()
-    if (filteredCitations.value.length > 0) {
+    if (searchResults.value.length > 0) {
+      selectedIndex.value = (selectedIndex.value + 1) % searchResults.value.length
+    } else if (filteredCitations.value.length > 0) {
       selectedIndex.value = (selectedIndex.value + 1) % filteredCitations.value.length
     }
   } else if (e.key === 'ArrowUp') {
     e.preventDefault()
-    if (filteredCitations.value.length > 0) {
+    if (searchResults.value.length > 0) {
+      selectedIndex.value = (selectedIndex.value - 1 + searchResults.value.length) % searchResults.value.length
+    } else if (filteredCitations.value.length > 0) {
       selectedIndex.value = (selectedIndex.value - 1 + filteredCitations.value.length) % filteredCitations.value.length
     }
   } else if (e.key === 'Enter') {
     e.preventDefault()
-    if (filteredCitations.value.length > 0) {
-      const citation = filteredCitations.value[selectedIndex.value]
-      handleSelect(citation)
+    if (searchResults.value.length > 0) {
+      handleSearchSelect(searchResults.value[selectedIndex.value])
+    } else if (filteredCitations.value.length > 0) {
+      handleSelect(filteredCitations.value[selectedIndex.value])
     }
   } else if (e.key === 'Escape') {
     e.preventDefault()
@@ -219,15 +233,13 @@ const handleKeyDown = (e: KeyboardEvent) => {
 
 const handleInput = (event: Event) => {
   const target = event.target as HTMLInputElement
-  console.log('Input event triggered')
-  console.log('Previous searchQuery value:', searchQuery.value)
-  console.log('New input value:', target.value)
   searchQuery.value = target.value
-  console.log('Updated searchQuery value:', searchQuery.value)
 }
 
 onMounted(() => {
   document.addEventListener('keydown', handleKeyDown)
+  // Focus the search input
+  searchInput.value?.focus()
 })
 
 onUnmounted(() => {
