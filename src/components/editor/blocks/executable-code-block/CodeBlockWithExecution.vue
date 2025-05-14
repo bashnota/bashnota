@@ -39,6 +39,8 @@ import CustomSelect from '@/components/CustomSelect.vue'
 import OutputRenderer from './OutputRenderer.vue'
 import { toast } from '@/lib/utils'
 import { useRoute } from 'vue-router'
+import ExecutionStatus from './ExecutionStatus.vue'
+import ErrorDisplay from './ErrorDisplay.vue'
 
 // Types
 interface Props {
@@ -103,6 +105,13 @@ const codeValue = ref(props.code)
 const hasUnsavedChanges = ref(false)
 const isFullScreen = ref(false)
 const executionInProgress = ref(false)
+const executionSuccess = ref(false)
+
+// Add after other refs
+const executionStartTime = ref<number | null>(null)
+const executionTime = ref<number>(0)
+const executionProgress = ref<number>(0)
+const errorMessage = ref<string | null>(null)
 const isCodeCopied = ref(false)
 
 // Computed
@@ -619,29 +628,51 @@ const createNewSession = async () => {
   }
 }
 
-// Update executeCode method to handle isExecuting prop
+// Add after other methods
+const startExecutionTimer = () => {
+  executionStartTime.value = Date.now()
+  executionTime.value = 0
+  executionProgress.value = 0
+  
+  const timer = setInterval(() => {
+    if (executionStartTime.value) {
+      executionTime.value = Date.now() - executionStartTime.value
+      // Simulate progress for long-running executions
+      if (executionTime.value > 1000) {
+        executionProgress.value = Math.min(90, (executionTime.value / 10000) * 90)
+      }
+    }
+  }, 100)
+  
+  return timer
+}
+
+// Modify the executeCode method
 const executeCode = async () => {
-  if (props.isExecuting || executionInProgress.value) return;
-  
-  // Ensure servers are loaded before execution
-  await refreshJupyterServers();
-  
-  // If not in shared mode, validate server and kernel selections
-  if (!isSharedSessionMode.value) {
-    if (!selectedServer.value || selectedServer.value === 'none') {
-      isServerOpen.value = true; // Open server selector
-      showConsoleMessage('Error', 'Please select a server first', 'error')
-      return
-    }
-    if (!selectedKernel.value) {
-      isServerOpen.value = true; // Open kernel selector too
-      showConsoleMessage('Error', 'Please select a kernel first', 'error')
-      return
-    }
-  }
+  if (props.isExecuting || executionInProgress.value) return
   
   executionInProgress.value = true
+  errorMessage.value = null
+  const timer = startExecutionTimer()
+  
   try {
+    // Ensure servers are loaded before execution
+    await refreshJupyterServers();
+    
+    // If not in shared mode, validate server and kernel selections
+    if (!isSharedSessionMode.value) {
+      if (!selectedServer.value || selectedServer.value === 'none') {
+        isServerOpen.value = true; // Open server selector
+        showConsoleMessage('Error', 'Please select a server first', 'error')
+        return
+      }
+      if (!selectedKernel.value) {
+        isServerOpen.value = true; // Open kernel selector too
+        showConsoleMessage('Error', 'Please select a kernel first', 'error')
+        return
+      }
+    }
+    
     // If in shared mode, ensure we're using the shared session
     if (isSharedSessionMode.value) {
       // Get or create shared session
@@ -677,39 +708,44 @@ const executeCode = async () => {
       emit('update:output', cell.value.output)
     }
   } catch (error) {
-    logger.error('Code execution failed:', error)
+    errorMessage.value = error instanceof Error ? error.message : String(error)
+    executionSuccess.value = false
     showConsoleMessage('Error', 'Code execution failed', 'error')
   } finally {
+    clearInterval(timer)
+    executionProgress.value = 100
     executionInProgress.value = false
   }
 }
 
+// Add retry handler
+const handleRetry = () => {
+  errorMessage.value = null
+  executeCode()
+}
+
 const updateCode = (newCode: string) => {
   codeValue.value = newCode
+  hasUnsavedChanges.value = true
   emit('update:code', newCode)
+}
+
+const copyCode = async () => {
+  try {
+    await navigator.clipboard.writeText(codeValue.value)
+    isCodeCopied.value = true
+    setTimeout(() => {
+      isCodeCopied.value = false
+    }, 2000)
+  } catch (error) {
+    logger.error('Failed to copy code:', error)
+  }
 }
 
 const saveChanges = () => {
   hasUnsavedChanges.value = false
+  emit('update:code', codeValue.value)
 }
-
-const copyCode = () => {
-  if (navigator.clipboard && codeValue.value) {
-    navigator.clipboard.writeText(codeValue.value)
-      .then(() => {
-        isCodeCopied.value = true
-        setTimeout(() => {
-          isCodeCopied.value = false
-        }, 2000)
-        toast('Code copied to clipboard')
-      })
-      .catch(err => {
-        logger.error('Failed to copy code:', err)
-        toast('Failed to copy code')
-      })
-  }
-}
-
 
 // Track disabled state changes with debugging
 const route = useRoute()
@@ -778,6 +814,21 @@ onMounted(() => {
   
   // Check if we need to initialize execution state from store
   syncExecutionStateWithStore()
+})
+
+// Add after other computed properties
+const currentExecutionTime = computed(() => {
+  if (props.isExecuting || executionInProgress.value) {
+    return executionTime.value
+  }
+  return 0
+})
+
+const runningStatus = computed(() => {
+  if (props.isExecuting || executionInProgress.value) return 'running'
+  if (cell?.value?.hasError) return 'error'
+  if (executionSuccess.value) return 'success'
+  return 'idle'
 })
 </script>
 
@@ -1200,7 +1251,7 @@ onMounted(() => {
     </div>
 
     <!-- Code Editor -->
-    <div v-show="isCodeVisible" class="relative group">
+    <div v-show="isCodeVisible" class="relative group code-editor-container">
       <!-- Copy button overlay -->
       <div class="absolute right-2 top-2 z-10 opacity-0 transition-opacity group-hover:opacity-100">
         <Button
@@ -1222,10 +1273,10 @@ onMounted(() => {
         :language="language"
         :disabled="(cell?.isExecuting || isExecuting) && !isPublished"
         :readonly="isReadOnly"
-        :runningStatus="isPublished ? 'idle' : runningStatus"
+        :runningStatus="runningStatus"
         :isPublished="isPublished"
         @update:modelValue="updateCode"
-        maxHeight="300px"
+        :maxHeight="'300px'"
         aria-label="Code editor"
         :indent-with-tab="true"
         :preserve-indent="true"
@@ -1262,6 +1313,19 @@ onMounted(() => {
       :is-read-only="isReadOnly"
       :is-published="isPublished"
       @execute="executeCode"
+    />
+
+    <ExecutionStatus
+      :status="runningStatus"
+      :execution-time="currentExecutionTime"
+      :progress="executionProgress"
+    />
+
+    <ErrorDisplay
+      v-if="errorMessage"
+      :error="errorMessage"
+      :code="codeValue"
+      @retry="handleRetry"
     />
   </div>
 </template>
@@ -1303,6 +1367,27 @@ div[v-html]::-webkit-scrollbar-thumb {
   .flex-wrap {
     flex-wrap: wrap;
   }
+}
+
+/* Add new styles for code editor container */
+.code-editor-container {
+  height: 300px;
+  min-height: 100px;
+  max-height: 600px;
+  overflow: hidden;
+  border-radius: 0.375rem;
+  background-color: var(--background);
+}
+
+/* Ensure proper scrolling behavior */
+:deep(.cm-editor) {
+  height: 100%;
+  overflow: hidden;
+}
+
+:deep(.cm-scroller) {
+  overflow: auto;
+  padding: 0.5rem 0;
 }
 
 /* Enhance styles for different states */
