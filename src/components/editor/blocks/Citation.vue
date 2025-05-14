@@ -4,8 +4,11 @@ import { useCitationStore } from '@/stores/citationStore'
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
-import { Link, ExternalLink, Edit, Copy, ClipboardCheck, X } from 'lucide-vue-next'
+import { Link, ExternalLink, Edit, Copy, ClipboardCheck, X, Search, Loader2 } from 'lucide-vue-next'
 import type { CitationEntry } from '@/types/nota'
+import { Input } from '@/components/ui/input'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { toast } from '@/lib/utils'
 
 const props = defineProps({
   node: {
@@ -32,6 +35,11 @@ const citationKey = computed(() => props.node.attrs.citationKey)
 const showDetailsTooltip = ref(false)
 const copiedFormat = ref<string | null>(null)
 const tooltipPosition = ref({ x: 0, y: 0 })
+const searchQuery = ref('')
+const isSearching = ref(false)
+const searchResults = ref<CitationEntry[]>([])
+const activeSearchTab = ref('crossref')
+const showSearchPanel = ref(false)
 
 // Get the current nota ID from the route
 const notaId = computed(() => {
@@ -57,7 +65,7 @@ const formatAuthors = (authors: string[], full = false) => {
 }
 
 const tooltipContent = computed(() => {
-  if (!citation.value) return `Citation key "${citationKey.value}" not found`
+  if (!citation.value) return `Citation key "${citationKey.value}" not found. Click to create a new citation.`
   
   let text = `${formatAuthors(citation.value.authors)} (${citation.value.year}). ${citation.value.title}.`
   
@@ -109,7 +117,14 @@ const toggleDetailsTooltip = (event?: MouseEvent) => {
     
     tooltipPosition.value = { x, y }
   }
+  
+  // Toggle tooltip and reset search panel state
   showDetailsTooltip.value = !showDetailsTooltip.value
+  if (!showDetailsTooltip.value) {
+    showSearchPanel.value = false
+    searchQuery.value = ''
+    searchResults.value = []
+  }
 }
 
 const closeTooltip = (event?: MouseEvent) => {
@@ -180,7 +195,7 @@ const copyToClipboard = (format: string) => {
 }
 
 const citationStatus = computed(() => {
-  if (!citation.value) return 'error'
+  if (!citation.value) return 'missing'
   
   // Check if essential fields are present
   const c = citation.value
@@ -198,6 +213,127 @@ const jumpToReferences = () => {
   
   // Close the tooltip
   showDetailsTooltip.value = false
+}
+
+const createNewCitation = () => {
+  // Close the tooltip
+  showDetailsTooltip.value = false
+  
+  // Navigate to the references page with the new citation key
+  router.push({
+    name: 'references',
+    params: { id: notaId.value },
+    query: { new: citationKey.value }
+  })
+}
+
+// Citation search services
+const searchServices = {
+  crossref: {
+    name: 'Crossref',
+    icon: '🔍',
+    search: async (query: string) => {
+      try {
+        const response = await fetch(`https://api.crossref.org/works?query=${encodeURIComponent(query)}&rows=10`)
+        const data = await response.json()
+        return data.message.items.map((item: any) => ({
+          key: item.DOI,
+          title: item.title?.[0] || '',
+          authors: item.author?.map((a: any) => `${a.given} ${a.family}`) || [],
+          year: item.published?.['date-parts']?.[0]?.[0] || '',
+          journal: item['container-title']?.[0] || '',
+          volume: item.volume || '',
+          number: item.issue || '',
+          pages: item.page || '',
+          doi: item.DOI || '',
+          url: item.URL || ''
+        }))
+      } catch (error) {
+        console.error('Crossref search error:', error)
+        return []
+      }
+    }
+  },
+  semanticScholar: {
+    name: 'Semantic Scholar',
+    icon: '🎓',
+    search: async (query: string) => {
+      try {
+        const response = await fetch(`https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(query)}&limit=10`)
+        const data = await response.json()
+        return data.data.map((item: any) => ({
+          key: item.paperId,
+          title: item.title || '',
+          authors: item.authors?.map((a: any) => a.name) || [],
+          year: item.year || '',
+          journal: item.venue || '',
+          doi: item.doi || '',
+          url: item.url || ''
+        }))
+      } catch (error) {
+        console.error('Semantic Scholar search error:', error)
+        return []
+      }
+    }
+  },
+  googleScholar: {
+    name: 'Google Scholar',
+    icon: '📚',
+    search: async (query: string) => {
+      // Note: This is a placeholder. Google Scholar doesn't have a public API.
+      // You would need to implement a proxy server to handle this.
+      return []
+    }
+  }
+}
+
+const performSearch = async () => {
+  if (!searchQuery.value.trim()) return
+  
+  isSearching.value = true
+  try {
+    const service = searchServices[activeSearchTab.value as keyof typeof searchServices]
+    searchResults.value = await service.search(searchQuery.value)
+  } catch (error) {
+    console.error('Search error:', error)
+    searchResults.value = []
+  } finally {
+    isSearching.value = false
+  }
+}
+
+const importCitation = async (citation: CitationEntry) => {
+  try {
+    // Add the citation to the store
+    await citationStore.addCitation(notaId.value, {
+      key: citation.key,
+      title: citation.title,
+      authors: citation.authors,
+      year: citation.year,
+      journal: citation.journal,
+      volume: citation.volume,
+      number: citation.number,
+      pages: citation.pages,
+      publisher: citation.publisher,
+      url: citation.url,
+      doi: citation.doi
+    })
+    
+    // Update the current citation
+    props.updateAttributes({
+      citationKey: citation.key
+    })
+    
+    // Close the search panel
+    showSearchPanel.value = false
+    showDetailsTooltip.value = false
+    
+    // Show success message
+    toast('Citation imported successfully')
+  } catch (error) {
+    console.error('Error importing citation:', error)
+    toast('Failed to import citation', 'Error', 'destructive')
+  }
 }
 </script>
 
@@ -307,8 +443,93 @@ const jumpToReferences = () => {
           </div>
         </div>
         
-        <div v-else class="py-4 text-center text-muted-foreground">
-          <p>Citation not found. The key "{{ citationKey }}" might be missing or invalid.</p>
+        <div v-else class="space-y-4">
+          <!-- Search panel -->
+          <div v-if="showSearchPanel" class="space-y-4">
+            <Tabs v-model="activeSearchTab" class="w-full">
+              <TabsList class="grid grid-cols-3 mb-4">
+                <TabsTrigger v-for="(service, key) in searchServices" 
+                           :key="key" 
+                           :value="key"
+                           class="flex items-center gap-1">
+                  <span>{{ service.icon }}</span>
+                  <span>{{ service.name }}</span>
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent v-for="(service, key) in searchServices" 
+                          :key="key" 
+                          :value="key"
+                          class="space-y-4">
+                <div class="flex gap-2">
+                  <Input
+                    v-model="searchQuery"
+                    placeholder="Search for papers..."
+                    class="flex-1"
+                    @keyup.enter="performSearch"
+                  />
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    :disabled="isSearching"
+                    @click="performSearch"
+                  >
+                    <Search v-if="!isSearching" class="h-4 w-4" />
+                    <Loader2 v-else class="h-4 w-4 animate-spin" />
+                  </Button>
+                </div>
+                
+                <!-- Search results -->
+                <div v-if="searchResults.length > 0" class="space-y-2 max-h-60 overflow-y-auto">
+                  <div v-for="result in searchResults" 
+                       :key="result.key"
+                       class="p-2 rounded-md border hover:bg-accent cursor-pointer"
+                       @click="importCitation(result)">
+                    <div class="font-medium text-sm">{{ result.title }}</div>
+                    <div class="text-xs text-muted-foreground">
+                      {{ formatAuthors(result.authors) }} ({{ result.year }})
+                    </div>
+                    <div v-if="result.journal" class="text-xs italic text-muted-foreground">
+                      {{ result.journal }}
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Empty state -->
+                <div v-else-if="searchQuery" class="text-center py-4 text-muted-foreground">
+                  <p>No results found</p>
+                  <p class="text-xs">Try a different search term</p>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
+          
+          <!-- Empty state with search option -->
+          <div v-else class="py-4 text-center space-y-4">
+            <p class="text-muted-foreground">
+              Citation not found. The key "{{ citationKey }}" might be missing or invalid.
+            </p>
+            <div class="flex flex-col gap-2">
+              <Button 
+                variant="default" 
+                size="sm" 
+                @click.stop="showSearchPanel = true"
+                class="w-full"
+              >
+                <Search class="h-4 w-4 mr-2" />
+                Search for Citation
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                @click.stop="createNewCitation"
+                class="w-full"
+              >
+                <Edit class="h-4 w-4 mr-2" />
+                Create New Citation
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -336,6 +557,10 @@ const jumpToReferences = () => {
   @apply bg-red-100 text-red-800;
 }
 
+.citation-missing {
+  @apply bg-gray-100 text-gray-800;
+}
+
 .citation-details-tooltip {
   animation: fadeIn 0.15s ease;
 }
@@ -354,5 +579,17 @@ const jumpToReferences = () => {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.citation-search-results {
+  @apply space-y-2 max-h-60 overflow-y-auto;
+}
+
+.citation-search-result {
+  @apply p-2 rounded-md border hover:bg-accent cursor-pointer transition-colors;
+}
+
+.citation-search-result:hover {
+  @apply border-primary/50;
 }
 </style>

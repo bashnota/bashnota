@@ -14,10 +14,23 @@ export const CitationExtension = Node.create({
     return {
       citationKey: {
         default: null,
+        parseHTML: element => element.getAttribute('data-citation-key'),
+        renderHTML: attributes => {
+          if (!attributes.citationKey) {
+            return { 'data-citation-key': '' }
+          }
+          return { 'data-citation-key': attributes.citationKey }
+        }
       },
-      // We'll store a reference to the actual citation data that can be used for rendering
       citationNumber: {
         default: null,
+        parseHTML: element => element.getAttribute('data-citation-number'),
+        renderHTML: attributes => {
+          if (!attributes.citationNumber) {
+            return { 'data-citation-number': '?' }
+          }
+          return { 'data-citation-number': attributes.citationNumber }
+        }
       }
     }
   },
@@ -34,7 +47,12 @@ export const CitationExtension = Node.create({
     return [
       'span',
       mergeAttributes(
-        { 'data-type': 'citation', class: 'citation-reference' }, 
+        { 
+          'data-type': 'citation',
+          class: 'citation-reference citation-missing',
+          'data-citation-key': HTMLAttributes.citationKey || '',
+          'data-citation-number': HTMLAttributes.citationNumber || '?'
+        }, 
         HTMLAttributes
       ),
       `[${HTMLAttributes.citationNumber || '?'}]`,
