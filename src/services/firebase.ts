@@ -35,16 +35,18 @@ export const logAnalyticsEvent = (eventName: string, eventParams?: Record<string
 const auth = getAuth(app)
 
 // Connect to the Auth emulator if running in development
-if (import.meta.env.VITE_NODE_ENV === 'development') {
+if (import.meta.env.DEV) {
   connectAuthEmulator(auth, 'http://localhost:9099')
+  console.log('Connected to Auth Emulator')
 }
 
 // Initialize Firestore
 const firestore = getFirestore(app)
 
 // Connect to the Firestore emulator if running in development
-if (import.meta.env.VITE_NODE_ENV === 'development') {
+if (import.meta.env.DEV) {
   connectFirestoreEmulator(firestore, 'localhost', 8080)
+  console.log('Connected to Firestore Emulator')
 }
 
 export { analytics, auth, firestore }
