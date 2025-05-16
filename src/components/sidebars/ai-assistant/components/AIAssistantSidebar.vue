@@ -2,29 +2,26 @@
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
-import { Tooltip } from '@/components/ui/tooltip'
-import { TooltipTrigger, TooltipContent } from 'radix-vue'
-import { toast } from '@/components/ui/toast'
 import { useAISettingsStore } from '@/stores/aiSettingsStore'
 import { logger } from '@/services/logger'
-import { 
-  LoaderIcon, 
-  SettingsIcon, 
-  CopyIcon, 
-  FileTextIcon,
-  XIcon,
-  StopCircleIcon
-} from 'lucide-vue-next'
+import { toast } from '@/components/ui/toast'
 
 // Import composables
-import { useConversation } from '../composables/useConversation'
-import { useAIGeneration } from '../composables/useAIGeneration'
-import { useAIProviders } from '../composables/useAIProviders'
+import { useConversation } from '../../ai-assistant/composables/useConversation'
+import { useAIGeneration } from '../../ai-assistant/composables/useAIGeneration'
+import { useMentions } from '../../ai-assistant/composables/useMentions'
 
 // Import components
+import { ScrollArea } from '@/components/ui/scroll-area'
+import ConversationHistory from './ConversationHistory.vue'
+import ConversationInput from './ConversationInput.vue'
+import ActionBar from './ActionBar.vue'
+import EmptyState from './EmptyState.vue'
+import ChatList from './ChatList.vue'
 import ProviderSelector from './ProviderSelector.vue'
-import MarkdownIt from 'markdown-it'
+
+// Import the icons
+import { List as ListIcon, ArrowLeft as ArrowLeftIcon } from 'lucide-vue-next'
 
 const props = defineProps<{
   editor: any
@@ -32,372 +29,706 @@ const props = defineProps<{
   hideHeader?: boolean
 }>()
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'keepOpen'])
 
-// Get AI providers info
-const { 
-  isLoadingWebLLMModels, 
-  webLLMProgress, 
-  currentWebLLMModel,
-  availableProviders,
-  isWebLLMSupported
-} = useAIProviders()
-
-// AI settings
+// AI Settings store
 const aiSettings = useAISettingsStore()
+const selectedProvider = computed(() => {
+  return aiSettings.providers.find(p => p.id === aiSettings.settings.preferredProviderId)
+})
 
-// AI generation
+// Initialize composables
 const { 
-  isLoading: isGenerating,
-  errorMessage, 
-  generateText: generateAIText,
-  abortGeneration
-} = useAIGeneration(props.editor)
-
-// Conversation management
-const { 
-  activeAIBlock,
-  promptInput: prompt, 
-  resultInput: result, 
-  conversationHistory, 
-  formatTimestamp: formatTime, 
-  clearActiveBlock: clearPrompt,
-  createNewSession: clearConversation,
-  isPromptEmpty
+  activeAIBlock, 
+  promptInput, 
+  followUpPrompt,
+  isContinuing, 
+  isEditing, 
+  resultInput,
+  selectedText,
+  copied,
+  conversationHistory,
+  promptTokenCount,
+  isPromptEmpty,
+  isLoading,
+  tokenWarning,
+  maxInputChars,
+  formatTimestamp,
+  loadConversationFromBlock,
+  clearActiveBlock,
+  createNewSession,
+  toggleContinuing,
+  toggleEditing,
+  saveEditedText
 } = useConversation(props.editor, props.notaId)
 
-// Model loading state
-const isLoadingProvider = computed(() => {
-  return isLoadingWebLLMModels.value || isGenerating.value
+const {
+  generateText: generateTextAction,
+  continueConversation: continueAction,
+  regenerateText: regenerateAction,
+  removeBlock: removeBlockAction
+} = useAIGeneration(props.editor)
+
+const {
+  showMentionSearch,
+  mentionSearchResults,
+  mentionsInPrompt,
+  checkForMentions,
+  selectNotaFromSearch,
+  loadMentionedNotaContents,
+  handleOutsideClick,
+  clearMentions,
+  updateMentionQuery,
+  closeMentionSearch
+} = useMentions()
+
+// Reference to the textarea for mention search
+const textareaRef = ref<HTMLTextAreaElement | null>(null)
+
+// Computed properties
+const hasResult = computed(() => {
+  return activeAIBlock.value?.node.attrs.result
 })
 
-// Is WebLLM model loading
-const isLoadingWebLLMModel = computed(() => {
-  return isLoadingWebLLMModels.value && 
-         aiSettings.settings.preferredProviderId === 'webllm'
+const error = computed(() => {
+  return activeAIBlock.value?.node.attrs.error || ''
 })
 
-// Get model loading message
-const modelLoadingMessage = computed(() => {
-  if (aiSettings.settings.preferredProviderId === 'webllm') {
-    if (isLoadingWebLLMModels.value) {
-      return `Loading ${currentWebLLMModel.value || 'WebLLM model'}...`
-    } else if (currentWebLLMModel.value) {
-      return `Using ${currentWebLLMModel.value}`
-    }
-    return 'Model needs to be loaded'
-  }
-  return ''
-})
-
-// Format result with markdown
-const md = new MarkdownIt({
-  breaks: true,
-  linkify: true,
-  typographer: true
-})
-
-const formattedResult = computed(() => {
-  return activeAIBlock.value?.node.attrs.result ? md.render(activeAIBlock.value.node.attrs.result) : ''
-})
-
-// Get provider status message
-const getProviderStatus = () => {
-  const providerId = aiSettings.settings.preferredProviderId
-  const provider = aiSettings.providers.find(p => p.id === providerId)
-  
-  if (!provider) return 'No provider selected'
-  
-  if (providerId === 'webllm') {
-    if (currentWebLLMModel.value) {
-      return `${provider.name} - ${currentWebLLMModel.value}`
-    }
-    if (!isWebLLMSupported.value) {
-      return `${provider.name} - Browser not supported`
-    }
-    return `${provider.name} - No model loaded`
-  }
-  
-  if (providerId === 'gemini' && !aiSettings.getApiKey('gemini')) {
-    return `${provider.name} - API key required`
-  }
-  
-  if (providerId === 'ollama' && !availableProviders.value.includes('ollama')) {
-    return `${provider.name} - Server not connected`
-  }
-  
-  return provider.name
-}
-
-// Generate text
+// Generate text with mentions
 const generateText = async () => {
-  if (isPromptEmpty.value || isGenerating.value) return
+  if (!activeAIBlock.value || !promptInput.value.trim()) return
   
   try {
-    await generateAIText(activeAIBlock.value, prompt.value, conversationHistory.value, formatTime)
+    // Check if there are any mentioned notas
+    if (promptInput.value.includes('#[')) {
+      // Process with mentions
+      const enhancedPrompt = await loadMentionedNotaContents(promptInput.value)
+      
+      // Generate with enhanced prompt
+      const newHistory = await generateTextAction(
+        activeAIBlock.value, 
+        enhancedPrompt, 
+        conversationHistory.value,
+        formatTimestamp
+      )
+      if (newHistory) conversationHistory.value = newHistory as typeof conversationHistory.value
+    } else {
+      // Generate normally
+      const newHistory = await generateTextAction(
+        activeAIBlock.value, 
+        promptInput.value, 
+        conversationHistory.value,
+        formatTimestamp
+      )
+      if (newHistory) conversationHistory.value = newHistory as typeof conversationHistory.value
+    }
+    
+    // Clear mentions after generation
+    clearMentions()
   } catch (error) {
-    logger.error('Error generating text:', error)
-  }
-}
-
-// Copy result to clipboard
-const copyResult = () => {
-  if (!activeAIBlock.value?.node.attrs.result) return
-  
-  navigator.clipboard.writeText(activeAIBlock.value.node.attrs.result).then(() => {
-    toast({
-      title: 'Copied!',
-      description: 'Response copied to clipboard'
-    })
-  })
-}
-
-// Insert result into document
-const insertIntoDocument = () => {
-  if (!activeAIBlock.value?.node.attrs.result || !props.editor) return
-  
-  try {
-    // Get the current position
-    const { view } = props.editor
-    const { state, dispatch } = view
-    const { selection } = state
-    
-    // Insert text at current position
-    const transaction = state.tr.insertText(activeAIBlock.value.node.attrs.result, selection.from, selection.to)
-    dispatch(transaction)
-    
-    toast({
-      title: 'Inserted',
-      description: 'AI response inserted into document'
-    })
-  } catch (error) {
-    logger.error('Error inserting into document:', error)
-    
+    logger.error('Error in generateText:', error)
     toast({
       title: 'Error',
-      description: 'Failed to insert response into document',
+      description: 'Failed to generate text',
       variant: 'destructive'
     })
   }
 }
 
-// Open AI settings
-const openSettings = () => {
-  // Implement opening settings dialog or navigating to settings
-  toast({
-    title: 'Settings',
-    description: 'AI settings dialog would open here'
+// Continue conversation with mentions
+const continueConversation = async () => {
+  if (!activeAIBlock.value || !followUpPrompt.value.trim() || isLoading.value) return
+  
+  try {
+    // Check if there are any mentioned notas
+    if (followUpPrompt.value.includes('#[')) {
+      const enhancedPrompt = await loadMentionedNotaContents(followUpPrompt.value)
+      
+      // Continue with enhanced prompt
+      const newHistory = await continueAction(
+        activeAIBlock.value, 
+        enhancedPrompt, 
+        conversationHistory.value,
+        formatTimestamp
+      )
+      if (newHistory) conversationHistory.value = newHistory as typeof conversationHistory.value
+    } else {
+      // Continue normally
+        const newHistory = await continueAction(
+          activeAIBlock.value, 
+          followUpPrompt.value, 
+          conversationHistory.value,
+          formatTimestamp
+        )
+        if (newHistory) conversationHistory.value = newHistory as typeof conversationHistory.value
+    }
+    
+    // Clear the prompt and exit continue mode
+    followUpPrompt.value = ''
+    isContinuing.value = false
+    
+    // Clear mentions after generation
+    clearMentions()
+  } catch (error) {
+    logger.error('Error in continueConversation:', error)
+    toast({
+      title: 'Error',
+      description: 'Failed to continue conversation',
+      variant: 'destructive'
+    })
+  }
+}
+
+// Regenerate text
+const regenerateText = async () => {
+  if (!activeAIBlock.value || isLoading.value) return
+  
+  try {
+    const newHistory = await regenerateAction(activeAIBlock.value, conversationHistory.value)
+    if (newHistory) conversationHistory.value = newHistory
+  } catch (error) {
+    logger.error('Error in regenerateText:', error)
+    toast({
+      title: 'Error',
+      description: 'Failed to regenerate text',
+      variant: 'destructive'
+    })
+  }
+}
+
+// Handle text selection in AI response
+const handleTextSelection = (content: string) => {
+  const selection = window.getSelection()
+  if (selection && selection.toString().trim()) {
+    selectedText.value = selection.toString()
+  }
+}
+
+// Copy text to clipboard
+const copyToClipboard = () => {
+  if (!activeAIBlock.value || !activeAIBlock.value.node.attrs.result) return
+  
+  navigator.clipboard.writeText(activeAIBlock.value.node.attrs.result)
+    .then(() => {
+      copied.value = true
+      setTimeout(() => {
+        copied.value = false
+      }, 2000)
+      
+      toast({
+        title: 'Copied',
+        description: 'Text copied to clipboard',
+        variant: 'default'
+      })
+    })
+    .catch(error => {
+      logger.error('Failed to copy text:', error)
+      toast({
+        title: 'Copy Failed',
+        description: 'Failed to copy text to clipboard',
+        variant: 'destructive'
+      })
+    })
+}
+
+// Copy specific message to clipboard
+const copyMessageToClipboard = (text: string) => {
+  navigator.clipboard.writeText(text)
+    .then(() => {
+      toast({
+        title: 'Copied',
+        description: 'Text copied to clipboard',
+        variant: 'default'
+      })
+    })
+    .catch(error => {
+      logger.error('Failed to copy text:', error)
+      toast({
+        title: 'Copy Failed',
+        description: 'Failed to copy text to clipboard',
+        variant: 'destructive'
+      })
+    })
+}
+
+// Insert AI response to document
+const insertToDocument = () => {
+  if (!activeAIBlock.value || !activeAIBlock.value.node.attrs.result) return
+  
+  try {
+    // Get the result text
+    const text = activeAIBlock.value.node.attrs.result
+    
+    // Get the current editor state
+    const { state } = props.editor
+    const { selection } = state
+    
+    // Check if we're in a list item
+    const isInListItem = selection.$anchor.parent.type.name === 'listItem'
+    
+    if (isInListItem) {
+      // When in a list item, insert as paragraphs inside the list item
+      props.editor.chain().focus().insertContent({
+        type: 'paragraph',
+        content: [{ type: 'text', text }]
+      }).run()
+    } else {
+      // Normal insertion for other contexts
+      props.editor.chain().focus().insertContent(text).run()
+    }
+    
+    toast({
+      title: 'Inserted',
+      description: 'Text inserted into document',
+      variant: 'default'
+    })
+  } catch (error) {
+    logger.error('Failed to insert text:', error)
+    toast({
+      title: 'Insert Failed',
+      description: 'Failed to insert text into document',
+      variant: 'destructive'
+    })
+  }
+}
+
+// Insert selected text to document
+const insertSelectionToDocument = () => {
+  if (!selectedText.value) return
+  
+  try {
+    // Get the current editor state
+    const { state } = props.editor
+    const { selection } = state
+    
+    // Check if we're in a list item
+    const isInListItem = selection.$anchor.parent.type.name === 'listItem'
+    
+    if (isInListItem) {
+      // When in a list item, insert as paragraphs inside the list item
+      props.editor.chain().focus().insertContent({
+        type: 'paragraph',
+        content: [{ type: 'text', text: selectedText.value }]
+      }).run()
+    } else {
+      // Normal insertion for other contexts
+      props.editor.chain().focus().insertContent(selectedText.value).run()
+    }
+    
+    toast({
+      title: 'Inserted',
+      description: 'Selection inserted into document',
+      variant: 'default'
+    })
+    
+    // Clear the selection
+    selectedText.value = ''
+  } catch (error) {
+    logger.error('Failed to insert selection:', error)
+    toast({
+      title: 'Insert Failed',
+      description: 'Failed to insert selection into document',
+      variant: 'destructive'
+    })
+  }
+}
+
+// Insert specific message to document
+const insertMessageToDocument = (text: string) => {
+  try {
+    // Get the current editor state
+    const { state } = props.editor
+    const { selection } = state
+    
+    // Check if we're in a list item
+    const isInListItem = selection.$anchor.parent.type.name === 'listItem'
+    
+    if (isInListItem) {
+      // When in a list item, insert as paragraphs inside the list item
+      props.editor.chain().focus().insertContent({
+        type: 'paragraph',
+        content: [{ type: 'text', text }]
+      }).run()
+    } else {
+      // Normal insertion for other contexts
+      props.editor.chain().focus().insertContent(text).run()
+    }
+    
+    toast({
+      title: 'Inserted',
+      description: 'Text inserted into document',
+      variant: 'default'
+    })
+  } catch (error) {
+    logger.error('Failed to insert text:', error)
+    toast({
+      title: 'Insert Failed',
+      description: 'Failed to insert text into document',
+      variant: 'destructive'
+    })
+  }
+}
+
+// Remove the block from the document
+const removeBlock = () => {
+  if (!activeAIBlock.value) return
+  
+  if (removeBlockAction(activeAIBlock.value)) {
+    clearActiveBlock()
+  }
+}
+
+// Handle mentions selection
+const handleMentionSelection = (nota: any) => {
+  selectNotaFromSearch(nota, textareaRef, isContinuing.value, promptInput, followUpPrompt)
+}
+
+// Update mention search query
+const handleUpdateMentionQuery = (query: string) => {
+  updateMentionQuery(query)
+}
+
+// Close mention search popup
+const handleCloseMentionSearch = () => {
+  closeMentionSearch()
+}
+
+// Handle model change
+const handleModelChange = (modelId: string) => {
+  try {
+    // Update the preferred provider in the AI settings store
+    aiSettings.setPreferredProvider(modelId)
+    
+    // Show toast notification
+    const provider = aiSettings.providers.find(p => p.id === modelId)
+    toast({
+      title: "AI Model Changed",
+      description: `Now using ${provider?.name || 'new model'}`,
+      variant: "default"
+    })
+  } catch (error) {
+    logger.error('Error changing AI model:', error)
+    toast({
+      title: "Error",
+      description: "Failed to change AI model",
+      variant: "destructive" 
+    })
+  }
+}
+
+// Listen for "activate-ai-assistant" event from InlineAIGeneration components
+onMounted(() => {
+  // Create a prefixed logger for easier debugging
+  const sidebarLogger = logger.createPrefixedLogger('AIAssistantSidebar');
+  
+  window.addEventListener('activate-ai-assistant', ((event: CustomEvent) => {
+    sidebarLogger.debug('Received activate-ai-assistant event:', event.detail);
+    
+    if (event.detail && event.detail.block) {
+      // Track if we're loading a new conversation or the same one
+      const isNewConversation = !activeAIBlock.value || 
+                              activeAIBlock.value.node !== event.detail.block.node;
+      
+      sidebarLogger.debug('Is new conversation:', isNewConversation, 
+                     'Current block:', activeAIBlock.value ? activeAIBlock.value.node.attrs : 'none',
+                     'New block:', event.detail.block.node.attrs);
+      
+      if (isNewConversation) {
+        // If this is a new conversation, load the history
+        if (event.detail.conversationHistory && event.detail.conversationHistory.length > 0) {
+          sidebarLogger.debug('Conversation history provided in event, length:', 
+                         event.detail.conversationHistory.length,
+                         'Content:', event.detail.conversationHistory);
+          
+          // Set the active block
+          activeAIBlock.value = event.detail.block;
+          // Set the conversation history from the event
+          conversationHistory.value = event.detail.conversationHistory;
+          
+          // Log that we've loaded the conversation history
+          logger.info('Loaded conversation history from AI block', {
+            messageCount: event.detail.conversationHistory.length
+          });
+          
+          // Ensure proper UI state based on the loaded conversation
+          if (isContinuing.value) {
+            // Reset continuing state if it was active
+            isContinuing.value = false;
+          }
+          
+          // Clear the prompt input to prepare for new input
+          promptInput.value = '';
+          
+          // Scroll to the bottom of the conversation after a short delay
+          setTimeout(() => {
+            scrollToBottom();
+          }, 100);
+        } else {
+          // Fall back to loading from block if no history provided
+          sidebarLogger.debug('No conversation history in event, falling back to loadConversationFromBlock');
+          loadConversationFromBlock(event.detail.block);
+          sidebarLogger.debug('After loadConversationFromBlock, history length:', 
+                         conversationHistory.value.length,
+                         'Content:', conversationHistory.value);
+        }
+        
+        // Emit event to indicate sidebar should stay open
+        emit('keepOpen', true);
+      } else {
+        sidebarLogger.debug('Same conversation, not reloading history. Current history length:', 
+                       conversationHistory.value.length);
+      }
+      // We don't do anything if it's the same conversation, this allows the normal sidebar toggle to work
+    } else {
+      sidebarLogger.warn('Received activate-ai-assistant event without valid detail or block');
+    }
+  }) as EventListener);
+  
+  document.addEventListener('mousedown', handleOutsideClick);
+});
+
+// Clean up event listeners
+onBeforeUnmount(() => {
+  document.removeEventListener('mousedown', handleOutsideClick)
+})
+
+// Add state for sidebar view mode
+const showChatList = ref(false)
+
+// Function to handle loading a specific chat from the chat list
+const handleSelectChat = (block: any) => {
+  loadConversationFromBlock(block)
+  showChatList.value = false
+}
+
+// Get ID for the active block for highlighting in the list
+const activeBlockId = computed(() => {
+  if (!activeAIBlock.value) return undefined
+  // Use a property that exists on the activeAIBlock object
+  return `ai-${activeAIBlock.value.node.attrs.lastUpdated || Date.now()}`
+})
+
+// Toggle between chat list and current conversation
+const toggleChatList = () => {
+  showChatList.value = !showChatList.value
+}
+
+// Auto-scroll to bottom when new messages arrive
+const scrollAreaViewportRef = ref<HTMLElement | null>(null)
+
+// Function to scroll to bottom of conversation
+const scrollToBottom = () => {
+  nextTick(() => {
+    if (scrollAreaViewportRef.value) {
+      scrollAreaViewportRef.value.scrollTop = scrollAreaViewportRef.value.scrollHeight
+    }
   })
 }
+
+// Watch conversation history changes to auto-scroll
+watch(() => conversationHistory.value.length, () => {
+  scrollToBottom()
+})
+
+// Watch loading state to scroll to bottom when it changes
+watch(() => isLoading.value, () => {
+  scrollToBottom()
+})
+
+// Scroll to bottom when component is mounted
+onMounted(() => {
+  scrollToBottom()
+})
 </script>
 
 <template>
-  <div class="ai-assistant-sidebar">
-    <!-- Provider Selection Panel -->
-    <div class="provider-panel mb-3 p-3 bg-secondary/20 rounded-md">
-      <div class="flex items-center justify-between">
-        <div>
-          <h3 class="text-sm font-medium">AI Provider</h3>
-          <div class="text-xs text-muted-foreground">
-            {{ getProviderStatus() }}
-          </div>
-        </div>
-        
-        <Tooltip v-if="isLoadingProvider" :content="modelLoadingMessage">
-          <span class="provider-loading flex items-center">
-            <LoaderIcon :size="16" class="animate-spin mr-1" />
-            <span class="text-xs">Loading...</span>
-          </span>
-        </Tooltip>
-      </div>
-      
-      <div class="mt-2">
-        <ProviderSelector />
-      </div>
-      
-      <!-- Model Loading Progress (for WebLLM) -->
-      <div v-if="isLoadingWebLLMModel" class="mt-3">
-        <div class="text-xs mb-1 flex justify-between">
-          <span>Loading model...</span>
-          <span>{{ Math.round(webLLMProgress * 100) }}%</span>
-        </div>
-        <Progress :value="webLLMProgress * 100" class="h-1" />
-        <p class="text-xs text-muted-foreground mt-1">
-          {{ modelLoadingMessage || 'Please wait, this may take a few minutes' }}
-        </p>
-      </div>
-    </div>
-    
-    <!-- Message Generation Area -->
-    <div class="ai-message-area mb-4">
-      <div class="flex items-center justify-between mb-2">
-        <h3 class="text-sm font-medium">Generate AI Response</h3>
-        
-        <div class="flex gap-1 items-center">
-          <Button 
-            v-if="isGenerating" 
-            variant="destructive" 
-            size="icon"
-            @click="abortGeneration"
-            class="h-7 w-7 rounded-full"
-          >
-            <StopCircleIcon :size="14" />
-          </Button>
-          
-          <Tooltip content="Configure AI Settings">
-            <Button 
-              variant="ghost" 
-              size="icon"
-              @click="openSettings"
-              class="h-7 w-7"
-            >
-              <SettingsIcon :size="14" />
-            </Button>
-          </Tooltip>
-        </div>
-      </div>
-      
-      <!-- Input Area -->
-      <div class="relative">
-        <Textarea 
-          v-model="prompt" 
-          placeholder="Ask the AI assistant..." 
-          class="resize-none min-h-[80px]"
-          :disabled="isGenerating || isLoadingProvider"
-          @keydown.ctrl.enter="generateText"
-        />
-        
-        <div class="absolute bottom-2 right-2 flex gap-1">
-          <Button 
-            @click="clearPrompt" 
-            variant="ghost" 
-            size="icon"
-            class="h-7 w-7 rounded-full opacity-70 hover:opacity-100"
-            :disabled="isPromptEmpty || isGenerating"
-          >
-            <XIcon :size="14" />
-          </Button>
-          
-          <Button 
-            @click="generateText" 
-            :disabled="isPromptEmpty || isGenerating || isLoadingProvider"
-            size="sm"
-            class="relative group h-7"
-          >
-            <span v-if="isGenerating" class="animate-pulse">Generating...</span>
-            <span v-else>Generate</span>
-            <kbd class="absolute top-[-18px] right-0 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] bg-muted px-1 rounded text-muted-foreground pointer-events-none">
-              Ctrl+Enter
-            </kbd>
-          </Button>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Response Display -->
-    <div v-if="activeAIBlock?.node.attrs.result || isGenerating" class="ai-result border rounded-md p-3 relative min-h-[100px]">
-      <div class="absolute top-2 right-2 flex gap-1">
-        <Tooltip content="Copy response">
-          <Button 
-            @click="copyResult" 
-            variant="ghost" 
-            size="icon"
-            class="h-7 w-7 rounded-full opacity-70 hover:opacity-100"
-            :disabled="!activeAIBlock?.node.attrs.result || isGenerating"
-          >
-            <CopyIcon :size="14" />
-          </Button>
-        </Tooltip>
-        
-        <Tooltip content="Insert into document">
-          <Button 
-            @click="insertIntoDocument" 
-            variant="ghost" 
-            size="icon"
-            class="h-7 w-7 rounded-full opacity-70 hover:opacity-100"
-            :disabled="!activeAIBlock?.node.attrs.result || isGenerating"
-          >
-            <FileTextIcon :size="14" />
-          </Button>
-        </Tooltip>
-      </div>
-      
-      <div v-if="isGenerating" class="text-muted-foreground text-sm flex items-center">
-        <LoaderIcon :size="14" class="animate-spin mr-2" />
-        <span>AI is thinking...</span>
-      </div>
-      
-      <div v-else-if="activeAIBlock?.node.attrs.result" class="prose prose-sm dark:prose-invert max-w-none overflow-auto">
-        <div v-html="formattedResult"></div>
-      </div>
-      
-      <div v-if="errorMessage" class="mt-2 text-destructive text-xs border border-destructive/30 bg-destructive/10 p-2 rounded">
-        {{ errorMessage }}
-      </div>
-    </div>
-    
-    <!-- Conversation History -->
-    <div v-if="conversationHistory.length > 1" class="mt-4">
-      <div class="flex items-center justify-between mb-2">
-        <h3 class="text-sm font-medium">Conversation History</h3>
+  <div class="h-full w-full flex flex-col overflow-hidden">
+    <!-- Content container with proper width styling -->
+    <div class="h-full w-full flex flex-col">
+      <!-- Header actions for chat list toggle -->
+      <div v-if="!hideHeader" class="px-4 py-2 flex items-center justify-between border-b">
         <Button 
-          @click="clearConversation" 
           variant="ghost" 
-          size="sm"
-          class="text-xs h-7"
+          size="icon"
+          class="h-8 w-8"
+          :title="showChatList ? 'Back to conversation' : 'Show all conversations'"
+          @click="toggleChatList"
         >
-          Clear
+          <ListIcon v-if="!showChatList" class="h-4 w-4" />
+          <ArrowLeftIcon v-else class="h-4 w-4" />
         </Button>
       </div>
       
-      <div class="conversation-history space-y-3 max-h-[300px] overflow-y-auto pr-1">
-        <div 
-          v-for="(message, index) in conversationHistory" 
-          :key="message.id"
-          class="message p-2 rounded-md text-sm"
-          :class="{
-            'bg-primary/10': message.role === 'user',
-            'bg-secondary/20': message.role === 'assistant'
-          }"
-        >
-          <div class="flex justify-between items-start mb-1">
-            <span class="font-medium text-xs">
-              {{ message.role === 'user' ? 'You' : 'AI Assistant' }}
-            </span>
-            <span class="text-xs text-muted-foreground">
-              {{ formatTime(message.timestamp) }}
-            </span>
+      <div class="flex-1 flex flex-col h-full min-h-0 relative overflow-hidden">
+        <!-- Empty State when no active conversation -->
+        <EmptyState 
+          v-if="!activeAIBlock" 
+          @create-session="createNewSession"
+          class="h-full overflow-y-auto"
+        />
+        
+        <!-- Conversation Content when a conversation is active -->
+        <template v-else>
+          <!-- Chat List -->
+          <ScrollArea 
+            v-if="showChatList"
+            class="flex-1 h-full"
+          >
+            <ChatList
+              :editor="props.editor"
+              :notaId="props.notaId"
+              :active-block-id="activeBlockId"
+              @select-chat="handleSelectChat"
+              @create-new="createNewSession"
+            />
+          </ScrollArea>
+          
+          <!-- Conversation Container - With Fixed Message Input -->
+          <div v-else class="h-full flex flex-col">
+            <!-- Scrollable conversation history area -->
+            <div 
+              class="flex-1 overflow-y-auto min-h-0"
+              ref="scrollAreaViewportRef"
+            >
+              <div class="p-4 space-y-4 bg-gradient-to-b from-background to-muted/10">
+                <ConversationHistory
+                  :conversation-history="conversationHistory"
+                  :is-loading="isLoading"
+                  :error="error"
+                  :provider-name="selectedProvider?.name || 'AI'"
+                  :format-timestamp="formatTimestamp"
+                  @copy-message="copyMessageToClipboard"
+                  @insert-message="insertMessageToDocument"
+                  @select-text="handleTextSelection"
+                  @retry="regenerateText"
+                />
+              </div>
+            </div>
+  
+            <!-- AI Provider Selector -->
+            <div class="px-3 py-1 border-t">
+              <ProviderSelector />
+            </div>
+  
+            <!-- Fixed Message Input Area -->
+            <div class="border-t p-3 bg-background flex-shrink-0 z-10 shadow-[0_-2px_5px_rgba(0,0,0,0.05)]">
+              <!-- Editing Response -->
+              <div v-if="isEditing">
+                <Textarea
+                  v-model="resultInput"
+                  class="min-h-[80px] resize-none w-full focus:shadow-sm transition-shadow rounded-md"
+                  @keydown.ctrl.enter.prevent="saveEditedText"
+                />
+                <div class="flex justify-end gap-2 mt-2">
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    @click="toggleEditing"
+                    class="h-8"
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="default"
+                    @click="saveEditedText"
+                    class="h-8 shadow-sm"
+                  >
+                    Save Changes
+                  </Button>
+                </div>
+              </div>
+              
+              <!-- Normal Input (prompt or follow-up) -->
+              <template v-else>
+                <ConversationInput
+                  v-if="!hasResult || isContinuing"
+                  :promptInput="promptInput"
+                  :followUpPrompt="followUpPrompt"
+                  :is-prompt-empty="isPromptEmpty"
+                  :is-loading="isLoading"
+                  :prompt-token-count="promptTokenCount"
+                  :is-continuing="isContinuing"
+                  :has-mentions="mentionsInPrompt.length > 0"
+                  :mention-count="mentionsInPrompt.length"
+                  :show-mention-search="showMentionSearch"
+                  :mention-search-results="mentionSearchResults"
+                  :token-warning="tokenWarning"
+                  :max-input-chars="maxInputChars"
+                  @update:promptInput="promptInput = $event"
+                  @update:followUpPrompt="followUpPrompt = $event"
+                  @generate="generateText"
+                  @continue="continueConversation"
+                  @check-mentions="checkForMentions($event, ref(textareaRef))"
+                  @select-mention="handleMentionSelection"
+                  @update-mention-search="handleUpdateMentionQuery"
+                  @close-mention-search="handleCloseMentionSearch"
+                  @change-model="handleModelChange"
+                  ref="textareaRef"
+                />
+                
+                <!-- Action Bar -->
+                <ActionBar
+                  v-else
+                  :has-result="!!hasResult"
+                  :is-loading="isLoading"
+                  :is-continuing="isContinuing"
+                  :has-selection="!!selectedText"
+                  @regenerate="regenerateText"
+                  @continue="toggleContinuing"
+                  @copy="copyToClipboard"
+                  @edit="toggleEditing"
+                  @insert="insertToDocument"
+                  @insert-selection="insertSelectionToDocument"
+                  @remove="removeBlock"
+                />
+              </template>
+            </div>
           </div>
-          <div>{{ message.content }}</div>
-        </div>
+        </template>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.ai-assistant-sidebar {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  padding: 1rem;
+/* Code block styling within AI responses */
+:deep(pre),
+:deep(code) {
+  background-color: hsl(var(--muted));
+  border-radius: 4px;
+  padding: 0.2em 0.4em;
+  font-family: 'Courier New', monospace;
+  border-left: 2px solid hsl(var(--primary));
+}
+
+:deep(pre) {
+  padding: 0.5em;
+  margin: 0.5em 0;
+  overflow-x: auto;
+}
+
+/* Mention search styling */
+.mention-search {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  background-color: hsl(var(--background));
+  max-height: 200px;
   overflow-y: auto;
+  width: 250px;
+  z-index: 50;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
-.conversation-history {
-  scrollbar-width: thin;
-}
-
-.conversation-history::-webkit-scrollbar {
-  width: 5px;
-}
-
-.conversation-history::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.conversation-history::-webkit-scrollbar-thumb {
-  background-color: rgba(155, 155, 155, 0.5);
-  border-radius: 20px;
+.mention-tag {
+  display: inline-flex;
+  align-items: center;
+  background-color: hsl(var(--primary) / 0.1);
+  color: hsl(var(--primary));
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin: 0 0.125rem;
 }
 </style>

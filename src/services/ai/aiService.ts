@@ -196,10 +196,10 @@ export class AIService {
   /**
    * Initialize a WebLLM model
    */
-  async initializeWebLLMModel(modelName: string, timeoutMs?: number): Promise<void> {
+  async initializeWebLLMModel(modelName: string): Promise<void> {
     try {
       const provider = this.getProvider('webllm') as WebLLMProvider;
-      await provider.initializeModel(modelName, timeoutMs);
+      await provider.initializeModel(modelName);
     } catch (error) {
       logger.error(`Error initializing WebLLM model ${modelName}:`, error);
       throw error;

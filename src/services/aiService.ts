@@ -150,7 +150,7 @@ class AIServiceLegacy {
 
   async generateMultimodalText(
     providerId: string,
-    apiKey: string,
+    apiKey: string, 
     options: MultimodalGenerationOptions,
     modelId?: string
   ): Promise<GenerationResult> {
@@ -204,12 +204,12 @@ class AIServiceLegacy {
     const state = newAIService.getWebLLMModelLoadingState();
     return !!state.currentModel;
   }
-
+  
   getCurrentModel(): string {
     const state = newAIService.getWebLLMModelLoadingState();
     return state.currentModel || '';
   }
-
+  
   abortGeneration(): void {
     // No direct equivalent in the new system yet
   }

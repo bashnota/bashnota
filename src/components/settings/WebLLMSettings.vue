@@ -193,20 +193,20 @@ const loadModel = async () => {
     const success = await loadWebLLMModel(selectedModelId.value)
     
     if (success) {
-      // Update the current model
-      currentModel.value = selectedModelId.value
+    // Update the current model
+    currentModel.value = selectedModelId.value
       
       // Add to downloaded models
       if (!downloadedModels.value.includes(selectedModelId.value)) {
         downloadedModels.value.push(selectedModelId.value)
         localStorage.setItem('webllm-models-history', JSON.stringify(downloadedModels.value))
       }
-      
-      toast({
-        title: 'Model Loaded',
-        description: `${selectedModel.value?.name || selectedModelId.value} has been loaded successfully`,
-        variant: 'default'
-      })
+    
+    toast({
+      title: 'Model Loaded',
+      description: `${selectedModel.value?.name || selectedModelId.value} has been loaded successfully`,
+      variant: 'default'
+    })
     } else {
       throw new Error('Failed to load model')
     }
@@ -380,7 +380,7 @@ watch(() => webLLMModelLoadingState.value.isLoading, (newIsLoading) => {
             <div class="flex items-center justify-between">
               <h3 class="font-medium">{{ selectedModel.name }}</h3>
               <div class="flex items-center gap-2">
-                <Badge>{{ selectedModel.size }}</Badge>
+              <Badge>{{ selectedModel.size }}</Badge>
                 <Badge v-if="isModelDownloaded(selectedModel.id)" variant="default" class="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
                   Downloaded
                 </Badge>
@@ -437,7 +437,7 @@ watch(() => webLLMModelLoadingState.value.isLoading, (newIsLoading) => {
                   'First-time downloads may take several minutes depending on your internet connection.' 
               }}
               <span v-if="!isModelDownloaded(selectedModelId)">
-                The model will be cached for future use.
+              The model will be cached for future use.
               </span>
             </p>
           </div>
