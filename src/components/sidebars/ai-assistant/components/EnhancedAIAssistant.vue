@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -9,12 +9,12 @@ import { toast } from '@/components/ui/toast'
 import { useAISettingsStore } from '@/stores/aiSettingsStore'
 import { logger } from '@/services/logger'
 import { 
-  LoaderIcon, 
-  SettingsIcon, 
-  CopyIcon, 
-  FileTextIcon,
-  XIcon,
-  StopCircleIcon
+  Loader as LoaderIcon, 
+  Settings as SettingsIcon, 
+  Copy as CopyIcon, 
+  FileText as FileTextIcon,
+  X as XIcon,
+  StopCircle as StopCircleIcon
 } from 'lucide-vue-next'
 
 // Import composables
@@ -40,7 +40,8 @@ const {
   webLLMProgress, 
   currentWebLLMModel,
   availableProviders,
-  isWebLLMSupported
+  isWebLLMSupported,
+  webLLMError
 } = useAIProviders()
 
 // AI settings
@@ -109,12 +110,31 @@ const getProviderStatus = () => {
   if (!provider) return 'No provider selected'
   
   if (providerId === 'webllm') {
+    // If model is currently loading
+    if (isLoadingWebLLMModels.value) {
+      return `${provider.name} - Loading model...`
+    }
+    
+    // If we have an error
+    if (webLLMError.value) {
+      // Truncate very long error messages
+      const shortError = webLLMError.value.length > 30 
+        ? webLLMError.value.substring(0, 30) + '...' 
+        : webLLMError.value
+      return `${provider.name} - Error: ${shortError}`
+    }
+    
+    // If a model is loaded
     if (currentWebLLMModel.value) {
       return `${provider.name} - ${currentWebLLMModel.value}`
     }
+    
+    // Browser not supported
     if (!isWebLLMSupported.value) {
       return `${provider.name} - Browser not supported`
     }
+    
+    // No model loaded
     return `${provider.name} - No model loaded`
   }
   
@@ -221,7 +241,7 @@ const openSettings = () => {
           <span>Loading model...</span>
           <span>{{ Math.round(webLLMProgress * 100) }}%</span>
         </div>
-        <Progress :value="webLLMProgress * 100" class="h-1" />
+        <Progress :value="Number(webLLMProgress * 100)" class="h-1" />
         <p class="text-xs text-muted-foreground mt-1">
           {{ modelLoadingMessage || 'Please wait, this may take a few minutes' }}
         </p>
@@ -400,4 +420,4 @@ const openSettings = () => {
   background-color: rgba(155, 155, 155, 0.5);
   border-radius: 20px;
 }
-</style>
+</style> 

@@ -284,24 +284,6 @@ onMounted(() => {
 
 <template>
   <div class="relative conversation-input">
-    <!-- AI Model Selector -->
-    <div class="mb-2">
-      <Select :value="selectedModel" @update:value="changeModel">
-        <SelectTrigger class="w-full h-8 text-sm flex items-center">
-          <div class="flex items-center gap-2">
-            <BrainCircuitIcon class="h-3.5 w-3.5" />
-            <SelectValue placeholder="Select model" />
-          </div>
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem v-for="model in modelOptions" :key="model.id" :value="model.id">
-            <div class="flex items-center gap-2">
-              <span class="font-medium">{{ model.name }}</span>
-            </div>
-          </SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
 
     <!-- New Prompt Input -->
     <div v-if="!isContinuing" class="relative prompt-container">

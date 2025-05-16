@@ -1,9 +1,13 @@
-import { ref, onUnmounted, watch } from 'vue'
+import { ref } from 'vue'
 import { logger } from '@/services/logger'
-import { aiService, type GenerationResult } from '@/services/aiService'
+import { aiService } from '@/services/ai'
+import type { GenerationResult, GenerationOptions } from '@/services/ai/types'
 import { toast } from '@/components/ui/toast'
 import { type ConversationMessage } from './useConversation'
 import { useAISettingsStore } from '@/stores/aiSettingsStore'
+import { useAIErrorHandling } from './useAIErrorHandling'
+import { useAIRequest } from './useAIRequest'
+import { useAIProviders } from './useAIProviders'
 
 // Define error types for better error handling
 type AIGenerationErrorType = 
@@ -24,164 +28,106 @@ interface AIGenerationError {
 
 export function useAIGeneration(editor: any) {
   const isLoading = ref(false)
-  const errorMessage = ref('')
-  const activeRequests = ref<AbortController[]>([])
-  const timeout = ref<number | null>(null)
   const aiSettings = useAISettingsStore()
-  
-  // Set default timeout from settings or use 60 seconds
-  const DEFAULT_TIMEOUT = 60000 // 60 seconds
-  
-  // Watch for settings changes to update timeout
-  watch(() => (aiSettings.settings as any).requestTimeout || DEFAULT_TIMEOUT / 1000, (value) => {
-    if (value && value > 0) {
-      timeout.value = value * 1000 // Convert to milliseconds
-    } else {
-      timeout.value = DEFAULT_TIMEOUT
-    }
-  }, { immediate: true })
-  
-  // Clean up any pending requests when component is unmounted
-  onUnmounted(() => {
-    abortAllRequests()
-  })
+  const { errorMessage, handleGenerationError } = useAIErrorHandling()
+  const { createRequestWithTimeout, abortRequest, abortAllRequests } = useAIRequest()
+  const { selectBestAvailableProvider, availableProviders } = useAIProviders()
 
   /**
-   * Classify error based on error message for consistent handling
+   * Ensure a valid provider is selected before generating
    */
-  const classifyError = (error: unknown): AIGenerationError => {
-    // Default error
-    const defaultError: AIGenerationError = {
-      type: 'UNKNOWN',
-      message: 'Failed to generate text. Please try again.',
-      originalError: error instanceof Error ? error : undefined
-    }
+  const ensureValidProvider = async (): Promise<string> => {
+    const currentProviderId = aiSettings.settings.preferredProviderId
+    logger.info(`Current provider ID: ${currentProviderId}, Available providers: ${availableProviders.value.join(', ')}`)
     
-    if (!(error instanceof Error)) return defaultError
-    
-    const errorMessage = error.message.toLowerCase()
-    
-    if (errorMessage.includes('api key')) {
-      return {
-        type: 'API_KEY',
-        message: 'Missing or invalid API key. Please check your settings.',
-        originalError: error
-      }
-    } else if (errorMessage.includes('rate limit') || errorMessage.includes('429')) {
-      return {
-        type: 'RATE_LIMIT',
-        message: 'Rate limit exceeded. Please wait a moment and try again.',
-        originalError: error
-      }
-    } else if (errorMessage.includes('timeout') || 
-              errorMessage.includes('network') || 
-              errorMessage.includes('connection')) {
-      return {
-        type: 'NETWORK',
-        message: 'Network error or timeout. Please check your connection.',
-        originalError: error
-      }
-    } else if (errorMessage.includes('content policy') || 
-              errorMessage.includes('moderation') || 
-              errorMessage.includes('safety') ||
-              errorMessage.includes('harmful')) {
-      return {
-        type: 'CONTENT_POLICY',
-        message: 'Content policy violation. Please modify your prompt and try again.',
-        originalError: error
-      }
-    } else if (errorMessage.includes('timeout')) {
-      return {
-        type: 'TIMEOUT',
-        message: 'Request timed out. Please try again or use a shorter prompt.',
-        originalError: error
-      }
-    } else if (errorMessage.includes('model') && 
-              (errorMessage.includes('unavailable') || errorMessage.includes('not found'))) {
-      return {
-        type: 'MODEL_UNAVAILABLE',
-        message: 'The selected AI model is currently unavailable. Please try another model.',
-        originalError: error
-      }
-    } else if (errorMessage.includes('500') || errorMessage.includes('server')) {
-      return {
-        type: 'SERVER_ERROR',
-        message: 'Server error. Please try again later.',
-        originalError: error
-      }
-    }
-    
-    return defaultError
-  }
-  
-  /**
-   * Handle errors consistently across all generation functions
-   */
-  const handleGenerationError = (
-    error: unknown, 
-    block: any,
-    conversationHistory: ConversationMessage[]
-  ): ConversationMessage[] => {
-    const classifiedError = classifyError(error)
-    logger.error(`AI Generation Error (${classifiedError.type}):`, classifiedError.originalError || error)
-    
-    // Set local error state
-    errorMessage.value = classifiedError.message
-    
-    // Update block with error
-    if (editor && block) {
-      try {
-        editor.commands.updateAttributes('aiGeneration', {
-          error: classifiedError.message,
-          loading: false
-        })
-      } catch (editorError) {
-        logger.error('Failed to update editor with error:', editorError)
-      }
-    }
-    
-    // Show toast notification
-    toast({
-      title: 'Error',
-      description: classifiedError.message,
-      variant: 'destructive'
-    })
-    
-    return conversationHistory
-  }
-  
-  /**
-   * Create a request with timeout handling
-   */
-  const createRequestWithTimeout = <T>(
-    promiseFunction: () => Promise<T>
-  ): Promise<T> => {
-    // Create an abort controller for this request
-    const controller = new AbortController()
-    activeRequests.value.push(controller)
-    
-    // Create a timeout promise
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      const timeoutId = setTimeout(() => {
-        controller.abort()
-        reject(new Error('Request timed out'))
-      }, timeout.value || DEFAULT_TIMEOUT)
+    // Special handling for WebLLM - if it's selected, check if a model is loaded
+    if (currentProviderId === 'webllm') {
+      const { updateWebLLMState, currentWebLLMModel, loadWebLLMModel, webLLMModels, selectProvider, isWebLLMSupported } = useAIProviders()
       
-      // Store the timeout ID on the controller for cleanup
-      controller.signal.addEventListener('abort', () => clearTimeout(timeoutId))
+      // Check if WebLLM is supported
+      logger.info(`WebLLM supported: ${isWebLLMSupported.value}`)
+      
+      if (!isWebLLMSupported.value) {
+        logger.warn('WebLLM is not supported in this browser, selecting alternative provider')
+        const newProvider = await selectBestAvailableProvider()
+        return newProvider
+      }
+      
+      // Check the current state
+      updateWebLLMState()
+      logger.info(`WebLLM model loaded: ${currentWebLLMModel.value || 'none'}`)
+      
+      // If no model is loaded, try to load one
+      if (!currentWebLLMModel.value) {
+        logger.info('No WebLLM model loaded, attempting to load one')
+        
+        // Show loading state in the editor
+        editor.commands.updateAttributes('aiGeneration', {
+          loading: true,
+          error: 'Loading WebLLM model (this may take a few minutes)...',
+        })
+        
+        try {
+          // Try to select the WebLLM provider, which will auto-load a model
+          const success = await selectProvider('webllm')
+          logger.info(`WebLLM provider selection ${success ? 'succeeded' : 'failed'}`)
+          
+          if (!success) {
+            // If WebLLM model loading failed, select an alternative provider
+            const fallbackProvider = await selectBestAvailableProvider()
+            
+            // Update error message
+            editor.commands.updateAttributes('aiGeneration', {
+              error: `WebLLM model loading failed. Using ${fallbackProvider} instead.`
+            })
+            
+            return fallbackProvider
+          }
+          
+          // Update state after loading
+          updateWebLLMState()
+          logger.info(`WebLLM model after loading: ${currentWebLLMModel.value || 'none'}`)
+          return 'webllm'
+        } catch (error) {
+          logger.error('Error during WebLLM model loading:', error)
+          
+          // Select alternative provider
+          const fallbackProvider = await selectBestAvailableProvider()
+          
+          // Update error message
+          editor.commands.updateAttributes('aiGeneration', {
+            error: `WebLLM error: ${error instanceof Error ? error.message : 'Unknown error'}. Using ${fallbackProvider} instead.`
+          })
+          
+          return fallbackProvider
+        }
+      }
+      
+      return 'webllm'
+    }
+    
+    // For other providers, check if they're available
+    // Check if current provider is in the available providers list
+    if (availableProviders.value.includes(currentProviderId)) {
+      return currentProviderId
+    }
+    
+    // If not available, try to select the best available provider
+    const newProvider = await selectBestAvailableProvider()
+    
+    // Update UI with provider change message
+    editor.commands.updateAttributes('aiGeneration', {
+      error: `${currentProviderId} is not available. Using ${newProvider} instead.`
     })
     
-    // Create the main request promise
-    const requestPromise = promiseFunction()
-      .finally(() => {
-        // Remove this controller from active requests when done
-        activeRequests.value = activeRequests.value.filter(c => c !== controller)
-      })
+    // If we couldn't find a valid provider, show an error
+    if (!availableProviders.value.includes(newProvider)) {
+      throw new Error('No AI providers are available. Please check your settings.')
+    }
     
-    // Race the request against the timeout
-    return Promise.race([requestPromise, timeoutPromise])
+    return newProvider
   }
-
+  
   /**
    * Generate text using the AI service based on prompt
    */
@@ -197,7 +143,6 @@ export function useAIGeneration(editor: any) {
 
     try {
       isLoading.value = true
-      errorMessage.value = ''
       
       // Update block to show loading state
       editor.commands.updateAttributes('aiGeneration', {
@@ -215,24 +160,29 @@ export function useAIGeneration(editor: any) {
       }
       newHistory.push(userMessage)
 
-      // Call AI service with timeout
-      const providerId = aiSettings.settings.preferredProviderId
+      // Ensure we have a valid provider before generating
+      const providerId = await ensureValidProvider()
       const apiKey = aiSettings.getApiKey(providerId)
-      const modelId = providerId === 'gemini' ? aiSettings.settings.geminiModel : undefined
-      const safetyThreshold = providerId === 'gemini' ? aiSettings.settings.geminiSafetyThreshold : undefined
       
+      const options: GenerationOptions = {
+        prompt,
+        maxTokens: aiSettings.settings.maxTokens,
+        temperature: aiSettings.settings.temperature
+      }
+      
+      // Add model ID for providers that support it
+      if (providerId === 'gemini' && aiSettings.settings.geminiModel) {
+        options.modelId = aiSettings.settings.geminiModel
+      }
+      
+      // Add safety threshold for providers that support it
+      if (providerId === 'gemini' && aiSettings.settings.geminiSafetyThreshold) {
+        options.safetyThreshold = aiSettings.settings.geminiSafetyThreshold
+      }
+      
+      // Call AI service with timeout
       const generationResult = await createRequestWithTimeout<GenerationResult>(() => 
-        aiService.generateText(
-          providerId,
-          apiKey,
-          {
-            prompt,
-            maxTokens: aiSettings.settings.maxTokens,
-            temperature: aiSettings.settings.temperature
-          },
-          modelId,
-          safetyThreshold
-        )
+        aiService.generateText(providerId, options, apiKey)
       )
 
       // Add AI response to history
@@ -258,7 +208,7 @@ export function useAIGeneration(editor: any) {
 
       return newHistory
     } catch (error) {
-      return handleGenerationError(error, block, conversationHistory)
+      return handleGenerationError(error, editor, block, conversationHistory)
     } finally {
       isLoading.value = false
     }
@@ -279,7 +229,6 @@ export function useAIGeneration(editor: any) {
 
     try {
       isLoading.value = true
-      errorMessage.value = ''
       
       // Update block to show loading state
       editor.commands.updateAttributes('aiGeneration', {
@@ -297,24 +246,29 @@ export function useAIGeneration(editor: any) {
       }
       newHistory.push(userMessage)
 
-      // Call AI service with timeout
-      const providerId = aiSettings.settings.preferredProviderId
+      // Ensure we have a valid provider before generating
+      const providerId = await ensureValidProvider()
       const apiKey = aiSettings.getApiKey(providerId)
-      const modelId = providerId === 'gemini' ? aiSettings.settings.geminiModel : undefined
-      const safetyThreshold = providerId === 'gemini' ? aiSettings.settings.geminiSafetyThreshold : undefined
       
+      const options: GenerationOptions = {
+        prompt,
+        maxTokens: aiSettings.settings.maxTokens,
+        temperature: aiSettings.settings.temperature
+      }
+      
+      // Add model ID for providers that support it
+      if (providerId === 'gemini' && aiSettings.settings.geminiModel) {
+        options.modelId = aiSettings.settings.geminiModel
+      }
+      
+      // Add safety threshold for providers that support it
+      if (providerId === 'gemini' && aiSettings.settings.geminiSafetyThreshold) {
+        options.safetyThreshold = aiSettings.settings.geminiSafetyThreshold
+      }
+      
+      // Call AI service with timeout
       const generationResult = await createRequestWithTimeout<GenerationResult>(() => 
-        aiService.generateText(
-          providerId,
-          apiKey,
-          {
-            prompt,
-            maxTokens: aiSettings.settings.maxTokens,
-            temperature: aiSettings.settings.temperature
-          },
-          modelId,
-          safetyThreshold
-        )
+        aiService.generateText(providerId, options, apiKey)
       )
 
       // Add AI response to history
@@ -344,7 +298,7 @@ export function useAIGeneration(editor: any) {
 
       return newHistory
     } catch (error) {
-      return handleGenerationError(error, block, conversationHistory)
+      return handleGenerationError(error, editor, block, conversationHistory)
     } finally {
       isLoading.value = false
     }
@@ -363,7 +317,6 @@ export function useAIGeneration(editor: any) {
 
     try {
       isLoading.value = true
-      errorMessage.value = ''
       
       // Update block to show loading state
       editor.commands.updateAttributes('aiGeneration', {
@@ -382,24 +335,29 @@ export function useAIGeneration(editor: any) {
         ? filteredHistory[filteredHistory.length - 1].content
         : block.node.attrs.prompt || ''
 
-      // Call AI service with timeout
-      const providerId = aiSettings.settings.preferredProviderId
+      // Ensure we have a valid provider before generating
+      const providerId = await ensureValidProvider()
       const apiKey = aiSettings.getApiKey(providerId)
-      const modelId = providerId === 'gemini' ? aiSettings.settings.geminiModel : undefined
-      const safetyThreshold = providerId === 'gemini' ? aiSettings.settings.geminiSafetyThreshold : undefined
       
+      const options: GenerationOptions = {
+        prompt: lastPrompt,
+        maxTokens: aiSettings.settings.maxTokens,
+        temperature: aiSettings.settings.temperature
+      }
+      
+      // Add model ID for providers that support it
+      if (providerId === 'gemini' && aiSettings.settings.geminiModel) {
+        options.modelId = aiSettings.settings.geminiModel
+      }
+      
+      // Add safety threshold for providers that support it
+      if (providerId === 'gemini' && aiSettings.settings.geminiSafetyThreshold) {
+        options.safetyThreshold = aiSettings.settings.geminiSafetyThreshold
+      }
+      
+      // Call AI service with timeout
       const generationResult = await createRequestWithTimeout<GenerationResult>(() => 
-        aiService.generateText(
-          providerId,
-          apiKey,
-          {
-            prompt: lastPrompt,
-            maxTokens: aiSettings.settings.maxTokens,
-            temperature: aiSettings.settings.temperature
-          },
-          modelId,
-          safetyThreshold
-        )
+        aiService.generateText(providerId, options, apiKey)
       )
 
       // Add AI response to history
@@ -425,29 +383,17 @@ export function useAIGeneration(editor: any) {
 
       return newHistory
     } catch (error) {
-      return handleGenerationError(error, block, conversationHistory)
+      return handleGenerationError(error, editor, block, conversationHistory)
     } finally {
       isLoading.value = false
     }
   }
 
   /**
-   * Abort all pending requests
-   */
-  const abortAllRequests = (): void => {
-    activeRequests.value.forEach(controller => {
-      if (!controller.signal.aborted) {
-        controller.abort()
-      }
-    })
-    activeRequests.value = []
-  }
-
-  /**
    * Abort current generation request
    */
   const abortGeneration = (): void => {
-    abortAllRequests()
+    abortRequest()
     isLoading.value = false
   }
 
