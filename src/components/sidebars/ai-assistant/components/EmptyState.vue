@@ -24,11 +24,5 @@ const createNewSession = () => {
       <SparklesIcon class="h-4 w-4 mr-2" />
       Create New Session
     </Button>
-    
-    <!-- AI Provider Selection -->
-    <div class="mt-8 w-full max-w-md">
-      <p class="text-sm mb-2">Select AI Provider:</p>
-      <ProviderSelector />
-    </div>
   </div>
 </template>

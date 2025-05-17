@@ -20,7 +20,6 @@ import ConversationInput from './ConversationInput.vue'
 import ActionBar from './ActionBar.vue'
 import EmptyState from './EmptyState.vue'
 import ChatList from './ChatList.vue'
-import ProviderSelector from './ProviderSelector.vue'
 import MentionSearch from './MentionSearch.vue'
 
 // Import the icons
@@ -46,7 +45,10 @@ const {
   webLLMProgress, 
   currentWebLLMModel, 
   isLoadingWebLLMModels,
-  initialize: initializeProviders
+  initialize: initializeProviders,
+  selectProvider,
+  availableProviders,
+  checkAllProviders
 } = useAIProviders()
 
 // Initialize streaming mode
@@ -136,6 +138,54 @@ const error = computed(() => {
   return activeAIBlock.value?.node.attrs.error || ''
 })
 
+// Add a debug function to log all received events
+const debugEvent = (event: string, payload: any) => {
+  console.log(`[AIAssistantSidebar] Debug: Received event: ${event}`, payload)
+}
+
+// Handle model change
+const handleModelChange = async (modelId: string) => {
+  console.log('[AIAssistantSidebar] handleModelChange called with:', modelId)
+  
+  try {
+    // Log the current provider before change
+    console.log('[AIAssistantSidebar] Current provider before change:', aiSettings.settings.preferredProviderId)
+    
+    // Update the preferred provider in the AI settings store
+    aiSettings.setPreferredProvider(modelId)
+    
+    // Directly select the provider using the provider API and await the result
+    console.log('[AIAssistantSidebar] Directly selecting provider using useAIProviders.selectProvider()...')
+    const success = await selectProvider(modelId)
+    console.log(`[AIAssistantSidebar] Direct provider selection ${success ? 'succeeded' : 'failed'}`)
+    
+    // Log the provider after change
+    console.log('[AIAssistantSidebar] Provider after change:', aiSettings.settings.preferredProviderId)
+    
+    // Show toast notification
+    const provider = aiSettings.providers.find(p => p.id === modelId)
+    toast({
+      title: "AI Model Changed",
+      description: `Now using ${provider?.name || 'new model'}`,
+      variant: "default"
+    })
+  } catch (error) {
+    console.error('[AIAssistantSidebar] Error changing AI model:', error)
+    logger.error('Error changing AI model:', error)
+    toast({
+      title: "Error",
+      description: "Failed to change AI model",
+      variant: "destructive" 
+    })
+  }
+}
+
+// Expose functions for template access
+defineExpose({
+  handleModelChange
+})
+
+
 // Generate text with mentions
 const generateText = async () => {
   if (!activeAIBlock.value || !promptInput.value.trim()) return
@@ -147,33 +197,46 @@ const generateText = async () => {
     // Set loading state
     isLoading.value = true
     
+    // Ensure provider is correctly selected before generating text
+    const preferredProviderId = aiSettings.settings.preferredProviderId
+    await selectProvider(preferredProviderId)
+    console.log('[AIAssistantSidebar] generateText - Using provider:', preferredProviderId)
+    
     // Check if there are any mentioned notas
     if (promptInput.value.includes('#[')) {
       // Process with mentions
       const enhancedPrompt = await loadMentionedNotaContents(promptInput.value)
       
       // Generate with enhanced prompt
+      console.log('[AIAssistantSidebar] Calling generateTextAction with enhanced prompt')
       const newHistory = await generateTextAction(
         activeAIBlock.value, 
         enhancedPrompt, 
         conversationHistory.value,
-        formatTimestamp
+        formatTimestamp,
+        preferredProviderId // Pass the preferred provider explicitly
       )
       if (newHistory) conversationHistory.value = newHistory as typeof conversationHistory.value
     } else {
       // Generate normally
+      console.log('[AIAssistantSidebar] Calling generateTextAction with normal prompt')
       const newHistory = await generateTextAction(
         activeAIBlock.value, 
         promptInput.value, 
         conversationHistory.value,
-        formatTimestamp
+        formatTimestamp,
+        preferredProviderId // Pass the preferred provider explicitly
       )
       if (newHistory) conversationHistory.value = newHistory as typeof conversationHistory.value
     }
     
+    // Log the provider after generation
+    console.log('[AIAssistantSidebar] generateText - Current provider after generation:', aiSettings.settings.preferredProviderId)
+    
     // Clear mentions after generation
     clearMentions()
   } catch (error) {
+    console.error('[AIAssistantSidebar] Error in generateText:', error)
     logger.error('Error in generateText:', error)
     toast({
       title: 'Error',
@@ -194,27 +257,36 @@ const continueConversation = async () => {
     // Set loading state
     isLoading.value = true
     
+    // Ensure provider is correctly selected before continuing
+    const preferredProviderId = aiSettings.settings.preferredProviderId
+    await selectProvider(preferredProviderId)
+    console.log('[AIAssistantSidebar] continueConversation - Using provider:', preferredProviderId)
+    
     // Check if there are any mentioned notas
     if (followUpPrompt.value.includes('#[')) {
       const enhancedPrompt = await loadMentionedNotaContents(followUpPrompt.value)
       
       // Continue with enhanced prompt
+      console.log('[AIAssistantSidebar] Calling continueAction with enhanced prompt')
       const newHistory = await continueAction(
         activeAIBlock.value, 
         enhancedPrompt, 
         conversationHistory.value,
-        formatTimestamp
+        formatTimestamp,
+        preferredProviderId // Pass the preferred provider explicitly
       )
       if (newHistory) conversationHistory.value = newHistory as typeof conversationHistory.value
     } else {
       // Continue normally
-        const newHistory = await continueAction(
-          activeAIBlock.value, 
-          followUpPrompt.value, 
-          conversationHistory.value,
-          formatTimestamp
-        )
-        if (newHistory) conversationHistory.value = newHistory as typeof conversationHistory.value
+      console.log('[AIAssistantSidebar] Calling continueAction with normal prompt')
+      const newHistory = await continueAction(
+        activeAIBlock.value, 
+        followUpPrompt.value, 
+        conversationHistory.value,
+        formatTimestamp,
+        preferredProviderId // Pass the preferred provider explicitly
+      )
+      if (newHistory) conversationHistory.value = newHistory as typeof conversationHistory.value
     }
     
     // Clear the prompt and exit continue mode
@@ -241,9 +313,20 @@ const regenerateText = async () => {
   if (!activeAIBlock.value || isLoading.value) return
   
   try {
-    const newHistory = await regenerateAction(activeAIBlock.value, conversationHistory.value)
+    // Ensure provider is correctly selected before regenerating
+    const preferredProviderId = aiSettings.settings.preferredProviderId
+    await selectProvider(preferredProviderId)
+    console.log('[AIAssistantSidebar] regenerateText - Using provider:', preferredProviderId)
+    
+    console.log('[AIAssistantSidebar] Calling regenerateAction')
+    const newHistory = await regenerateAction(
+      activeAIBlock.value, 
+      conversationHistory.value,
+      preferredProviderId // Pass the preferred provider explicitly
+    )
     if (newHistory) conversationHistory.value = newHistory
   } catch (error) {
+    console.error('[AIAssistantSidebar] Error in regenerateText:', error)
     logger.error('Error in regenerateText:', error)
     toast({
       title: 'Error',
@@ -452,34 +535,37 @@ const handleCloseMentionSearch = () => {
   closeMentionSearch()
 }
 
-// Handle model change
-const handleModelChange = (modelId: string) => {
-  try {
-    // Update the preferred provider in the AI settings store
-    aiSettings.setPreferredProvider(modelId)
-    
-    // Show toast notification
-    const provider = aiSettings.providers.find(p => p.id === modelId)
-    toast({
-      title: "AI Model Changed",
-      description: `Now using ${provider?.name || 'new model'}`,
-      variant: "default"
-    })
-  } catch (error) {
-    logger.error('Error changing AI model:', error)
-    toast({
-      title: "Error",
-      description: "Failed to change AI model",
-      variant: "destructive" 
-    })
-  }
+// Add function to log provider availability
+const logProviderAvailability = () => {
+  console.log('[AIAssistantSidebar] Current provider:', aiSettings.settings.preferredProviderId)
+  console.log('[AIAssistantSidebar] Available providers:', availableProviders.value.join(', '))
+  console.log('[AIAssistantSidebar] WebLLM model:', currentWebLLMModel.value || 'none')
 }
 
 // Explicitly initialize the providers on component mount
 onMounted(async () => {
   try {
-    await initializeProviders()
+    await initializeProviders(false) // Force checking all providers, not just the current one
     logger.info('AI providers initialized')
+    
+    // Log provider availability after initialization
+    logProviderAvailability()
+    
+    // Set up periodic check of provider availability
+    const providerCheckInterval = window.setInterval(() => {
+      console.log('[AIAssistantSidebar] Periodic provider check...')
+      updateWebLLMState()
+      
+      // Only check the current provider to avoid unnecessary network requests
+      checkAllProviders(true)
+      
+      logProviderAvailability()
+    }, 30000) // Check every 30 seconds instead of 5 seconds
+    
+    // Clean up interval on unmount
+    onBeforeUnmount(() => {
+      clearInterval(providerCheckInterval)
+    })
   } catch (error) {
     logger.error('Error initializing AI providers:', error)
   }
@@ -724,16 +810,12 @@ onMounted(() => {
                   />
                 </div>
                 
-                <!-- Provider Selector -->
-                <div class="flex items-center justify-between">
-                  <ProviderSelector />
-                  
-                  <!-- WebLLM Streaming toggle -->
+                <!-- WebLLM Streaming toggle only -->
+                <div class="flex items-center justify-end" v-if="aiSettings.settings.preferredProviderId === 'webllm'">
                   <Button 
-                    v-if="aiSettings.settings.preferredProviderId === 'webllm'"
                     variant="outline" 
                     size="sm"
-                    class="ml-2 text-xs h-8 px-2 py-1 flex items-center gap-1"
+                    class="text-xs h-8 px-2 py-1 flex items-center gap-1"
                     :class="{'bg-primary/10': isStreamingEnabled}"
                     @click="toggleStreamingMode"
                     title="Toggle live streaming mode for WebLLM"
@@ -798,7 +880,6 @@ onMounted(() => {
                   @select-mention="handleMentionSelection"
                   @update-mention-search="handleUpdateMentionQuery"
                   @close-mention-search="handleCloseMentionSearch"
-                  @change-model="handleModelChange"
                   ref="conversationInputRef"
                 />
                 

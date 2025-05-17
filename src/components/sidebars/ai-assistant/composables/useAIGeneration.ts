@@ -42,7 +42,8 @@ export function useAIGeneration(editor: any) {
     loadWebLLMModel,
     webLLMModels,
     selectProvider,
-    isWebLLMSupported
+    isWebLLMSupported,
+    checkAllProviders
   } = useAIProviders()
   
   const { 
@@ -58,22 +59,20 @@ export function useAIGeneration(editor: any) {
    */
   const ensureValidProvider = async (): Promise<string> => {
     const currentProviderId = aiSettings.settings.preferredProviderId
-    logger.info(`Current provider ID: ${currentProviderId}, Available providers: ${availableProviders.value.join(', ')}`)
+    console.log(`[useAIGeneration] ensureValidProvider - Current provider ID: ${currentProviderId}, Available providers: ${availableProviders.value.join(', ')}`)
     
     // Special handling for WebLLM - if it's selected, check if a model is loaded
     if (currentProviderId === 'webllm') {
-      // Use the already initialized providers - no need to call useAIProviders() here
-      
       // Check if WebLLM is supported
-      logger.info(`WebLLM supported: ${isWebLLMSupported.value}`)
+      console.log(`[useAIGeneration] WebLLM requested and supported: ${isWebLLMSupported.value}`)
       
       // Check the current state
       updateWebLLMState()
-      logger.info(`WebLLM model loaded: ${currentWebLLMModel.value || 'none'}`)
+      console.log(`[useAIGeneration] WebLLM model loaded: ${currentWebLLMModel.value || 'none'}`)
       
       // If no model is loaded, try to load one
       if (!currentWebLLMModel.value) {
-        logger.info('No WebLLM model loaded, attempting to load one')
+        console.log('[useAIGeneration] No WebLLM model loaded, attempting to load one')
         
         // Show loading state in the editor
         editor.commands.updateAttributes('aiGeneration', {
@@ -83,7 +82,7 @@ export function useAIGeneration(editor: any) {
         
         // Try to select the WebLLM provider, which will auto-load a model
         const success = await selectProvider('webllm')
-        logger.info(`WebLLM provider selection ${success ? 'succeeded' : 'failed'}`)
+        console.log(`[useAIGeneration] WebLLM provider selection ${success ? 'succeeded' : 'failed'}`)
         
         if (!success) {
           throw new Error('Failed to load WebLLM model. Please select a model in the settings.')
@@ -91,23 +90,46 @@ export function useAIGeneration(editor: any) {
         
         // Update state after loading
         updateWebLLMState()
-        logger.info(`WebLLM model after loading: ${currentWebLLMModel.value || 'none'}`)
+        console.log(`[useAIGeneration] WebLLM model after loading: ${currentWebLLMModel.value || 'none'}`)
       }
       
       return 'webllm'
     }
     
     // For other providers, check if they're available
-    // Check if current provider is in the available providers list
+    console.log(`[useAIGeneration] Using non-WebLLM provider: ${currentProviderId}`)
+    
+    // First check if the explicitly selected provider is available
     if (availableProviders.value.includes(currentProviderId)) {
+      console.log(`[useAIGeneration] Selected provider ${currentProviderId} is available, using it`)
       return currentProviderId
     }
     
-    // If not available, try to select the best available provider
-    const newProvider = await selectBestAvailableProvider()
+    // If the selected provider is not available, log a warning
+    console.log(`[useAIGeneration] Warning: Selected provider ${currentProviderId} is not in available providers list`)
+    console.log(`[useAIGeneration] Available providers: ${availableProviders.value.join(', ')}`)
     
-    // If we couldn't find a valid provider, show an error
+    // Check if we need to update provider availability
+    if (availableProviders.value.length === 0) {
+      console.log('[useAIGeneration] No available providers found, checking all providers')
+      await checkAllProviders(false)
+      console.log(`[useAIGeneration] After checkAllProviders, available providers: ${availableProviders.value.join(', ')}`)
+      
+      // Check again if the selected provider is now available
+      if (availableProviders.value.includes(currentProviderId)) {
+        console.log(`[useAIGeneration] Selected provider ${currentProviderId} is now available after check, using it`)
+        return currentProviderId
+      }
+    }
+    
+    // If we still don't have the selected provider available, try to find an alternative
+    console.log('[useAIGeneration] Selected provider not available, trying to find best alternative')
+    const newProvider = await selectBestAvailableProvider()
+    console.log(`[useAIGeneration] Best available provider: ${newProvider}`)
+    
+    // If we couldn't find a valid provider, throw an error
     if (!availableProviders.value.includes(newProvider)) {
+      console.error('[useAIGeneration] No AI providers are available')
       throw new Error('No AI providers are available. Please check your settings.')
     }
     
@@ -121,7 +143,8 @@ export function useAIGeneration(editor: any) {
     block: any, 
     prompt: string, 
     conversationHistory: ConversationMessage[],
-    formatTimestamp: (date?: Date) => string
+    formatTimestamp: (date?: Date) => string,
+    forcedProvider?: string // Optional parameter to force a specific provider
   ): Promise<ConversationMessage[] | undefined> => {
     if (!block || !prompt.trim()) {
       return
@@ -147,8 +170,16 @@ export function useAIGeneration(editor: any) {
       newHistory.push(userMessage)
 
       // Ensure we have a valid provider before generating
-      const providerId = await ensureValidProvider()
+      let providerId = forcedProvider
+      if (!providerId) {
+        console.log('[useAIGeneration] generateText - No forced provider, ensuring valid provider')
+        providerId = await ensureValidProvider()
+      } else {
+        console.log(`[useAIGeneration] generateText - Using forced provider: ${providerId}`)
+      }
+      
       const apiKey = aiSettings.getApiKey(providerId)
+      console.log(`[useAIGeneration] generateText - Final provider selected: ${providerId}`)
       
       const options: GenerationOptions = {
         prompt,
@@ -286,7 +317,8 @@ export function useAIGeneration(editor: any) {
     block: any, 
     prompt: string, 
     conversationHistory: ConversationMessage[],
-    formatTimestamp: (date?: Date) => string
+    formatTimestamp: (date?: Date) => string,
+    forcedProvider?: string // Optional parameter to force a specific provider
   ): Promise<ConversationMessage[] | undefined> => {
     if (!block || !prompt.trim()) {
       return
@@ -312,8 +344,16 @@ export function useAIGeneration(editor: any) {
       newHistory.push(userMessage)
 
       // Ensure we have a valid provider before generating
-      const providerId = await ensureValidProvider()
+      let providerId = forcedProvider
+      if (!providerId) {
+        console.log('[useAIGeneration] continueConversation - No forced provider, ensuring valid provider')
+        providerId = await ensureValidProvider()
+      } else {
+        console.log(`[useAIGeneration] continueConversation - Using forced provider: ${providerId}`)
+      }
+      
       const apiKey = aiSettings.getApiKey(providerId)
+      console.log(`[useAIGeneration] continueConversation - Final provider selected: ${providerId}`)
       
       const options: GenerationOptions = {
         prompt,
@@ -374,7 +414,8 @@ export function useAIGeneration(editor: any) {
    */
   const regenerateText = async (
     block: any,
-    conversationHistory: ConversationMessage[]
+    conversationHistory: ConversationMessage[],
+    forcedProvider?: string // Optional parameter to force a specific provider
   ): Promise<ConversationMessage[] | undefined> => {
     if (!block) {
       return
@@ -401,8 +442,16 @@ export function useAIGeneration(editor: any) {
         : block.node.attrs.prompt || ''
 
       // Ensure we have a valid provider before generating
-      const providerId = await ensureValidProvider()
+      let providerId = forcedProvider
+      if (!providerId) {
+        console.log('[useAIGeneration] regenerateText - No forced provider, ensuring valid provider')
+        providerId = await ensureValidProvider()
+      } else {
+        console.log(`[useAIGeneration] regenerateText - Using forced provider: ${providerId}`)
+      }
+      
       const apiKey = aiSettings.getApiKey(providerId)
+      console.log(`[useAIGeneration] regenerateText - Final provider selected: ${providerId}`)
       
       const options: GenerationOptions = {
         prompt: lastPrompt,
@@ -496,6 +545,10 @@ export function useAIGeneration(editor: any) {
     removeBlock,
     abortGeneration,
     abortAllRequests,
-    currentStreamingText
+    currentStreamingText,
+    
+    // Add data about the current provider
+    getCurrentProvider: () => aiSettings.settings.preferredProviderId,
+    getAvailableProviders: () => availableProviders.value
   }
 }

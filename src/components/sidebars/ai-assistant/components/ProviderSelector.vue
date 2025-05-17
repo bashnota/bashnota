@@ -17,6 +17,9 @@ import {
 } from 'lucide-vue-next'
 import { useAIProviders } from '../composables/useAIProviders'
 
+// Define emits for provider changes
+const emit = defineEmits(['provider-changed'])
+
 // Get the AI providers and settings
 const aiSettings = useAISettingsStore()
 const { 
@@ -77,23 +80,40 @@ const getProviderLabel = (provider: any) => {
 
 // Update the provider when changed
 const updateProvider = async (providerId: string) => {
+  console.log('[ProviderSelector] updateProvider called with:', providerId, 'current:', currentProviderId.value)
+  
   if (providerId !== currentProviderId.value) {
     try {
       isChangingProvider.value = true
       
+      console.log('[ProviderSelector] Attempting to select provider:', providerId)
       // Use our new selectProvider function that handles auto-loading
       const success = await selectProvider(providerId)
       
       if (success) {
+        console.log('[ProviderSelector] Provider selection successful')
         // Update local state
         currentProviderId.value = providerId
+        
+        // Emit event to notify parent component with a slight delay to ensure it's processed
+        console.log('[ProviderSelector] Emitting provider-changed event with:', providerId)
+        emit('provider-changed', providerId)
+        
+        // Also emit after a slight delay to ensure it's captured
+        setTimeout(() => {
+          console.log('[ProviderSelector] Re-emitting provider-changed event with delay:', providerId)
+          emit('provider-changed', providerId)
+        }, 100)
       } else {
+        console.log('[ProviderSelector] Provider selection failed, reverting to:', aiSettings.settings.preferredProviderId)
         // If provider selection failed, revert to the previous selection
         currentProviderId.value = aiSettings.settings.preferredProviderId
       }
     } finally {
       isChangingProvider.value = false
     }
+  } else {
+    console.log('[ProviderSelector] Provider unchanged, no action needed')
   }
 }
 
@@ -111,7 +131,10 @@ onMounted(async () => {
 
 <template>
   <div>
-    <Select v-model="currentProviderId" @update:modelValue="updateProvider">
+    <Select 
+      v-model="currentProviderId" 
+      @update:modelValue="updateProvider"
+    >
       <SelectTrigger
         class="w-full text-sm border-none bg-background shadow-none px-0 h-6 font-normal"
         :disabled="isChangingProvider"
@@ -133,6 +156,7 @@ onMounted(async () => {
           :key="provider.id" 
           :value="provider.id"
           class="flex items-center gap-1"
+          @click="() => { console.log('[ProviderSelector] SelectItem clicked:', provider.id) }"
         >
           <div class="flex items-center gap-1.5">
             <component :is="getProviderIcon(provider.id)" class="h-3.5 w-3.5" />

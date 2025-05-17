@@ -47,6 +47,18 @@ export function useAIRequest() {
     const controller = new AbortController()
     activeRequests.value.push(controller)
     
+    // Skip timeout for WebLLM provider
+    if (providerId === 'webllm') {
+      // Create the main request promise without timeout for WebLLM
+      const requestPromise = promiseFunction()
+        .finally(() => {
+          // Remove this controller from active requests when done
+          activeRequests.value = activeRequests.value.filter(c => c !== controller)
+        })
+      
+      return requestPromise
+    }
+    
     // Get the appropriate timeout value
     const timeoutValue = getTimeoutForRequest(providerId, isStreaming)
     

@@ -15,9 +15,6 @@ const emit = defineEmits<{
   close: []
 }>()
 
-// Get the AI settings store to access provider name
-const aiSettings = useAISettingsStore()
-const providerName = ref(aiSettings.providers.find(p => p.id === aiSettings.settings.preferredProviderId)?.name || 'AI')
 </script>
 
 <template>

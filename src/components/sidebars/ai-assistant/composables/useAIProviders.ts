@@ -252,6 +252,13 @@ export function useAIProviders() {
       
       for (const provider of providersToCheck) {
         try {
+          // Skip checking Ollama provider if it's not the currently selected provider
+          // This avoids unnecessary connection attempts that result in timeout errors
+          if (provider.id === 'ollama' && provider.id !== aiSettings.settings.preferredProviderId) {
+            logger.info('Skipping Ollama availability check as it is not the current provider');
+            continue;
+          }
+          
           const isAvailable = await checkProviderAvailability(provider.id)
           if (isAvailable) {
             availableProviders.value.push(provider.id)
