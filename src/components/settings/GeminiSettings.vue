@@ -50,7 +50,9 @@ const loadGeminiModels = async () => {
   }
   
   try {
-    const models = await fetchGeminiModels(apiKey.value)
+    // Set the API key in the store first, then fetch models
+    aiSettings.setApiKey('gemini', apiKey.value)
+    const models = await fetchGeminiModels() || []
     
     // If current model isn't in the list, select the first one
     if (!models.find(m => m.id === selectedModelId.value) && models.length > 0) {
