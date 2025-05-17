@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@/components/ui/button'
 import { Bot, Sparkles as SparklesIcon } from 'lucide-vue-next'
+import ProviderSelector from './ProviderSelector.vue'
 
 const emit = defineEmits(['create-session'])
 

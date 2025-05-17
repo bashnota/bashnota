@@ -55,47 +55,67 @@ export function useMentions() {
    * Check for mention triggers in text (e.g., @ or #[)
    */
   const checkForMentions = (event: any, textareaRef: any) => {
-    // Skip if textarea ref is not available
-    if (!textareaRef.value) return
-    
-    const textarea = event.target
-    const value = textarea.value as string
-    const cursorPos = textarea.selectionStart as number
+    // Handle different input formats
+    let value: string;
+    let cursorPos: number;
+
+    // Skip if required data is not available
+    if (!event) return;
+
+    // Case 1: event is a DOM event with target property
+    if (event.target && typeof event.target.value === 'string') {
+      value = event.target.value;
+      cursorPos = event.target.selectionStart || 0;
+    } 
+    // Case 2: event is an object with explicit value and cursor position
+    else if (typeof event.value === 'string') {
+      value = event.value;
+      cursorPos = event.selectionStart || 0;
+    }
+    // Case 3: no valid input format
+    else {
+      // Fallback to try getting value from textareaRef
+      if (!textareaRef || !textareaRef.value || typeof textareaRef.value.value !== 'string') {
+        return;
+      }
+      
+      value = textareaRef.value.value;
+      cursorPos = textareaRef.value.selectionStart || 0;
+    }
     
     // Look for '#[' before the cursor
-    const textBeforeCursor = value.substring(0, cursorPos)
-    const mentionMatch = textBeforeCursor.match(/#\[([^\]]+)?$/)
+    const textBeforeCursor = value.substring(0, cursorPos);
+    const mentionMatch = textBeforeCursor.match(/#\[([^\]]+)?$/);
     
     if (mentionMatch) {
       // Found a potential mention
-      const query = mentionMatch[1] || ''
-      searchQuery.value = query
+      const query = mentionMatch[1] || '';
+      searchQuery.value = query;
       
       // Record the mention range for later replacement
-      const startPos = mentionMatch.index as number
-      const endPos = cursorPos
-      currentMentionRange.value = { start: startPos, end: endPos }
+      const startPos = mentionMatch.index as number;
+      const endPos = cursorPos;
+      currentMentionRange.value = { start: startPos, end: endPos };
       
       // Show search and perform search
-      showMentionSearch.value = true
-      debouncedSearch(query)
+      showMentionSearch.value = true;
+      debouncedSearch(query);
     } else {
       // No mention found, close search
-      showMentionSearch.value = false
-      currentMentionRange.value = null
+      showMentionSearch.value = false;
+      currentMentionRange.value = null;
     }
     
     // Also parse existing mentions in the prompt
-    parseExistingMentions(value)
+    parseExistingMentions(value);
   }
   
   /**
    * Select a nota from search results and insert it into the text
    */
   const selectNotaFromSearch = (nota: any, textareaRef: any, isContinuing: boolean, promptInput: any, followUpPrompt: any) => {
-    if (!textareaRef.value || !currentMentionRange.value) return
+    if (!currentMentionRange.value) return
     
-    const textarea = textareaRef.value
     const range = currentMentionRange.value
     
     // Create the mention text
@@ -124,13 +144,23 @@ export function useMentions() {
     // Update existing mentions
     parseExistingMentions(newValue)
     
-    // Focus back on textarea and set cursor position after the mention
+    // Focus back on textarea and set cursor position after the mention if possible
     nextTick(() => {
-      if (textareaRef.value) {
-        textareaRef.value.focus()
-        const newCursorPos = range.start + mentionText.length
-        textareaRef.value.selectionStart = newCursorPos
-        textareaRef.value.selectionEnd = newCursorPos
+      try {
+        // Only attempt to focus if textareaRef exists, is valid, and has a focus method
+        if (textareaRef && textareaRef.value && typeof textareaRef.value.focus === 'function') {
+          textareaRef.value.focus()
+          
+          // Only set cursor position if the selection methods exist
+          if (typeof textareaRef.value.selectionStart !== 'undefined') {
+            const newCursorPos = range.start + mentionText.length
+            textareaRef.value.selectionStart = newCursorPos
+            textareaRef.value.selectionEnd = newCursorPos
+          }
+        }
+      } catch (error) {
+        // Silently handle any focus errors
+        logger.debug('Could not focus textarea after mention insertion:', error)
       }
     })
   }

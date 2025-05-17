@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { supportedProviders, type LLMProvider } from '@/services/aiService'
 import { toast } from '@/components/ui/toast'
 import { logger } from '@/services/logger'
+import type { ProviderConfig } from '@/services/ai'
 
 export interface AISettings {
   preferredProviderId: string
@@ -13,6 +14,11 @@ export interface AISettings {
   geminiModel?: string // The specific Gemini model to use
   geminiSafetyThreshold?: string // Safety threshold for content filtering
   sidebarWidth?: number // Width of the AI assistant sidebar
+  ollamaServerUrl?: string // Ollama server URL
+  ollamaModel?: string // The selected Ollama model
+  webllmModel?: string // The selected WebLLM model
+  autoSelectProvider?: boolean // Whether to auto-select the best available provider
+  requestTimeout?: number // Request timeout in seconds
 }
 
 export const useAISettingsStore = defineStore('aiSettings', () => {
@@ -24,13 +30,17 @@ export const useAISettingsStore = defineStore('aiSettings', () => {
     temperature: 0.7,
     geminiModel: 'gemini-1.5-pro', // Default to stable Gemini 1.5 Pro instead of experimental model
     geminiSafetyThreshold: 'BLOCK_MEDIUM_AND_ABOVE', // Default safety threshold
-    sidebarWidth: 350 // Default sidebar width
+    sidebarWidth: 350, // Default sidebar width
+    ollamaServerUrl: 'http://localhost:11434', // Default Ollama server URL
+    ollamaModel: 'llama2', // Default Ollama model
+    webllmModel: '', // No default WebLLM model
+    autoSelectProvider: true // Default to auto-selecting the best available provider
   })
 
   const providers = computed(() => supportedProviders)
   
   const preferredProvider = computed<LLMProvider | undefined>(
-    () => supportedProviders.find(p => p.id === settings.value.preferredProviderId)
+    () => supportedProviders.find(p => p.id === settings.value.preferredProviderId) as unknown as LLMProvider | undefined
   )
 
   const getApiKey = (providerId: string): string => {
@@ -48,6 +58,15 @@ export const useAISettingsStore = defineStore('aiSettings', () => {
   const setPreferredProvider = (providerId: string) => {
     settings.value.preferredProviderId = providerId
     saveSettings()
+    
+    // Update the AI service's default provider to match
+    try {
+      import('@/services/ai').then(({ aiService }) => {
+        aiService.setDefaultProviderId(providerId)
+      })
+    } catch (error) {
+      logger.error('Failed to update AI service provider', error)
+    }
   }
 
   const updateSettings = (newSettings: Partial<AISettings>) => {

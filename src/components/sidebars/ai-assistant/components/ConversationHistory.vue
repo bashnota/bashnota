@@ -8,6 +8,8 @@ import { type ConversationMessage } from '../composables/useConversation'
 const props = defineProps<{
   conversationHistory: ConversationMessage[]
   isLoading: boolean
+  streamingText: string
+  isStreaming: boolean
   error: string
   providerName: string
   formatTimestamp: (date?: Date) => string
@@ -55,15 +57,41 @@ const retryGeneration = () => {
       @select="handleSelectText"
     />
     
-    <!-- Enhanced Loading Indicator -->
-    <div v-if="isLoading" class="loading-indicator mb-3">
-      <div class="text-sm text-muted-foreground p-2.5 bg-muted/20 rounded-lg max-w-[80%] ml-auto">
-        <div class="typing-indicator">
-          <span></span>
-          <span></span>
-          <span></span>
+    <!-- Streaming Text Display -->
+    <div v-if="isStreaming && streamingText" class="streaming-message mb-3">
+      <div class="flex items-start gap-3 p-2.5">
+        <Avatar :fallback="providerName ? providerName[0] : 'AI'" class="h-8 w-8 shrink-0 bg-primary/10 text-primary" />
+        <div class="space-y-1.5 w-full">
+          <div class="flex items-center justify-between">
+            <span class="text-sm font-medium">{{ providerName }}</span>
+            <span class="text-xs text-muted-foreground">Live Generation</span>
+          </div>
+          <div class="text-sm p-2.5 bg-muted/20 rounded-lg max-w-full streaming-content">
+            <span>{{ streamingText }}</span>
+            <span class="cursor-blink"></span>
+          </div>
         </div>
-        <span class="sr-only">AI is generating a response...</span>
+      </div>
+    </div>
+    
+    <!-- Enhanced Loading Indicator -->
+    <div v-else-if="isLoading" class="loading-indicator mb-3">
+      <div class="flex items-start gap-3 p-2.5">
+        <Avatar :fallback="providerName ? providerName[0] : 'AI'" class="h-8 w-8 shrink-0 bg-primary/10 text-primary" />
+        <div class="space-y-1.5 w-full">
+          <div class="flex items-center justify-between">
+            <span class="text-sm font-medium">{{ providerName }}</span>
+            <span class="text-xs text-muted-foreground">Generating...</span>
+          </div>
+          <div class="text-sm p-2.5 bg-muted/20 rounded-lg max-w-full">
+            <div class="typing-indicator">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <span class="sr-only">AI is generating a response...</span>
+          </div>
+        </div>
       </div>
     </div>
     
@@ -118,6 +146,30 @@ const retryGeneration = () => {
   animation: pulse 1s infinite ease-in-out 0.4s;
 }
 
+/* Streaming text cursor animation */
+.streaming-content {
+  position: relative;
+}
+
+.cursor-blink {
+  display: inline-block;
+  width: 2px;
+  height: 16px;
+  background-color: hsl(var(--primary));
+  margin-left: 2px;
+  vertical-align: middle;
+  animation: blink 0.8s infinite;
+}
+
+@keyframes blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
 @keyframes pulse {
   0%, 100% {
     transform: scale(1);
@@ -130,7 +182,7 @@ const retryGeneration = () => {
 }
 
 /* Fade in animation for the loading indicator */
-.loading-indicator {
+.loading-indicator, .streaming-message {
   animation: fadeIn 0.3s ease-in-out;
 }
 

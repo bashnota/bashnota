@@ -1,6 +1,16 @@
 import axios from 'axios'
 import * as webllm from "@mlc-ai/web-llm";
 import { logger } from '@/services/logger'
+import { aiService as newAIService } from './ai';
+import type {
+  GenerationOptions as NewGenerationOptions,
+  GenerationResult as NewGenerationResult,
+  MultimodalGenerationOptions as NewMultimodalGenerationOptions,
+  StreamCallbacks,
+  WebLLMModelInfo as NewWebLLMModelInfo,
+  GeminiModelInfo as NewGeminiModelInfo,
+  GeminiSafetySettings as NewGeminiSafetySettings
+} from './ai';
 
 // Add the InitProgressReport interface to match WebLLM's API
 interface InitProgressReport {
@@ -15,15 +25,6 @@ export interface LLMProvider {
   requiresApiKey: boolean
   maxTokens: number
   defaultPrompt: string
-}
-
-export interface GenerationOptions {
-  prompt: string
-  maxTokens?: number
-  temperature?: number
-  topP?: number
-  frequencyPenalty?: number
-  presencePenalty?: number
 }
 
 export interface GeminiSafetySettings {
@@ -47,12 +48,6 @@ export interface MultimodalGenerationOptions extends GenerationOptions {
   tuningOptions?: GeminiTuningOptions
 }
 
-export interface GenerationResult {
-  text: string
-  provider: string
-  tokens: number
-}
-
 export interface WebLLMModelInfo {
   id: string
   name: string
@@ -69,123 +64,45 @@ export interface GeminiModelInfo {
   supportsImages: boolean
 }
 
-export const supportedProviders: LLMProvider[] = [
-  {
-    id: 'gemini',
-    name: 'Google Gemini',
-    apiEndpoint: 'https://generativelanguage.googleapis.com/v1beta/models',
-    requiresApiKey: true,
-    maxTokens: 8192,
-    defaultPrompt: 'You are Gemini, a helpful AI assistant from Google.',
-  },
-  {
-    id: 'ollama',
-    name: 'Ollama (Local)',
-    apiEndpoint: 'http://localhost:11434/api/generate',
-    requiresApiKey: false,
-    maxTokens: 4096,
-    defaultPrompt: 'You are a helpful AI assistant.',
-  },
-  {
-    id: 'webllm',
-    name: 'WebLLM (Browser)',
-    apiEndpoint: '', // Not needed for WebLLM as it runs locally
-    requiresApiKey: false,
-    maxTokens: 4096, // This can vary based on the model
-    defaultPrompt: 'You are a helpful AI assistant running locally in the browser.',
-  },
-]
+// For backward compatibility
+export const supportedProviders = newAIService.getProviderConfigs();
 
-export class AIService {
-  private webllmEngine: webllm.MLCEngine | null = null;
-  private webllmModel: string = '';
-  private modelLoadingProgress: number = 0;
-  private isModelLoading: boolean = false;
-  private modelLoadingError: string | null = null;
-  private defaultGeminiModel: string = 'gemini-1.5-pro';
-  private geminiModels: GeminiModelInfo[] = [
-    {
-      id: 'gemini-1.5-flash',
-      name: 'Gemini 1.5 Flash',
-      description: 'Fast and efficient model for most common tasks',
-      maxTokens: 16384,
-      supportsImages: true
-    },
-    {
-      id: 'gemini-1.5-pro',
-      name: 'Gemini 1.5 Pro',
-      description: 'High-quality model with strong reasoning capabilities',
-      maxTokens: 32768,
-      supportsImages: true
-    },
-    {
-      id: 'gemini-1.5-ultra',
-      name: 'Gemini 1.5 Ultra',
-      description: 'Top-tier model with cutting-edge capabilities',
-      maxTokens: 1048576,
-      supportsImages: true
-    },
-    {
-      id: 'gemini-2.0-pro-exp-02-05',
-      name: 'Gemini 2.0 Pro Exp',
-      description: 'Experimental version of Gemini 2.0 Pro',
-      maxTokens: 32768,
-      supportsImages: true
-    }
-  ];
+// Original types for backward compatibility
+export interface GenerationOptions {
+  prompt: string
+  maxTokens?: number
+  temperature?: number
+  topP?: number
+  frequencyPenalty?: number
+  presencePenalty?: number
+  safetyThreshold?: string
+  modelId?: string
+}
 
-  async isWebGPUSupported(): Promise<boolean> {
-    if (typeof navigator === 'undefined') return false;
-    
+export interface GenerationResult {
+  text: string
+  provider: string
+  tokens: number
+}
+
+// This class is just a compatibility wrapper around the new modular AI service
+class AIServiceLegacy {
+  // Sync the preferred provider with the settings store
+  syncPreferredProvider(): void {
     try {
-      return 'gpu' in navigator;
-    } catch (error) {
-      logger.error('Error checking WebGPU support:', error);
-      return false;
-    }
-  }
-
-  async initializeWebLLM(modelName: string): Promise<void> {
-    if (this.isModelLoading) {
-      throw new Error('A model is already being loaded');
-    }
-    
-    try {
-      this.isModelLoading = true;
-      this.modelLoadingProgress = 0;
-      this.modelLoadingError = null;
-      
-      // Progress callback function with correct type
-      const initProgressCallback = (report: InitProgressReport) => {
-        this.modelLoadingProgress = report.progress;
-        logger.log(`Loading model: ${Math.round(report.progress * 100)}% - ${report.text}`);
-      };
-      
-      // If we already have an engine, reload it with the new model
-      if (this.webllmEngine) {
-        this.webllmModel = modelName;
-        await this.webllmEngine.reload(modelName);
-      } else {
-        // Create a new engine with the selected model
-        this.webllmEngine = await webllm.CreateMLCEngine(
-          modelName,
-          { 
-            initProgressCallback,
-            // Optional: Add custom configuration here
-            // appConfig: { ... }
-          }
-        );
-        this.webllmModel = modelName;
+      const savedSettings = localStorage.getItem('ai-settings');
+      if (savedSettings) {
+        const settings = JSON.parse(savedSettings);
+        if (settings.preferredProviderId) {
+          newAIService.setDefaultProviderId(settings.preferredProviderId);
+        }
       }
     } catch (error) {
-      this.modelLoadingError = error instanceof Error ? error.message : 'Unknown error loading model';
-      logger.error('Error initializing WebLLM:', error);
-      throw error;
-    } finally {
-      this.isModelLoading = false;
+      console.error('Failed to sync preferred provider', error);
     }
   }
 
+  // Pass through to the new service with backward compatibility
   async generateText(
     providerId: string, 
     apiKey: string, 
@@ -193,330 +110,59 @@ export class AIService {
     modelId?: string,
     safetyThreshold?: string
   ): Promise<GenerationResult> {
-    const provider = supportedProviders.find(p => p.id === providerId)
-    
-    if (!provider) {
-      throw new Error(`Provider ${providerId} not supported`)
+    // Handle safety threshold conversion
+    if (safetyThreshold) {
+      options = {
+        ...options,
+        safetyThreshold
+      };
     }
     
-    try {
-      switch (providerId) {
-        case 'gemini':
-          // If this is a GeminiGenerationOptions, merge the safety threshold
-          if (safetyThreshold) {
-            const geminiOptions = options as GeminiGenerationOptions;
-            
-            // Create or update tuningOptions to include safety settings
-            if (!geminiOptions.tuningOptions) {
-              geminiOptions.tuningOptions = {};
-            }
-            
-            // Apply safety settings
-            geminiOptions.tuningOptions.safetySettings = [
-              {
-                category: "HARM_CATEGORY_HARASSMENT",
-                threshold: safetyThreshold as any
-              },
-              {
-                category: "HARM_CATEGORY_HATE_SPEECH",
-                threshold: safetyThreshold as any
-              },
-              {
-                category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-                threshold: safetyThreshold as any
-              },
-              {
-                category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-                threshold: safetyThreshold as any
-              }
-            ];
-            
-            return await this.generateWithGemini(apiKey, geminiOptions, modelId)
-          } else {
-            return await this.generateWithGemini(apiKey, options, modelId)
-          }
-        case 'ollama':
-          return await this.generateWithOllama(options)
-        case 'webllm':
-          return await this.generateWithWebLLM(options)
-        default:
-          throw new Error(`Provider ${providerId} not implemented`)
-      }
-    } catch (error) {
-      logger.error('AI generation failed:', error)
-      throw error
+    // Handle model ID
+    if (modelId) {
+      options = {
+        ...options,
+        modelId
+      };
     }
+    
+    const result = await newAIService.generateText(providerId, options as NewGenerationOptions, apiKey);
+    return result as GenerationResult;
   }
 
-  private async generateWithGemini(
+  async generateTextStream(
+    providerId: string,
+    apiKey: string,
+    options: GenerationOptions,
+    onChunk: (text: string) => void,
+    onComplete: (result: GenerationResult) => void,
+    onError?: (error: Error) => void
+  ): Promise<void> {
+    // Convert to the new callbacks interface
+    const callbacks: StreamCallbacks = {
+      onChunk,
+      onComplete: (result: NewGenerationResult) => onComplete(result as GenerationResult),
+      onError
+    };
+    
+    return newAIService.generateTextStream(providerId, options as NewGenerationOptions, callbacks, apiKey);
+  }
+
+  async generateMultimodalText(
+    providerId: string,
     apiKey: string, 
-    options: GenerationOptions | GeminiGenerationOptions,
+    options: MultimodalGenerationOptions,
     modelId?: string
   ): Promise<GenerationResult> {
-    // Use the provided model ID or fall back to the default
-    const model = modelId || this.defaultGeminiModel;
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-    
-    // Check if we have Gemini-specific tuning options
-    const geminiOptions = options as GeminiGenerationOptions;
-    const tuningOptions = geminiOptions.tuningOptions || {};
-    
-    // Retry configuration
-    const MAX_RETRIES = 3;
-    const INITIAL_RETRY_DELAY = 1000; // 1 second
-    
-    let retryCount = 0;
-    let lastError: any = null;
-    
-    while (retryCount <= MAX_RETRIES) {
-      try {
-        // Build the request payload
-        const payload: any = {
-          contents: [
-            {
-              parts: [
-                {
-                  text: options.prompt
-                }
-              ]
-            }
-          ],
-          generationConfig: {
-            maxOutputTokens: options.maxTokens || 2048, // Increased from 1024 to avoid MAX_TOKEN issues
-            temperature: options.temperature || 0.7,
-            topP: options.topP || 0.95,
-            topK: tuningOptions.topK || 40,
-          }
-        };
-        
-        // Add optional generation parameters if specified
-        if (tuningOptions.candidateCount) {
-          payload.generationConfig.candidateCount = tuningOptions.candidateCount;
-        }
-        
-        if (tuningOptions.stopSequences && tuningOptions.stopSequences.length > 0) {
-          payload.generationConfig.stopSequences = tuningOptions.stopSequences;
-        }
-        
-        // Add safety settings
-        if (tuningOptions.safetySettings && tuningOptions.safetySettings.length > 0) {
-          payload.safetySettings = tuningOptions.safetySettings;
-        } else {
-          // Default safety settings if none provided
-          payload.safetySettings = [
-            {
-              category: "HARM_CATEGORY_HARASSMENT",
-              threshold: "BLOCK_MEDIUM_AND_ABOVE"
-            },
-            {
-              category: "HARM_CATEGORY_HATE_SPEECH",
-              threshold: "BLOCK_MEDIUM_AND_ABOVE"
-            },
-            {
-              category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-              threshold: "BLOCK_MEDIUM_AND_ABOVE"
-            },
-            {
-              category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-              threshold: "BLOCK_MEDIUM_AND_ABOVE"
-            }
-          ];
-        }
-
-        // Log the payload for debugging
-        logger.log('Sending Gemini API request with payload:', JSON.stringify(payload));
-
-        const response = await axios.post(endpoint, payload);
-        
-        // Log the full response for debugging
-        logger.log('Received Gemini API response:', JSON.stringify(response.data));
-
-        // Extract the generated text from Gemini's response format
-        let generatedText = '';
-        if (response.data.candidates && 
-            response.data.candidates[0] && 
-            response.data.candidates[0].content &&
-            response.data.candidates[0].content.parts) {
-          
-          // Log each part for debugging
-          logger.log('Response parts:', JSON.stringify(response.data.candidates[0].content.parts));
-          
-          // Concatenate all text parts from the response
-          generatedText = response.data.candidates[0].content.parts
-            .filter((part: any) => part.text)
-            .map((part: any) => part.text)
-            .join('');
-        } else {
-          // If response structure is different than expected, try to extract text in alternative ways
-          logger.warn('Unusual Gemini response structure, attempting alternative text extraction');
-          
-          if (response.data.candidates?.[0]?.text) {
-            generatedText = response.data.candidates[0].text;
-          } else if (response.data.text) {
-            generatedText = response.data.text;
-          } else if (typeof response.data === 'string') {
-            generatedText = response.data;
-          }
-        }
-        
-        // If we still don't have text, check finish reason and provide appropriate message
-        if (!generatedText) {
-          const finishReason = response.data.candidates?.[0]?.finishReason;
-          logger.error('Failed to extract text from Gemini response', response.data);
-          
-          if (finishReason === 'MAX_TOKENS') {
-            // If stopped due to max tokens limit, try again with a smaller prompt or different model
-            if (retryCount < MAX_RETRIES) {
-              logger.warn(`MAX_TOKENS limit hit, retrying with different configuration (attempt ${retryCount + 1})`);
-              
-              // Try with a different model or settings on retry
-              if (model === 'gemini-2.0-pro-exp-02-05') {
-                // If using experimental model, try the stable one instead
-                const stableModel = 'gemini-1.5-pro';
-                logger.log(`Switching from experimental model to stable model: ${stableModel}`);
-                
-                // Use a different endpoint
-                const stableEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${stableModel}:generateContent?key=${apiKey}`;
-                
-                // Make request with stable model
-                const stableResponse = await axios.post(stableEndpoint, payload);
-                logger.log('Received stable model response:', JSON.stringify(stableResponse.data));
-                
-                // Try to extract text from stable model response
-                if (stableResponse.data.candidates?.[0]?.content?.parts) {
-                  generatedText = stableResponse.data.candidates[0].content.parts
-                    .filter((part: any) => part.text)
-                    .map((part: any) => part.text)
-                    .join('');
-                    
-                  if (generatedText) {
-                    // We got text from the stable model, return it
-                    return {
-                      text: generatedText,
-                      provider: 'gemini',
-                      tokens: stableResponse.data.usageMetadata?.totalTokenCount || 0
-                    };
-                  }
-                }
-              }
-              
-              // If we couldn't get a response from the stable model, retry with current one
-              retryCount++;
-              continue;
-            }
-            
-            generatedText = "I apologize, but I couldn't complete generating a response due to length constraints. Please try a more specific prompt.";
-          } else if (finishReason === 'SAFETY') {
-            generatedText = "I apologize, but I can't provide a response to that prompt due to safety guidelines.";
-          } else if (finishReason === 'RECITATION') {
-            generatedText = "I apologize, but I can't provide a detailed response as it would require reciting content that I shouldn't reproduce.";
-          } else {
-            generatedText = "I'm sorry, I couldn't generate a response. Please try again with a different prompt.";
-          }
-        }
-
-        return {
-          text: generatedText,
-          provider: 'gemini',
-          tokens: response.data.usageMetadata?.totalTokenCount || 0
-        };
-      } catch (error) {
-        lastError = error;
-        
-        // Determine if we should retry
-        let shouldRetry = false;
-        
-        if (axios.isAxiosError(error) && error.response) {
-          logger.error(`Gemini API error (attempt ${retryCount + 1}/${MAX_RETRIES + 1}):`, error.response.data);
-          
-          // Check for rate limit error (429)
-          if (error.response.status === 429) {
-            shouldRetry = true;
-            logger.warn(`Rate limit hit with Gemini API. Retrying in ${(INITIAL_RETRY_DELAY * Math.pow(2, retryCount)) / 1000} seconds...`);
-          }
-        }
-        
-        // If we shouldn't retry or we're out of retries, throw the error
-        if (!shouldRetry || retryCount >= MAX_RETRIES) {
-          // Handle specific error cases before giving up
-          if (axios.isAxiosError(error) && error.response) {
-            if (error.response.status === 404) {
-              throw new Error(`Gemini model "${model}" not found. Please check if the model ID is correct.`);
-            } else if (error.response.status === 400) {
-              throw new Error(`Gemini API error: ${error.response.data?.error?.message || 'Bad request'}`);
-            } else if (error.response.status === 403) {
-              throw new Error('Gemini API error: Invalid API key or lacking permissions');
-            } else if (error.response.status === 429) {
-              throw new Error('Gemini API rate limit exceeded. Please try again later.');
-            }
-          }
-          throw error;
-        }
-        
-        // Wait with exponential backoff before retrying
-        const delay = INITIAL_RETRY_DELAY * Math.pow(2, retryCount);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        retryCount++;
-      }
-    }
-    
-    // Should never reach here but just in case
-    throw lastError || new Error('Failed to generate text with Gemini after retries');
-  }
-
-  private async generateWithOllama(
-    options: GenerationOptions
-  ): Promise<GenerationResult> {
-    const response = await axios.post(
-      'http://localhost:11434/api/generate',
-      {
-        model: 'llama3',
-        prompt: options.prompt,
-        options: {
-          temperature: options.temperature || 0.7,
-        }
-      }
-    )
-
-    return {
-      text: response.data.response,
-      provider: 'ollama',
-      tokens: 0 // Ollama doesn't return token count in the same way
-    }
-  }
-
-  private async generateWithWebLLM(
-    options: GenerationOptions
-  ): Promise<GenerationResult> {
-    if (!this.webllmEngine) {
-      throw new Error('WebLLM engine not initialized. Please select and load a model first.');
-    }
-
-    try {
-      // Create a chat completion using the OpenAI-compatible API
-      const response = await this.webllmEngine.chat.completions.create({
-        messages: [
-          { role: "system", content: "You are a helpful assistant." },
-          { role: "user", content: options.prompt }
-        ],
-        temperature: options.temperature || 0.7,
-        max_tokens: options.maxTokens || 1024,
-        top_p: options.topP || 0.95,
-        stream: false
-      });
-
-      // Extract the response text
-      const generatedText = response.choices[0].message.content;
-      
-      return {
-        text: generatedText || '',
-        provider: 'webllm',
-        tokens: response.usage?.completion_tokens || 0
+    if (modelId) {
+      options = {
+        ...options,
+        modelId
       };
-    } catch (error) {
-      logger.error('WebLLM generation failed:', error);
-      throw new Error(error instanceof Error ? error.message : 'WebLLM generation failed');
-    }
+        }
+
+    const result = await newAIService.generateMultimodal(providerId, options as NewMultimodalGenerationOptions, undefined, apiKey);
+    return result as GenerationResult;
   }
 
   async generateWithWebLLMStreaming(
@@ -524,258 +170,84 @@ export class AIService {
     onChunk: (text: string) => void,
     onComplete: (result: GenerationResult) => void
   ): Promise<void> {
-    if (!this.webllmEngine) {
-      throw new Error('WebLLM engine not initialized. Please select and load a model first.');
-    }
-
-    try {
-      let fullText = '';
-      
-      // Create a streaming chat completion
-      const stream = await this.webllmEngine.chat.completions.create({
-        messages: [
-          { role: "system", content: "You are a helpful assistant." },
-          { role: "user", content: options.prompt }
-        ],
-        temperature: options.temperature || 0.7,
-        max_tokens: options.maxTokens || 1024,
-        top_p: options.topP || 0.95,
-        stream: true,
-        stream_options: { include_usage: true }
-      });
-
-      // Process each chunk as it arrives
-      for await (const chunk of stream) {
-        const content = chunk.choices[0]?.delta?.content || '';
-        if (content) {
-          fullText += content;
-          onChunk(content);
-        }
-        
-        // If this is the last chunk with usage information
-        if (chunk.usage) {
-          onComplete({
-            text: fullText,
-            provider: 'webllm',
-            tokens: chunk.usage.completion_tokens || 0
-          });
-        }
-      }
-    } catch (error) {
-      logger.error('WebLLM streaming generation failed:', error);
-      throw new Error(error instanceof Error ? error.message : 'WebLLM streaming generation failed');
-    }
+    const callbacks: StreamCallbacks = {
+      onChunk,
+      onComplete: (result: NewGenerationResult) => onComplete(result as GenerationResult)
+    };
+    
+    return newAIService.generateTextStream('webllm', options as NewGenerationOptions, callbacks);
   }
 
   async setWebLLMModel(modelName: string): Promise<void> {
-    if (this.isModelLoading) {
-      throw new Error('A model is already being loaded');
-    }
-    
-    if (this.webllmModel === modelName && this.webllmEngine) {
-      // Model is already loaded
-      return;
-    }
-    
-    await this.initializeWebLLM(modelName);
+    return newAIService.initializeWebLLMModel(modelName);
   }
 
   async getAvailableWebLLMModels(): Promise<WebLLMModelInfo[]> {
-    try {
-      // Get the list of models from WebLLM
-      const modelRecords = webllm.prebuiltAppConfig.model_list;
-      
-      // Transform the model records into a more user-friendly format
-      return modelRecords.map(model => {
-        // Extract model size from the ID (e.g., "Llama-3.1-8B-Instruct" -> "8B")
-        // Handle both standard format and Gemma format (e.g., "gemma-3-1b-it" -> "1B")
-        const sizeMatch = model.model_id.match(/(?:(\d+\.?\d*)[BM])|(?:gemma-\d+-(\d+)b)/);
-        const size = sizeMatch ? 
-          (sizeMatch[1] ? `${sizeMatch[1]}B` : `${sizeMatch[2]}B`) : 
-          'Unknown';
-        
-        // Extract quantization info (e.g., "q4f32_1" -> "4-bit")
-        const quantMatch = model.model_id.match(/q(\d+)f(\d+)/);
-        const quantization = quantMatch ? `${quantMatch[1]}-bit` : 'Unknown';
-        
-        // Format the model name for display
-        const name = model.model_id
-          .replace(/-/g, ' ')
-          .replace(/q\d+f\d+_\d+/, '')
-          .replace(/MLC$/, '')
-          .replace(/gemma-(\d+)-(\d+)b/, 'Gemma $1 $2B') // Updated to handle Gemma 3
-          .trim();
-        
-        // Determine if it's an instruction model
-        const isInstruct = model.model_id.includes('-Instruct') || model.model_id.includes('-it');
-        
-        return {
-          id: model.model_id,
-          name: name,
-          size: size,
-          description: `${name} (${size}, ${quantization})${isInstruct ? ' - Instruction-tuned' : ''}`,
-          // Estimate download size based on model size
-          downloadSize: this.estimateDownloadSize(size)
-        };
-      });
-    } catch (error) {
-      logger.error('Error getting available WebLLM models:', error);
-      // Return a default list of models if we can't get them from WebLLM
-      return [
-        {
-          id: 'Llama-2-7b-chat-hf-q4f32_1',
-          name: 'Llama 2 7B Chat',
-          size: '7B',
-          description: 'Llama 2 7B Chat (7B, 4-bit) - Instruction-tuned',
-          downloadSize: '~4GB'
-        },
-        {
-          id: 'Llama-2-13b-chat-hf-q4f32_1',
-          name: 'Llama 2 13B Chat',
-          size: '13B',
-          description: 'Llama 2 13B Chat (13B, 4-bit) - Instruction-tuned',
-          downloadSize: '~7GB'
-        }
-      ];
-    }
+    const models = await newAIService.getWebLLMModels();
+    return models as unknown as WebLLMModelInfo[];
+  }
+
+  async isWebGPUSupported(): Promise<boolean> {
+    return newAIService.isWebLLMSupported();
   }
   
-  // Helper method to estimate download size
-  private estimateDownloadSize(modelSize: string): string {
-    if (modelSize.includes('0.5B')) return '~250MB';
-    if (modelSize.includes('1B') || modelSize.includes('1.5B')) return '~500MB';
-    if (modelSize.includes('2B')) return '~1GB';
-    if (modelSize.includes('3B')) return '~1.5GB';
-    if (modelSize.includes('7B') || modelSize.includes('8B')) return '~4GB';
-    if (modelSize.includes('13B')) return '~7GB';
-    return 'Unknown';
-  }
-  
-  // Add methods to get the current model loading state
   getModelLoadingState(): { 
     isLoading: boolean; 
     progress: number; 
     error: string | null;
     currentModel: string | null;
   } {
-    return {
-      isLoading: this.isModelLoading,
-      progress: this.modelLoadingProgress,
-      error: this.modelLoadingError,
-      currentModel: this.webllmModel || null
-    };
+    return newAIService.getWebLLMModelLoadingState();
   }
   
-  // Add a method to check if a model is loaded
   isModelLoaded(): boolean {
-    return !!this.webllmEngine && !!this.webllmModel;
+    const state = newAIService.getWebLLMModelLoadingState();
+    return !!state.currentModel;
   }
   
-  // Add a method to get the current model
   getCurrentModel(): string {
-    return this.webllmModel;
+    const state = newAIService.getWebLLMModelLoadingState();
+    return state.currentModel || '';
   }
   
-  // Add a method to abort generation
   abortGeneration(): void {
-    if (this.webllmEngine) {
-      try {
-        // Since there's no direct cancel method, we can try to create a new completion
-        // which should effectively cancel the previous one
-        logger.log('Attempting to abort WebLLM generation');
-        // We could potentially reload the model to force a reset
-        // or just let the current generation complete
-      } catch (error) {
-        logger.error('Error aborting generation:', error);
-      }
-    }
+    // No direct equivalent in the new system yet
   }
 
-  // Add a method to get the available Gemini models
   getAvailableGeminiModels(): GeminiModelInfo[] {
-    return this.geminiModels;
-  }
-  
-  // Set default Gemini model
-  setDefaultGeminiModel(modelId: string): void {
-    // Check if the model exists in our list
-    const modelExists = this.geminiModels.some(model => model.id === modelId);
-    
-    if (!modelExists) {
-      throw new Error(`Gemini model "${modelId}" not found in the list of available models`);
-    }
-    
-    this.defaultGeminiModel = modelId;
-  }
-
-  // Get the current default Gemini model
-  getDefaultGeminiModel(): string {
-    return this.defaultGeminiModel;
-  }
-
-  // Fetch the available Gemini models directly from the API
-  async fetchAvailableGeminiModels(apiKey: string): Promise<GeminiModelInfo[]> {
-    try {
-      const response = await axios.get(
-        `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
-      );
-      
-      // Filter models to include only Gemini models
-      const geminiModels = response.data.models
-        .filter((model: any) => model.name.includes('gemini'))
-        .map((model: any) => {
-          const modelId = model.name.split('/').pop();
-          const supportsImages = model.supportedGenerationMethods?.includes('generateContent') || false;
-          
-          // Extract size info if available in the name (e.g., gemini-1.5-pro)
-          let modelName = modelId;
-          
-          // Make the name more readable
-          modelName = modelName
-            .replace('gemini-', 'Gemini ')
-            .replace('-', ' ')
-            .replace('-', ' ');
-          
-          // Capitalize first letter of each word
-          const words = modelName.split(' ');
-          modelName = words
-            .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
-            .join(' ');
-          
-          // Dynamic token limit estimation based on model name
-          let maxTokens = 8192; // Default
-          if (modelId.includes('flash')) {
-            maxTokens = 16384;
-          } else if (modelId.includes('pro')) {
-            maxTokens = 32768;
-          } else if (modelId.includes('ultra')) {
-            maxTokens = 1048576; // 1M tokens
-          }
-          
-          // Create a model info object
-          return {
-            id: modelId,
-            name: modelName,
-            description: model.description || `${modelName} model`,
-            maxTokens: maxTokens,
-            supportsImages: supportsImages
-          };
-        });
-      
-      // Update our local models list
-      if (geminiModels.length > 0) {
-        this.geminiModels = geminiModels;
+    // Return default models since this is synchronous
+    return [
+      {
+        id: 'gemini-1.5-flash',
+        name: 'Gemini 1.5 Flash',
+        description: 'Fast and efficient model for most common tasks',
+        maxTokens: 16384,
+        supportsImages: true
+      },
+      {
+        id: 'gemini-1.5-pro',
+        name: 'Gemini 1.5 Pro',
+        description: 'High-quality model with strong reasoning capabilities',
+        maxTokens: 32768,
+        supportsImages: true
       }
-      
-      return geminiModels;
-    } catch (error) {
-      logger.error('Error fetching Gemini models:', error);
-      // On error, return the static list we have
-      return this.geminiModels;
-    }
+    ];
   }
 
-  // Get usage and quota information for Gemini API
+  setDefaultGeminiModel(modelId: string): void {
+    newAIService.setDefaultModel('gemini', modelId);
+  }
+
+  getDefaultGeminiModel(): string {
+    // Use a reasonable default since we don't have a direct equivalent
+    return 'gemini-1.5-pro';
+  }
+
+  async fetchAvailableGeminiModels(apiKey: string): Promise<GeminiModelInfo[]> {
+    const models = await newAIService.getGeminiModels(apiKey);
+    return models as unknown as GeminiModelInfo[];
+    }
+
   async getGeminiUsageInfo(apiKey: string): Promise<{ 
     available: boolean;
     tokensUsed: number;
@@ -783,34 +255,18 @@ export class AIService {
     tokensLimit: number | null;
     resetTime: Date | null;
   }> {
+    // Not directly implemented in new service yet
+    // Just check if the API key works
     try {
-      // Note: This is a simplified approach since Google AI API doesn't have a direct
-      // endpoint for checking quotas. We're making a very small request to check if
-      // the API key works and to get any quota information from response headers.
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
-      
-      const response = await axios.get(endpoint);
-      
-      // Check if the request was successful
-      const available = response.status === 200;
-      
-      // Attempt to get quota information from headers (if available)
-      // Note: Google's API may not expose these headers, so this is speculative
-      const quotaLimit = parseInt(response.headers['x-ratelimit-limit'] || '0');
-      const quotaRemaining = parseInt(response.headers['x-ratelimit-remaining'] || '0');
-      const quotaReset = response.headers['x-ratelimit-reset'] ? 
-        new Date(parseInt(response.headers['x-ratelimit-reset']) * 1000) : null;
-      
-      // Return the available information
+      await newAIService.isProviderAvailable('gemini');
       return {
-        available: available,
-        tokensUsed: quotaLimit - quotaRemaining,
-        tokensRemaining: quotaRemaining || null,
-        tokensLimit: quotaLimit || null,
-        resetTime: quotaReset
+        available: true,
+        tokensUsed: 0,
+        tokensRemaining: null,
+        tokensLimit: null,
+        resetTime: null
       };
     } catch (error) {
-      // If there's an error (such as an invalid API key), return appropriate values
       return {
         available: false,
         tokensUsed: 0,
@@ -821,486 +277,30 @@ export class AIService {
     }
   }
 
-  async generateMultimodalText(
-    providerId: string,
-    apiKey: string,
-    options: MultimodalGenerationOptions,
-    modelId?: string
-  ): Promise<GenerationResult> {
-    const provider = supportedProviders.find(p => p.id === providerId);
-    
-    if (!provider) {
-      throw new Error(`Provider ${providerId} not supported`);
-    }
-    
-    // Currently only Gemini supports multimodal inputs
-    if (providerId !== 'gemini') {
-      throw new Error(`Multimodal generation is not supported by ${providerId}`);
-    }
-    
-    try {
-      return await this.generateWithGeminiMultimodal(apiKey, options, modelId);
-    } catch (error) {
-      logger.error('Multimodal AI generation failed:', error);
-      throw error;
-    }
-  }
-
-  private async generateWithGeminiMultimodal(
-    apiKey: string,
-    options: MultimodalGenerationOptions,
-    modelId?: string
-  ): Promise<GenerationResult> {
-    // Use the provided model ID or fall back to the default
-    const model = modelId || this.defaultGeminiModel;
-    
-    // Check if the model supports images
-    const modelInfo = this.geminiModels.find(m => m.id === model);
-    if (!modelInfo) {
-      throw new Error(`Gemini model "${model}" not found`);
-    }
-    
-    if (!modelInfo.supportsImages && options.images && options.images.length > 0) {
-      throw new Error(`Gemini model "${model}" does not support image inputs`);
-    }
-    
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-    
-    // Get tuning options if provided
-    const tuningOptions = options.tuningOptions || {};
-    
-    try {
-      // Prepare the content parts array with text prompt
-      const parts: any[] = [{ text: options.prompt }];
-      
-      // Add image parts if provided
-      if (options.images && options.images.length > 0) {
-        for (const image of options.images) {
-          // Check if the image is a URL or base64
-          if (image.startsWith('http')) {
-            parts.push({
-              inlineData: {
-                mimeType: "image/jpeg", // Assumes JPEG, could be made dynamic
-                data: await this.fetchAndConvertImageToBase64(image)
-              }
-            });
-          } else if (image.startsWith('data:')) {
-            // Extract base64 content from data URI
-            const base64Data = image.split(',')[1];
-            parts.push({
-              inlineData: {
-                mimeType: image.split(';')[0].split(':')[1],
-                data: base64Data
-              }
-            });
-          } else {
-            // Assuming the input is already base64 encoded
-            parts.push({
-              inlineData: {
-                mimeType: "image/jpeg", // Default assumption
-                data: image
-              }
-            });
-          }
-        }
-      }
-      
-      // Build the request payload
-      const payload: any = {
-        contents: [
-          {
-            parts: parts
-          }
-        ],
-        generationConfig: {
-          maxOutputTokens: options.maxTokens || 1024,
-          temperature: options.temperature || 0.7,
-          topP: options.topP || 0.95,
-          topK: tuningOptions.topK || 40,
-        }
-      };
-      
-      // Add optional generation parameters if specified
-      if (tuningOptions.candidateCount) {
-        payload.generationConfig.candidateCount = tuningOptions.candidateCount;
-      }
-      
-      if (tuningOptions.stopSequences && tuningOptions.stopSequences.length > 0) {
-        payload.generationConfig.stopSequences = tuningOptions.stopSequences;
-      }
-      
-      // Add safety settings
-      if (tuningOptions.safetySettings && tuningOptions.safetySettings.length > 0) {
-        payload.safetySettings = tuningOptions.safetySettings;
-      } else {
-        // Default safety settings if none provided
-        payload.safetySettings = [
-          {
-            category: "HARM_CATEGORY_HARASSMENT",
-            threshold: "BLOCK_MEDIUM_AND_ABOVE"
-          },
-          {
-            category: "HARM_CATEGORY_HATE_SPEECH",
-            threshold: "BLOCK_MEDIUM_AND_ABOVE"
-          },
-          {
-            category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-            threshold: "BLOCK_MEDIUM_AND_ABOVE"
-          },
-          {
-            category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-            threshold: "BLOCK_MEDIUM_AND_ABOVE"
-          }
-        ];
-      }
-
-      const response = await axios.post(endpoint, payload);
-      
-      // Extract the generated text from Gemini's response format
-      let generatedText = '';
-      if (response.data.candidates && 
-          response.data.candidates[0] && 
-          response.data.candidates[0].content &&
-          response.data.candidates[0].content.parts) {
-        
-        // Concatenate all text parts from the response
-        generatedText = response.data.candidates[0].content.parts
-          .filter((part: any) => part.text)
-          .map((part: any) => part.text)
-          .join('');
-      }
-      
-      return {
-        text: generatedText,
-        provider: 'gemini',
-        tokens: 0 // Gemini doesn't provide token count in the same way
-      };
-    } catch (error) {
-      // Add better error handling for debugging
-      if (axios.isAxiosError(error) && error.response) {
-        logger.error('Gemini Multimodal API error:', error.response.data);
-        
-        if (error.response.status === 404) {
-          throw new Error(`Gemini model "${model}" not found. Please check if the model ID is correct.`);
-        } else if (error.response.status === 400) {
-          throw new Error(`Gemini API error: ${error.response.data?.error?.message || 'Bad request'}`);
-        } else if (error.response.status === 403) {
-          throw new Error('Gemini API error: Invalid API key or lacking permissions');
-        }
-      }
-      throw error;
-    }
-  }
-  
-  private async fetchAndConvertImageToBase64(imageUrl: string): Promise<string> {
-    try {
-      const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
-      const contentType = response.headers['content-type'];
-      
-      // Browser-compatible way to convert ArrayBuffer to base64
-      const arrayBuffer = response.data;
-      const bytes = new Uint8Array(arrayBuffer);
-      let binary = '';
-      for (let i = 0; i < bytes.byteLength; i++) {
-        binary += String.fromCharCode(bytes[i]);
-      }
-      const base64 = btoa(binary);
-      
-      return base64;
-    } catch (error) {
-      logger.error('Error fetching and converting image:', error);
-      throw new Error('Failed to fetch and convert image to base64');
-    }
-  }
-
   async generateWithGeminiMultimodalStreaming(
     apiKey: string,
     options: MultimodalGenerationOptions,
     onChunk: (text: string) => void,
     onComplete: (result: GenerationResult) => void,
+    onError?: (error: Error) => void,
     modelId?: string
   ): Promise<void> {
-    // Use the provided model ID or fall back to the default
-    const model = modelId || this.defaultGeminiModel;
-    
-    // Check if the model supports images
-    const modelInfo = this.geminiModels.find(m => m.id === model);
-    if (!modelInfo) {
-      throw new Error(`Gemini model "${model}" not found`);
+    if (modelId) {
+      options = {
+        ...options,
+        modelId
+      };
     }
     
-    if (!modelInfo.supportsImages && options.images && options.images.length > 0) {
-      throw new Error(`Gemini model "${model}" does not support image inputs`);
-    }
+    const callbacks: StreamCallbacks = {
+      onChunk,
+      onComplete: (result: NewGenerationResult) => onComplete(result as GenerationResult),
+      onError
+    };
     
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}`;
-    
-    // Get tuning options if provided
-    const tuningOptions = options.tuningOptions || {};
-    
-    // Retry configuration
-    const MAX_RETRIES = 3;
-    const INITIAL_RETRY_DELAY = 1000; // 1 second
-    
-    let retryCount = 0;
-    let lastError: any = null;
-    
-    while (retryCount <= MAX_RETRIES) {
-      try {
-        let fullText = '';
-        
-        // Build the request payload
-        const payload: any = {
-          contents: [
-            {
-              parts: [
-                {
-                  text: options.prompt
-                }
-              ]
-            }
-          ],
-          generationConfig: {
-            maxOutputTokens: options.maxTokens || 1024,
-            temperature: options.temperature || 0.7,
-            topP: options.topP || 0.95,
-            topK: tuningOptions.topK || 40,
-          }
-        };
-        
-        // Add images if provided
-        if (options.images && options.images.length > 0) {
-          // Add images to the parts array
-          for (const imageUrl of options.images) {
-            try {
-              const base64Image = await this.fetchAndConvertImageToBase64(imageUrl);
-              
-              // Add the image to the parts array of the first content item
-              payload.contents[0].parts.push({
-                inlineData: {
-                  mimeType: "image/jpeg", // Assuming JPEG, adjust if needed
-                  data: base64Image
-                }
-              });
-            } catch (error) {
-              logger.error(`Failed to process image ${imageUrl}:`, error);
-              // Continue with other images
-            }
-          }
-        }
-        
-        // Add optional generation parameters if specified
-        if (tuningOptions.candidateCount) {
-          payload.generationConfig.candidateCount = tuningOptions.candidateCount;
-        }
-        
-        if (tuningOptions.stopSequences && tuningOptions.stopSequences.length > 0) {
-          payload.generationConfig.stopSequences = tuningOptions.stopSequences;
-        }
-        
-        // Add safety settings
-        if (tuningOptions.safetySettings && tuningOptions.safetySettings.length > 0) {
-          payload.safetySettings = tuningOptions.safetySettings;
-        } else {
-          // Default safety settings if none provided
-          payload.safetySettings = [
-            {
-              category: "HARM_CATEGORY_HARASSMENT",
-              threshold: "BLOCK_MEDIUM_AND_ABOVE"
-            },
-            {
-              category: "HARM_CATEGORY_HATE_SPEECH",
-              threshold: "BLOCK_MEDIUM_AND_ABOVE"
-            },
-            {
-              category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-              threshold: "BLOCK_MEDIUM_AND_ABOVE"
-            },
-            {
-              category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-              threshold: "BLOCK_MEDIUM_AND_ABOVE"
-            }
-          ];
-        }
-        
-        try {
-          const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(payload)
-          });
-          
-          // Check for rate limit errors
-          if (response.status === 429) {
-            logger.warn(`Rate limit hit with Gemini API multimodal streaming (attempt ${retryCount + 1}/${MAX_RETRIES + 1}). Retrying in ${(INITIAL_RETRY_DELAY * Math.pow(2, retryCount)) / 1000} seconds...`);
-            throw new Error('Rate limit exceeded');
-          }
-          
-          // Check for other error responses
-          if (!response.ok) {
-            const errorText = await response.text();
-            logger.error(`Gemini API error (status ${response.status}):`, errorText);
-            
-            if (response.status === 404) {
-              throw new Error(`Gemini model "${model}" not found. Please check if the model ID is correct.`);
-            } else if (response.status === 400) {
-              throw new Error(`Gemini API error: ${errorText || 'Bad request'}`);
-            } else if (response.status === 403) {
-              throw new Error('Gemini API error: Invalid API key or lacking permissions');
-            } else {
-              throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
-            }
-          }
-
-          if (!response.body) {
-            throw new Error('Response body is null');
-          }
-
-          const reader = response.body.getReader();
-          const decoder = new TextDecoder();
-          let buffer = '';
-
-          const processText = (text: string) => {
-            // Process each line as it might contain multiple JSON objects
-            const lines = (buffer + text).split('\n');
-            // Keep the last potentially incomplete line in the buffer
-            buffer = lines.pop() || '';
-
-            for (const line of lines) {
-              if (line.trim() === '') continue;
-              
-              try {
-                // Make sure the line is valid JSON before parsing
-                const trimmedLine = line.trim();
-                if (!(trimmedLine.startsWith('{') && trimmedLine.endsWith('}')) && 
-                    !(trimmedLine.startsWith('[') && trimmedLine.endsWith(']'))) {
-                  logger.warn('Skipping non-JSON line:', trimmedLine);
-                  continue;
-                }
-                
-                const data = JSON.parse(trimmedLine);
-                
-                // Extract text content from the response
-                if (data.candidates && 
-                    data.candidates[0] && 
-                    data.candidates[0].content && 
-                    data.candidates[0].content.parts) {
-                  
-                  const parts = data.candidates[0].content.parts;
-                  for (const part of parts) {
-                    if (part.text) {
-                      fullText += part.text;
-                      onChunk(part.text);
-                    }
-                  }
-                }
-              } catch (parseError) {
-                logger.warn('Error parsing JSON chunk:', parseError);
-              }
-            }
-          };
-
-          // Read the stream
-          const read = async () => {
-            try {
-              const { done, value } = await reader.read();
-              
-              if (done) {
-                // Process any remaining buffer
-                if (buffer.trim() !== '') {
-                  processText(buffer);
-                }
-                
-                onComplete({
-                  text: fullText,
-                  provider: 'gemini',
-                  tokens: 0
-                });
-                return;
-              }
-
-              // Process this chunk
-              processText(decoder.decode(value, { stream: true }));
-              
-              // Continue reading
-              await read();
-            } catch (error) {
-              logger.error('Error reading stream:', error);
-              throw error;
-            }
-          };
-
-          await read();
-          
-          // Success, return and don't retry
-          return;
-        } catch (error: any) {
-          // Propagate certain errors for retry logic
-          if (error.message === 'Rate limit exceeded' || 
-              (error instanceof TypeError && error.message.includes('fetch'))) {
-            throw error; // This will be caught by the outer try/catch
-          }
-          
-          logger.error('Gemini multimodal streaming fetch error:', error);
-          throw error;
-        }
-      } catch (error: any) {
-        lastError = error;
-        
-        // Determine if we should retry
-        let shouldRetry = false;
-        
-        // Check for rate limit error
-        if (error.message === 'Rate limit exceeded' || 
-            error.message?.includes('429') || 
-            (error.response && error.response.status === 429)) {
-          shouldRetry = true;
-        }
-        
-        // Also retry on network errors
-        if (error instanceof TypeError && error.message.includes('fetch')) {
-          shouldRetry = true;
-          logger.warn(`Network error with Gemini API multimodal streaming. Retrying in ${(INITIAL_RETRY_DELAY * Math.pow(2, retryCount)) / 1000} seconds...`);
-        }
-        
-        // If we shouldn't retry or we're out of retries, throw the error
-        if (!shouldRetry || retryCount >= MAX_RETRIES) {
-          if (error.message === 'Rate limit exceeded' || 
-              error.message?.includes('429') || 
-              (error.response && error.response.status === 429)) {
-            onComplete({
-              text: "⚠️ Rate limit exceeded. Please try again later.",
-              provider: 'gemini',
-              tokens: 0
-            });
-            return;
-          }
-          
-          logger.error('Gemini multimodal streaming setup failed:', error);
-          onComplete({
-            text: `Error: ${error.message || 'An unknown error occurred'}`,
-            provider: 'gemini',
-            tokens: 0
-          });
-          return;
-        }
-        
-        // Wait with exponential backoff before retrying
-        const delay = INITIAL_RETRY_DELAY * Math.pow(2, retryCount);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        retryCount++;
-      }
-    }
-    
-    // Should never reach here but just in case
-    onComplete({
-      text: lastError ? `Error after ${MAX_RETRIES} retries: ${lastError.message}` : 'Failed to generate text with Gemini after retries',
-      provider: 'gemini',
-      tokens: 0
-    });
+    await newAIService.generateMultimodal('gemini', options as NewMultimodalGenerationOptions, callbacks, apiKey);
   }
-}
-
-export const aiService = new AIService()
+        }
+        
+// Export the singleton instance for backward compatibility
+export const aiService = new AIServiceLegacy();

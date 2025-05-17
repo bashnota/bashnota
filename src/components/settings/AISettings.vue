@@ -10,28 +10,39 @@ import { Slider } from '@/components/ui/slider'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from '@/components/ui/toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { SparklesIcon, KeyIcon, Save, Trash2Icon, CpuIcon, RefreshCcwIcon } from 'lucide-vue-next'
+import { SparklesIcon, KeyIcon, Save, Trash2Icon, CpuIcon, RefreshCcwIcon, ServerIcon } from 'lucide-vue-next'
 import WebLLMSettings from '@/components/settings/WebLLMSettings.vue'
-import { aiService } from '@/services/aiService'
+import GeminiSettings from '@/components/settings/GeminiSettings.vue'
+import OllamaSettings from '@/components/settings/OllamaSettings.vue'
+import type { GeminiModelInfo } from '@/services/ai'
 import SearchableSelect from '@/components/ui/searchable-select.vue'
+// Import the composable
+import { useAIProviders } from '@/components/sidebars/ai-assistant/composables/useAIProviders'
 
 const aiSettings = useAISettingsStore()
+// Use the composable
+const {
+  providers,
+  geminiModels,
+  isLoadingGeminiModels,
+  fetchGeminiModels,
+  setDefaultModel
+} = useAIProviders()
+
 const apiKeys = ref<Record<string, string>>({...aiSettings.settings.apiKeys})
 const customPrompt = ref(aiSettings.settings.customPrompt)
 const maxTokens = ref([aiSettings.settings.maxTokens])
 const temperature = ref([aiSettings.settings.temperature])
 const preferredProviderId = ref(aiSettings.settings.preferredProviderId)
-const activeTab = ref('api-keys')
-const geminiModels = ref(aiService.getAvailableGeminiModels())
-const selectedGeminiModel = ref(aiSettings.settings.geminiModel || aiService.getDefaultGeminiModel())
-const loadingGeminiModels = ref(false)
+const activeTab = ref('general')
+const selectedGeminiModel = ref(aiSettings.settings.geminiModel || 'gemini-1.5-pro')
 const safetyThreshold = ref(aiSettings.settings.geminiSafetyThreshold || 'BLOCK_MEDIUM_AND_ABOVE')
 const showAdvancedGeminiSettings = ref(false)
 const sidebarWidth = ref([aiSettings.settings.sidebarWidth || 350])
 
-// Only show Gemini model settings when Gemini is selected
-const showGeminiSettings = computed(() => preferredProviderId.value === 'gemini')
-
+/**
+ * Save all settings across tabs
+ */
 const saveSettings = () => {
   // Update API keys
   Object.entries(apiKeys.value).forEach(([providerId, key]) => {
@@ -51,9 +62,9 @@ const saveSettings = () => {
     sidebarWidth: sidebarWidth.value[0]
   })
 
-  // Set default Gemini model if using Gemini
+  // Set default model for current provider
   if (preferredProviderId.value === 'gemini') {
-    aiService.setDefaultGeminiModel(selectedGeminiModel.value)
+    setDefaultModel('gemini', selectedGeminiModel.value)
   }
 
   toast({
@@ -62,6 +73,9 @@ const saveSettings = () => {
   })
 }
 
+/**
+ * Clear API key for a provider
+ */
 const clearApiKey = (providerId: string) => {
   apiKeys.value[providerId] = ''
   aiSettings.setApiKey(providerId, '')
@@ -72,14 +86,18 @@ const clearApiKey = (providerId: string) => {
   })
 }
 
-// Format temperature label
+/**
+ * Format temperature label for UI display
+ */
 const formatTemperature = (temp: number) => {
   if (temp < 0.3) return 'More precise'
   if (temp > 0.7) return 'More creative'
   return 'Balanced'
 }
 
-// Add helper method for getting API key instructions
+/**
+ * Get API key instructions for a provider
+ */
 const getApiKeyInstructions = (providerId: string) => {
   switch(providerId) {
     case 'gemini':
@@ -91,8 +109,10 @@ const getApiKeyInstructions = (providerId: string) => {
   }
 }
 
-// Function to fetch Gemini models from API
-const fetchGeminiModels = async () => {
+/**
+ * Fetch Gemini models from API
+ */
+const loadGeminiModels = async () => {
   const apiKey = aiSettings.getApiKey('gemini')
   if (!apiKey) {
     toast({
@@ -104,9 +124,9 @@ const fetchGeminiModels = async () => {
   }
   
   try {
-    loadingGeminiModels.value = true
-    const models = await aiService.fetchAvailableGeminiModels(apiKey)
-    geminiModels.value = models
+    // Set the API key in the store first, then fetch models
+    aiSettings.setApiKey('gemini', apiKey)
+    const models = await fetchGeminiModels() || []
     
     // If current model isn't in the list, select the first one
     if (!models.find(m => m.id === selectedGeminiModel.value) && models.length > 0) {
@@ -123,19 +143,28 @@ const fetchGeminiModels = async () => {
       description: 'Failed to fetch Gemini models. Using default models instead.',
       variant: 'destructive'
     })
-  } finally {
-    loadingGeminiModels.value = false
   }
 }
 
-// Watch for provider changes to update model list
+// Watch for provider changes
 watch(preferredProviderId, (newValue) => {
+  // Set the active tab to the selected provider
+  activeTab.value = newValue
+  
   if (newValue === 'gemini') {
     // Try to load models with existing API key
     const apiKey = aiSettings.getApiKey('gemini')
     if (apiKey) {
-      fetchGeminiModels()
+      loadGeminiModels()
     }
+  }
+})
+
+// Watch for active tab changes
+watch(activeTab, (newValue) => {
+  // Exclude general and webllm tabs from changing preferred provider
+  if (newValue !== 'general' && newValue !== 'webllm') {
+    preferredProviderId.value = newValue
   }
 })
 
@@ -150,16 +179,23 @@ onMounted(() => {
     }
   })
   
+  // Set active tab to preferred provider if there is one
+  if (preferredProviderId.value) {
+    activeTab.value = preferredProviderId.value
+  }
+  
   // Try to load Gemini models if Gemini is selected
   if (preferredProviderId.value === 'gemini') {
     const apiKey = aiSettings.getApiKey('gemini')
     if (apiKey) {
-      fetchGeminiModels()
+      loadGeminiModels()
     }
   }
 })
 
-// Handle API key change
+/**
+ * Handle API key change
+ */
 const handleApiKeyChange = (providerId: string, newKey: string) => {
   // Get the old key for comparison
   const oldKey = aiSettings.getApiKey(providerId) || ''
@@ -184,7 +220,9 @@ const handleApiKeyChange = (providerId: string, newKey: string) => {
   }
 }
 
-// Handle paste event properly 
+/**
+ * Handle paste event properly
+ */ 
 const handlePaste = (providerId: string, event: ClipboardEvent) => {
   // Access the clipboard data directly instead of relying on the input value
   const clipboardText = event.clipboardData?.getData('text') || ''
@@ -196,34 +234,58 @@ const handlePaste = (providerId: string, event: ClipboardEvent) => {
     handleApiKeyChange(providerId, clipboardText.trim())
   }
 }
+
+/**
+ * Get provider icon component
+ */
+const getProviderIcon = (providerId: string) => {
+  switch(providerId) {
+    case 'webllm':
+      return CpuIcon
+    case 'ollama':
+      return ServerIcon
+    default:
+      return SparklesIcon
+  }
+}
 </script>
 
 <template>
   <div class="space-y-6">
     <Tabs v-model="activeTab" class="w-full">
-      <TabsList class="grid w-full grid-cols-2 mb-6">
-        <TabsTrigger value="api-keys" class="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+      <!-- Dynamic tabs list with one tab per provider plus general settings -->
+      <TabsList class="grid" :class="`grid-cols-${providers.length + 1}`">
+        <!-- General Settings Tab -->
+        <TabsTrigger value="general" class="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
           <div class="flex items-center justify-center gap-2 p-2">
-            <KeyIcon class="w-4 h-4 shrink-0" />
-            <span class="text-sm font-medium">API Keys & Settings</span>
+            <SparklesIcon class="w-4 h-4 shrink-0" />
+            <span class="text-sm font-medium">General</span>
           </div>
         </TabsTrigger>
-        <TabsTrigger value="webllm" class="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+        
+        <!-- One tab per provider -->
+        <TabsTrigger 
+          v-for="provider in providers" 
+          :key="provider.id"
+          :value="provider.id" 
+          class="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+        >
           <div class="flex items-center justify-center gap-2 p-2">
-            <CpuIcon class="w-4 h-4 shrink-0" />
-            <span class="text-sm font-medium">WebLLM (Local Models)</span>
+            <component :is="getProviderIcon(provider.id)" class="w-4 h-4 shrink-0" />
+            <span class="text-sm font-medium">{{ provider.name }}</span>
           </div>
         </TabsTrigger>
       </TabsList>
 
-      <TabsContent value="api-keys">
+      <!-- General settings content -->
+      <TabsContent value="general">
         <Card>
           <CardHeader>
             <CardTitle class="flex items-center text-xl font-semibold">
-              <SparklesIcon class="mr-2 h-5 w-5" /> AI Generation Settings
+              <SparklesIcon class="mr-2 h-5 w-5" /> General AI Settings
             </CardTitle>
             <CardDescription>
-              Configure your AI text generation settings and API keys
+              Configure common AI text generation settings
             </CardDescription>
           </CardHeader>
           
@@ -238,7 +300,7 @@ const handlePaste = (providerId: string, event: ClipboardEvent) => {
                   </SelectTrigger>
                   <SelectContent class="max-h-[200px] overflow-auto">
                     <SelectItem 
-                      v-for="provider in aiSettings.providers" 
+                      v-for="provider in providers" 
                       :key="provider.id" 
                       :value="provider.id"
                     >
@@ -246,138 +308,12 @@ const handlePaste = (providerId: string, event: ClipboardEvent) => {
                     </SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-
-              <!-- Gemini Model Selection (only shown when Gemini is selected) -->
-              <div v-if="showGeminiSettings" class="space-y-2">
-                <div class="flex items-center justify-between">
-                  <Label for="gemini-model">Gemini Model</Label>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    @click="fetchGeminiModels" 
-                    :disabled="loadingGeminiModels || !apiKeys['gemini']"
-                    class="h-8 px-2 text-xs"
-                  >
-                    <RefreshCcwIcon :class="{'animate-spin': loadingGeminiModels}" class="mr-2 h-3 w-3" />
-                    Refresh Models
-                  </Button>
-                </div>
-                <SearchableSelect
-                  v-model="selectedGeminiModel"
-                  :options="geminiModels.map(model => ({
-                    value: model.id,
-                    label: model.name,
-                    description: model.description
-                  }))"
-                  placeholder="Select Gemini model"
-                  max-height="300px"
-                  search-placeholder="Search Gemini models..."
-                  :disabled="loadingGeminiModels"
-                />
                 <p class="text-xs text-gray-500">
-                  Select the specific Gemini model to use for AI text generation.
-                  <span v-if="geminiModels.length > 0">
-                    Token limit: {{ geminiModels.find(m => m.id === selectedGeminiModel)?.maxTokens.toLocaleString() || 'Unknown' }} tokens.
-                  </span>
+                  Select your preferred AI provider for text generation
                 </p>
-                
-                <!-- Advanced Gemini Settings -->
-                <div class="mt-4">
-                  <button 
-                    @click="showAdvancedGeminiSettings = !showAdvancedGeminiSettings"
-                    class="text-sm flex items-center text-primary"
-                  >
-                    <span v-if="!showAdvancedGeminiSettings">▶</span>
-                    <span v-else>▼</span>
-                    Advanced Gemini Settings
-                  </button>
-                  
-                  <div v-if="showAdvancedGeminiSettings" class="mt-3 space-y-4">
-                    <!-- Safety Thresholds -->
-                    <div class="space-y-2">
-                      <Label for="safety-threshold">Content Safety Filter</Label>
-                      <Select v-model="safetyThreshold">
-                        <SelectTrigger id="safety-threshold">
-                          <SelectValue placeholder="Select safety threshold" />
-                        </SelectTrigger>
-                        <SelectContent class="max-h-[200px] overflow-auto">
-                          <SelectItem value="BLOCK_NONE">
-                            <div>
-                              <div>No filtering</div>
-                              <div class="text-xs text-gray-500">Allow all content without safety filtering</div>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="BLOCK_LOW_AND_ABOVE">
-                            <div>
-                              <div>Low filtering</div>
-                              <div class="text-xs text-gray-500">Block content with low or higher harm probability</div>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="BLOCK_MEDIUM_AND_ABOVE">
-                            <div>
-                              <div>Medium filtering (recommended)</div>
-                              <div class="text-xs text-gray-500">Block content with medium or higher harm probability</div>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="BLOCK_HIGH_AND_ABOVE">
-                            <div>
-                              <div>High filtering</div>
-                              <div class="text-xs text-gray-500">Only block content with high harm probability</div>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="BLOCK_ONLY_HIGH">
-                            <div>
-                              <div>Only block highest risk content</div>
-                              <div class="text-xs text-gray-500">Minimal filtering for only the highest risk content</div>
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p class="text-xs text-gray-500">
-                        Controls how strictly the AI filters potentially harmful or inappropriate content.
-                      </p>
-                    </div>
-                  </div>
-                </div>
               </div>
 
-              <!-- API Keys -->
-              <div class="space-y-4">
-                <h3 class="text-lg font-medium">API Keys</h3>
-                
-                <div 
-                  v-for="provider in aiSettings.providers.filter(p => p.requiresApiKey)" 
-                  :key="provider.id"
-                  class="space-y-2"
-                >
-                  <Label :for="`api-key-${provider.id}`">{{ provider.name }} API Key</Label>
-                  <div class="flex space-x-2">
-                    <Input
-                      :id="`api-key-${provider.id}`"
-                      v-model="apiKeys[provider.id]"
-                      type="password"
-                      placeholder="Enter API key"
-                      class="flex-1"
-                      @blur="handleApiKeyChange(provider.id, apiKeys[provider.id])"
-                      @paste="(event: ClipboardEvent) => handlePaste(provider.id, event)"
-                    />
-                    <Button 
-                      variant="destructive" 
-                      size="icon"
-                      @click="clearApiKey(provider.id)"
-                      v-if="apiKeys[provider.id]"
-                    >
-                      <Trash2Icon class="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <p class="text-xs text-gray-500">
-                    {{ getApiKeyInstructions(provider.id) }}
-                  </p>
-                </div>
-              </div>
-
-              <!-- Advanced Settings -->
+              <!-- Common Advanced Settings -->
               <div class="space-y-4">
                 <h3 class="text-lg font-medium">Advanced Settings</h3>
 
@@ -464,8 +400,17 @@ const handlePaste = (providerId: string, event: ClipboardEvent) => {
         </Card>
       </TabsContent>
 
+      <!-- Provider-specific tabs -->
       <TabsContent value="webllm">
         <WebLLMSettings />
+      </TabsContent>
+      
+      <TabsContent value="gemini">
+        <GeminiSettings />
+      </TabsContent>
+      
+      <TabsContent value="ollama">
+        <OllamaSettings />
       </TabsContent>
     </Tabs>
   </div>

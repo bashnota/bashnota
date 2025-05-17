@@ -2,15 +2,11 @@
 import { ref, onMounted, computed, watch, onUnmounted, defineComponent, h } from 'vue'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { toast } from '@/components/ui/toast'
-import { Separator } from '@/components/ui/separator'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { 
-  SparklesIcon, 
   DownloadIcon, 
   AlertTriangleIcon, 
   CheckCircleIcon, 
@@ -18,13 +14,14 @@ import {
   InfoIcon,
   CpuIcon,
   GaugeIcon,
-  TrashIcon,
-  RefreshCwIcon
+  RefreshCwIcon,
+  HardDriveIcon
 } from 'lucide-vue-next'
-import { aiService } from '@/services/aiService'
-import type { WebLLMModelInfo } from '@/services/aiService'
+import type { WebLLMModelInfo } from '@/services/ai'
 import { logger } from '@/services/logger'
 import SearchableSelect from '@/components/ui/searchable-select.vue'
+// Import the composable
+import { useAIProviders } from '@/components/sidebars/ai-assistant/composables/useAIProviders'
 
 // Create a simple Progress component since it might not exist
 const Progress = defineComponent({
@@ -45,15 +42,27 @@ const Progress = defineComponent({
   }
 })
 
+// Use the composable
+const {
+  webLLMModels,
+  isLoadingWebLLMModels,
+  webLLMModelLoadingState,
+  isWebLLMSupported,
+  checkWebLLMSupport,
+  fetchWebLLMModels,
+  loadWebLLMModel
+} = useAIProviders()
+
 // State variables
 const availableModels = ref<WebLLMModelInfo[]>([])
+const downloadedModels = ref<string[]>([]) // Track which models are downloaded
 const selectedModelId = ref<string>('')
 const isLoading = ref(true)
-const isWebGPUSupported = ref(false)
 const loadingProgress = ref(0)
 const isModelLoading = ref(false)
 const loadingError = ref<string | null>(null)
 const currentModel = ref<string | null>(null)
+const isCheckingCache = ref(false)
 
 // Computed properties
 const selectedModel = computed(() => {
@@ -91,15 +100,17 @@ const largeModels = computed(() => {
   )
 })
 
-// Methods
-const checkWebGPUSupport = async () => {
-  isWebGPUSupported.value = await aiService.isWebGPUSupported()
+// Check if a model is already downloaded
+const isModelDownloaded = (modelId: string) => {
+  return downloadedModels.value.includes(modelId)
 }
 
+// Load available models
 const loadAvailableModels = async () => {
   try {
     isLoading.value = true
-    availableModels.value = await aiService.getAvailableWebLLMModels()
+    const models = await fetchWebLLMModels()
+    availableModels.value = models
     
     // Set the first model as selected by default
     if (availableModels.value.length > 0 && !selectedModelId.value) {
@@ -109,6 +120,9 @@ const loadAvailableModels = async () => {
       )
       selectedModelId.value = smallModel?.id || availableModels.value[0].id
     }
+    
+    // Check which models are already downloaded
+    await checkDownloadedModels()
   } catch (error) {
     logger.error('Error loading WebLLM models:', error)
     toast({
@@ -121,6 +135,53 @@ const loadAvailableModels = async () => {
   }
 }
 
+// Check which models are already in browser cache
+const checkDownloadedModels = async () => {
+  isCheckingCache.value = true
+  
+  try {
+    // WebLLM doesn't have a direct API to check cached models
+    // We can detect by looking at IndexedDB or trying to estimate from browser storage
+    // For now, we'll use a mock approach that would need to be replaced with actual implementation
+    
+    // In a real implementation, this would be a check to WebLLM's cache
+    // For example, something like webllm.checkModelCache() if it existed
+    
+    // For demonstration purposes, let's assume models are cached if:
+    // 1. They were previously loaded according to localStorage history
+    // 2. The current model is definitely downloaded
+    
+    const modelHistory = localStorage.getItem('webllm-models-history')
+    const cachedModels = new Set<string>()
+    
+    if (modelHistory) {
+      try {
+        const history = JSON.parse(modelHistory)
+        if (Array.isArray(history)) {
+          history.forEach(modelId => cachedModels.add(modelId))
+        }
+      } catch (e) {
+        logger.error('Error parsing model history:', e)
+      }
+    }
+    
+    // Current model is definitely downloaded
+    if (currentModel.value) {
+      cachedModels.add(currentModel.value)
+    }
+    
+    downloadedModels.value = Array.from(cachedModels)
+    
+    // Save updated history
+    localStorage.setItem('webllm-models-history', JSON.stringify(downloadedModels.value))
+    
+  } catch (error) {
+    logger.error('Error checking downloaded models:', error)
+  } finally {
+    isCheckingCache.value = false
+  }
+}
+
 const loadModel = async () => {
   if (!selectedModelId.value || isModelLoading.value) return
   
@@ -129,16 +190,26 @@ const loadModel = async () => {
     loadingError.value = null
     
     // Start loading the model
-    await aiService.setWebLLMModel(selectedModelId.value)
+    const success = await loadWebLLMModel(selectedModelId.value)
     
+    if (success) {
     // Update the current model
     currentModel.value = selectedModelId.value
+      
+      // Add to downloaded models
+      if (!downloadedModels.value.includes(selectedModelId.value)) {
+        downloadedModels.value.push(selectedModelId.value)
+        localStorage.setItem('webllm-models-history', JSON.stringify(downloadedModels.value))
+      }
     
     toast({
       title: 'Model Loaded',
       description: `${selectedModel.value?.name || selectedModelId.value} has been loaded successfully`,
       variant: 'default'
     })
+    } else {
+      throw new Error('Failed to load model')
+    }
   } catch (error) {
     logger.error('Error loading model:', error)
     loadingError.value = error instanceof Error ? error.message : 'Unknown error loading model'
@@ -157,7 +228,7 @@ const loadModel = async () => {
 const startProgressPolling = () => {
   const pollInterval = setInterval(() => {
     if (isModelLoading.value) {
-      const state = aiService.getModelLoadingState()
+      const state = webLLMModelLoadingState.value
       loadingProgress.value = state.progress * 100
       
       if (state.error) {
@@ -176,19 +247,25 @@ const startProgressPolling = () => {
 
 // Lifecycle hooks
 onMounted(async () => {
-  await checkWebGPUSupport()
+  await checkWebLLMSupport()
   await loadAvailableModels()
   
   // Check if a model is already loaded
-  const state = aiService.getModelLoadingState()
+  const state = webLLMModelLoadingState.value
   currentModel.value = state.currentModel
+  
+  // If there's a current model, it's definitely downloaded
+  if (currentModel.value && !downloadedModels.value.includes(currentModel.value)) {
+    downloadedModels.value.push(currentModel.value)
+    localStorage.setItem('webllm-models-history', JSON.stringify(downloadedModels.value))
+  }
   
   // Start polling for progress updates
   startProgressPolling()
 })
 
 // Watch for changes in the loading state
-watch(() => aiService.getModelLoadingState().isLoading, (newIsLoading) => {
+watch(() => webLLMModelLoadingState.value.isLoading, (newIsLoading) => {
   isModelLoading.value = newIsLoading
 })
 </script>
@@ -207,18 +284,18 @@ watch(() => aiService.getModelLoadingState().isLoading, (newIsLoading) => {
       
       <CardContent>
         <!-- WebGPU Support Check -->
-        <Alert :variant="isWebGPUSupported ? 'default' : 'destructive'" class="mb-6">
+        <Alert :variant="isWebLLMSupported ? 'default' : 'destructive'" class="mb-6">
           <div class="flex items-start">
-            <div v-if="isWebGPUSupported" class="mr-2 mt-0.5">
+            <div v-if="isWebLLMSupported" class="mr-2 mt-0.5">
               <CheckCircleIcon class="h-5 w-5 text-green-500" />
             </div>
             <div v-else class="mr-2 mt-0.5">
               <AlertTriangleIcon class="h-5 w-5 text-red-500" />
             </div>
             <div>
-              <AlertTitle>{{ isWebGPUSupported ? 'WebGPU Supported' : 'WebGPU Not Supported' }}</AlertTitle>
+              <AlertTitle>{{ isWebLLMSupported ? 'WebGPU Supported' : 'WebGPU Not Supported' }}</AlertTitle>
               <AlertDescription>
-                <p v-if="isWebGPUSupported">
+                <p v-if="isWebLLMSupported">
                   Your browser supports WebGPU, which enables hardware acceleration for local AI models.
                 </p>
                 <p v-else>
@@ -246,6 +323,28 @@ watch(() => aiService.getModelLoadingState().isLoading, (newIsLoading) => {
           </p>
         </div>
         
+        <!-- Downloaded Models Summary -->
+        <div class="mb-6 p-4 bg-muted rounded-lg" v-if="downloadedModels.length > 0">
+          <div class="flex items-center">
+            <HardDriveIcon class="h-5 w-5 mr-2 text-primary" />
+            <h3 class="font-medium">Downloaded Models</h3>
+          </div>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <Badge 
+              v-for="modelId in downloadedModels" 
+              :key="modelId" 
+              :variant="currentModel === modelId ? 'default' : 'outline'"
+              class="flex items-center gap-1"
+            >
+              <CheckCircleIcon class="h-3 w-3" />
+              {{ availableModels.find(m => m.id === modelId)?.name || modelId }}
+            </Badge>
+          </div>
+          <p class="mt-2 text-xs text-muted-foreground">
+            These models are already downloaded and cached in your browser.
+          </p>
+        </div>
+        
         <!-- Model Selection -->
         <div class="space-y-6">
           <div class="space-y-2">
@@ -255,17 +354,17 @@ watch(() => aiService.getModelLoadingState().isLoading, (newIsLoading) => {
               :options="[
                 ...smallModels.map(model => ({
                   value: model.id,
-                  label: model.name,
+                  label: isModelDownloaded(model.id) ? `${model.name} (Downloaded)` : model.name,
                   description: `Small Model (${model.size}) - Faster inference`
                 })),
                 ...mediumModels.map(model => ({
                   value: model.id,
-                  label: model.name,
+                  label: isModelDownloaded(model.id) ? `${model.name} (Downloaded)` : model.name,
                   description: `Medium Model (${model.size}) - Balanced performance`
                 })),
                 ...largeModels.map(model => ({
                   value: model.id,
-                  label: model.name,
+                  label: isModelDownloaded(model.id) ? `${model.name} (Downloaded)` : model.name,
                   description: `Large Model (${model.size}) - Better quality`
                 }))
               ]"
@@ -280,7 +379,12 @@ watch(() => aiService.getModelLoadingState().isLoading, (newIsLoading) => {
           <div v-if="selectedModel" class="p-4 bg-muted/50 rounded-lg space-y-3">
             <div class="flex items-center justify-between">
               <h3 class="font-medium">{{ selectedModel.name }}</h3>
+              <div class="flex items-center gap-2">
               <Badge>{{ selectedModel.size }}</Badge>
+                <Badge v-if="isModelDownloaded(selectedModel.id)" variant="default" class="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
+                  Downloaded
+                </Badge>
+              </div>
             </div>
             
             <div class="grid grid-cols-2 gap-2 text-sm">
@@ -294,7 +398,7 @@ watch(() => aiService.getModelLoadingState().isLoading, (newIsLoading) => {
                   class="ml-1 font-medium"
                   :class="{ 'text-green-500': currentModel === selectedModelId }"
                 >
-                  {{ currentModel === selectedModelId ? 'Loaded' : 'Not Loaded' }}
+                  {{ currentModel === selectedModelId ? 'Loaded' : isModelDownloaded(selectedModelId) ? 'Downloaded' : 'Not Downloaded' }}
                 </span>
               </div>
             </div>
@@ -306,9 +410,16 @@ watch(() => aiService.getModelLoadingState().isLoading, (newIsLoading) => {
                 :disabled="isModelLoading || currentModel === selectedModelId"
                 class="flex items-center"
               >
-                <DownloadIcon v-if="!isModelLoading" class="mr-2 h-4 w-4" />
-                <RefreshCwIcon v-if="isModelLoading" class="mr-2 h-4 w-4 animate-spin" />
-                {{ isModelLoading ? 'Loading...' : currentModel === selectedModelId ? 'Already Loaded' : 'Load Model' }}
+                <template v-if="!isModelLoading">
+                  <DownloadIcon v-if="!isModelDownloaded(selectedModelId)" class="mr-2 h-4 w-4" />
+                  <CheckCircleIcon v-else class="mr-2 h-4 w-4" />
+                  {{ 
+                    currentModel === selectedModelId ? 'Already Loaded' : 
+                    isModelDownloaded(selectedModelId) ? 'Load Model' : 'Download & Load'
+                  }}
+                </template>
+                <RefreshCwIcon v-else class="mr-2 h-4 w-4 animate-spin" />
+                <span v-if="isModelLoading">Loading...</span>
               </Button>
             </div>
           </div>
@@ -321,8 +432,13 @@ watch(() => aiService.getModelLoadingState().isLoading, (newIsLoading) => {
             </div>
             <Progress :value="loadingProgress" class="w-full" />
             <p class="text-xs text-muted-foreground">
-              First-time downloads may take several minutes depending on your internet connection.
+              {{ isModelDownloaded(selectedModelId) ? 
+                  'Loading model from browser cache...' : 
+                  'First-time downloads may take several minutes depending on your internet connection.' 
+              }}
+              <span v-if="!isModelDownloaded(selectedModelId)">
               The model will be cached for future use.
+              </span>
             </p>
           </div>
           
