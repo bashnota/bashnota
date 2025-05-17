@@ -90,9 +90,11 @@ onBeforeUnmount(() => {
         :placeholder="'Search notas...'" 
         :value="query"
         @input="(e) => updateQuery(e.target.value)"
+        class="mention-search-input"
+        autofocus
       />
       
-      <CommandList>
+      <CommandList class="mention-command-list">
         <CommandEmpty v-if="!hasResults">
           <div class="flex flex-col items-center justify-center p-4 text-sm text-muted-foreground">
             <span>No matching notas found</span>
@@ -127,48 +129,42 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .mention-search-popup {
-  position: absolute;
-  width: 320px;
-  max-width: calc(100vw - 2rem);
+  width: 100%;
   z-index: 50;
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1), 0 0 1px rgba(0, 0, 0, 0.2);
-  animation: slideIn 0.2s ease-out;
-  transform-origin: top left;
+  animation: fadeIn 0.2s ease-out;
 }
 
-@keyframes slideIn {
+.mention-search-input:focus {
+  box-shadow: 0 0 0 1px hsl(var(--primary) / 0.3), 0 0 0 3px hsl(var(--primary) / 0.1);
+  border-color: hsl(var(--primary));
+}
+
+.mention-command-list {
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+@keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(-10px) scale(0.98);
+    transform: translateY(-5px);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
 }
 
 @media (max-width: 640px) {
   .mention-search-popup {
-    position: fixed;
-    top: auto !important;
-    left: 50% !important;
-    bottom: 5rem;
-    transform: translateX(-50%);
-    width: calc(100% - 2rem);
-    animation: slideUp 0.2s ease-out;
+    width: 100%;
   }
   
-  @keyframes slideUp {
-    from {
-      opacity: 0;
-      transform: translateX(-50%) translateY(10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
+  .mention-command-list {
+    max-height: 180px;
   }
 }
 

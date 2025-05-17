@@ -11,7 +11,6 @@ import {
   BrainCircuitIcon
 } from 'lucide-vue-next'
 import { ref, nextTick, watch, onMounted, computed } from 'vue'
-import MentionSearch from './MentionSearch.vue'
 import { useAISettingsStore } from '@/stores/aiSettingsStore'
 import {
   Select,
@@ -51,7 +50,6 @@ const emit = defineEmits([
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const localPromptInput = ref(props.promptInput)
 const localFollowUpPrompt = ref(props.followUpPrompt)
-const mentionPosition = ref<{ top: number; left: number } | null>(null)
 const isTyping = ref(false)
 const typingTimeout = ref<number | null>(null)
 
@@ -100,137 +98,58 @@ watch(localPromptInput, (newVal) => {
     }, 1000)
   }
   
-  // Emit the checkMentions event with a simple object
-  emit('checkMentions', {
-    target: {
+  // Emit the checkMentions event with well-structured data
+  if (textareaRef.value) {
+    emit('checkMentions', {
       value: newVal,
-      selectionStart: textareaRef.value?.selectionStart || 0,
-      selectionEnd: textareaRef.value?.selectionEnd || 0
-    }
-  })
+      selectionStart: textareaRef.value.selectionStart || 0,
+      selectionEnd: textareaRef.value.selectionEnd || 0
+    })
+  }
 })
 
 watch(localFollowUpPrompt, (newVal) => {
   emit('update:followUpPrompt', newVal)
   
-  // Emit the checkMentions event with a simple object
-  emit('checkMentions', {
-    target: {
+  // Emit the checkMentions event with well-structured data
+  if (textareaRef.value) {
+    emit('checkMentions', {
       value: newVal,
-      selectionStart: textareaRef.value?.selectionStart || 0,
-      selectionEnd: textareaRef.value?.selectionEnd || 0
-    }
-  })
-})
-
-// Watch for mention search visibility to calculate position
-watch(() => props.showMentionSearch, (isVisible) => {
-  if (isVisible && textareaRef.value) {
-    calculateMentionPosition()
+      selectionStart: textareaRef.value.selectionStart || 0,
+      selectionEnd: textareaRef.value.selectionEnd || 0
+    })
   }
 })
-
-// Calculate position for mention search popup
-const calculateMentionPosition = () => {
-  try {
-    // First safety check - verify the textarea ref exists and is an element
-    if (!textareaRef.value || !(textareaRef.value instanceof Element)) {
-      console.warn('textareaRef is not a valid Element in calculateMentionPosition');
-      return;
-    }
-    
-    // Make sure the textarea has all the necessary methods
-    if (typeof textareaRef.value.getBoundingClientRect !== 'function') {
-      console.warn('textareaRef.value.getBoundingClientRect is not a function');
-      return;
-    }
-    
-    const textarea = textareaRef.value;
-    
-    // Get current value from the local state variables since textarea.value might be null
-    const currentValue = props.isContinuing ? localFollowUpPrompt.value : localPromptInput.value;
-    
-    // Second safety check - verify we have a value to work with
-    if (!currentValue) {
-      console.warn('No value available to calculate mention position');
-      return;
-    }
-    
-    const caretPosition = textarea.selectionStart || 0;
-    
-    // Make sure the caret position is within bounds
-    if (caretPosition > currentValue.length) {
-      console.warn('Caret position out of bounds');
-      return;
-    }
-    
-    const text = currentValue.substring(0, caretPosition);
-    const lines = text.split('\n');
-    const lineCount = lines.length;
-    const lastLine = lines[lineCount - 1] || '';
-    
-    // Create temporary element to measure text
-    const div = document.createElement('div');
-    div.style.position = 'absolute';
-    div.style.visibility = 'hidden';
-    div.style.width = `${textarea.clientWidth}px`;
-    
-    // Make sure we can get computed style
-    const computedStyle = window.getComputedStyle(textarea);
-    if (!computedStyle) {
-      console.warn('Could not get computed style for textarea');
-      return;
-    }
-    
-    div.style.font = computedStyle.font;
-    div.style.lineHeight = computedStyle.lineHeight;
-    div.style.whiteSpace = 'pre-wrap';
-    div.style.wordWrap = 'break-word';
-    div.textContent = lastLine;
-    
-    document.body.appendChild(div);
-    
-    const lineHeight = parseInt(computedStyle.lineHeight) || 20;
-    const rect = textarea.getBoundingClientRect();
-    
-    mentionPosition.value = {
-      top: rect.top + window.scrollY + (lineCount * lineHeight) + 8,
-      left: rect.left + window.scrollX + div.clientWidth
-    };
-    
-    document.body.removeChild(div);
-  } catch (error) {
-    console.error('Error in calculateMentionPosition:', error);
-    
-    // Provide a fallback position based on the window
-    mentionPosition.value = {
-      top: 100,
-      left: 100
-    };
-  }
-}
 
 // Handle input on prompt textarea
 const handlePromptInput = (e: Event) => {
   const textarea = e.target as HTMLTextAreaElement
+  localPromptInput.value = textarea.value
   emit('update:promptInput', textarea.value)
+  
+  // Pass the original DOM event
   emit('checkMentions', e)
 }
 
 // Handle input on follow-up textarea
 const handleFollowUpInput = (e: Event) => {
   const textarea = e.target as HTMLTextAreaElement
+  localFollowUpPrompt.value = textarea.value
   emit('update:followUpPrompt', textarea.value)
+  
+  // Pass the original DOM event
   emit('checkMentions', e)
 }
 
 // Generate text with the current prompt
 const generateText = () => {
+  if (props.isLoading) return
   emit('generate')
 }
 
 // Continue conversation with current follow-up
 const continueConversation = () => {
+  if (props.isLoading) return
   emit('continue')
 }
 
@@ -279,6 +198,16 @@ const focusTextarea = () => {
 // Calculate initial mention position on mount
 onMounted(() => {
   focusTextarea()
+})
+
+// Add method to expose the textarea reference
+const getTextareaRef = () => {
+  return textareaRef
+}
+
+// Expose methods to the parent component
+defineExpose({
+  getTextareaRef
 })
 </script>
 
@@ -412,17 +341,6 @@ onMounted(() => {
         Processing locally in your browser
       </div>
     </div>
-
-    <!-- New Mention Search using the MentionSearch component -->
-    <MentionSearch
-      :is-visible="showMentionSearch"
-      :query="props.mentionSearchResults.length > 0 ? props.mentionSearchResults[0]?.searchQuery || '' : ''"
-      :search-results="mentionSearchResults"
-      :position="mentionPosition"
-      @select="selectNotaFromSearch"
-      @close="closeMentionSearch"
-      @update-query="updateMentionQuery"
-    />
   </div>
 </template>
 

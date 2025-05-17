@@ -159,8 +159,8 @@ class AIServiceLegacy {
         ...options,
         modelId
       };
-    }
-    
+        }
+
     const result = await newAIService.generateMultimodal(providerId, options as NewMultimodalGenerationOptions, undefined, apiKey);
     return result as GenerationResult;
   }
@@ -190,7 +190,7 @@ class AIServiceLegacy {
   async isWebGPUSupported(): Promise<boolean> {
     return newAIService.isWebLLMSupported();
   }
-
+  
   getModelLoadingState(): { 
     isLoading: boolean; 
     progress: number; 
@@ -199,7 +199,7 @@ class AIServiceLegacy {
   } {
     return newAIService.getWebLLMModelLoadingState();
   }
-
+  
   isModelLoaded(): boolean {
     const state = newAIService.getWebLLMModelLoadingState();
     return !!state.currentModel;
@@ -246,7 +246,7 @@ class AIServiceLegacy {
   async fetchAvailableGeminiModels(apiKey: string): Promise<GeminiModelInfo[]> {
     const models = await newAIService.getGeminiModels(apiKey);
     return models as unknown as GeminiModelInfo[];
-  }
+    }
 
   async getGeminiUsageInfo(apiKey: string): Promise<{ 
     available: boolean;
@@ -300,7 +300,7 @@ class AIServiceLegacy {
     
     await newAIService.generateMultimodal('gemini', options as NewMultimodalGenerationOptions, callbacks, apiKey);
   }
-}
-
+        }
+        
 // Export the singleton instance for backward compatibility
 export const aiService = new AIServiceLegacy();

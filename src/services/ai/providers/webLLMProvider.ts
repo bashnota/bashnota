@@ -86,11 +86,14 @@ export class WebLLMProvider implements AIProvider {
     callbacks: StreamCallbacks
   ): Promise<void> {
     if (!this.engine) {
+      logger.error('WebLLM engine not initialized when generating text stream');
       throw new Error('WebLLM engine not initialized. Please select and load a model first.');
     }
 
     try {
       let fullText = '';
+      
+      logger.info('Starting WebLLM streaming generation with prompt length:', options.prompt.length);
       
       // Create a streaming chat completion
       const stream = await this.engine.chat.completions.create({
@@ -105,36 +108,47 @@ export class WebLLMProvider implements AIProvider {
         stream_options: { include_usage: true }
       });
 
+      logger.info('WebLLM stream created, waiting for chunks');
+      
       // Process each chunk as it arrives
       for await (const chunk of stream) {
         const content = chunk.choices[0]?.delta?.content || '';
         if (content) {
           fullText += content;
-          callbacks.onChunk(content);
+          logger.debug('Received WebLLM chunk, calling onChunk callback', { contentLength: content.length });
+          if (callbacks.onChunk) {
+            callbacks.onChunk(content);
+          }
         }
         
         // If this is the last chunk with usage information
         if (chunk.usage) {
-          callbacks.onComplete({
-            text: fullText,
-            provider: 'webllm',
-            tokens: chunk.usage.completion_tokens || 0
-          });
+          logger.info('WebLLM streaming complete, calling onComplete callback');
+          if (callbacks.onComplete) {
+            callbacks.onComplete({
+              text: fullText,
+              provider: 'webllm',
+              tokens: chunk.usage.completion_tokens || 0
+            });
+          }
           return;
         }
       }
       
       // If we didn't get usage information, still complete the stream
-      callbacks.onComplete({
-        text: fullText,
-        provider: 'webllm',
-        tokens: 0
-      });
+      logger.info('WebLLM streaming complete (no usage info), calling onComplete callback');
+      if (callbacks.onComplete) {
+        callbacks.onComplete({
+          text: fullText,
+          provider: 'webllm',
+          tokens: 0
+        });
+      }
     } catch (error) {
+      logger.error('WebLLM streaming generation failed:', error);
       if (callbacks.onError) {
         callbacks.onError(error instanceof Error ? error : new Error(String(error)));
       }
-      logger.error('WebLLM streaming generation failed:', error);
       throw new Error(error instanceof Error ? error.message : 'WebLLM streaming generation failed');
     }
   }

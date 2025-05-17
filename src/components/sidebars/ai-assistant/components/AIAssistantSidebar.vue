@@ -21,6 +21,7 @@ import ActionBar from './ActionBar.vue'
 import EmptyState from './EmptyState.vue'
 import ChatList from './ChatList.vue'
 import ProviderSelector from './ProviderSelector.vue'
+import MentionSearch from './MentionSearch.vue'
 
 // Import the icons
 import { List as ListIcon, ArrowLeft as ArrowLeftIcon, Cpu as CpuIcon, Zap as ZapIcon } from 'lucide-vue-next'
@@ -113,6 +114,15 @@ const formattedProgress = computed(() => {
 
 // Reference to the textarea for mention search
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
+const conversationInputRef = ref<any | null>(null)
+
+// Helper function to get the current textarea from ConversationInput
+const getTextareaRef = () => {
+  if (conversationInputRef.value) {
+    return conversationInputRef.value.getTextareaRef?.() || null
+  }
+  return null
+}
 
 // Create a WebLLM state update interval
 const webLLMStateInterval = ref<number | null>(null)
@@ -131,6 +141,12 @@ const generateText = async () => {
   if (!activeAIBlock.value || !promptInput.value.trim()) return
   
   try {
+    // Ensure we're not already in a loading state
+    if (isLoading.value) return
+    
+    // Set loading state
+    isLoading.value = true
+    
     // Check if there are any mentioned notas
     if (promptInput.value.includes('#[')) {
       // Process with mentions
@@ -164,6 +180,9 @@ const generateText = async () => {
       description: 'Failed to generate text',
       variant: 'destructive'
     })
+  } finally {
+    // Always reset loading state regardless of success/failure
+    isLoading.value = false
   }
 }
 
@@ -172,6 +191,9 @@ const continueConversation = async () => {
   if (!activeAIBlock.value || !followUpPrompt.value.trim() || isLoading.value) return
   
   try {
+    // Set loading state
+    isLoading.value = true
+    
     // Check if there are any mentioned notas
     if (followUpPrompt.value.includes('#[')) {
       const enhancedPrompt = await loadMentionedNotaContents(followUpPrompt.value)
@@ -208,6 +230,9 @@ const continueConversation = async () => {
       description: 'Failed to continue conversation',
       variant: 'destructive'
     })
+  } finally {
+    // Always reset loading state regardless of success/failure
+    isLoading.value = false
   }
 }
 
@@ -412,7 +437,9 @@ const removeBlock = () => {
 
 // Handle mentions selection
 const handleMentionSelection = (nota: any) => {
-  selectNotaFromSearch(nota, textareaRef, isContinuing.value, promptInput, followUpPrompt)
+  // Use the textarea ref from ConversationInput when possible
+  const currentTextareaRef = getTextareaRef() || textareaRef
+  selectNotaFromSearch(nota, currentTextareaRef, isContinuing.value, promptInput, followUpPrompt)
 }
 
 // Update mention search query
@@ -683,22 +710,38 @@ onMounted(() => {
   
             <!-- AI Provider Selector with WebLLM streaming toggle -->
             <div class="px-3 py-1 border-t">
-              <div class="flex items-center justify-between">
-                <ProviderSelector />
+              <div class="flex flex-col">
+                <!-- Mention Search Component -->
+                <div v-if="showMentionSearch" class="mb-2">
+                  <MentionSearch
+                    :is-visible="showMentionSearch"
+                    :query="mentionSearchResults.length > 0 ? mentionSearchResults[0]?.searchQuery || '' : ''"
+                    :search-results="mentionSearchResults"
+                    :position="null"
+                    @select="handleMentionSelection"
+                    @close="handleCloseMentionSearch"
+                    @update-query="handleUpdateMentionQuery"
+                  />
+                </div>
                 
-                <!-- WebLLM Streaming toggle -->
-                <Button 
-                  v-if="aiSettings.settings.preferredProviderId === 'webllm'"
-                  variant="outline" 
-                  size="sm"
-                  class="ml-2 text-xs h-8 px-2 py-1 flex items-center gap-1"
-                  :class="{'bg-primary/10': isStreamingEnabled}"
-                  @click="toggleStreamingMode"
-                  title="Toggle live streaming mode for WebLLM"
-                >
-                  <ZapIcon class="h-3.5 w-3.5" :class="{'text-primary': isStreamingEnabled}" />
-                  <span>Live Mode</span>
-                </Button>
+                <!-- Provider Selector -->
+                <div class="flex items-center justify-between">
+                  <ProviderSelector />
+                  
+                  <!-- WebLLM Streaming toggle -->
+                  <Button 
+                    v-if="aiSettings.settings.preferredProviderId === 'webllm'"
+                    variant="outline" 
+                    size="sm"
+                    class="ml-2 text-xs h-8 px-2 py-1 flex items-center gap-1"
+                    :class="{'bg-primary/10': isStreamingEnabled}"
+                    @click="toggleStreamingMode"
+                    title="Toggle live streaming mode for WebLLM"
+                  >
+                    <ZapIcon class="h-3.5 w-3.5" :class="{'text-primary': isStreamingEnabled}" />
+                    <span>Live Mode</span>
+                  </Button>
+                </div>
               </div>
             </div>
   
@@ -751,12 +794,12 @@ onMounted(() => {
                   @update:followUpPrompt="followUpPrompt = $event"
                   @generate="generateText"
                   @continue="continueConversation"
-                  @check-mentions="checkForMentions($event, ref(textareaRef))"
+                  @check-mentions="checkForMentions($event, null)"
                   @select-mention="handleMentionSelection"
                   @update-mention-search="handleUpdateMentionQuery"
                   @close-mention-search="handleCloseMentionSearch"
                   @change-model="handleModelChange"
-                  ref="textareaRef"
+                  ref="conversationInputRef"
                 />
                 
                 <!-- Action Bar -->
@@ -822,5 +865,21 @@ onMounted(() => {
   font-size: 0.875rem;
   font-weight: 500;
   margin: 0 0.125rem;
+}
+
+/* Animation for mention search appearance */
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.mb-2 {
+  animation: slideInUp 0.2s ease-out;
 }
 </style>
