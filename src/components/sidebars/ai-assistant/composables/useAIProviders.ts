@@ -1,4 +1,4 @@
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useAISettingsStore } from '@/stores/aiSettingsStore'
 import { aiService } from '@/services/ai'
 import type { 
@@ -36,6 +36,30 @@ export function useAIProviders() {
   
   // Get available providers that can be used right now
   const availableProviders = ref<string[]>([])
+  
+  /**
+   * Initialize providers - can be called from component setup
+   */
+  const initialize = async (checkOnlyActiveProvider = true) => {
+    // Check WebLLM support
+    await checkWebLLMSupport()
+    
+    // Fetch models
+    if (isWebLLMSupported.value) {
+      await fetchWebLLMModels()
+      updateWebLLMState()
+    }
+    
+    await fetchGeminiModels()
+    
+    // Check provider availability - only check the active provider by default
+    await checkAllProviders(checkOnlyActiveProvider)
+    
+    // Auto-select best available provider on start if needed
+    if (aiSettings.settings.autoSelectProvider !== false && !checkOnlyActiveProvider) {
+      await selectBestAvailableProvider()
+    }
+  }
   
   /**
    * Check if WebLLM is supported in the current browser
@@ -94,73 +118,41 @@ export function useAIProviders() {
   /**
    * Load a WebLLM model
    */
-  const loadWebLLMModel = async (modelId: string): Promise<boolean> => {
-    if (!modelId) {
-      logger.warn('No WebLLM model ID provided')
-      return false
-    }
-    
+  const loadWebLLMModel = async (modelName: string) => {
     try {
       isLoadingWebLLMModels.value = true
       webLLMError.value = null
       
-      // Set up polling for progress updates
-      const pollInterval = setInterval(() => {
-        const state = aiService.getWebLLMModelLoadingState()
-        webLLMProgress.value = state.progress
-        
-        if (state.error) {
-          webLLMError.value = state.error
-          logger.warn('WebLLM loading error:', state.error)
-        }
-      }, 200)
+      await aiService.initializeWebLLMModel(modelName)
       
-      logger.info(`Loading WebLLM model: ${modelId}`)
-      
-      // Set a reasonable timeout for model loading (3 minutes)
-      const timeoutMs = 180000
-      
-      // Initialize the model with the timeout
-      await aiService.initializeWebLLMModel(modelId, timeoutMs)
-      
-      // Update state after successful loading
+      // Update WebLLM model state
       updateWebLLMState()
-      currentWebLLMModel.value = modelId
       
-      // Save to settings
-      aiSettings.updateSettings({
-        webllmModel: modelId
+      toast({
+        title: 'Model Loaded',
+        description: `WebLLM model ${modelName} loaded successfully.`
       })
       
-      // Add to available providers if not already there
-      if (!availableProviders.value.includes('webllm')) {
-        availableProviders.value.push('webllm')
-      }
+      // Make sure WebLLM is set as the preferred provider
+      aiSettings.setPreferredProvider('webllm')
       
-      logger.info(`WebLLM model ${modelId} loaded successfully`)
-      
-      // Clear polling interval
-      clearInterval(pollInterval)
       return true
     } catch (error) {
-      // Update state on error
-      const errorMessage = error instanceof Error ? error.message : 'Failed to load model'
-      webLLMError.value = errorMessage
-      logger.error(`Error loading WebLLM model ${modelId}:`, error)
+      logger.error(`Error loading WebLLM model ${modelName}:`, error)
       
-      // Show user-friendly error toast
+      webLLMError.value = error instanceof Error 
+        ? error.message 
+        : 'Unknown error loading model'
+      
       toast({
-        title: 'Model Loading Failed',
-        description: errorMessage,
+        title: 'Error',
+        description: `Failed to load WebLLM model: ${webLLMError.value}`,
         variant: 'destructive'
       })
       
       return false
     } finally {
       isLoadingWebLLMModels.value = false
-      
-      // Refresh available providers
-      await checkAllProviders()
     }
   }
   
@@ -246,17 +238,27 @@ export function useAIProviders() {
   }
   
   // Check all providers and update availability state
-  const checkAllProviders = async () => {
+  const checkAllProviders = async (checkOnlyCurrentProvider = false) => {
     if (isCheckingProviders.value) return
     
     try {
       isCheckingProviders.value = true
       availableProviders.value = []
       
-      for (const provider of providers.value) {
-        const isAvailable = await checkProviderAvailability(provider.id)
-        if (isAvailable) {
-          availableProviders.value.push(provider.id)
+      // If checkOnlyCurrentProvider is true, only check the current provider
+      const providersToCheck = checkOnlyCurrentProvider
+        ? providers.value.filter(p => p.id === aiSettings.settings.preferredProviderId)
+        : providers.value
+      
+      for (const provider of providersToCheck) {
+        try {
+          const isAvailable = await checkProviderAvailability(provider.id)
+          if (isAvailable) {
+            availableProviders.value.push(provider.id)
+          }
+        } catch (error) {
+          logger.error(`Error checking provider ${provider.id}:`, error)
+          // Continue with other providers even if one fails
         }
       }
       
@@ -311,7 +313,6 @@ export function useAIProviders() {
     if (providerId === 'webllm') {
       try {
         // Check browser support
-        await checkWebLLMSupport()
         if (!isWebLLMSupported.value) {
           logger.warn('WebLLM not supported in this browser');
           toast({
@@ -344,124 +345,89 @@ export function useAIProviders() {
           // No model loaded, try to load the default or first available model
           let modelToLoad = aiSettings.settings.webllmModel;
           
-          // If no model is specified in settings, or the specified model isn't in the list,
-          // try to find a smaller model to load first (for faster experience)
-          if (!modelToLoad || !webLLMModels.value.find(m => m.id === modelToLoad)) {
-            logger.info('No model specified in settings, looking for a small model to load');
+          // If no model is set in settings, try to find a smaller model to load first
+          if (!modelToLoad) {
+            // Find smallest model by looking for specific keywords
+            const smallModels = webLLMModels.value.filter(m => 
+              m.id.includes('7b') || 
+              m.id.includes('3b') || 
+              m.description.includes('7B') ||
+              m.description.includes('3B'));
             
-            // Preference for smaller models that load faster
-            const smallModel = webLLMModels.value.find(m => 
-              m.size.includes('0.5B') || 
-              m.size.includes('1B') || 
-              m.size.includes('2B') ||
-              m.size.includes('3B')
-            );
-            
-            if (smallModel) {
-              modelToLoad = smallModel.id;
-              logger.info(`Selected small model to load: ${smallModel.name} (${smallModel.id})`);
-            } else {
-              // If no small model found, use the first model in the list
+            if (smallModels.length > 0) {
+              // Prefer instruction tuned models
+              const instructModel = smallModels.find(m => 
+                m.id.includes('instruct') || 
+                m.id.includes('-it') || 
+                m.description.includes('Instruction'));
+              
+              modelToLoad = instructModel ? instructModel.id : smallModels[0].id;
+              logger.info(`Selected smaller WebLLM model: ${modelToLoad}`);
+            } else if (webLLMModels.value.length > 0) {
+              // Just use the first available model
               modelToLoad = webLLMModels.value[0].id;
-              logger.info(`No small model found, using first available model: ${modelToLoad}`);
+              logger.info(`Selected first available WebLLM model: ${modelToLoad}`);
             }
           }
           
-          logger.info(`Attempting to load WebLLM model: ${modelToLoad}`);
-          
-          // Load the selected model
-          const loadSuccess = await loadWebLLMModel(modelToLoad);
-          
-          if (!loadSuccess) {
-            logger.warn(`Failed to load WebLLM model ${modelToLoad}, trying alternative smaller model`);
+          if (modelToLoad) {
+            logger.info(`Attempting to load WebLLM model: ${modelToLoad}`);
+            const success = await loadWebLLMModel(modelToLoad);
             
-            // If loading failed, try one more time with the smallest model available
-            const tinierModel = webLLMModels.value.find(m => 
-              m.size.includes('0.5B') || 
-              m.size.includes('1B')
-            );
-            
-            if (tinierModel && tinierModel.id !== modelToLoad) {
-              logger.info(`Trying smaller model instead: ${tinierModel.name}`);
-              const retrySuccess = await loadWebLLMModel(tinierModel.id);
-              
-              if (!retrySuccess) {
-                logger.error('Failed to load WebLLM model after retry');
-                return false;
-              }
+            // Save the model ID to settings for future use
+            if (success) {
+              aiSettings.updateSettings({ webllmModel: modelToLoad });
             } else {
-              // No alternative model to try
-              logger.error('No alternative WebLLM model available');
               return false;
             }
+          } else {
+            // No models available to load
+            toast({
+              title: 'No WebLLM Model',
+              description: 'Please select a WebLLM model in settings.',
+              variant: 'destructive'
+            });
+            return false;
           }
         }
-        
-        // Successfully loaded or already had model loaded
-        aiSettings.setPreferredProvider('webllm');
-        return true;
       } catch (error) {
         logger.error('Error selecting WebLLM provider:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to initialize WebLLM',
+          variant: 'destructive'
+        });
         return false;
       }
     }
     
-    // For other providers
-    try {
-      // Verify the provider is available
-      const isAvailable = await checkProviderAvailability(providerId);
-      
-      if (isAvailable) {
-        // Update settings with the new provider
-        aiSettings.setPreferredProvider(providerId);
-        currentProviderId.value = providerId;
-        return true;
-      } else {
-        // Log the reason why provider is not available
-        if (providerId === 'gemini' && !aiSettings.getApiKey('gemini')) {
-          logger.warn('Gemini provider not available: No API key');
-          toast({
-            title: 'API Key Required',
-            description: 'Please set your Gemini API key in settings.',
-            variant: 'destructive'
-          });
-        } else if (providerId === 'ollama') {
-          logger.warn('Ollama provider not available: Server not connected');
-          toast({
-            title: 'Ollama Not Available',
-            description: 'Unable to connect to Ollama server. Is it running?',
-            variant: 'destructive'
-          });
-        }
-        
-        return false;
-      }
-    } catch (error) {
-      logger.error(`Error selecting ${providerId} provider:`, error);
-      return false;
-    }
+    // Set the provider
+    aiSettings.setPreferredProvider(providerId);
+    return true;
   }
   
-  // Initialize
-  onMounted(async () => {
-    // Check WebLLM support
-    await checkWebLLMSupport()
+  // Initialize WebLLM state at creation time (no onMounted needed)
+  checkWebLLMSupport().then(() => {
+    updateWebLLMState()
     
-    // Fetch models
-    if (isWebLLMSupported.value) {
-      await fetchWebLLMModels()
-      updateWebLLMState()
+    // Check if WebLLM is the preferred provider and if so, make sure it's initialized
+    if (aiSettings.settings.preferredProviderId === 'webllm') {
+      logger.info('WebLLM is the preferred provider, checking state...')
+      if (isWebLLMSupported.value) {
+        updateWebLLMState()
+        if (!currentWebLLMModel.value) {
+          logger.info('No WebLLM model loaded, will auto-load on next generation')
+        }
+      }
+      
+      // Only check WebLLM availability if it's the preferred provider
+      checkAllProviders(true)
+    } else {
+      // Only check the current provider
+      checkAllProviders(true)
     }
-    
-    await fetchGeminiModels()
-    
-    // Check provider availability
-    await checkAllProviders()
-    
-    // Auto-select best available provider on start
-    if (aiSettings.settings.autoSelectProvider !== false) {
-      await selectBestAvailableProvider()
-    }
+  }).catch(error => {
+    logger.error('Error during initial WebLLM check:', error)
   })
   
   return {
@@ -480,6 +446,7 @@ export function useAIProviders() {
     availableProviders,
     
     // Methods
+    initialize,
     checkWebLLMSupport,
     fetchGeminiModels,
     fetchWebLLMModels,

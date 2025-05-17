@@ -1,4 +1,4 @@
-import { ref, watch, onUnmounted } from 'vue'
+import { ref, watch, onUnmounted, computed } from 'vue'
 import { useAISettingsStore } from '@/stores/aiSettingsStore'
 
 export function useAIRequest() {
@@ -8,6 +8,7 @@ export function useAIRequest() {
   
   // Set default timeout from settings or use 60 seconds
   const DEFAULT_TIMEOUT = 60000 // 60 seconds
+  const STREAMING_TIMEOUT = 120000 // 120 seconds for streaming - WebLLM needs more time
   
   // Watch for settings changes to update timeout
   watch(() => (aiSettings.settings as any).requestTimeout || DEFAULT_TIMEOUT / 1000, (value) => {
@@ -18,6 +19,17 @@ export function useAIRequest() {
     }
   }, { immediate: true })
   
+  // Compute the timeout value to use based on provider and streaming
+  const getTimeoutForRequest = (providerId?: string, isStreaming?: boolean): number => {
+    // WebLLM or streaming requests get extended timeout
+    if (providerId === 'webllm' || isStreaming) {
+      return STREAMING_TIMEOUT
+    }
+    
+    // Otherwise use the normal timeout
+    return timeout.value || DEFAULT_TIMEOUT
+  }
+  
   // Clean up any pending requests when component is unmounted
   onUnmounted(() => {
     abortAllRequests()
@@ -27,18 +39,23 @@ export function useAIRequest() {
    * Create a request with timeout handling
    */
   const createRequestWithTimeout = <T>(
-    promiseFunction: () => Promise<T>
+    promiseFunction: () => Promise<T>,
+    providerId?: string,
+    isStreaming?: boolean
   ): Promise<T> => {
     // Create an abort controller for this request
     const controller = new AbortController()
     activeRequests.value.push(controller)
+    
+    // Get the appropriate timeout value
+    const timeoutValue = getTimeoutForRequest(providerId, isStreaming)
     
     // Create a timeout promise
     const timeoutPromise = new Promise<never>((_, reject) => {
       const timeoutId = setTimeout(() => {
         controller.abort()
         reject(new Error('Request timed out'))
-      }, timeout.value || DEFAULT_TIMEOUT)
+      }, timeoutValue)
       
       // Store the timeout ID on the controller for cleanup
       controller.signal.addEventListener('abort', () => clearTimeout(timeoutId))

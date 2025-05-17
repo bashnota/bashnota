@@ -334,14 +334,14 @@ onMounted(() => {
             </Badge>
           </div>
           <Button 
-            size="sm" 
-            class="h-8 bg-primary hover:bg-primary/90 text-primary-foreground transition-all shadow-sm generate-button"
+            size="icon" 
+            class="w-9 h-9 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground transition-all shadow-sm send-button"
             @click="generateText" 
             :disabled="isPromptEmpty || isLoading"
+            aria-label="Send message"
           >
-            <LoaderIcon v-if="isLoading" class="h-3.5 w-3.5 mr-1.5 animate-spin" />
-            <SendIcon v-else class="h-3.5 w-3.5 mr-1.5" />
-            Send
+            <LoaderIcon v-if="isLoading" class="h-4 w-4 animate-spin" />
+            <SendIcon v-else class="h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -374,25 +374,43 @@ onMounted(() => {
           </span>
         </span>
         <Button 
-          size="sm" 
-          class="h-8 bg-primary hover:bg-primary/90 text-primary-foreground transition-all shadow-sm continue-button"
+          size="icon" 
+          class="w-9 h-9 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground transition-all shadow-sm send-button"
           @click="continueConversation" 
           :disabled="!localFollowUpPrompt.trim() || isLoading"
+          aria-label="Send message"
         >
-          <SendIcon class="h-3.5 w-3.5 mr-1.5" />
-          Send
+          <LoaderIcon v-if="isLoading" class="h-4 w-4 animate-spin" />
+          <SendIcon v-else class="h-4 w-4" />
         </Button>
       </div>
     </div>
 
     <!-- Loading Indicator -->
     <div v-if="isLoading" class="loading-indicator">
-      <div class="typing-indicator">
-        <span></span>
-        <span></span>
-        <span></span>
+      <div class="flex items-center gap-2">
+        <div class="typing-indicator">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+        
+        <div class="flex flex-col">
+          <p class="text-sm font-medium">
+            {{ 
+              selectedModel === 'webllm' ? 'WebLLM' : 
+              selectedModel === 'ollama' ? 'Ollama' : 
+              selectedModel === 'gemini' ? 'Gemini' : 'AI'
+            }} is generating...
+          </p>
+          <p class="text-xs text-muted-foreground">This may take a moment</p>
+        </div>
       </div>
-      <p class="text-xs text-muted-foreground">{{ selectedModel === 'claude' ? 'Claude' : selectedModel === 'gpt4' ? 'GPT-4' : 'AI' }} is thinking...</p>
+      
+      <!-- Show additional context for WebLLM -->
+      <div v-if="selectedModel === 'webllm'" class="mt-1 text-xs text-muted-foreground">
+        Processing locally in your browser
+      </div>
     </div>
 
     <!-- New Mention Search using the MentionSearch component -->
@@ -472,21 +490,44 @@ kbd {
   animation: fadeIn 0.3s ease-in-out;
 }
 
-.generate-button,
-.continue-button {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+.send-button {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  position: relative;
+  overflow: hidden;
 }
 
-.generate-button:not(:disabled):hover,
-.continue-button:not(:disabled):hover {
+.send-button:not(:disabled):hover {
   transform: translateY(-1px);
   box-shadow: 0 3px 5px rgba(0, 0, 0, 0.1);
 }
 
-.generate-button:not(:disabled):active,
-.continue-button:not(:disabled):active {
+.send-button:not(:disabled):active {
   transform: translateY(1px);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.send-button svg {
+  transition: all 0.3s ease;
+}
+
+.send-button:disabled {
+  opacity: 0.7;
+}
+
+.send-button::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0) 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.send-button:not(:disabled):hover::after {
+  opacity: 1;
 }
 
 @keyframes fadeIn {
@@ -503,22 +544,27 @@ kbd {
 /* Loading indicator styling */
 .loading-indicator {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: start;
   justify-content: center;
-  gap: 8px;
-  margin-top: 8px;
-  padding: 8px;
-  background-color: hsl(var(--primary) / 0.05);
-  border-radius: 6px;
-  animation: pulse 2s infinite;
+  gap: 4px;
+  margin-top: 12px;
+  padding: 12px;
+  background-color: hsl(var(--primary) / 0.08);
+  border: 1px solid hsl(var(--primary) / 0.15);
+  border-radius: 8px;
+  animation: pulseBackground 2s infinite ease-in-out;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
-@keyframes pulse {
+@keyframes pulseBackground {
   0%, 100% {
-    background-color: hsl(var(--primary) / 0.05);
+    background-color: hsl(var(--primary) / 0.08);
+    border-color: hsl(var(--primary) / 0.15);
   }
   50% {
-    background-color: hsl(var(--primary) / 0.1);
+    background-color: hsl(var(--primary) / 0.12);
+    border-color: hsl(var(--primary) / 0.25);
   }
 }
 

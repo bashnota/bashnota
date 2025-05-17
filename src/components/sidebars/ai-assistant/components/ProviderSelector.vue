@@ -24,7 +24,7 @@ const {
   availableProviders, 
   currentWebLLMModel,
   isLoadingWebLLMModels,
-  checkAllProviders, 
+  initialize,
   selectProvider 
 } = useAIProviders()
 
@@ -102,44 +102,44 @@ watch(() => aiSettings.settings.preferredProviderId, (newProviderId) => {
   currentProviderId.value = newProviderId
 })
 
-// Initialize
+// Initialize providers and refresh provider status in onMounted
 onMounted(async () => {
-  // This will refresh our provider status
-  await checkAllProviders()
+  // Use the new initialize function instead of directly calling checkAllProviders
+  await initialize()
 })
 </script>
 
 <template>
-  <div class="provider-selector">
-    <div class="mb-1 text-xs font-medium text-muted-foreground">
-      Select AI Provider
-    </div>
-    
-    <Select 
-      v-model="currentProviderId" 
-      @update:modelValue="updateProvider"
-      :disabled="isChangingProvider"
-    >
-      <SelectTrigger class="w-full">
-        <div class="flex items-center gap-2">
-          <LoaderIcon v-if="isChangingProvider" class="h-4 w-4 animate-spin" />
-          <SelectValue placeholder="Select AI provider" />
-        </div>
+  <div>
+    <Select v-model="currentProviderId" @update:modelValue="updateProvider">
+      <SelectTrigger
+        class="w-full text-sm border-none bg-background shadow-none px-0 h-6 font-normal"
+        :disabled="isChangingProvider"
+      >
+        <span v-if="isChangingProvider" class="flex items-center gap-1.5">
+          <LoaderIcon class="h-3.5 w-3.5 animate-spin" />
+          <span>Changing provider...</span>
+        </span>
+        <span v-else class="flex items-center gap-1.5">
+          <component :is="getProviderIcon(currentProviderId)" class="h-3.5 w-3.5" />
+          <span>{{ 
+            providers.find(p => p.id === currentProviderId)?.name || 'Select Provider'
+          }}</span>
+        </span>
       </SelectTrigger>
-      
       <SelectContent>
         <SelectItem 
           v-for="provider in providers" 
           :key="provider.id" 
           :value="provider.id"
-          :disabled="!availableProviders.includes(provider.id) && provider.id !== 'webllm'"
+          class="flex items-center gap-1"
         >
-          <div class="flex items-center gap-2">
-            <component :is="getProviderIcon(provider.id)" class="h-4 w-4" />
+          <div class="flex items-center gap-1.5">
+            <component :is="getProviderIcon(provider.id)" class="h-3.5 w-3.5" />
             <span>{{ getProviderLabel(provider) }}</span>
-            <Badge v-if="provider.requiresApiKey && !aiSettings.getApiKey(provider.id)" 
-              variant="outline" class="ml-auto text-xs">
-              Needs API key
+            
+            <Badge v-if="availableProviders.includes(provider.id)" variant="outline" class="ml-1 text-xs py-0 h-4 bg-primary/5">
+              Available
             </Badge>
           </div>
         </SelectItem>

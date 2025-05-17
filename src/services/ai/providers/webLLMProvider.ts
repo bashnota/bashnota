@@ -143,7 +143,7 @@ export class WebLLMProvider implements AIProvider {
     return false;
   }
   
-  async initializeModel(modelId: string, timeoutMs: number = 180000): Promise<void> {
+  async initializeModel(modelId: string): Promise<void> {
     if (this.isModelLoaded() && this.currentModel === modelId) {
       logger.info(`WebLLM model ${modelId} is already loaded`);
       return;
@@ -158,18 +158,8 @@ export class WebLLMProvider implements AIProvider {
     try {
       logger.info(`Initializing WebLLM model: ${modelId}`);
       
-      // Set up timeout for model loading
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        const timeoutId = setTimeout(() => {
-          reject(new Error(`Model loading timed out after ${timeoutMs/1000} seconds. This may be due to slow network, insufficient memory, or GPU issues.`));
-        }, timeoutMs);
-        
-        // Store timeoutId for cleanup
-        return () => clearTimeout(timeoutId);
-      });
-      
-      // Create model loading promise
-      const modelLoadingPromise = webllm.CreateMLCEngine(
+      // Create a new chat instance
+      this.engine = await webllm.CreateMLCEngine(
         modelId,
         { 
           initProgressCallback: (report: webllm.InitProgressReport) => {
@@ -178,9 +168,6 @@ export class WebLLMProvider implements AIProvider {
           },
         }
       );
-      
-      // Race the model loading against the timeout
-      this.engine = await Promise.race([modelLoadingPromise, timeoutPromise]);
 
       // Update state on success
       this.isModelLoading = false;
@@ -191,30 +178,11 @@ export class WebLLMProvider implements AIProvider {
     } catch (error) {
       // Handle initialization error
       this.isModelLoading = false;
-      
-      // Determine error type and provide more informative messages
-      let errorMessage: string;
-      if (error instanceof Error) {
-        if (error.message.includes('timed out')) {
-          errorMessage = error.message;
-        } else if (error.message.includes('memory')) {
-          errorMessage = `Insufficient memory to load model ${modelId}. Try a smaller model or close other applications.`;
-        } else if (error.message.includes('wasm') || error.message.includes('WASM')) {
-          errorMessage = `WebAssembly error loading model ${modelId}. Your browser may have compatibility issues.`;
-        } else if (error.message.includes('network') || error.message.includes('fetch')) {
-          errorMessage = `Network error loading model ${modelId}. Check your internet connection and try again.`;
-        } else {
-          errorMessage = error.message;
-        }
-      } else {
-        errorMessage = 'Unknown error loading model';
-      }
-      
-      this.modelLoadingError = errorMessage;
+      this.modelLoadingError = error instanceof Error ? error.message : 'Unknown error loading model';
       this.currentModel = null;
       
       logger.error(`Error initializing WebLLM model ${modelId}:`, error);
-      throw new Error(errorMessage);
+      throw error;
     }
   }
   
@@ -288,16 +256,7 @@ export class WebLLMProvider implements AIProvider {
     return 'Unknown';
   }
   
-  /**
-   * Check if a model is currently loaded
-   */
-  isModelLoaded(): boolean {
-    return this.engine !== null && this.currentModel !== null;
-  }
-  
-  /**
-   * Get the current model loading state
-   */
+  // Get the current model loading state
   getModelLoadingState(): { 
     isLoading: boolean; 
     progress: number; 
@@ -308,8 +267,13 @@ export class WebLLMProvider implements AIProvider {
       isLoading: this.isModelLoading,
       progress: this.modelLoadingProgress,
       error: this.modelLoadingError,
-      currentModel: this.currentModel
+      currentModel: this.currentModel || null
     };
+  }
+  
+  // Check if a model is loaded
+  isModelLoaded(): boolean {
+    return !!this.engine && !!this.currentModel;
   }
   
   // Get the current model

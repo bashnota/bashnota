@@ -1,13 +1,14 @@
 import { ref } from 'vue'
 import { logger } from '@/services/logger'
 import { aiService } from '@/services/ai'
-import type { GenerationResult, GenerationOptions } from '@/services/ai/types'
+import type { GenerationResult, GenerationOptions, StreamCallbacks } from '@/services/ai/types'
 import { toast } from '@/components/ui/toast'
 import { type ConversationMessage } from './useConversation'
 import { useAISettingsStore } from '@/stores/aiSettingsStore'
 import { useAIErrorHandling } from './useAIErrorHandling'
 import { useAIRequest } from './useAIRequest'
 import { useAIProviders } from './useAIProviders'
+import { useStreamingMode } from './useStreamingMode'
 
 // Define error types for better error handling
 type AIGenerationErrorType = 
@@ -31,7 +32,26 @@ export function useAIGeneration(editor: any) {
   const aiSettings = useAISettingsStore()
   const { errorMessage, handleGenerationError } = useAIErrorHandling()
   const { createRequestWithTimeout, abortRequest, abortAllRequests } = useAIRequest()
-  const { selectBestAvailableProvider, availableProviders } = useAIProviders()
+  
+  // Get all needed functions from useAIProviders at the top level
+  const { 
+    selectBestAvailableProvider, 
+    availableProviders,
+    updateWebLLMState,
+    currentWebLLMModel,
+    loadWebLLMModel,
+    webLLMModels,
+    selectProvider,
+    isWebLLMSupported
+  } = useAIProviders()
+  
+  const { 
+    shouldUseStreaming, 
+    startStreaming, 
+    handleStreamingChunk, 
+    completeStreaming, 
+    currentStreamingText
+  } = useStreamingMode()
 
   /**
    * Ensure a valid provider is selected before generating
@@ -42,16 +62,10 @@ export function useAIGeneration(editor: any) {
     
     // Special handling for WebLLM - if it's selected, check if a model is loaded
     if (currentProviderId === 'webllm') {
-      const { updateWebLLMState, currentWebLLMModel, loadWebLLMModel, webLLMModels, selectProvider, isWebLLMSupported } = useAIProviders()
+      // Use the already initialized providers - no need to call useAIProviders() here
       
       // Check if WebLLM is supported
       logger.info(`WebLLM supported: ${isWebLLMSupported.value}`)
-      
-      if (!isWebLLMSupported.value) {
-        logger.warn('WebLLM is not supported in this browser, selecting alternative provider')
-        const newProvider = await selectBestAvailableProvider()
-        return newProvider
-      }
       
       // Check the current state
       updateWebLLMState()
@@ -64,43 +78,20 @@ export function useAIGeneration(editor: any) {
         // Show loading state in the editor
         editor.commands.updateAttributes('aiGeneration', {
           loading: true,
-          error: 'Loading WebLLM model (this may take a few minutes)...',
+          error: 'Loading WebLLM model...',
         })
         
-        try {
-          // Try to select the WebLLM provider, which will auto-load a model
-          const success = await selectProvider('webllm')
-          logger.info(`WebLLM provider selection ${success ? 'succeeded' : 'failed'}`)
-          
-          if (!success) {
-            // If WebLLM model loading failed, select an alternative provider
-            const fallbackProvider = await selectBestAvailableProvider()
-            
-            // Update error message
-            editor.commands.updateAttributes('aiGeneration', {
-              error: `WebLLM model loading failed. Using ${fallbackProvider} instead.`
-            })
-            
-            return fallbackProvider
-          }
-          
-          // Update state after loading
-          updateWebLLMState()
-          logger.info(`WebLLM model after loading: ${currentWebLLMModel.value || 'none'}`)
-          return 'webllm'
-        } catch (error) {
-          logger.error('Error during WebLLM model loading:', error)
-          
-          // Select alternative provider
-          const fallbackProvider = await selectBestAvailableProvider()
-          
-          // Update error message
-          editor.commands.updateAttributes('aiGeneration', {
-            error: `WebLLM error: ${error instanceof Error ? error.message : 'Unknown error'}. Using ${fallbackProvider} instead.`
-          })
-          
-          return fallbackProvider
+        // Try to select the WebLLM provider, which will auto-load a model
+        const success = await selectProvider('webllm')
+        logger.info(`WebLLM provider selection ${success ? 'succeeded' : 'failed'}`)
+        
+        if (!success) {
+          throw new Error('Failed to load WebLLM model. Please select a model in the settings.')
         }
+        
+        // Update state after loading
+        updateWebLLMState()
+        logger.info(`WebLLM model after loading: ${currentWebLLMModel.value || 'none'}`)
       }
       
       return 'webllm'
@@ -114,11 +105,6 @@ export function useAIGeneration(editor: any) {
     
     // If not available, try to select the best available provider
     const newProvider = await selectBestAvailableProvider()
-    
-    // Update UI with provider change message
-    editor.commands.updateAttributes('aiGeneration', {
-      error: `${currentProviderId} is not available. Using ${newProvider} instead.`
-    })
     
     // If we couldn't find a valid provider, show an error
     if (!availableProviders.value.includes(newProvider)) {
@@ -147,7 +133,7 @@ export function useAIGeneration(editor: any) {
       // Update block to show loading state
       editor.commands.updateAttributes('aiGeneration', {
         loading: true,
-        error: '',
+        error: ''
       })
 
       // Add user message to history
@@ -180,33 +166,112 @@ export function useAIGeneration(editor: any) {
         options.safetyThreshold = aiSettings.settings.geminiSafetyThreshold
       }
       
-      // Call AI service with timeout
-      const generationResult = await createRequestWithTimeout<GenerationResult>(() => 
-        aiService.generateText(providerId, options, apiKey)
-      )
-
-      // Add AI response to history
+      // Create a new AI message ready for streaming content
       const aiMessage: ConversationMessage = {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
-        content: generationResult.text,
+        content: '',
         timestamp: new Date()
       }
+      
+      // Add empty AI message to history
       newHistory.push(aiMessage)
-
-      // Update block with result
-      editor.commands.updateAttributes('aiGeneration', {
-        prompt,
-        result: generationResult.text,
-        loading: false,
-        lastUpdated: new Date().toISOString(),
-        conversation: newHistory.map(msg => ({ 
-          ...msg, 
-          timestamp: msg.timestamp?.toISOString() 
-        }))
-      })
-
-      return newHistory
+      
+      let generationResult: GenerationResult
+      
+      // Check if we should use streaming (for WebLLM)
+      if (shouldUseStreaming.value && providerId === 'webllm') {
+        // Start streaming session
+        startStreaming(providerId)
+        
+        // Create streaming callbacks
+        const streamCallbacks: StreamCallbacks = {
+          onChunk: (text: string) => {
+            // Update streaming text
+            handleStreamingChunk(text)
+            
+            // Update the AI message in history
+            aiMessage.content += text
+            
+            // Update the editor in real-time
+            const fullResult = block.node.attrs.result 
+              ? `${block.node.attrs.result}\n\n${aiMessage.content}`
+              : aiMessage.content
+              
+            // Update block with current result
+            editor.commands.updateAttributes('aiGeneration', {
+              result: fullResult,
+              loading: true,
+              lastUpdated: new Date().toISOString(),
+              conversation: newHistory.map(msg => ({ 
+                ...msg, 
+                timestamp: msg.timestamp?.toISOString() 
+              }))
+            })
+          },
+          onComplete: (result: GenerationResult) => {
+            // Streaming complete
+            completeStreaming()
+            
+            // Get the full result now that we're complete
+            const fullResult = block.node.attrs.result 
+              ? `${block.node.attrs.result}\n\n${result.text}`
+              : result.text
+              
+            // Update block with complete result
+            editor.commands.updateAttributes('aiGeneration', {
+              result: fullResult,
+              loading: false,
+              lastUpdated: new Date().toISOString(),
+              conversation: newHistory.map(msg => ({ 
+                ...msg, 
+                timestamp: msg.timestamp?.toISOString() 
+              }))
+            })
+          },
+          onError: (error: Error) => {
+            throw error
+          }
+        }
+        
+        // Use streaming API with longer timeout
+        await createRequestWithTimeout(
+          () => aiService.generateTextStream(providerId, options, streamCallbacks, apiKey),
+          providerId,
+          true
+        )
+        
+        // Return updated conversation history
+        return newHistory
+      } else {
+        // Use non-streaming API with timeout
+        generationResult = await createRequestWithTimeout<GenerationResult>(
+          () => aiService.generateText(providerId, options, apiKey),
+          providerId,
+          false
+        )
+        
+        // Update AI message content
+        aiMessage.content = generationResult.text
+        
+        // Get the full result (original + new text)
+        const fullResult = block.node.attrs.result 
+          ? `${block.node.attrs.result}\n\n${generationResult.text}`
+          : generationResult.text
+  
+        // Update block with result
+        editor.commands.updateAttributes('aiGeneration', {
+          result: fullResult,
+          loading: false,
+          lastUpdated: new Date().toISOString(),
+          conversation: newHistory.map(msg => ({ 
+            ...msg, 
+            timestamp: msg.timestamp?.toISOString() 
+          }))
+        })
+        
+        return newHistory
+      }
     } catch (error) {
       return handleGenerationError(error, editor, block, conversationHistory)
     } finally {
@@ -430,6 +495,7 @@ export function useAIGeneration(editor: any) {
     regenerateText,
     removeBlock,
     abortGeneration,
-    abortAllRequests
+    abortAllRequests,
+    currentStreamingText
   }
 }

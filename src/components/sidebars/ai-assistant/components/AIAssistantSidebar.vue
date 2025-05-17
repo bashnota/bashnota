@@ -10,6 +10,8 @@ import { toast } from '@/components/ui/toast'
 import { useConversation } from '../../ai-assistant/composables/useConversation'
 import { useAIGeneration } from '../../ai-assistant/composables/useAIGeneration'
 import { useMentions } from '../../ai-assistant/composables/useMentions'
+import { useAIProviders } from '../composables/useAIProviders'
+import { useStreamingMode } from '../composables/useStreamingMode'
 
 // Import components
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -21,7 +23,7 @@ import ChatList from './ChatList.vue'
 import ProviderSelector from './ProviderSelector.vue'
 
 // Import the icons
-import { List as ListIcon, ArrowLeft as ArrowLeftIcon } from 'lucide-vue-next'
+import { List as ListIcon, ArrowLeft as ArrowLeftIcon, Cpu as CpuIcon, Zap as ZapIcon } from 'lucide-vue-next'
 
 const props = defineProps<{
   editor: any
@@ -37,7 +39,26 @@ const selectedProvider = computed(() => {
   return aiSettings.providers.find(p => p.id === aiSettings.settings.preferredProviderId)
 })
 
-// Initialize composables
+// Initialize AI providers
+const { 
+  updateWebLLMState, 
+  webLLMProgress, 
+  currentWebLLMModel, 
+  isLoadingWebLLMModels,
+  initialize: initializeProviders
+} = useAIProviders()
+
+// Initialize streaming mode
+const { 
+  isStreamingEnabled, 
+  shouldUseStreaming, 
+  currentStreamingText, 
+  isStreaming, 
+  streamingProvider, 
+  toggleStreamingMode 
+} = useStreamingMode()
+
+// Initialize conversation state
 const { 
   activeAIBlock, 
   promptInput, 
@@ -62,13 +83,7 @@ const {
   saveEditedText
 } = useConversation(props.editor, props.notaId)
 
-const {
-  generateText: generateTextAction,
-  continueConversation: continueAction,
-  regenerateText: regenerateAction,
-  removeBlock: removeBlockAction
-} = useAIGeneration(props.editor)
-
+// Initialize mentions
 const {
   showMentionSearch,
   mentionSearchResults,
@@ -82,8 +97,25 @@ const {
   closeMentionSearch
 } = useMentions()
 
+// Initialize AI generation
+const {
+  generateText: generateTextAction,
+  continueConversation: continueAction,
+  regenerateText: regenerateAction,
+  removeBlock: removeBlockAction,
+  currentStreamingText: streamingText
+} = useAIGeneration(props.editor)
+
+// Format progress percentage
+const formattedProgress = computed(() => {
+  return `${Math.round(webLLMProgress.value * 100)}%`
+})
+
 // Reference to the textarea for mention search
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
+
+// Create a WebLLM state update interval
+const webLLMStateInterval = ref<number | null>(null)
 
 // Computed properties
 const hasResult = computed(() => {
@@ -416,8 +448,16 @@ const handleModelChange = (modelId: string) => {
   }
 }
 
-// Listen for "activate-ai-assistant" event from InlineAIGeneration components
-onMounted(() => {
+// Explicitly initialize the providers on component mount
+onMounted(async () => {
+  try {
+    await initializeProviders()
+    logger.info('AI providers initialized')
+  } catch (error) {
+    logger.error('Error initializing AI providers:', error)
+  }
+  
+  // Listen for "activate-ai-assistant" event from InlineAIGeneration components
   // Create a prefixed logger for easier debugging
   const sidebarLogger = logger.createPrefixedLogger('AIAssistantSidebar');
   
@@ -485,11 +525,25 @@ onMounted(() => {
   }) as EventListener);
   
   document.addEventListener('mousedown', handleOutsideClick);
-});
+  
+  // Scroll to bottom of conversation
+  scrollToBottom()
+  
+  // Start the WebLLM state update interval
+  webLLMStateInterval.value = window.setInterval(() => {
+    updateWebLLMState()
+  }, 1000)
+})
 
-// Clean up event listeners
+// Clean up event listeners and intervals
 onBeforeUnmount(() => {
   document.removeEventListener('mousedown', handleOutsideClick)
+  
+  // Clear the WebLLM state update interval
+  if (webLLMStateInterval.value) {
+    clearInterval(webLLMStateInterval.value)
+    webLLMStateInterval.value = null
+  }
 })
 
 // Add state for sidebar view mode
@@ -543,6 +597,26 @@ onMounted(() => {
 
 <template>
   <div class="h-full w-full flex flex-col overflow-hidden">
+    <!-- WebLLM Loading Overlay -->
+    <div v-if="isLoadingWebLLMModels" class="fixed inset-0 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center z-50">
+      <div class="w-64 bg-card border rounded-lg shadow-lg overflow-hidden">
+        <div class="p-4 flex flex-col items-center space-y-3">
+          <CpuIcon class="h-10 w-10 text-primary animate-pulse" />
+          <h3 class="text-lg font-semibold">Loading WebLLM Model</h3>
+          <p class="text-sm text-muted-foreground text-center">
+            {{ currentWebLLMModel || 'AI model' }} is being downloaded and prepared. This may take a few minutes.
+          </p>
+          
+          <!-- Progress bar -->
+          <div class="w-full bg-muted rounded-full h-2.5 mt-2">
+            <div class="bg-primary h-2.5 rounded-full transition-all duration-300" 
+                 :style="{ width: formattedProgress }"></div>
+          </div>
+          <div class="text-xs text-muted-foreground">{{ formattedProgress }}</div>
+        </div>
+      </div>
+    </div>
+    
     <!-- Content container with proper width styling -->
     <div class="h-full w-full flex flex-col">
       <!-- Header actions for chat list toggle -->
@@ -595,7 +669,9 @@ onMounted(() => {
                   :conversation-history="conversationHistory"
                   :is-loading="isLoading"
                   :error="error"
-                  :provider-name="selectedProvider?.name || 'AI'"
+                  :streaming-text="streamingText"
+                  :is-streaming="isStreaming"
+                  :provider-name="isStreaming ? streamingProvider : selectedProvider?.name || 'AI'"
                   :format-timestamp="formatTimestamp"
                   @copy-message="copyMessageToClipboard"
                   @insert-message="insertMessageToDocument"
@@ -605,9 +681,25 @@ onMounted(() => {
               </div>
             </div>
   
-            <!-- AI Provider Selector -->
+            <!-- AI Provider Selector with WebLLM streaming toggle -->
             <div class="px-3 py-1 border-t">
-              <ProviderSelector />
+              <div class="flex items-center justify-between">
+                <ProviderSelector />
+                
+                <!-- WebLLM Streaming toggle -->
+                <Button 
+                  v-if="aiSettings.settings.preferredProviderId === 'webllm'"
+                  variant="outline" 
+                  size="sm"
+                  class="ml-2 text-xs h-8 px-2 py-1 flex items-center gap-1"
+                  :class="{'bg-primary/10': isStreamingEnabled}"
+                  @click="toggleStreamingMode"
+                  title="Toggle live streaming mode for WebLLM"
+                >
+                  <ZapIcon class="h-3.5 w-3.5" :class="{'text-primary': isStreamingEnabled}" />
+                  <span>Live Mode</span>
+                </Button>
+              </div>
             </div>
   
             <!-- Fixed Message Input Area -->

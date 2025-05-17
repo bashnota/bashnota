@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import EnhancedAIAssistant from './ai-assistant/components/EnhancedAIAssistant.vue'
+import AIAssistantSidebarComponent from './ai-assistant/components/AIAssistantSidebar.vue'
 import { BrainIcon } from 'lucide-vue-next'
 import { BaseSidebar, KeyboardShortcut } from '@/components/ui/sidebars'
 import { useAISettingsStore } from '@/stores/aiSettingsStore'
@@ -28,7 +28,7 @@ const providerName = ref(aiSettings.providers.find(p => p.id === aiSettings.sett
     position="right" 
     @close="$emit('close')"
   >
-    <EnhancedAIAssistant 
+    <AIAssistantSidebarComponent 
       :editor="editor" 
       :notaId="notaId"
       :hide-header="true"
