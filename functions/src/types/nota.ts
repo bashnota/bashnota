@@ -11,7 +11,29 @@ export interface PublishedNota {
   parentId?: string | null
   publishedSubPages?: string[]
   citations?: CitationEntry[]
+  // Statistics fields
+  viewCount?: number
+  uniqueViewers?: number
+  lastViewedAt?: string
+  referrers?: { [source: string]: number }
+  tags?: string[]
+  stats?: {
+    dailyViews?: { [date: string]: number }
+    weeklyViews?: { [week: string]: number }
+    monthlyViews?: { [month: string]: number }
+  }
+  // Voting fields
+  likeCount?: number
+  dislikeCount?: number
+  cloneCount?: number
+  // Comment counts
+  commentCount?: number
+  votes?: {
+    [userId: string]: NotaVoteType
+  }
 }
+
+export type NotaVoteType = 'like' | 'dislike'
 
 export interface CitationEntry {
   id: string

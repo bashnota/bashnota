@@ -9,25 +9,69 @@ const router = express.Router()
 const db = admin.firestore()
 const publishedNotasCollection = 'publishedNotas'
 
-// Get all published notas for the current user (excluding sub-pages)
-router.get('/published', authorizeRequest, async (req: Request, res: Response) => {
+// Get published notas with filtering and pagination
+router.get('/published', async (req: Request, res: Response) => {
   try {
-    // @ts-ignore
-    const user = req.user
+    const {
+      authorId,
+      orderBy = 'publishedAt',
+      orderDirection = 'desc',
+      limit = 10,
+      startAfter,
+    } = req.query
 
-    const querySnapshot = await db
+    // Start building the query
+    let notasQuery = db
       .collection(publishedNotasCollection)
-      .where('authorId', '==', user.uid)
       .where('isPublic', '==', true)
       .where('isSubPage', '==', false) // Only get main pages, not sub-pages
-      .get()
+
+    // Add author filter if provided
+    if (authorId) {
+      notasQuery = notasQuery.where('authorId', '==', authorId)
+    }
+
+    // Add ordering
+    notasQuery = notasQuery.orderBy(
+      orderBy as string,
+      (orderDirection as string)?.toLowerCase() === 'asc' ? 'asc' : 'desc',
+    )
+
+    // Add pagination
+    notasQuery = notasQuery.limit(Number(limit))
+
+    // Add startAfter cursor if provided
+    if (startAfter) {
+      // Get the document to start after
+      const startAfterDoc = await db
+        .collection(publishedNotasCollection)
+        .doc(startAfter as string)
+        .get()
+      if (startAfterDoc.exists) {
+        notasQuery = notasQuery.startAfter(startAfterDoc)
+      }
+    }
+
+    // Execute the query
+    const querySnapshot = await notasQuery.get()
 
     const publishedNotas: PublishedNota[] = []
     querySnapshot.forEach((doc) => {
-      publishedNotas.push({ ...doc.data(), id: doc.id } as PublishedNota)
+      const data = doc.data() as PublishedNota;
+
+      // @ts-ignore
+      delete data.content;
+      delete data.votes;
+
+      publishedNotas.push({ ...data, id: doc.id })
     })
 
-    return res.json(publishedNotas)
+    // Return the results with pagination info
+    return res.json({
+      items: publishedNotas,
+      hasMore: publishedNotas.length === Number(limit),
+      lastVisible: publishedNotas.length > 0 ? publishedNotas[publishedNotas.length - 1].id : null,
+    })
   } catch (error) {
     console.error('Failed to fetch published notas:', error)
     return res.status(500).json({ error: 'Failed to fetch published notas' })
@@ -175,7 +219,7 @@ router.post('/publish/:id', authorizeRequest, async (req: Request, res: Response
         publishedSubPages: Array.isArray(notaData.publishedSubPages)
           ? notaData.publishedSubPages
           : [], // Published sub-pages
-        citations: Array.isArray(notaData.citations) ? notaData.citations : [] // Include citations
+        citations: Array.isArray(notaData.citations) ? notaData.citations : [], // Include citations
       }
 
       // Use set with merge:false to create a new document
@@ -284,7 +328,7 @@ const validatePublishNota = (data: any) => {
     isSubPage: ['boolean'],
     parentId: ['string'],
     publishedSubPages: ['array'],
-    citations: ['array']
+    citations: ['array'],
   }
 
   const validation = new Validator(data, rules)
