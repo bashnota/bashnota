@@ -50,3 +50,28 @@ export interface CitationEntry {
   doi?: string
   createdAt: Date | string
 }
+
+// Comment interfaces for public notas
+export interface Comment {
+  id: string
+  notaId: string
+  content: string
+  authorId: string
+  authorName: string
+  authorTag?: string
+  createdAt: string
+  updatedAt: string
+  parentId: string | null
+  likeCount: number
+  dislikeCount: number
+  replyCount: number
+  // Map of user votes (userId: 'like' | 'dislike')
+  votes?: Record<string, 'like' | 'dislike'>
+}
+
+export interface CommentVote {
+  commentId: string
+  userId: string
+  voteType: 'like' | 'dislike'
+  createdAt: string
+}
