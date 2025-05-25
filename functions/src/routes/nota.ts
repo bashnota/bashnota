@@ -319,6 +319,109 @@ router.delete('/publish/:id', authorizeRequest, async (req: Request, res: Respon
   }
 })
 
+// Vote on a nota (like or dislike)
+router.post('/vote/:id', authorizeRequest, async (req: Request, res: Response) => {
+  try {
+    // @ts-ignore
+    const user = req.user
+    const notaId = req.params.id
+    const { voteType } = req.body
+
+    // Validate vote type
+    if (!voteType || (voteType !== 'like' && voteType !== 'dislike')) {
+      return res.status(400).json({ error: 'Invalid vote type. Must be "like" or "dislike".' })
+    }
+
+    // Reference to the nota document
+    const notaRef = db.collection(publishedNotasCollection).doc(notaId)
+    const notaDoc = await notaRef.get()
+
+    // Check if the nota exists
+    if (!notaDoc.exists) {
+      return res.status(404).json({ error: 'Published nota not found' })
+    }
+
+    // Get the current nota data
+    const notaData = notaDoc.data() as PublishedNota
+    let likeCount = notaData.likeCount || 0
+    let dislikeCount = notaData.dislikeCount || 0
+    
+    // Get the current votes map (or initialize it)
+    const votes = notaData.votes || {}
+    const userCurrentVote = votes[user.uid] || null
+    
+    // Prepare the update data
+    const updateData: Record<string, any> = {}
+    
+    // Determine the action based on the current vote
+    if (userCurrentVote === voteType) {
+      // User is removing their vote
+      updateData[`votes.${user.uid}`] = admin.firestore.FieldValue.delete()
+      
+      // Decrement the appropriate counter
+      if (voteType === 'like') {
+        updateData.likeCount = admin.firestore.FieldValue.increment(-1)
+        likeCount--
+      } else {
+        updateData.dislikeCount = admin.firestore.FieldValue.increment(-1)
+        dislikeCount--
+      }
+    } else if (userCurrentVote) {
+      // User is changing their vote
+      updateData[`votes.${user.uid}`] = voteType
+      
+      // Update counters: decrement the old vote type, increment the new one
+      if (voteType === 'like') {
+        updateData.likeCount = admin.firestore.FieldValue.increment(1)
+        updateData.dislikeCount = admin.firestore.FieldValue.increment(-1)
+        likeCount++
+        dislikeCount--
+      } else {
+        updateData.likeCount = admin.firestore.FieldValue.increment(-1)
+        updateData.dislikeCount = admin.firestore.FieldValue.increment(1)
+        likeCount--
+        dislikeCount++
+      }
+    } else {
+      // User is voting for the first time
+      updateData[`votes.${user.uid}`] = voteType
+      
+      // Check if likeCount and dislikeCount exist, initialize them if not
+      if (typeof notaData.likeCount !== 'number') {
+        updateData.likeCount = voteType === 'like' ? 1 : 0
+        likeCount = voteType === 'like' ? 1 : 0
+      } else if (voteType === 'like') {
+        updateData.likeCount = admin.firestore.FieldValue.increment(1)
+        likeCount++
+      }
+      
+      if (typeof notaData.dislikeCount !== 'number') {
+        updateData.dislikeCount = voteType === 'dislike' ? 1 : 0
+        dislikeCount = voteType === 'dislike' ? 1 : 0
+      } else if (voteType === 'dislike') {
+        updateData.dislikeCount = admin.firestore.FieldValue.increment(1)
+        dislikeCount++
+      }
+    }
+
+    // Update the nota document
+    await notaRef.update(updateData)
+
+    // Return the updated counts and the user's current vote
+    return res.json({
+      likeCount,
+      dislikeCount,
+      userVote: userCurrentVote === voteType ? null : voteType
+    })
+  } catch (error) {
+    console.error('Failed to record vote:', error)
+    return res.status(500).json({ 
+      error: 'Failed to record vote',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    })
+  }
+})
+
 // Validation function for publishing a nota
 const validatePublishNota = (data: any) => {
   const rules = {
