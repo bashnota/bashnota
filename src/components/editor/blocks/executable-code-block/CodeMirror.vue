@@ -11,6 +11,8 @@ import { json } from '@codemirror/lang-json'
 import { EditorView, lineNumbers } from '@codemirror/view'
 import { indentUnit } from '@codemirror/language'
 import { computed, ref, onMounted, watch, onUnmounted } from 'vue'
+import { useCodeFormatting } from './composables/useCodeFormatting'
+import { Button } from '@/components/ui/button'
 
 const props = defineProps<{
   modelValue: string
@@ -25,14 +27,19 @@ const props = defineProps<{
   indentWithTab?: boolean
   preserveIndent?: boolean
   tabSize?: number
+  autoFormat?: boolean
+  showTemplateButton?: boolean
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
+  'format-code': []
+  'show-templates': []
 }>()
 
 const isDark = ref(false)
 const editorElement = ref<HTMLElement | null>(null)
+const editorView = ref<EditorView | null>(null)
 
 // Determine colorization extension for known languages
 const languageExtension = computed(() => {
@@ -81,6 +88,20 @@ const checkDarkMode = () => {
   }
 }
 
+// Add formatting composable
+const {
+  isFormatting,
+  formatError,
+  formatDocument,
+  formatSelection,
+  getFormattingExtensions
+} = useCodeFormatting({
+  language: props.language || 'text',
+  tabSize: props.tabSize || 4,
+  insertSpaces: true,
+  autoFormat: props.autoFormat || false
+})
+
 // Set up editor extensions
 const extensions = computed(() => {
   const exts = [
@@ -88,6 +109,8 @@ const extensions = computed(() => {
     EditorView.lineWrapping,
     isDark.value ? basicDark : basicLight,
     indentUnit.of(' '.repeat(props.tabSize || 4)),
+    // Add formatting extensions
+    ...getFormattingExtensions(),
     // Add scrollbar configuration
     EditorView.theme({
       '&': {
@@ -114,6 +137,24 @@ const extensions = computed(() => {
       },
       '.cm-scroller::-webkit-scrollbar-thumb:hover': {
         background: 'var(--scrollbar-thumb-hover)'
+      },
+      // Add formatting status styles
+      '&.formatting': {
+        opacity: '0.7',
+        pointerEvents: 'none'
+      },
+      // Enhanced running status styles
+      '&.running': {
+        borderLeft: '3px solid var(--primary)',
+        backgroundColor: 'var(--primary/5)'
+      },
+      '&.error': {
+        borderLeft: '3px solid var(--destructive)',
+        backgroundColor: 'var(--destructive/5)'
+      },
+      '&.success': {
+        borderLeft: '3px solid var(--success)',
+        backgroundColor: 'var(--success/5)'
       }
     })
   ]
@@ -216,6 +257,29 @@ const containerClasses = computed(() => {
     'published': props.isPublished,
   }
 })
+
+// Add formatting methods
+const handleFormatDocument = async () => {
+  if (editorView.value) {
+    await formatDocument(editorView.value)
+    emit('format-code')
+  }
+}
+
+const handleFormatSelection = async () => {
+  if (editorView.value) {
+    await formatSelection(editorView.value)
+    emit('format-code')
+  }
+}
+
+const handleShowTemplates = () => {
+  emit('show-templates')
+}
+
+const onEditorReady = (payload: any) => {
+  editorView.value = payload.view
+}
 </script>
 
 <template>
@@ -225,6 +289,36 @@ const containerClasses = computed(() => {
     :class="containerClasses"
     :style="{ maxHeight: maxHeight }"
   >
+    <!-- Formatting Toolbar -->
+    <div v-if="!readonly && !disabled && !isPublished" class="flex items-center gap-2 p-2 border-b bg-muted/30">
+      <Button
+        variant="ghost"
+        size="sm"
+        @click="handleFormatDocument"
+        :disabled="isFormatting"
+        class="h-7 px-2 text-xs"
+        title="Format code (Ctrl+Shift+F)"
+      >
+        <span v-if="isFormatting">Formatting...</span>
+        <span v-else>Format</span>
+      </Button>
+      
+      <Button
+        v-if="showTemplateButton"
+        variant="ghost"
+        size="sm"
+        @click="handleShowTemplates"
+        class="h-7 px-2 text-xs"
+        title="Insert template"
+      >
+        Templates
+      </Button>
+      
+      <div v-if="formatError" class="text-xs text-destructive ml-2">
+        {{ formatError }}
+      </div>
+    </div>
+
     <Codemirror
       v-model="code"
       :extensions="extensions"
@@ -237,7 +331,9 @@ const containerClasses = computed(() => {
         'cm-readonly': readonly,
         'cm-disabled': disabled,
         'cm-published': isPublished,
+        'formatting': isFormatting
       }"
+      @ready="onEditorReady"
     />
     
     <!-- Disabled overlay - Don't show when in published mode -->

@@ -5,6 +5,7 @@ import { X, Play, Loader2, Copy, Check } from 'lucide-vue-next'
 import CodeMirror from './CodeMirror.vue'
 import OutputRenderer from './OutputRenderer.vue'
 import { useFullscreenCode } from './composables/useFullscreenCode'
+import { useCodeBlockShortcuts } from './composables/useCodeBlockShortcuts'
 
 interface Props {
   code: string
@@ -36,6 +37,21 @@ const {
   editorContainerStyle,
   outputContainerStyle
 } = useFullscreenCode()
+
+// Initialize keyboard shortcuts for fullscreen mode
+const { shortcuts, getShortcutText } = useCodeBlockShortcuts({
+  onExecute: () => {
+    if (!props.isExecuting && !props.isReadOnly) {
+      executeCode()
+    }
+  },
+  onToggleFullscreen: () => {
+    onClose() // Close fullscreen mode
+  },
+  isEnabled: () => {
+    return !props.isReadOnly && props.isOpen
+  }
+})
 
 // New reactive state for improved UX
 const isCodeCopied = ref(false)
@@ -185,7 +201,7 @@ function stopExecutionTimer() {
       <div class="flex items-center gap-3">
         <!-- Keyboard shortcut help text (hidden in readonly mode) -->
         <div v-if="!isReadOnly" class="hidden sm:flex text-xs text-muted-foreground mr-2">
-          <kbd class="px-1.5 py-0.5 border rounded">{{ isMac() ? '⌘' : 'Ctrl' }}+Shift+Alt+Enter</kbd>
+          <kbd class="px-1.5 py-0.5 border rounded">{{ isMac() ? '⌘' : 'Ctrl' }}+Alt+Shift+Enter</kbd>
           <span class="ml-1">to run</span>
         </div>
 
