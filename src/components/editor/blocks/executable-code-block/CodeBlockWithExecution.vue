@@ -37,8 +37,6 @@ import PopoverContent from '@/components/ui/popover/PopoverContent.vue'
 import FullScreenCodeBlock from './FullScreenCodeBlock.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
 import OutputRenderer from './OutputRenderer.vue'
-import { toast } from '@/lib/utils'
-import { useRoute } from 'vue-router'
 import ExecutionStatus from './ExecutionStatus.vue'
 import ErrorDisplay from './ErrorDisplay.vue'
 import { useOutputStreaming } from './composables/useOutputStreaming'
@@ -48,17 +46,13 @@ import TemplateSelector from './TemplateSelector.vue'
 interface Props {
   code: string
   language: string
-  result: string | null
   id: string
-  serverID: string | null
-  kernelName: string | null
   sessionId: string | null
   notaId: string
   kernelPreference?: KernelConfig | null
   isReadOnly?: boolean
   isExecuting?: boolean
   isPublished?: boolean
-  runningStatus?: 'idle' | 'running' | 'error' | 'success'
 }
 
 // Define props
@@ -122,10 +116,6 @@ const executionId = ref<string | null>(null)
 
 // Initialize output streaming
 const {
-  isStreaming,
-  hasOutput: hasStreamingOutput,
-  outputText: streamingOutputText,
-  errorText: streamingErrorText,
   startStreaming,
   stopStreaming,
   getFormattedOutput
@@ -139,12 +129,10 @@ const handleCodeFormattedRef = ref<(() => void) | null>(null)
 const { shortcuts, getShortcutText } = useCodeBlockShortcuts({
   onExecute: () => {
     if (executeCodeRef.value && isReadyToExecute.value && !props.isReadOnly) {
-      console.log('Executing code via keyboard shortcut...')
       executeCodeRef.value()
     }
   },
   onToggleFullscreen: () => {
-    console.log('Toggling fullscreen via keyboard shortcut...')
     isFullScreen.value = !isFullScreen.value
   },
   onFormatCode: () => {
@@ -406,7 +394,6 @@ onMounted(async () => {
     isPublished: props.isPublished,
     readonly: props.isReadOnly,
     hasSessionId: !!props.sessionId,
-    route: route.path
   })
   
   // Check if we need to initialize execution state from store
@@ -684,25 +671,6 @@ const createNewSession = async () => {
   }
 }
 
-// Add after other methods
-const startExecutionTimer = () => {
-  executionStartTime.value = Date.now()
-  executionTime.value = 0
-  executionProgress.value = 0
-  
-  const timer = setInterval(() => {
-    if (executionStartTime.value) {
-      executionTime.value = Date.now() - executionStartTime.value
-      // Simulate progress for long-running executions
-      if (executionTime.value > 1000) {
-        executionProgress.value = Math.min(90, (executionTime.value / 10000) * 90)
-      }
-    }
-  }, 100)
-  
-  return timer
-}
-
 // Enhanced execution with streaming
 const executeCodeBlock = async () => {
   if (!isReadyToExecute.value) return
@@ -791,36 +759,6 @@ const saveChanges = () => {
   hasUnsavedChanges.value = false
   emit('update:code', codeValue.value)
 }
-
-// Track disabled state changes with debugging
-const route = useRoute()
-const isDisabled = computed(() => {
-  // Add direct console logging to help debug this issue
-  logger.log(`[CodeBlock ${props.id}] isDisabled computed:`, {
-    readonly: props.isReadOnly,
-    executionInProgress: executionInProgress.value,
-    isPublished: props.isPublished,
-    route: route.path
-  })
-  
-  // In published view, we never want to show the execution in progress state
-  if (props.isPublished) {
-    logger.log(`[CodeBlock ${props.id}] Published mode detected, disabling execution controls`)
-    return true // Force disabled state for published content
-  }
-  
-  return props.isReadOnly || executionInProgress.value
-})
-
-// Watch for execution state changes
-watch(() => executionInProgress.value, (newValue, oldValue) => {
-  logger.debug(`[CodeBlock ${props.id}] Execution state changed from ${oldValue} to ${newValue}`, {
-    readonly: props.isReadOnly,
-    isPublished: props.isPublished,
-    inStore: !!cell.value,
-    storeExecuting: cell.value?.isExecuting
-  })
-}, { immediate: true })
 
 const syncExecutionStateWithStore = () => {
   if (cell.value) {
