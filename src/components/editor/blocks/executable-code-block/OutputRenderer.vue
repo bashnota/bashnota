@@ -3,6 +3,7 @@ import { ref, watch, onMounted, computed } from 'vue'
 import { Copy, Check, Download, Maximize, Minimize, Eye, EyeOff, Loader2 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { logger } from '@/services/logger'
+import { ansiToHtml, stripAnsi } from '@/lib/utils'
 
 const props = defineProps<{
   content: string
@@ -80,8 +81,8 @@ const processContent = () => {
       break
     case 'text':
     default:
-      // For text content, keep as is (images will be rendered by the browser if they are valid image tags)
-      formattedContent.value = props.content
+      // For text content, convert ANSI escape codes to HTML
+      formattedContent.value = ansiToHtml(props.content)
       break
   }
 }
@@ -95,11 +96,16 @@ const copyOutput = async () => {
     if (effectiveOutputType.value === 'json' && formattedContent.value) {
       await navigator.clipboard.writeText(formattedContent.value)
     } else {
-      // Convert HTML to plain text for copying
-      const tempDiv = document.createElement('div')
-      tempDiv.innerHTML = props.content
-      const textContent = tempDiv.textContent || tempDiv.innerText || ''
-      await navigator.clipboard.writeText(textContent)
+      // For text content with ANSI codes, strip them for copying
+      if (effectiveOutputType.value === 'text') {
+        await navigator.clipboard.writeText(stripAnsi(props.content))
+      } else {
+        // Convert HTML to plain text for copying
+        const tempDiv = document.createElement('div')
+        tempDiv.innerHTML = props.content
+        const textContent = tempDiv.textContent || tempDiv.innerText || ''
+        await navigator.clipboard.writeText(textContent)
+      }
     }
     
     isOutputCopied.value = true
@@ -282,14 +288,18 @@ const formatCodeOutput = (content: string) => {
     const lineNumber = index + 1
     const paddedNumber = lineNumber.toString().padStart(3, ' ')
     
-    // Highlight error lines
-    const isErrorLine = line.toLowerCase().includes('error') || 
-                        line.toLowerCase().includes('exception') ||
-                        line.toLowerCase().includes('warning')
+    // Highlight error lines (check stripped version for keywords)
+    const strippedLine = stripAnsi(line)
+    const isErrorLine = strippedLine.toLowerCase().includes('error') || 
+                        strippedLine.toLowerCase().includes('exception') ||
+                        strippedLine.toLowerCase().includes('warning')
+    
+    // Convert ANSI codes to HTML for the line content
+    const formattedLine = ansiToHtml(line)
     
     result += `<div class="code-line ${isErrorLine ? 'error-line' : ''}">
                 <span class="line-number">${paddedNumber}</span>
-                <span class="line-content">${line}</span>
+                <span class="line-content">${formattedLine}</span>
               </div>`
   })
   
@@ -431,8 +441,8 @@ const executionTime = computed(() => {
     >
       <!-- Only one of these should render based on the effectiveOutputType -->
       <template v-if="effectiveOutputType === 'text'">
-        <!-- Text output with automatic handling of img tags -->
-        <div class="text-output" v-html="content"></div>
+        <!-- Text output with ANSI escape codes converted to HTML -->
+        <div class="text-output" v-html="formattedContent"></div>
       </template>
       
       <template v-else-if="effectiveOutputType === 'json'">

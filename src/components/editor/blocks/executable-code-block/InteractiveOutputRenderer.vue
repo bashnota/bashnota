@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ansiToHtml, stripAnsi } from '@/lib/utils'
 
 export interface InteractiveOutput {
   type: 'text' | 'html' | 'json' | 'image' | 'plotly' | 'matplotlib' | 'widget' | 'dataframe' | 'error'
@@ -97,7 +98,7 @@ const copyOutput = async () => {
     
     switch (currentOutput.value.type) {
       case 'text':
-        textToCopy = currentOutput.value.content
+        textToCopy = stripAnsi(currentOutput.value.content)
         break
       case 'json':
         textToCopy = JSON.stringify(currentOutput.value.content, null, 2)
@@ -109,7 +110,7 @@ const copyOutput = async () => {
         textToCopy = tempDiv.textContent || tempDiv.innerText || ''
         break
       default:
-        textToCopy = String(currentOutput.value.content)
+        textToCopy = stripAnsi(String(currentOutput.value.content))
     }
 
     await navigator.clipboard.writeText(textToCopy)
@@ -367,7 +368,7 @@ onMounted(() => {
         >
           <div class="output-content">
             <!-- Text Output -->
-            <pre v-if="output.type === 'text'" class="whitespace-pre-wrap text-sm p-3 bg-muted/20 rounded border overflow-auto">{{ output.content }}</pre>
+            <div v-if="output.type === 'text'" class="whitespace-pre-wrap text-sm p-3 bg-muted/20 rounded border overflow-auto font-mono" v-html="ansiToHtml(output.content)"></div>
             
             <!-- JSON Output -->
             <pre v-else-if="output.type === 'json'" class="whitespace-pre-wrap text-sm p-3 bg-muted/20 rounded border overflow-auto font-mono">{{ formatJson(output.content) }}</pre>
@@ -394,11 +395,11 @@ onMounted(() => {
             
             <!-- Error Output -->
             <div v-else-if="output.type === 'error'" class="p-3 bg-destructive/10 border border-destructive/20 rounded">
-              <pre class="text-sm text-destructive whitespace-pre-wrap">{{ output.content }}</pre>
+              <div class="text-sm text-destructive whitespace-pre-wrap font-mono" v-html="ansiToHtml(output.content)"></div>
             </div>
             
             <!-- Fallback -->
-            <pre v-else class="whitespace-pre-wrap text-sm p-3 bg-muted/20 rounded border overflow-auto">{{ String(output.content) }}</pre>
+            <div v-else class="whitespace-pre-wrap text-sm p-3 bg-muted/20 rounded border overflow-auto font-mono" v-html="ansiToHtml(String(output.content))"></div>
           </div>
           
           <!-- Output Metadata -->
@@ -417,7 +418,7 @@ onMounted(() => {
       <!-- Single Output -->
       <div v-else-if="currentOutput" class="output-content">
         <!-- Text Output -->
-        <pre v-if="currentOutput.type === 'text'" class="whitespace-pre-wrap text-sm p-3 bg-muted/20 rounded border overflow-auto">{{ currentOutput.content }}</pre>
+        <div v-if="currentOutput.type === 'text'" class="whitespace-pre-wrap text-sm p-3 bg-muted/20 rounded border overflow-auto font-mono" v-html="ansiToHtml(currentOutput.content)"></div>
         
         <!-- JSON Output -->
         <pre v-else-if="currentOutput.type === 'json'" class="whitespace-pre-wrap text-sm p-3 bg-muted/20 rounded border overflow-auto font-mono">{{ formatJson(currentOutput.content) }}</pre>
@@ -444,11 +445,11 @@ onMounted(() => {
         
         <!-- Error Output -->
         <div v-else-if="currentOutput.type === 'error'" class="p-3 bg-destructive/10 border border-destructive/20 rounded">
-          <pre class="text-sm text-destructive whitespace-pre-wrap">{{ currentOutput.content }}</pre>
+          <div class="text-sm text-destructive whitespace-pre-wrap font-mono" v-html="ansiToHtml(currentOutput.content)"></div>
         </div>
         
         <!-- Fallback -->
-        <pre v-else class="whitespace-pre-wrap text-sm p-3 bg-muted/20 rounded border overflow-auto">{{ String(currentOutput.content) }}</pre>
+        <div v-else class="whitespace-pre-wrap text-sm p-3 bg-muted/20 rounded border overflow-auto font-mono" v-html="ansiToHtml(String(currentOutput.content))"></div>
         
         <!-- Output Metadata -->
         <div v-if="currentOutput.metadata" class="mt-2 text-xs text-muted-foreground border-t pt-2">
