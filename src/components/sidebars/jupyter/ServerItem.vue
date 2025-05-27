@@ -2,203 +2,198 @@
   <div class="server-item border rounded-md mb-2 overflow-hidden">
     <!-- Server Header -->
     <div
-      class="server-header p-2 flex items-center justify-between cursor-pointer hover:bg-muted/30"
+      class="server-header p-3 flex items-center justify-between cursor-pointer hover:bg-muted/30 transition-colors"
       :class="{ 'bg-muted/20': isExpanded }"
-      @click="isExpanded = !isExpanded"
+      @click="toggleExpanded"
     >
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-3">
         <!-- Connection Status -->
-        <div class="relative h-2 w-2">
+        <div class="relative h-3 w-3">
           <span
-            class="absolute inset-0 rounded-full"
-            :class="{
-              'bg-green-500': testResults?.success,
-              'bg-red-500': testResults && !testResults.success,
-              'bg-yellow-500': !testResults,
-            }"
+            class="absolute inset-0 rounded-full transition-colors"
+            :class="connectionStatusClass"
           ></span>
           <span
-            v-if="testResults?.success"
+            v-if="isConnected"
             class="absolute inset-0 rounded-full bg-green-500 animate-ping opacity-75"
           ></span>
         </div>
 
-        <!-- Server Name/Details -->
-        <div>
-          <h4 class="text-sm font-medium">{{ server.name || `${server.ip}:${server.port}` }}</h4>
+        <!-- Server Details -->
+        <div class="flex-1 min-w-0">
+          <h4 class="text-sm font-medium truncate">
+            {{ displayName }}
+          </h4>
           <p class="text-xs text-muted-foreground">
-            {{ kernels?.length || 0 }} kernel{{ (kernels?.length || 0) !== 1 ? 's' : '' }},
-            {{ sessions?.length || 0 }} session{{ (sessions?.length || 0) !== 1 ? 's' : '' }}
+            {{ kernelCount }} kernel{{ kernelCount !== 1 ? 's' : '' }},
+            {{ sessionCount }} session{{ sessionCount !== 1 ? 's' : '' }}
           </p>
         </div>
       </div>
 
-      <!-- Actions -->
+      <!-- Header Actions -->
       <div class="flex items-center gap-1">
-        <!-- Refresh Button -->
         <Button
           variant="ghost"
           size="sm"
           class="h-7 w-7 p-0"
-          @click.stop="$emit('refresh')"
+          @click.stop="handleRefresh"
           :disabled="isRefreshing"
+          :title="isRefreshing ? 'Refreshing...' : 'Refresh kernels and sessions'"
         >
           <RotateCw class="h-3.5 w-3.5" :class="{ 'animate-spin': isRefreshing }" />
         </Button>
-
-        <!-- Remove Button -->
+        
         <Button
           variant="ghost"
           size="sm"
           class="h-7 w-7 p-0 text-destructive hover:text-destructive"
-          @click.stop="$emit('remove')"
+          @click.stop="handleRemove"
+          title="Remove server"
         >
           <Trash2 class="h-3.5 w-3.5" />
         </Button>
-
-        <!-- Expand/Collapse Icon -->
-        <ChevronDown
-          class="h-4 w-4 transition-transform"
-          :class="{ 'rotate-180': !isExpanded }"
+        
+        <ChevronDown 
+          class="h-4 w-4 text-muted-foreground transition-transform"
+          :class="{ 'rotate-180': isExpanded }"
         />
       </div>
     </div>
 
-    <!-- Server Details (when expanded) -->
-    <div v-if="isExpanded" class="border-t px-2 py-2">
-      <!-- Server Status & Info -->
-      <div class="p-1 mb-2">
-        <div class="flex justify-between text-xs">
-          <div>
-            <span class="text-muted-foreground">URL:</span>
-            {{ server.ip }}:{{ server.port }}
-          </div>
+    <!-- Expanded Content -->
+    <Transition
+      enter-active-class="transition-all duration-200 ease-out"
+      enter-from-class="max-h-0 opacity-0"
+      enter-to-class="max-h-96 opacity-100"
+      leave-active-class="transition-all duration-200 ease-in"
+      leave-from-class="max-h-96 opacity-100"
+      leave-to-class="max-h-0 opacity-0"
+    >
+      <div v-if="isExpanded" class="border-t overflow-hidden">
+        <div class="p-3 space-y-4">
+          <!-- Server Info -->
+          <ServerInfo 
+            :server="server"
+            :test-result="testResult"
+            :last-updated="lastUpdated"
+          />
 
-          <div v-if="refreshedTimestamp" class="text-muted-foreground">
-            Last updated: {{ formatTimeAgo(refreshedTimestamp) }}
-          </div>
-        </div>
+          <!-- Available Kernels -->
+          <KernelsList
+            v-if="kernels && kernels.length > 0"
+            :kernels="kernels"
+            :server="server"
+            @connect="handleKernelConnect"
+          />
 
-        <!-- Status Message -->
-        <div
-          v-if="testResults"
-          class="text-xs mt-1"
-          :class="{
-            'text-green-500': testResults.success,
-            'text-red-500': !testResults.success,
-          }"
-        >
-          {{ testResults.message }}
-        </div>
-      </div>
+          <!-- Active Sessions -->
+          <SessionsList
+            v-if="sessions && sessions.length > 0"
+            :sessions="sessions"
+            @use="handleSessionUse"
+          />
 
-      <!-- Available Kernels -->
-      <div v-if="kernels && kernels.length > 0" class="mb-3">
-        <h5 class="text-xs font-medium mb-1.5">Available Kernels</h5>
-        <div class="grid grid-cols-2 gap-2">
-          <Button
-            v-for="kernel in kernels"
-            :key="kernel.name"
-            variant="outline"
-            size="sm"
-            class="justify-start h-auto py-1.5"
-            @click="$emit('connect-kernel', kernel.name)"
-          >
-            <div class="flex flex-col items-start text-left">
-              <span class="text-xs">{{ kernel.spec?.display_name || kernel.name }}</span>
-              <span class="text-[10px] text-muted-foreground">{{ kernel.name }}</span>
-            </div>
-          </Button>
+          <!-- Empty States -->
+          <EmptyState
+            v-if="(!kernels || kernels.length === 0) && (!sessions || sessions.length === 0)"
+            :is-loading="isRefreshing"
+          />
         </div>
       </div>
-
-      <!-- Active Sessions -->
-      <div v-if="sessions && sessions.length > 0">
-        <h5 class="text-xs font-medium mb-1.5">Active Sessions</h5>
-        <div class="space-y-2">
-          <div
-            v-for="session in sessions"
-            :key="session.id"
-            class="flex items-center justify-between bg-muted/30 p-2 rounded-md"
-          >
-            <div>
-              <div class="text-xs font-medium">{{ session.name || session.id }}</div>
-              <div class="text-[10px] text-muted-foreground">
-                Kernel: {{ session.kernelName || 'Unknown' }}
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              class="h-7"
-              @click="$emit('use-session', session.id)"
-            >
-              Use
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Empty States -->
-      <div v-if="!kernels || kernels.length === 0" class="text-center py-3">
-        <p class="text-xs text-muted-foreground">No kernels available</p>
-      </div>
-
-      <div v-if="!sessions || sessions.length === 0" class="text-center py-2">
-        <p class="text-xs text-muted-foreground">No active sessions</p>
-      </div>
-    </div>
+    </Transition>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { Button } from '@/components/ui/button'
 import { RotateCw, Trash2, ChevronDown } from 'lucide-vue-next'
 import type { JupyterServer, KernelSpec } from '@/types/jupyter'
+import type { JupyterSession, RunningKernel } from '@/composables/useJupyterSessions'
+import ServerInfo from './ServerInfo.vue'
+import KernelsList from './KernelsList.vue'
+import SessionsList from './SessionsList.vue'
+import EmptyState from './EmptyState.vue'
 
-// Define CodeExecutionSession interface locally
-interface CodeExecutionSession {
-  id: string
-  name?: string
-  kernelName?: string
-}
-
-const props = defineProps<{
+interface Props {
   server: JupyterServer
   kernels?: KernelSpec[]
+  sessions?: JupyterSession[]
+  runningKernels?: RunningKernel[]
   isRefreshing?: boolean
-  testResults?: { success: boolean; message: string }
-  refreshedTimestamp?: Date
-  sessions?: CodeExecutionSession[]
-}>()
+  testResult?: { success: boolean; message: string }
+  lastUpdated?: Date
+}
 
-defineEmits<{
+interface Emits {
   refresh: []
   remove: []
   'connect-kernel': [kernelName: string]
   'use-session': [sessionId: string]
-}>()
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  kernels: () => [],
+  sessions: () => [],
+  runningKernels: () => [],
+  isRefreshing: false
+})
+
+const emit = defineEmits<Emits>()
 
 // Local state
 const isExpanded = ref(false)
 
-// Format time ago function
-const formatTimeAgo = (date: Date) => {
-  const now = new Date()
-  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
-  
-  if (diffInSeconds < 60) {
-    return 'Just now'
-  } else if (diffInSeconds < 3600) {
-    const minutes = Math.floor(diffInSeconds / 60)
-    return `${minutes} minute${minutes > 1 ? 's' : ''} ago`
-  } else if (diffInSeconds < 86400) {
-    const hours = Math.floor(diffInSeconds / 3600)
-    return `${hours} hour${hours > 1 ? 's' : ''} ago`
-  } else {
-    const days = Math.floor(diffInSeconds / 86400)
-    return `${days} day${days > 1 ? 's' : ''} ago`
-  }
+// Computed properties
+const displayName = computed(() => 
+  props.server.name || `${props.server.ip}:${props.server.port}`
+)
+
+const kernelCount = computed(() => props.kernels?.length || 0)
+const sessionCount = computed(() => props.sessions?.length || 0)
+
+const isConnected = computed(() => props.testResult?.success === true)
+const hasTestResult = computed(() => !!props.testResult)
+
+const connectionStatusClass = computed(() => ({
+  'bg-green-500': isConnected.value,
+  'bg-red-500': hasTestResult.value && !isConnected.value,
+  'bg-yellow-500': !hasTestResult.value,
+}))
+
+// Event handlers
+const toggleExpanded = () => {
+  isExpanded.value = !isExpanded.value
+}
+
+const handleRefresh = () => {
+  emit('refresh')
+}
+
+const handleRemove = () => {
+  emit('remove')
+}
+
+const handleKernelConnect = (kernelName: string) => {
+  emit('connect-kernel', kernelName)
+}
+
+const handleSessionUse = (sessionId: string) => {
+  emit('use-session', sessionId)
 }
 </script>
+
+<style scoped>
+.server-item {
+  @apply transition-all duration-200;
+}
+
+.server-item:hover {
+  @apply shadow-sm;
+}
+
+.server-header {
+  @apply select-none;
+}
+</style>
