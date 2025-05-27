@@ -9,25 +9,69 @@ const router = express.Router()
 const db = admin.firestore()
 const publishedNotasCollection = 'publishedNotas'
 
-// Get all published notas for the current user (excluding sub-pages)
-router.get('/published', authorizeRequest, async (req: Request, res: Response) => {
+// Get published notas with filtering and pagination
+router.get('/published', async (req: Request, res: Response) => {
   try {
-    // @ts-ignore
-    const user = req.user
+    const {
+      authorId,
+      orderBy = 'publishedAt',
+      orderDirection = 'desc',
+      limit = 10,
+      startAfter,
+    } = req.query
 
-    const querySnapshot = await db
+    // Start building the query
+    let notasQuery = db
       .collection(publishedNotasCollection)
-      .where('authorId', '==', user.uid)
       .where('isPublic', '==', true)
       .where('isSubPage', '==', false) // Only get main pages, not sub-pages
-      .get()
+
+    // Add author filter if provided
+    if (authorId) {
+      notasQuery = notasQuery.where('authorId', '==', authorId)
+    }
+
+    // Add ordering
+    notasQuery = notasQuery.orderBy(
+      orderBy as string,
+      (orderDirection as string)?.toLowerCase() === 'asc' ? 'asc' : 'desc',
+    )
+
+    // Add pagination
+    notasQuery = notasQuery.limit(Number(limit))
+
+    // Add startAfter cursor if provided
+    if (startAfter) {
+      // Get the document to start after
+      const startAfterDoc = await db
+        .collection(publishedNotasCollection)
+        .doc(startAfter as string)
+        .get()
+      if (startAfterDoc.exists) {
+        notasQuery = notasQuery.startAfter(startAfterDoc)
+      }
+    }
+
+    // Execute the query
+    const querySnapshot = await notasQuery.get()
 
     const publishedNotas: PublishedNota[] = []
     querySnapshot.forEach((doc) => {
-      publishedNotas.push({ ...doc.data(), id: doc.id } as PublishedNota)
+      const data = doc.data() as PublishedNota;
+
+      // @ts-ignore
+      delete data.content;
+      delete data.votes;
+
+      publishedNotas.push({ ...data, id: doc.id })
     })
 
-    return res.json(publishedNotas)
+    // Return the results with pagination info
+    return res.json({
+      items: publishedNotas,
+      hasMore: publishedNotas.length === Number(limit),
+      lastVisible: publishedNotas.length > 0 ? publishedNotas[publishedNotas.length - 1].id : null,
+    })
   } catch (error) {
     console.error('Failed to fetch published notas:', error)
     return res.status(500).json({ error: 'Failed to fetch published notas' })
@@ -175,7 +219,7 @@ router.post('/publish/:id', authorizeRequest, async (req: Request, res: Response
         publishedSubPages: Array.isArray(notaData.publishedSubPages)
           ? notaData.publishedSubPages
           : [], // Published sub-pages
-        citations: Array.isArray(notaData.citations) ? notaData.citations : [] // Include citations
+        citations: Array.isArray(notaData.citations) ? notaData.citations : [], // Include citations
       }
 
       // Use set with merge:false to create a new document
@@ -275,6 +319,109 @@ router.delete('/publish/:id', authorizeRequest, async (req: Request, res: Respon
   }
 })
 
+// Vote on a nota (like or dislike)
+router.post('/vote/:id', authorizeRequest, async (req: Request, res: Response) => {
+  try {
+    // @ts-ignore
+    const user = req.user
+    const notaId = req.params.id
+    const { voteType } = req.body
+
+    // Validate vote type
+    if (!voteType || (voteType !== 'like' && voteType !== 'dislike')) {
+      return res.status(400).json({ error: 'Invalid vote type. Must be "like" or "dislike".' })
+    }
+
+    // Reference to the nota document
+    const notaRef = db.collection(publishedNotasCollection).doc(notaId)
+    const notaDoc = await notaRef.get()
+
+    // Check if the nota exists
+    if (!notaDoc.exists) {
+      return res.status(404).json({ error: 'Published nota not found' })
+    }
+
+    // Get the current nota data
+    const notaData = notaDoc.data() as PublishedNota
+    let likeCount = notaData.likeCount || 0
+    let dislikeCount = notaData.dislikeCount || 0
+    
+    // Get the current votes map (or initialize it)
+    const votes = notaData.votes || {}
+    const userCurrentVote = votes[user.uid] || null
+    
+    // Prepare the update data
+    const updateData: Record<string, any> = {}
+    
+    // Determine the action based on the current vote
+    if (userCurrentVote === voteType) {
+      // User is removing their vote
+      updateData[`votes.${user.uid}`] = admin.firestore.FieldValue.delete()
+      
+      // Decrement the appropriate counter
+      if (voteType === 'like') {
+        updateData.likeCount = admin.firestore.FieldValue.increment(-1)
+        likeCount--
+      } else {
+        updateData.dislikeCount = admin.firestore.FieldValue.increment(-1)
+        dislikeCount--
+      }
+    } else if (userCurrentVote) {
+      // User is changing their vote
+      updateData[`votes.${user.uid}`] = voteType
+      
+      // Update counters: decrement the old vote type, increment the new one
+      if (voteType === 'like') {
+        updateData.likeCount = admin.firestore.FieldValue.increment(1)
+        updateData.dislikeCount = admin.firestore.FieldValue.increment(-1)
+        likeCount++
+        dislikeCount--
+      } else {
+        updateData.likeCount = admin.firestore.FieldValue.increment(-1)
+        updateData.dislikeCount = admin.firestore.FieldValue.increment(1)
+        likeCount--
+        dislikeCount++
+      }
+    } else {
+      // User is voting for the first time
+      updateData[`votes.${user.uid}`] = voteType
+      
+      // Check if likeCount and dislikeCount exist, initialize them if not
+      if (typeof notaData.likeCount !== 'number') {
+        updateData.likeCount = voteType === 'like' ? 1 : 0
+        likeCount = voteType === 'like' ? 1 : 0
+      } else if (voteType === 'like') {
+        updateData.likeCount = admin.firestore.FieldValue.increment(1)
+        likeCount++
+      }
+      
+      if (typeof notaData.dislikeCount !== 'number') {
+        updateData.dislikeCount = voteType === 'dislike' ? 1 : 0
+        dislikeCount = voteType === 'dislike' ? 1 : 0
+      } else if (voteType === 'dislike') {
+        updateData.dislikeCount = admin.firestore.FieldValue.increment(1)
+        dislikeCount++
+      }
+    }
+
+    // Update the nota document
+    await notaRef.update(updateData)
+
+    // Return the updated counts and the user's current vote
+    return res.json({
+      likeCount,
+      dislikeCount,
+      userVote: userCurrentVote === voteType ? null : voteType
+    })
+  } catch (error) {
+    console.error('Failed to record vote:', error)
+    return res.status(500).json({ 
+      error: 'Failed to record vote',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    })
+  }
+})
+
 // Validation function for publishing a nota
 const validatePublishNota = (data: any) => {
   const rules = {
@@ -284,7 +431,7 @@ const validatePublishNota = (data: any) => {
     isSubPage: ['boolean'],
     parentId: ['string'],
     publishedSubPages: ['array'],
-    citations: ['array']
+    citations: ['array'],
   }
 
   const validation = new Validator(data, rules)
