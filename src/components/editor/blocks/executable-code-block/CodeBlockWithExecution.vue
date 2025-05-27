@@ -37,26 +37,22 @@ import PopoverContent from '@/components/ui/popover/PopoverContent.vue'
 import FullScreenCodeBlock from './FullScreenCodeBlock.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
 import OutputRenderer from './OutputRenderer.vue'
-import { toast } from '@/lib/utils'
-import { useRoute } from 'vue-router'
 import ExecutionStatus from './ExecutionStatus.vue'
 import ErrorDisplay from './ErrorDisplay.vue'
+import { useOutputStreaming } from './composables/useOutputStreaming'
+import TemplateSelector from './TemplateSelector.vue'
 
 // Types
 interface Props {
   code: string
   language: string
-  result: string | null
   id: string
-  serverID: string | null
-  kernelName: string | null
   sessionId: string | null
   notaId: string
   kernelPreference?: KernelConfig | null
   isReadOnly?: boolean
   isExecuting?: boolean
   isPublished?: boolean
-  runningStatus?: 'idle' | 'running' | 'error' | 'success'
 }
 
 // Define props
@@ -114,7 +110,40 @@ const executionProgress = ref<number>(0)
 const errorMessage = ref<string | null>(null)
 const isCodeCopied = ref(false)
 
-// Computed
+// Add new state for enhanced features
+const isTemplateDialogOpen = ref(false)
+const executionId = ref<string | null>(null)
+
+// Initialize output streaming
+const {
+  startStreaming,
+  stopStreaming,
+  getFormattedOutput
+} = useOutputStreaming(props.id)
+
+// Function refs for keyboard shortcuts (will be assigned later)
+const executeCodeRef = ref<(() => Promise<void>) | null>(null)
+const handleCodeFormattedRef = ref<(() => void) | null>(null)
+
+// Initialize keyboard shortcuts
+const { shortcuts, getShortcutText } = useCodeBlockShortcuts({
+  onExecute: () => {
+    if (executeCodeRef.value && isReadyToExecute.value && !props.isReadOnly) {
+      executeCodeRef.value()
+    }
+  },
+  onToggleFullscreen: () => {
+    isFullScreen.value = !isFullScreen.value
+  },
+  onFormatCode: () => {
+    if (handleCodeFormattedRef.value && !props.isReadOnly) {
+      handleCodeFormattedRef.value()
+    }
+  },
+  isEnabled: () => {
+    return !props.isReadOnly && !isTemplateDialogOpen.value
+  }
+})
 
 // Enhanced readyToExecute with more visual feedback
 const isReadyToExecute = computed(() => {
@@ -355,6 +384,20 @@ onMounted(async () => {
   
   // Load shared session if in shared mode or individual preferences otherwise
   await loadSavedPreferences()
+  
+  // Assign functions to refs for keyboard shortcuts
+  executeCodeRef.value = executeCodeBlock
+  handleCodeFormattedRef.value = handleCodeFormatted
+  
+  // Initialization debugging
+  logger.debug(`[CodeBlock ${props.id}] Mounted`, {
+    isPublished: props.isPublished,
+    readonly: props.isReadOnly,
+    hasSessionId: !!props.sessionId,
+  })
+  
+  // Check if we need to initialize execution state from store
+  syncExecutionStateWithStore()
   
   if (codeBlockRef.value && !props.isReadOnly) {
     const editor = codeBlockRef.value.querySelector('.cm-editor')
@@ -628,100 +671,70 @@ const createNewSession = async () => {
   }
 }
 
-// Add after other methods
-const startExecutionTimer = () => {
+// Enhanced execution with streaming
+const executeCodeBlock = async () => {
+  if (!isReadyToExecute.value) return
+
+  executionInProgress.value = true
   executionStartTime.value = Date.now()
   executionTime.value = 0
-  executionProgress.value = 0
-  
-  const timer = setInterval(() => {
-    if (executionStartTime.value) {
-      executionTime.value = Date.now() - executionStartTime.value
-      // Simulate progress for long-running executions
-      if (executionTime.value > 1000) {
-        executionProgress.value = Math.min(90, (executionTime.value / 10000) * 90)
-      }
-    }
-  }, 100)
-  
-  return timer
-}
-
-// Modify the executeCode method
-const executeCode = async () => {
-  if (props.isExecuting || executionInProgress.value) return
-  
-  executionInProgress.value = true
   errorMessage.value = null
-  const timer = startExecutionTimer()
-  
+
   try {
-    // Ensure servers are loaded before execution
-    await refreshJupyterServers();
+    // Generate execution ID for streaming
+    executionId.value = `exec-${Date.now()}-${Math.random().toString(36).slice(2)}`
     
-    // If not in shared mode, validate server and kernel selections
-    if (!isSharedSessionMode.value) {
-      if (!selectedServer.value || selectedServer.value === 'none') {
-        isServerOpen.value = true; // Open server selector
-        showConsoleMessage('Error', 'Please select a server first', 'error')
-        return
-      }
-      if (!selectedKernel.value) {
-        isServerOpen.value = true; // Open kernel selector too
-        showConsoleMessage('Error', 'Please select a kernel first', 'error')
-        return
-      }
-    }
+    // Start output streaming
+    startStreaming(executionId.value)
     
-    // If in shared mode, ensure we're using the shared session
-    if (isSharedSessionMode.value) {
-      // Get or create shared session
-      const sessionId = await codeExecutionStore.ensureSharedSession();
-      
-      // Apply shared session to this cell
-      await codeExecutionStore.applySharedSessionToCell(props.id);
-      
-      // Update the UI with the shared session
-      selectedSession.value = sessionId;
-      
-      // Get shared session info for UI feedback
-      const session = codeExecutionStore.kernelSessions.get(sessionId);
-      if (session?.serverConfig) {
-        const serverId = `${session.serverConfig.ip}:${session.serverConfig.port}`;
-        selectedServer.value = serverId;
-      }
-      if (session?.kernelName) {
-        selectedKernel.value = session.kernelName;
-      }
-    } 
-    // If not in shared mode and no session is selected, create a new one
-    else if (!selectedSession.value) {
-      await createNewSession();
-      if (!selectedSession.value) {
-        throw new Error('Failed to create session')
-      }
-    }
-    
-    // Execute the code
+    // Execute the code using the store
     await codeExecutionStore.executeCell(props.id)
+    
+    // Get result from cell
     if (cell.value?.output) {
       emit('update:output', cell.value.output)
     }
+    
+    // Get streaming output if available
+    const streamingOutput = getFormattedOutput()
+    if (streamingOutput.error) {
+      errorMessage.value = streamingOutput.error
+    }
+    
+    executionSuccess.value = !cell.value?.hasError
+    
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : String(error)
-    executionSuccess.value = false
-    showConsoleMessage('Error', 'Code execution failed', 'error')
+    errorMessage.value = error instanceof Error ? error.message : 'Execution failed'
+    logger.error('Code execution failed:', error)
   } finally {
-    clearInterval(timer)
-    executionProgress.value = 100
     executionInProgress.value = false
+    stopStreaming()
+    
+    // Calculate final execution time
+    if (executionStartTime.value > 0) {
+      executionTime.value = Date.now() - executionStartTime.value
+    }
   }
 }
 
-// Add retry handler
-const handleRetry = () => {
-  errorMessage.value = null
-  executeCode()
+// Create executeCode alias for template compatibility
+const executeCode = executeCodeBlock
+
+// Template handling
+const handleTemplateSelected = (templateCode: string) => {
+  // Replace current code with template
+  emit('update:code', templateCode)
+  isTemplateDialogOpen.value = false
+}
+
+const showTemplateDialog = () => {
+  isTemplateDialogOpen.value = true
+}
+
+// Enhanced code formatting
+const handleCodeFormatted = () => {
+  // Code was formatted, could trigger auto-save or other actions
+  logger.debug('Code formatted successfully')
 }
 
 const updateCode = (newCode: string) => {
@@ -746,36 +759,6 @@ const saveChanges = () => {
   hasUnsavedChanges.value = false
   emit('update:code', codeValue.value)
 }
-
-// Track disabled state changes with debugging
-const route = useRoute()
-const isDisabled = computed(() => {
-  // Add direct console logging to help debug this issue
-  logger.log(`[CodeBlock ${props.id}] isDisabled computed:`, {
-    readonly: props.isReadOnly,
-    executionInProgress: executionInProgress.value,
-    isPublished: props.isPublished,
-    route: route.path
-  })
-  
-  // In published view, we never want to show the execution in progress state
-  if (props.isPublished) {
-    logger.log(`[CodeBlock ${props.id}] Published mode detected, disabling execution controls`)
-    return true // Force disabled state for published content
-  }
-  
-  return props.isReadOnly || executionInProgress.value
-})
-
-// Watch for execution state changes
-watch(() => executionInProgress.value, (newValue, oldValue) => {
-  logger.debug(`[CodeBlock ${props.id}] Execution state changed from ${oldValue} to ${newValue}`, {
-    readonly: props.isReadOnly,
-    isPublished: props.isPublished,
-    inStore: !!cell.value,
-    storeExecuting: cell.value?.isExecuting
-  })
-}, { immediate: true })
 
 const syncExecutionStateWithStore = () => {
   if (cell.value) {
@@ -802,19 +785,6 @@ const syncExecutionStateWithStore = () => {
 watch(cell, () => {
   syncExecutionStateWithStore()
 }, { deep: true })
-
-onMounted(() => {
-  // Initialization debugging
-  logger.debug(`[CodeBlock ${props.id}] Mounted`, {
-    isPublished: props.isPublished,
-    readonly: props.isReadOnly,
-    hasSessionId: !!props.sessionId,
-    route: route.path
-  })
-  
-  // Check if we need to initialize execution state from store
-  syncExecutionStateWithStore()
-})
 
 // Add after other computed properties
 const currentExecutionTime = computed(() => {
@@ -1139,11 +1109,11 @@ const runningStatus = computed(() => {
           class="hidden md:flex items-center text-xs text-muted-foreground mr-1 gap-2"
         >
           <div class="flex items-center">
-            <kbd class="px-1.5 py-0.5 border rounded text-[10px]">Ctrl+Shift+Alt+Enter</kbd>
+            <kbd class="px-1.5 py-0.5 border rounded text-[10px]">{{ getShortcutText('Ctrl+Alt+Shift+Enter') }}</kbd>
             <span class="ml-1">run</span>
           </div>
           <div class="flex items-center">
-            <kbd class="px-1.5 py-0.5 border rounded text-[10px]">Ctrl+Shift+Alt+F11</kbd>
+            <kbd class="px-1.5 py-0.5 border rounded text-[10px]">{{ getShortcutText('Ctrl+Alt+Shift+F') }}</kbd>
             <span class="ml-1">fullscreen</span>
           </div>
         </div>
@@ -1269,19 +1239,16 @@ const runningStatus = computed(() => {
       </div>
 
       <CodeMirror
-        v-model="codeValue"
-        :language="language"
-        :disabled="(cell?.isExecuting || isExecuting) && !isPublished"
-        :readonly="isReadOnly"
-        :runningStatus="runningStatus"
-        :isPublished="isPublished"
-        @update:modelValue="updateCode"
-        :maxHeight="'300px'"
-        aria-label="Code editor"
-        :indent-with-tab="true"
-        :preserve-indent="true"
-        :tab-size="4"
-        :line-numbers="true"
+        :model-value="codeValue"
+        :language="props.language"
+        :readonly="props.isReadOnly"
+        :running-status="runningStatus"
+        :is-published="props.isPublished"
+        :auto-format="true"
+        :show-template-button="true"
+        @update:model-value="updateCode"
+        @format-code="handleCodeFormatted"
+        @show-templates="showTemplateDialog"
       />
     </div>
 
@@ -1326,7 +1293,15 @@ const runningStatus = computed(() => {
       v-if="errorMessage && !isPublished"
       :error="errorMessage"
       :code="codeValue"
-      @retry="handleRetry"
+      @retry="executeCode"
+    />
+
+    <!-- Template Dialog -->
+    <TemplateSelector
+      :language="props.language"
+      :is-open="isTemplateDialogOpen"
+      @update:is-open="(value) => isTemplateDialogOpen = value"
+      @template-selected="handleTemplateSelected"
     />
   </div>
 </template>
