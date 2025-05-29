@@ -15,6 +15,7 @@ admin.initializeApp({
 import notaRouter from './routes/nota'
 import imageRouter from './routes/image'
 import commentsRouter from './routes/comments'
+import authorsRouter from './routes/authors'
 import { migrateUserTags, checkUserTagMigrationNeeded } from './routes/userTags'
 
 // Create an Express app
@@ -31,7 +32,7 @@ app.use(express.json({ limit: '5mb' }))
 
 app.get('/', (req: Request, res: Response) => {
   res.json({
-    message: 'Welcome to the Bahsnota API',
+    message: 'Welcome to the Bashnota API',
     version: '1.0.0',
     description: 'A RESTful API for the Bashnota',
     url: 'https://bashnota.com',
@@ -41,6 +42,7 @@ app.get('/', (req: Request, res: Response) => {
 app.use('/nota', notaRouter)
 app.use('/image', imageRouter)
 app.use('/comments', commentsRouter)
+app.use('/authors', authorsRouter)
 
 // Export the cloud functions
 export const api = onRequest(app)
