@@ -56,7 +56,8 @@ export function useWorkspacePreferences() {
         }
         
         // Additional validation for specific fields
-        if (!Object.values(REFRESH_INTERVALS).includes(validatedPrefs.refreshInterval)) {
+        const validIntervals = Object.values(REFRESH_INTERVALS) as number[]
+        if (!validIntervals.includes(validatedPrefs.refreshInterval)) {
           validatedPrefs.refreshInterval = DEFAULT_PREFERENCES.refreshInterval
         }
         
@@ -126,7 +127,7 @@ export function useWorkspacePreferences() {
 
   // Validate refresh interval
   const setRefreshInterval = (interval: number): void => {
-    const validIntervals = Object.values(REFRESH_INTERVALS)
+    const validIntervals = Object.values(REFRESH_INTERVALS) as number[]
     if (validIntervals.includes(interval)) {
       preferences.value.refreshInterval = interval
     } else {
