@@ -16,7 +16,6 @@ import notaRouter from './routes/nota'
 import imageRouter from './routes/image'
 import commentsRouter from './routes/comments'
 import authorsRouter from './routes/authors'
-import { migrateUserTags, checkUserTagMigrationNeeded } from './routes/userTags'
 
 // Create an Express app
 const app = express()
@@ -46,4 +45,3 @@ app.use('/authors', authorsRouter)
 
 // Export the cloud functions
 export const api = onRequest(app)
-export { migrateUserTags, checkUserTagMigrationNeeded }
