@@ -8,13 +8,16 @@ import { useNotaStore } from '@/stores/nota'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import Badge from '@/components/ui/badge/Badge.vue'
 import type { Nota } from '@/types/nota'
+import { formatDate } from '@/utils/dateUtils'
+import { useNotaActions } from '@/composables/useNotaActions'
 
 const router = useRouter()
 const { toggleFavorite } = useNotaStore()
+const { toggleNotaFavorite, navigateToNotaSettings } = useNotaActions()
 
 // Pagination state
 const currentPage = ref(1)
-const pageSize = ref(9) // Reduced from 12 to 9 items per page
+const pageSize = ref(9) // 9 items per page for better grid layout
 
 const props = defineProps<{
   isLoading: boolean
@@ -31,66 +34,6 @@ const emit = defineEmits<{
   (e: 'update:selectedTag', value: string): void
   (e: 'update:page', value: number): void
 }>()
-
-const formatDate = (date: Date | string) => {
-  const d = date instanceof Date ? date : new Date(date)
-  const now = new Date()
-  const diff = now.getTime() - d.getTime()
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-
-  if (days === 0) return 'Today'
-  if (days === 1) return 'Yesterday'
-  if (days < 7) return `${days} days ago`
-  return d.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: now.getFullYear() !== d.getFullYear() ? 'numeric' : undefined,
-  })
-}
-
-const openSettings = (id: string) => {
-  router.push(`/nota/${id}/settings`)
-}
-
-const allFilteredNotas = computed(() => {
-  let filtered = props.notas.map((nota) => ({
-    ...nota,
-    tags: nota.tags || [],
-  }))
-
-  if (props.showFavorites) {
-    filtered = filtered.filter((nota) => nota.favorite)
-  }
-
-  if (props.searchQuery) {
-    filtered = filtered.filter(
-      (nota) =>
-        nota.title.toLowerCase().includes(props.searchQuery.toLowerCase()) ||
-        nota.content?.toLowerCase().includes(props.searchQuery.toLowerCase()),
-    )
-  }
-
-  if (props.selectedTag) {
-    filtered = filtered.filter((nota) => nota.tags?.includes(props.selectedTag))
-  }
-
-  return filtered.slice().sort((a, b) => {
-    const dateA = a.updatedAt instanceof Date ? a.updatedAt : new Date(a.updatedAt)
-    const dateB = b.updatedAt instanceof Date ? b.updatedAt : new Date(b.updatedAt)
-    return dateB.getTime() - dateA.getTime()
-  })
-})
-
-// Total pages calculation
-const totalPages = computed(() => {
-  return Math.max(1, Math.ceil(allFilteredNotas.value.length / pageSize.value))
-})
-
-// Paginated notes
-const filteredNotas = computed(() => {
-  const startIndex = (currentPage.value - 1) * pageSize.value
-  return allFilteredNotas.value.slice(startIndex, startIndex + pageSize.value)
-})
 
 // Reset to first page when filters change
 watch(
@@ -110,6 +53,17 @@ watch(
   }
 )
 
+// Total pages calculation
+const totalPages = computed(() => {
+  return Math.max(1, Math.ceil(props.notas.length / pageSize.value))
+})
+
+// Paginated notes
+const paginatedNotas = computed(() => {
+  const startIndex = (currentPage.value - 1) * pageSize.value
+  return props.notas.slice(startIndex, startIndex + pageSize.value)
+})
+
 const nextPage = () => {
   if (currentPage.value < totalPages.value) {
     currentPage.value++
@@ -124,7 +78,6 @@ const prevPage = () => {
   }
 }
 
-// Add a new function to handle direct page changes
 const goToPage = (page: number) => {
   if (page >= 1 && page <= totalPages.value) {
     currentPage.value = page
@@ -132,7 +85,7 @@ const goToPage = (page: number) => {
   }
 }
 
-// Add a function to display a limited number of page buttons
+// Display a limited number of page buttons for better UX
 const displayedPages = computed(() => {
   const total = totalPages.value
   const current = currentPage.value
@@ -153,37 +106,83 @@ const displayedPages = computed(() => {
   // Sort and remove duplicates
   return [...new Set(pages)].sort((a, b) => a - b)
 })
+
+// Improved action handlers with error handling
+const handleToggleFavorite = async (id: string) => {
+  await toggleNotaFavorite(id)
+}
+
+const openSettings = (id: string) => {
+  navigateToNotaSettings(id)
+}
+
+const handleTagClick = (tag: string) => {
+  emit('update:selectedTag', tag)
+}
+
+// Empty state configuration
+const emptyStateConfig = computed(() => {
+  if (props.showFavorites) {
+    return {
+      icon: Star,
+      title: 'No Favorite Notas',
+      description: 'Star important notas for quick access',
+      showButton: false
+    }
+  }
+  
+  if (props.searchQuery || props.selectedTag) {
+    return {
+      icon: FileText,
+      title: 'No Matching Notas',
+      description: 'Try adjusting your search or create a new nota',
+      showButton: true
+    }
+  }
+  
+  return {
+    icon: FileText,
+    title: 'No Notas Yet',
+    description: 'Create your first nota to get started',
+    showButton: true
+  }
+})
 </script>
 
 <template>
+  <!-- Empty State -->
   <div
-    v-if="!isLoading && allFilteredNotas.length === 0"
+    v-if="!isLoading && props.notas.length === 0"
     class="flex flex-col items-center justify-center p-12 text-center"
   >
     <component
-      :is="showFavorites ? Star : FileText"
+      :is="emptyStateConfig.icon"
       class="w-12 h-12 text-muted-foreground/50 mb-4"
     />
     <h3 class="text-lg font-semibold mb-2">
-      {{ showFavorites ? 'No Favorites Yet' : 'No Notas Yet' }}
+      {{ emptyStateConfig.title }}
     </h3>
     <p class="text-muted-foreground mb-4">
-      {{
-        showFavorites
-          ? 'Star your important notas for quick access'
-          : 'Create your first nota to get started'
-      }}
+      {{ emptyStateConfig.description }}
     </p>
-    <Button v-if="!showFavorites" @click="$emit('create-nota')">Create Nota</Button>
+    <Button 
+      v-if="emptyStateConfig.showButton" 
+      @click="$emit('create-nota')"
+    >
+      Create Nota
+    </Button>
   </div>
 
+  <!-- Loading State -->
   <div v-else-if="isLoading" class="flex justify-center items-center py-12">
     <LoadingSpinner />
   </div>
 
+  <!-- Content -->
   <div v-else>
+    <!-- Grid View -->
     <div v-if="viewType === 'grid'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      <RouterLink v-for="nota in filteredNotas" :key="nota.id" :to="`/nota/${nota.id}`">
+      <RouterLink v-for="nota in paginatedNotas" :key="nota.id" :to="`/nota/${nota.id}`">
         <Card class="h-full hover:shadow-md transition-all group relative">
           <CardHeader>
             <div class="flex items-center justify-between flex-wrap gap-2">
@@ -196,7 +195,7 @@ const displayedPages = computed(() => {
                   variant="ghost"
                   size="icon"
                   class="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                  @click.prevent="toggleFavorite(nota.id)"
+                  @click.prevent="handleToggleFavorite(nota.id)"
                 >
                   <Star
                     class="w-5 h-5"
@@ -219,12 +218,12 @@ const displayedPages = computed(() => {
             </div>
           </CardHeader>
           <CardContent>
-            <div v-if="nota.tags.length > 0" class="flex flex-wrap gap-2">
+            <div v-if="nota.tags && nota.tags.length > 0" class="flex flex-wrap gap-2">
               <Badge
                 v-for="tag in nota.tags"
                 :key="tag"
-                @click.prevent="$emit('update:selectedTag', tag)"
-                class="cursor-pointer transition-colors truncate max-w-full"
+                @click.prevent="handleTagClick(tag)"
+                class="cursor-pointer transition-colors truncate max-w-full hover:bg-primary/10"
               >
                 {{ tag }}
               </Badge>
@@ -235,8 +234,9 @@ const displayedPages = computed(() => {
       </RouterLink>
     </div>
 
+    <!-- List View -->
     <div v-else-if="viewType === 'list'" class="flex flex-col space-y-3">
-      <RouterLink v-for="nota in filteredNotas" :key="nota.id" :to="`/nota/${nota.id}`">
+      <RouterLink v-for="nota in paginatedNotas" :key="nota.id" :to="`/nota/${nota.id}`">
         <div class="flex items-start gap-4 p-4 rounded-lg hover:bg-muted/50 transition-colors group border">
           <FileText class="w-5 h-5 text-muted-foreground mt-1 flex-shrink-0" />
           <div class="flex-1 min-w-0">
@@ -249,7 +249,7 @@ const displayedPages = computed(() => {
                 />
               </div>
               <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                <Button variant="ghost" size="icon" class="h-8 w-8" @click.prevent="toggleFavorite(nota.id)">
+                <Button variant="ghost" size="icon" class="h-8 w-8" @click.prevent="handleToggleFavorite(nota.id)">
                   <Star
                     class="w-4 h-4"
                     :class="nota.favorite ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground'"
@@ -267,10 +267,10 @@ const displayedPages = computed(() => {
               </span>
               <div class="flex flex-wrap gap-2">
                 <Badge
-                  v-for="tag in nota.tags"
+                  v-for="tag in nota.tags || []"
                   :key="tag"
-                  @click.prevent="$emit('update:selectedTag', tag)"
-                  class="cursor-pointer transition-colors truncate max-w-[200px]"
+                  @click.prevent="handleTagClick(tag)"
+                  class="cursor-pointer transition-colors truncate max-w-[200px] hover:bg-primary/10"
                 >
                   {{ tag }}
                 </Badge>
@@ -281,8 +281,9 @@ const displayedPages = computed(() => {
       </RouterLink>
     </div>
 
+    <!-- Compact View -->
     <div v-else class="divide-y">
-      <RouterLink v-for="nota in filteredNotas" :key="nota.id" :to="`/nota/${nota.id}`">
+      <RouterLink v-for="nota in paginatedNotas" :key="nota.id" :to="`/nota/${nota.id}`">
         <div class="flex items-center gap-3 py-2 hover:bg-muted/50 transition-colors px-2 border-b">
           <FileText class="w-4 h-4 text-muted-foreground flex-shrink-0" />
           <span class="font-medium truncate">{{ nota.title }}</span>
@@ -301,7 +302,7 @@ const displayedPages = computed(() => {
     <!-- Pagination Controls -->
     <div class="flex justify-between items-center mt-6">
       <p v-if="searchQuery" class="text-sm text-muted-foreground">
-        Found {{ allFilteredNotas.length }} results
+        Found {{ props.notas.length }} results
       </p>
       
       <div v-if="totalPages > 1" class="flex items-center gap-1 ml-auto">
@@ -352,18 +353,16 @@ const displayedPages = computed(() => {
 </template>
 
 <style scoped>
-.icon-btn {
-  @apply p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors;
-}
-
-:deep(.tag) {
-  @apply text-xs px-2 py-1 rounded-md bg-muted hover:bg-muted/80 transition-colors;
-}
-
-/* Add responsive breakpoints for tag max-width */
+/* Responsive adjustments for better mobile experience */
 @media (max-width: 640px) {
-  :deep(.tag) {
-    @apply max-w-[150px];
+  :deep(.badge) {
+    @apply max-w-[120px];
+  }
+}
+
+@media (max-width: 768px) {
+  .grid {
+    @apply grid-cols-1;
   }
 }
 </style>
