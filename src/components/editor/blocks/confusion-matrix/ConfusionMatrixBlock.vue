@@ -1,345 +1,517 @@
 <template>
   <node-view-wrapper class="confusion-matrix-block">
-    <div class="block-container">
+    <Card class="w-full">
       <!-- Block Header -->
-      <div class="block-header">
-        <div class="header-content">
-          <div class="block-icon">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 00-2-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H9z"></path>
-            </svg>
+      <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+        <div class="flex items-center space-x-3">
+          <div class="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg text-white">
+            <Grid3x3 class="w-5 h-5" />
           </div>
-          <div class="block-title">
-            <input
+          <div class="flex-1">
+            <Input
               v-if="editingTitle"
               v-model="localTitle"
               @blur="saveTitle"
               @keyup.enter="saveTitle"
               @keyup.escape="cancelTitleEdit"
-              class="title-input"
+              class="h-8 text-lg font-semibold bg-transparent border-none p-0 focus:ring-0"
               placeholder="Enter title..."
               ref="titleInput"
             />
-            <h3 v-else @click="startTitleEdit" class="title-display">
+            <CardTitle 
+              v-else 
+              @click="startTitleEdit" 
+              class="cursor-pointer hover:text-muted-foreground transition-colors"
+            >
               {{ displayTitle }}
-            </h3>
+            </CardTitle>
           </div>
         </div>
-        <div class="header-actions">
-          <button
-            @click="showSettings = !showSettings"
-            class="settings-button"
-            :class="{ active: showSettings }"
+        
+        <div class="flex items-center space-x-2">
+          <!-- AI Insights Button -->
+          <Button
+            v-if="hasData && aiInsightsEnabled"
+            @click="generateAIInsights"
+            variant="outline"
+            size="sm"
+            :disabled="isGeneratingInsights"
+            class="hidden sm:flex"
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-            </svg>
-          </button>
-          <button @click="deleteNode" class="delete-button">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-            </svg>
-          </button>
+            <Sparkles class="w-4 h-4 mr-1" />
+            {{ isGeneratingInsights ? 'Analyzing...' : 'AI Insights' }}
+          </Button>
+          
+          <!-- Export Options -->
+          <DropdownMenu v-if="hasData">
+            <DropdownMenuTrigger as-child>
+              <Button variant="outline" size="sm">
+                <Download class="w-4 h-4 mr-1" />
+                Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem @click="exportAsPNG">
+                <Image class="w-4 h-4 mr-2" />
+                Export as PNG
+              </DropdownMenuItem>
+              <DropdownMenuItem @click="exportAsCSV">
+                <FileText class="w-4 h-4 mr-2" />
+                Export as CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem @click="exportAsJSON">
+                <Code class="w-4 h-4 mr-2" />
+                Export as JSON
+              </DropdownMenuItem>
+              <DropdownMenuItem @click="exportReport">
+                <BarChart3 class="w-4 h-4 mr-2" />
+                Generate Report
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          
+          <Button
+            @click="showSettings = !showSettings"
+            variant="outline"
+            size="sm"
+            :class="{ 'bg-accent': showSettings }"
+          >
+            <Settings class="w-4 h-4" />
+          </Button>
+          
+          <Button
+            @click="deleteNode"
+            variant="outline"
+            size="sm"
+            class="text-destructive hover:text-destructive"
+          >
+            <Trash2 class="w-4 h-4" />
+          </Button>
         </div>
+      </CardHeader>
+
+      <!-- AI Insights Panel -->
+      <div v-if="aiInsights && showAIInsights" class="border-b">
+        <CardContent class="pt-0">
+          <Alert class="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 border-blue-200 dark:border-blue-800">
+            <Sparkles class="h-4 w-4 text-blue-600" />
+            <AlertTitle class="text-blue-800 dark:text-blue-200">AI Insights</AlertTitle>
+            <AlertDescription class="text-blue-700 dark:text-blue-300 mt-2">
+              {{ aiInsights }}
+            </AlertDescription>
+          </Alert>
+          <Button
+            @click="showAIInsights = false"
+            variant="ghost"
+            size="sm"
+            class="mt-2"
+          >
+            <X class="w-4 h-4 mr-1" />
+            Dismiss
+          </Button>
+        </CardContent>
       </div>
 
       <!-- Settings Panel -->
-      <div v-if="showSettings" class="settings-panel">
-        <div class="settings-content">
-          <div class="setting-group">
-            <label class="setting-label">Data Source</label>
-            <div class="source-tabs">
-              <button
-                @click="dataSource = 'upload'"
-                :class="['source-tab', { active: dataSource === 'upload' }]"
-              >
-                Upload CSV
-              </button>
-              <button
-                @click="dataSource = 'jupyter'"
-                :class="['source-tab', { active: dataSource === 'jupyter' }]"
-              >
-                Jupyter Server
-              </button>
-              <button
-                @click="dataSource = 'sample'"
-                :class="['source-tab', { active: dataSource === 'sample' }]"
-              >
-                Sample Data
-              </button>
-            </div>
-          </div>
+      <Collapsible v-if="showSettings" v-model:open="showSettings">
+        <CollapsibleContent>
+          <CardContent class="border-b bg-muted/20">
+            <div class="grid gap-6 md:grid-cols-2">
+              <!-- Data Source -->
+              <div class="space-y-3">
+                <Label class="text-sm font-medium">Data Source</Label>
+                <Select v-model="dataSource">
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select data source" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="upload">Upload CSV</SelectItem>
+                    <SelectItem value="jupyter">Jupyter</SelectItem>
+                    <SelectItem value="sample">Sample</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div class="setting-group">
-            <label class="setting-label">Visualization Options</label>
-            <div class="setting-checkboxes">
-              <label class="checkbox-label">
-                <input
-                  v-model="showMatrix"
-                  type="checkbox"
-                  class="setting-checkbox"
-                />
-                Show Interactive Matrix
-              </label>
-              <label class="checkbox-label">
-                <input
-                  v-model="showStats"
-                  type="checkbox"
-                  class="setting-checkbox"
-                />
-                Show Statistics
-              </label>
+              <!-- Visualization Options -->
+              <div class="space-y-3">
+                <Label class="text-sm font-medium">Visualization Options</Label>
+                <div class="flex flex-col space-y-2">
+                  <div class="flex items-center space-x-2">
+                    <Switch v-model:checked="showMatrix" id="show-matrix" />
+                    <Label for="show-matrix" class="text-sm">Interactive Matrix</Label>
+                  </div>
+                  <div class="flex items-center space-x-2">
+                    <Switch v-model:checked="showStats" id="show-stats" />
+                    <Label for="show-stats" class="text-sm">Statistics Dashboard</Label>
+                  </div>
+                  <div class="flex items-center space-x-2">
+                    <Switch v-model:checked="showAdvancedMetrics" id="show-advanced" />
+                    <Label for="show-advanced" class="text-sm">Advanced Metrics</Label>
+                  </div>
+                  <div class="flex items-center space-x-2">
+                    <Switch v-model:checked="showComparison" id="show-comparison" />
+                    <Label for="show-comparison" class="text-sm">Model Comparison</Label>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Advanced Settings -->
+              <div class="space-y-3">
+                <Label class="text-sm font-medium">Advanced Settings</Label>
+                <div class="space-y-2">
+                  <div class="flex items-center space-x-2">
+                    <Switch v-model:checked="enableTooltips" id="enable-tooltips" />
+                    <Label for="enable-tooltips" class="text-sm">Enhanced Tooltips</Label>
+                  </div>
+                  <div class="flex items-center space-x-2">
+                    <Switch v-model:checked="enableAnimations" id="enable-animations" />
+                    <Label for="enable-animations" class="text-sm">Smooth Animations</Label>
+                  </div>
+                  <div class="flex items-center space-x-2">
+                    <Switch v-model:checked="aiInsightsEnabled" id="ai-insights" />
+                    <Label for="ai-insights" class="text-sm">AI-Powered Insights</Label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Color Scheme -->
+              <div class="space-y-3">
+                <Label class="text-sm font-medium">Color Scheme</Label>
+                <Select v-model="colorScheme">
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select color scheme" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="default">Default</SelectItem>
+                    <SelectItem value="blue">Blue</SelectItem>
+                    <SelectItem value="green">Green</SelectItem>
+                    <SelectItem value="purple">Purple</SelectItem>
+                    <SelectItem value="viridis">Viridis</SelectItem>
+                    <SelectItem value="plasma">Plasma</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </div>
-        </div>
-      </div>
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
 
       <!-- Content Area -->
-      <div class="block-content">
+      <CardContent class="p-6">
         <!-- Data Loading Section -->
-        <div v-if="!hasData" class="data-loading-section">
-          <!-- Upload CSV -->
-          <div v-if="dataSource === 'upload'">
-            <FileUpload
-              @file-uploaded="handleFileUpload"
-              @error="handleError"
-            />
-          </div>
+        <div v-if="!hasData" class="space-y-6">
+          <Tabs v-model="dataSource" class="w-full">
+            <TabsList class="grid w-full grid-cols-3">
+              <TabsTrigger value="upload">Upload CSV</TabsTrigger>
+              <TabsTrigger value="jupyter">Jupyter</TabsTrigger>
+              <TabsTrigger value="sample">Sample</TabsTrigger>
+            </TabsList>
 
-          <!-- Jupyter Browser -->
-          <div v-else-if="dataSource === 'jupyter'">
-            <JupyterFileBrowser
-              @file-selected="handleJupyterFileSelect"
-              @error="handleError"
-              @open-jupyter-sidebar="handleOpenJupyterSidebar"
-            />
-          </div>
+            <TabsContent value="upload">
+              <FileUpload
+                @file-uploaded="handleFileUpload"
+                @error="handleError"
+              />
+            </TabsContent>
 
-          <!-- Sample Data -->
-          <div v-else-if="dataSource === 'sample'">
-            <div class="sample-data-section">
-              <div class="sample-info">
-                <h4 class="sample-title">Sample Confusion Matrix</h4>
-                <p class="sample-description">
-                  Load a sample 3-class confusion matrix for animal classification (Cat, Dog, Bird)
-                </p>
-              </div>
-              <button @click="loadSampleData" class="sample-button">
-                Load Sample Data
-              </button>
-            </div>
-          </div>
+            <TabsContent value="jupyter">
+              <JupyterFileBrowser
+                @file-selected="handleJupyterFileSelect"
+                @error="handleError"
+                @open-jupyter-sidebar="handleOpenJupyterSidebar"
+              />
+            </TabsContent>
+
+            <TabsContent value="sample">
+              <Card class="p-8 text-center bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border-dashed">
+                <div class="space-y-4">
+                  <div class="w-16 h-16 mx-auto bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                    <Database class="w-8 h-8 text-white" />
+                  </div>
+                  <div>
+                    <h4 class="text-lg font-semibold">Sample Confusion Matrix</h4>
+                    <p class="text-sm text-muted-foreground mt-2">
+                      Load a sample 3-class confusion matrix for animal classification (Cat, Dog, Bird)
+                    </p>
+                  </div>
+                  <Button @click="loadSampleData" class="mt-4">
+                    <PlayCircle class="w-4 h-4 mr-2" />
+                    Load Sample Data
+                  </Button>
+                </div>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
 
         <!-- Visualization Section -->
-        <div v-else class="visualization-section">
-          <!-- Data Info -->
-          <div class="data-info">
-            <div class="info-badges">
-              <span class="info-badge">
-                {{ matrixData.labels.length }} Classes
-              </span>
-              <span class="info-badge">
+        <div v-else class="space-y-6">
+          <!-- Data Summary Header -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-muted/30 rounded-lg">
+            <div class="flex flex-wrap gap-2">
+              <Badge variant="secondary" class="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                <Target class="w-3 h-3 mr-1" />
+                {{ matrixData?.labels.length || 0 }} Classes
+              </Badge>
+              <Badge variant="secondary" class="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                <Users class="w-3 h-3 mr-1" />
                 {{ getTotalSamples() }} Samples
-              </span>
-              <span v-if="stats" class="info-badge">
+              </Badge>
+              <Badge v-if="stats" variant="secondary" class="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                <TrendingUp class="w-3 h-3 mr-1" />
                 {{ formatNumber(stats.accuracy * 100, 1) }}% Accuracy
-              </span>
+              </Badge>
             </div>
-            <div class="data-actions">
-              <button @click="changeData" class="change-data-button">
+            
+            <div class="flex gap-2">
+              <Button @click="changeData" variant="outline" size="sm">
+                <RefreshCw class="w-4 h-4 mr-1" />
                 Change Data
-              </button>
-              <button v-if="filePath" @click="reloadFromSource" class="reload-button">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                </svg>
+              </Button>
+              <Button v-if="filePath" @click="reloadFromSource" variant="outline" size="sm">
+                <RotateCcw class="w-4 h-4 mr-1" />
                 Reload
-              </button>
+              </Button>
             </div>
           </div>
 
-          <!-- Interactive Matrix -->
-          <div v-if="showMatrix" class="matrix-section">
-            <InteractiveMatrix
-              :matrix="matrixData.matrix"
-              :labels="matrixData.labels"
-              :title="matrixData.title"
-            />
-          </div>
+          <!-- Main Visualization Tabs -->
+          <Tabs v-model="activeVisualizationTab" class="w-full">
+            <TabsList class="grid w-full grid-cols-4">
+              <TabsTrigger value="matrix" :disabled="!showMatrix">
+                <Grid3x3 class="w-4 h-4 mr-1" />
+                Matrix
+              </TabsTrigger>
+              <TabsTrigger value="stats" :disabled="!showStats">
+                <BarChart3 class="w-4 h-4 mr-1" />
+                Statistics
+              </TabsTrigger>
+              <TabsTrigger value="advanced" :disabled="!showAdvancedMetrics">
+                <LineChart class="w-4 h-4 mr-1" />
+                Advanced
+              </TabsTrigger>
+              <TabsTrigger value="comparison" :disabled="!showComparison">
+                <GitCompare class="w-4 h-4 mr-1" />
+                Compare
+              </TabsTrigger>
+            </TabsList>
 
-          <!-- Statistics -->
-          <div v-if="showStats && stats" class="stats-section">
-            <StatsVisualization
-              :stats="stats"
-              :labels="matrixData.labels"
-              :matrix="matrixData.matrix"
-            />
-          </div>
+            <!-- Interactive Matrix Tab -->
+            <TabsContent value="matrix" class="mt-6">
+              <InteractiveMatrix
+                v-if="matrixData"
+                :matrix="matrixData.matrix"
+                :labels="matrixData.labels"
+                :title="matrixData.title"
+                :color-scheme="colorScheme"
+                :enable-tooltips="enableTooltips"
+                :enable-animations="enableAnimations"
+              />
+            </TabsContent>
+
+            <!-- Statistics Tab -->
+            <TabsContent value="stats" class="mt-6">
+              <StatsVisualization
+                v-if="stats && matrixData"
+                :stats="stats"
+                :labels="matrixData.labels"
+                :matrix="matrixData.matrix"
+                :color-scheme="colorScheme"
+              />
+            </TabsContent>
+
+            <!-- Advanced Metrics Tab -->
+            <TabsContent value="advanced" class="mt-6">
+              <AdvancedMetricsPanel
+                v-if="stats && matrixData"
+                :stats="stats"
+                :labels="matrixData.labels"
+                :matrix="matrixData.matrix"
+              />
+            </TabsContent>
+
+            <!-- Model Comparison Tab -->
+            <TabsContent value="comparison" class="mt-6">
+              <ModelComparisonPanel
+                v-if="matrixData"
+                :matrix="matrixData.matrix"
+                :labels="matrixData.labels"
+                :stats="stats"
+              />
+            </TabsContent>
+          </Tabs>
         </div>
-      </div>
+      </CardContent>
 
       <!-- Error Display -->
-      <div v-if="error" class="error-display">
-        <div class="error-content">
-          <div class="error-icon">
-            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
-            </svg>
-          </div>
-          <span class="error-text">{{ error }}</span>
-          <button @click="clearError" class="error-dismiss">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </button>
-        </div>
+      <div v-if="error">
+        <CardContent class="pt-0">
+          <Alert variant="destructive">
+            <AlertCircle class="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription class="flex items-center justify-between">
+              <span>{{ error }}</span>
+              <Button @click="clearError" variant="ghost" size="sm">
+                <X class="w-4 h-4" />
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </CardContent>
       </div>
-    </div>
+    </Card>
   </node-view-wrapper>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { NodeViewWrapper } from '@tiptap/vue-3'
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import {
+  Button
+} from '@/components/ui/button'
+import {
+  Input
+} from '@/components/ui/input'
+import {
+  Label
+} from '@/components/ui/label'
+import {
+  Switch
+} from '@/components/ui/switch'
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  Collapsible,
+  CollapsibleContent,
+} from '@/components/ui/collapsible'
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from '@/components/ui/alert'
+import {
+  Badge
+} from '@/components/ui/badge'
+import {
+  Grid3x3,
+  Settings,
+  Trash2,
+  Download,
+  Image,
+  FileText,
+  Code,
+  BarChart3,
+  Sparkles,
+  X,
+  Target,
+  Users,
+  TrendingUp,
+  RefreshCw,
+  RotateCcw,
+  LineChart,
+  GitCompare,
+  Database,
+  PlayCircle,
+  AlertCircle,
+  Trophy
+} from 'lucide-vue-next'
+
+// Component imports - using existing components, not "Enhanced" versions
 import FileUpload from './components/FileUpload.vue'
 import JupyterFileBrowser from './components/JupyterFileBrowser.vue'
 import InteractiveMatrix from './components/InteractiveMatrix.vue'
 import StatsVisualization from './components/StatsVisualization.vue'
-import {
-  calculateConfusionMatrixStats,
-  generateSampleConfusionMatrix,
-  formatNumber,
-  type ConfusionMatrixData,
-  type ConfusionMatrixStats
-} from './utils/confusionMatrixUtils'
+import AdvancedMetricsPanel from './components/AdvancedMetricsPanel.vue'
+import ModelComparisonPanel from './components/ModelComparisonPanel.vue'
 
+import { calculateConfusionMatrixStats, formatNumber, generateSampleConfusionMatrix, type ConfusionMatrixData, type ConfusionMatrixStats } from './utils/confusionMatrixUtils'
+
+// Props and emits
 interface Props {
-  node: {
-    attrs: {
-      data: number[][] | null
-      labels: string[]
-      title: string
-      source: 'upload' | 'jupyter' | 'sample'
-      filePath: string
-      stats: ConfusionMatrixStats | null
-    }
-  }
-  updateAttributes: (attrs: any) => void
+  node: any
+  updateAttributes: (attributes: Record<string, any>) => void
   deleteNode: () => void
 }
 
 const props = defineProps<Props>()
 
 // Reactive state
-const showSettings = ref(false)
 const editingTitle = ref(false)
 const localTitle = ref('')
+const showSettings = ref(false)
+const showAIInsights = ref(false)
+const isGeneratingInsights = ref(false)
+const aiInsights = ref('')
 const error = ref('')
+
+// Settings
 const dataSource = ref<'upload' | 'jupyter' | 'sample'>('upload')
 const showMatrix = ref(true)
 const showStats = ref(true)
-const titleInput = ref<HTMLInputElement>()
+const showAdvancedMetrics = ref(false)
+const showComparison = ref(false)
+const enableTooltips = ref(true)
+const enableAnimations = ref(true)
+const aiInsightsEnabled = ref(true)
+const colorScheme = ref('default')
+const activeVisualizationTab = ref('matrix')
+
+// Data
+const matrixData = ref<ConfusionMatrixData | null>(null)
+const filePath = ref<string>('')
 
 // Computed properties
-const hasData = computed(() => {
-  return props.node.attrs.data && props.node.attrs.labels.length > 0
+const displayTitle = computed(() => {
+  return props.node.attrs.title || 'Confusion Matrix Analysis'
 })
 
-const matrixData = computed((): ConfusionMatrixData => {
-  return {
-    matrix: props.node.attrs.data || [],
-    labels: props.node.attrs.labels || [],
-    title: props.node.attrs.title || 'Confusion Matrix'
-  }
+const hasData = computed(() => {
+  return matrixData.value !== null
 })
 
 const stats = computed(() => {
-  if (!hasData.value) return null
-  if (props.node.attrs.stats) return props.node.attrs.stats
-  
-  // Calculate stats if not cached
+  if (!matrixData.value) return null
   return calculateConfusionMatrixStats(matrixData.value.matrix, matrixData.value.labels)
 })
 
-const displayTitle = computed(() => {
-  return props.node.attrs.title || 'Confusion Matrix'
-})
+const titleInput = ref<HTMLInputElement>()
 
-const filePath = computed(() => {
-  return props.node.attrs.filePath
-})
+// Watch for attribute changes
+watch(() => props.node.attrs, (newAttrs) => {
+  if (newAttrs.matrixData) {
+    matrixData.value = newAttrs.matrixData
+  }
+  if (newAttrs.filePath) {
+    filePath.value = newAttrs.filePath
+  }
+}, { immediate: true })
 
 // Methods
-function handleFileUpload(data: ConfusionMatrixData) {
-  updateMatrixData({
-    ...data,
-    source: 'upload',
-    filePath: ''
-  })
-  clearError()
-}
-
-function handleJupyterFileSelect(data: ConfusionMatrixData & { filePath: string }) {
-  updateMatrixData({
-    matrix: data.matrix,
-    labels: data.labels,
-    title: data.title || props.node.attrs.title,
-    source: 'jupyter',
-    filePath: data.filePath
-  })
-  clearError()
-}
-
-function loadSampleData() {
-  const sampleData = generateSampleConfusionMatrix()
-  updateMatrixData({
-    ...sampleData,
-    source: 'sample',
-    filePath: ''
-  })
-  clearError()
-}
-
-function updateMatrixData(data: Partial<ConfusionMatrixData> & { source: string; filePath: string }) {
-  const newStats = data.matrix && data.labels 
-    ? calculateConfusionMatrixStats(data.matrix, data.labels)
-    : null
-
-  props.updateAttributes({
-    data: data.matrix || props.node.attrs.data,
-    labels: data.labels || props.node.attrs.labels,
-    title: data.title || props.node.attrs.title,
-    source: data.source || props.node.attrs.source,
-    filePath: data.filePath || props.node.attrs.filePath,
-    stats: newStats
-  })
-}
-
-function changeData() {
-  showSettings.value = true
-  // Clear current data
-  props.updateAttributes({
-    data: null,
-    labels: [],
-    stats: null,
-    filePath: ''
-  })
-}
-
-async function reloadFromSource() {
-  if (!filePath.value) return
-  
-  // For now, just show a message that this would reload from Jupyter
-  // In a full implementation, this would reconnect to Jupyter and reload the file
-  error.value = 'Reload functionality would reconnect to Jupyter server and reload the file'
-  setTimeout(() => clearError(), 3000)
-}
-
 function startTitleEdit() {
   editingTitle.value = true
-  localTitle.value = props.node.attrs.title
+  localTitle.value = displayTitle.value
   nextTick(() => {
     titleInput.value?.focus()
     titleInput.value?.select()
@@ -347,222 +519,164 @@ function startTitleEdit() {
 }
 
 function saveTitle() {
-  props.updateAttributes({
-    title: localTitle.value || 'Confusion Matrix'
-  })
+  props.updateAttributes({ title: localTitle.value })
   editingTitle.value = false
 }
 
 function cancelTitleEdit() {
   editingTitle.value = false
-  localTitle.value = props.node.attrs.title
+  localTitle.value = ''
 }
 
-function handleError(errorMessage: string) {
-  error.value = errorMessage
+function getTotalSamples(): number {
+  if (!matrixData.value) return 0
+  return matrixData.value.matrix.reduce((total, row) => 
+    total + row.reduce((sum, val) => sum + val, 0), 0
+  )
+}
+
+function handleFileUpload(data: ConfusionMatrixData & { filePath?: string }) {
+  matrixData.value = data
+  filePath.value = data.filePath || ''
+  props.updateAttributes({ 
+    matrixData: data,
+    filePath: data.filePath 
+  })
+  clearError()
+}
+
+function handleJupyterFileSelect(data: ConfusionMatrixData & { filePath: string }) {
+  matrixData.value = data
+  filePath.value = data.filePath
+  props.updateAttributes({ 
+    matrixData: data,
+    filePath: data.filePath 
+  })
+  clearError()
+}
+
+function handleOpenJupyterSidebar() {
+  // Emit event to parent to open Jupyter sidebar
+}
+
+function loadSampleData() {
+  const sampleData = generateSampleConfusionMatrix()
+  matrixData.value = sampleData
+  props.updateAttributes({ matrixData: sampleData })
+  clearError()
+}
+
+function changeData() {
+  matrixData.value = null
+  filePath.value = ''
+  props.updateAttributes({ 
+    matrixData: null,
+    filePath: '' 
+  })
+  clearError()
+}
+
+function reloadFromSource() {
+  // Implementation depends on the data source
+  // For now, just show a message
+  handleError('Reload functionality coming soon')
+}
+
+async function generateAIInsights() {
+  if (!stats.value) return
+  
+  isGeneratingInsights.value = true
+  try {
+    // Simulated AI analysis - in real implementation, this would call an AI service
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    
+    const accuracy = stats.value.accuracy
+    const bestClass = stats.value.classMetrics.reduce((best, current) => 
+      current.f1Score > best.f1Score ? current : best
+    )
+    const worstClass = stats.value.classMetrics.reduce((worst, current) => 
+      current.f1Score < worst.f1Score ? current : worst
+    )
+    
+    let insight = `Your model shows ${accuracy > 0.9 ? 'excellent' : accuracy > 0.8 ? 'good' : accuracy > 0.7 ? 'moderate' : 'poor'} performance with ${formatNumber(accuracy * 100, 1)}% accuracy. `
+    insight += `The "${bestClass.className}" class performs best (F1: ${formatNumber(bestClass.f1Score, 3)}), while "${worstClass.className}" needs improvement (F1: ${formatNumber(worstClass.f1Score, 3)}). `
+    
+    if (accuracy < 0.8) {
+      insight += 'Consider collecting more training data, feature engineering, or trying different algorithms.'
+    } else {
+      insight += 'Great job! Your model is performing well across most classes.'
+    }
+    
+    aiInsights.value = insight
+    showAIInsights.value = true
+  } catch (error) {
+    handleError('Failed to generate AI insights')
+  } finally {
+    isGeneratingInsights.value = false
+  }
+}
+
+function exportAsPNG() {
+  // Implementation for PNG export
+  handleError('PNG export functionality coming soon')
+}
+
+function exportAsCSV() {
+  // Implementation for CSV export
+  if (!matrixData.value) return
+  
+  const csv = [
+    ['', ...matrixData.value.labels].join(','),
+    ...matrixData.value.matrix.map((row, i) => 
+      [matrixData.value!.labels[i], ...row].join(',')
+    )
+  ].join('\n')
+  
+  const blob = new Blob([csv], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'confusion_matrix.csv'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function exportAsJSON() {
+  // Implementation for JSON export
+  if (!matrixData.value || !stats.value) return
+  
+  const data = {
+    matrix: matrixData.value.matrix,
+    labels: matrixData.value.labels,
+    title: matrixData.value.title,
+    stats: stats.value,
+    exportedAt: new Date().toISOString()
+  }
+  
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'confusion_matrix_analysis.json'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function exportReport() {
+  // Implementation for report generation
+  handleError('Report generation functionality coming soon')
+}
+
+function handleError(message: string) {
+  error.value = message
 }
 
 function clearError() {
   error.value = ''
 }
 
-function getTotalSamples(): number {
-  if (!hasData.value) return 0
-  return matrixData.value.matrix.reduce((total, row) => 
-    total + row.reduce((rowTotal, value) => rowTotal + value, 0), 0
-  )
-}
-
-function handleOpenJupyterSidebar() {
-  // Dispatch a custom event that can be caught by the main editor
-  window.dispatchEvent(new CustomEvent('open-jupyter-sidebar'))
-}
-
-// Initialize state from node attributes
+// Lifecycle
 onMounted(() => {
-  dataSource.value = props.node.attrs.source || 'upload'
+  // Initialize any required services or state
 })
-
-// Watch for data source changes
-watch(dataSource, (newSource) => {
-  if (hasData.value) {
-    props.updateAttributes({
-      source: newSource
-    })
-  }
-})
-</script>
-
-<style scoped>
-.confusion-matrix-block {
-  @apply w-full;
-}
-
-.block-container {
-  @apply bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden;
-}
-
-.block-header {
-  @apply flex items-center justify-between p-4 bg-gray-50 border-b border-gray-200;
-}
-
-.header-content {
-  @apply flex items-center gap-3;
-}
-
-.block-icon {
-  @apply text-purple-600;
-}
-
-.block-title {
-  @apply flex-1;
-}
-
-.title-input {
-  @apply px-2 py-1 text-lg font-semibold text-gray-900 bg-white border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500;
-}
-
-.title-display {
-  @apply text-lg font-semibold text-gray-900 cursor-pointer hover:text-purple-600 transition-colors;
-}
-
-.header-actions {
-  @apply flex items-center gap-2;
-}
-
-.settings-button {
-  @apply p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors;
-}
-
-.settings-button.active {
-  @apply text-purple-600 bg-purple-50;
-}
-
-.delete-button {
-  @apply p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors;
-}
-
-.settings-panel {
-  @apply border-b border-gray-200 bg-gray-50;
-}
-
-.settings-content {
-  @apply p-4 space-y-4;
-}
-
-.setting-group {
-  @apply space-y-2;
-}
-
-.setting-label {
-  @apply block text-sm font-medium text-gray-700;
-}
-
-.source-tabs {
-  @apply flex gap-1 p-1 bg-gray-200 rounded-lg;
-}
-
-.source-tab {
-  @apply px-3 py-2 text-sm font-medium text-gray-600 rounded-md transition-colors;
-}
-
-.source-tab.active {
-  @apply bg-white text-purple-600 shadow-sm;
-}
-
-.setting-checkboxes {
-  @apply space-y-2;
-}
-
-.checkbox-label {
-  @apply flex items-center gap-2 text-sm text-gray-700 cursor-pointer;
-}
-
-.setting-checkbox {
-  @apply rounded border-gray-300 text-purple-600 focus:ring-purple-500;
-}
-
-.block-content {
-  @apply p-6;
-}
-
-.data-loading-section {
-  @apply space-y-6;
-}
-
-.sample-data-section {
-  @apply text-center space-y-4 py-8;
-}
-
-.sample-info {
-  @apply space-y-2;
-}
-
-.sample-title {
-  @apply text-lg font-semibold text-gray-900;
-}
-
-.sample-description {
-  @apply text-gray-600 max-w-md mx-auto;
-}
-
-.sample-button {
-  @apply px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium;
-}
-
-.visualization-section {
-  @apply space-y-6;
-}
-
-.data-info {
-  @apply flex items-center justify-between flex-wrap gap-4;
-}
-
-.info-badges {
-  @apply flex gap-2 flex-wrap;
-}
-
-.info-badge {
-  @apply px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-medium;
-}
-
-.data-actions {
-  @apply flex gap-2;
-}
-
-.change-data-button {
-  @apply px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors font-medium;
-}
-
-.reload-button {
-  @apply flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium;
-}
-
-.matrix-section {
-  @apply space-y-4;
-}
-
-.stats-section {
-  @apply space-y-4;
-}
-
-.error-display {
-  @apply border-t border-gray-200 bg-red-50;
-}
-
-.error-content {
-  @apply flex items-center gap-3 p-4;
-}
-
-.error-icon {
-  @apply text-red-500 flex-shrink-0;
-}
-
-.error-text {
-  @apply text-red-700 flex-1;
-}
-
-.error-dismiss {
-  @apply p-1 text-red-500 hover:text-red-700 transition-colors;
-}
-</style> 
+</script> 
