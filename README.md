@@ -33,7 +33,6 @@ Transform your notes into powerful tools with code snippets execution, markdown 
 
 ### 🤖 AI Assistance
 - **AI Assistant**: Get help with writing, research, and code
-- **VIBE System**: Virtual Intelligence for Better Efficiency with task-based workflows
 - **Multiple AI Providers**: Support for various AI models
 - **Context-Aware**: AI that understands your notes and preferences
 

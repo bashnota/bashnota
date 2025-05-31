@@ -27,7 +27,6 @@ import { SubfigureExtension } from '../blocks'
 import GlobalDragHandle from './DragHandlePlugin'
 import { InlineAIGenerationExtension } from './InlineAIGenerationExtension'
 import { CitationExtension, BibliographyExtension } from './CitationExtension'
-import { VibeExtension } from './VibeExtension'
 import { TheoremExtension } from '../blocks/theorem-block'
 
 // Import command-related extensions
@@ -110,7 +109,6 @@ export function getEditorExtensions() {
     InlineAIGenerationExtension,
     CitationExtension,
     BibliographyExtension,
-    VibeExtension,
     TheoremExtension,
   ]
 }
