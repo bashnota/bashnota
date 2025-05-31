@@ -35,52 +35,25 @@ import UnifiedAISettings from '@/components/settings/ai/UnifiedAISettings.vue'
 import JupyterSettings from '@/components/settings/JupyterSettings.vue'
 import VibeSettings from '@/components/settings/VibeSettings.vue'
 import UserTagEditor from '@/components/auth/UserTagEditor.vue'
+import WorkspaceSettings from '@/components/settings/workspace/WorkspaceSettings.vue'
 import { logger } from '@/services/logger'
 import { useAuthStore } from '@/stores/auth'
-import { useTheme } from '@/composables/theme'
-import ThemeSelector from '@/components/layout/ThemeSelector.vue'
-import ThemeModeSelector from '@/components/layout/ThemeModeSelector.vue'
-import DarkIntensitySelector from '@/components/layout/DarkIntensitySelector.vue'
 
 // Stores and composables
 const shortcutsStore = useShortcutsStore()
 const notaStore = useNotaStore()
 const authStore = useAuthStore()
-const { isDark } = useTheme()
+
+// Component refs
+const workspaceSettingsRef = ref()
 
 // Computed properties
 const isAuthenticated = computed(() => authStore.isAuthenticated)
-
-// Settings state
-const interfaceSettings = ref({
-  sidebarWidth: [280],
-  animationSpeed: [0.5],
-  compactMode: false,
-  showLineNumbers: true,
-})
-
-const editorSettings = ref({
-  autoSave: true,
-  dragHandleWidth: [24],
-  fontSize: [16],
-  lineHeight: [1.6],
-  spellCheck: true,
-  tabSize: [2],
-  indentWithTabs: false,
-  wordWrap: true,
-})
 
 // Shortcuts editing state
 const isEditingShortcut = ref(false)
 const currentEditingShortcut = ref<{ id?: string; key: string; description: string; category?: string } | null>(null)
 const newShortcutKey = ref('')
-
-// Computed properties
-const animationSpeedLabel = computed(() => {
-  if (interfaceSettings.value.animationSpeed[0] < 0.3) return 'Slow'
-  if (interfaceSettings.value.animationSpeed[0] > 0.7) return 'Fast'
-  return 'Normal'
-})
 
 const browserInfo = computed(() => {
   if (typeof navigator !== 'undefined') {
@@ -120,56 +93,9 @@ const otherShortcuts = computed(() => {
 
 // Lifecycle
 onMounted(() => {
-  // Load settings from localStorage
-  loadSettings()
   // Load shortcuts
   shortcutsStore.loadShortcuts()
 })
-
-// Settings management
-const loadSettings = () => {
-  // Load interface settings
-  const savedInterfaceSettings = localStorage.getItem('interface-settings')
-  if (savedInterfaceSettings) {
-    try {
-      interfaceSettings.value = { ...interfaceSettings.value, ...JSON.parse(savedInterfaceSettings) }
-    } catch (e) {
-      logger.error('Failed to parse saved interface settings', e)
-    }
-  }
-  
-  // Load editor settings
-  const savedEditorSettings = localStorage.getItem('editor-settings')
-  if (savedEditorSettings) {
-    try {
-      editorSettings.value = { ...editorSettings.value, ...JSON.parse(savedEditorSettings) }
-    } catch (e) {
-      logger.error('Failed to parse saved editor settings', e)
-    }
-  }
-}
-
-const saveInterfaceSettings = () => {
-  localStorage.setItem('interface-settings', JSON.stringify(interfaceSettings.value))
-  
-  // Apply settings immediately
-  if (window.dispatchEvent) {
-    window.dispatchEvent(new CustomEvent('interface-settings-changed', { 
-      detail: interfaceSettings.value 
-    }))
-  }
-}
-
-const saveEditorSettings = () => {
-  localStorage.setItem('editor-settings', JSON.stringify(editorSettings.value))
-  
-  // Apply settings immediately
-  if (window.dispatchEvent) {
-    window.dispatchEvent(new CustomEvent('editor-settings-changed', { 
-      detail: editorSettings.value 
-    }))
-  }
-}
 
 // Utility functions
 const clearCache = () => {
@@ -201,27 +127,8 @@ const formatStorageSize = () => {
 
 const resetAllSettings = () => {
   if (confirm('Are you sure you want to reset all settings to default?')) {
-    // Reset interface settings
-    interfaceSettings.value = {
-      sidebarWidth: [280],
-      animationSpeed: [0.5],
-      compactMode: false,
-      showLineNumbers: true,
-    }
-    saveInterfaceSettings()
-    
-    // Reset editor settings
-    editorSettings.value = {
-      autoSave: true,
-      dragHandleWidth: [24],
-      fontSize: [16],
-      lineHeight: [1.6],
-      spellCheck: true,
-      tabSize: [2],
-      indentWithTabs: false,
-      wordWrap: true,
-    }
-    saveEditorSettings()
+    // Reset workspace settings through the workspace component
+    workspaceSettingsRef.value?.resetAllWorkspaceSettings()
     
     toast({
       title: 'Settings Reset',
@@ -364,244 +271,7 @@ function formatShortcutKey(key: string) {
 
         <!-- Workspace Tab -->
         <TabsContent value="workspace" class="space-y-6">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- Theme & Appearance Card -->
-            <Card class="border-2 hover:border-primary/50 transition-all">
-              <CardHeader class="bg-muted/50">
-                <CardTitle class="flex items-center gap-2">
-                  <Palette class="h-5 w-5 text-primary" />
-                  Theme & Appearance
-                </CardTitle>
-                <CardDescription>Customize the look and feel of the application</CardDescription>
-              </CardHeader>
-              <CardContent class="pt-6">
-                <ThemeSelector />
-                <div class="mt-6">
-                  <ThemeModeSelector />
-                </div>
-                <div class="mt-6" v-if="isDark">
-                  <DarkIntensitySelector />
-                </div>
-              </CardContent>
-            </Card>
-
-            <!-- Interface Behavior Card -->
-            <Card class="border-2 hover:border-primary/50 transition-all">
-              <CardHeader class="bg-muted/50">
-                <CardTitle class="flex items-center gap-2">
-                  <Settings class="h-5 w-5 text-primary" />
-                  Interface Behavior
-                </CardTitle>
-                <CardDescription>Configure interface animations and interactions</CardDescription>
-              </CardHeader>
-              <CardContent class="pt-6">
-                <div class="space-y-6">
-                  <div class="space-y-2">
-                    <div class="flex items-center justify-between">
-                      <Label for="animation-speed">Animation Speed</Label>
-                      <Badge variant="outline">{{ animationSpeedLabel }}</Badge>
-                    </div>
-                    <Slider 
-                      id="animation-speed" 
-                      v-model="interfaceSettings.animationSpeed" 
-                      :min="0.1" 
-                      :max="2" 
-                      :step="0.1"
-                      @update:modelValue="saveInterfaceSettings"
-                    />
-                  </div>
-                  
-                  <div class="space-y-2">
-                    <div class="flex items-center justify-between">
-                      <Label for="sidebar-width">Sidebar Width</Label>
-                      <Badge variant="outline">{{ interfaceSettings.sidebarWidth[0] }}px</Badge>
-                    </div>
-                    <Slider 
-                      id="sidebar-width" 
-                      v-model="interfaceSettings.sidebarWidth" 
-                      :min="200" 
-                      :max="400" 
-                      :step="10"
-                      @update:modelValue="saveInterfaceSettings"
-                    />
-                  </div>
-                  
-                  <Separator />
-                  
-                  <div class="flex items-center justify-between pt-2">
-                    <div class="space-y-0.5">
-                      <Label for="compact-mode">Compact Mode</Label>
-                      <p class="text-sm text-muted-foreground">Reduce spacing for more content</p>
-                    </div>
-                    <Switch 
-                      id="compact-mode" 
-                      v-model="interfaceSettings.compactMode" 
-                      @update:modelValue="saveInterfaceSettings"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <!-- Editor Settings Row -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- Text Editing Card -->
-            <Card class="border-2 hover:border-primary/50 transition-all">
-              <CardHeader class="bg-muted/50">
-                <CardTitle class="flex items-center gap-2">
-                  <Code2 class="h-5 w-5 text-primary" />
-                  Text Editing
-                </CardTitle>
-                <CardDescription>Configure text editing and display preferences</CardDescription>
-              </CardHeader>
-              <CardContent class="pt-6">
-                <div class="space-y-6">
-                  <div class="space-y-2">
-                    <div class="flex items-center justify-between">
-                      <Label for="font-size">Font Size</Label>
-                      <Badge variant="outline">{{ editorSettings.fontSize[0] }}px</Badge>
-                    </div>
-                    <Slider 
-                      id="font-size" 
-                      v-model="editorSettings.fontSize" 
-                      :min="12" 
-                      :max="24" 
-                      :step="1" 
-                      class="flex-1"
-                      @update:modelValue="saveEditorSettings"
-                    />
-                  </div>
-                  
-                  <div class="space-y-2">
-                    <div class="flex items-center justify-between">
-                      <Label for="line-height">Line Height</Label>
-                      <Badge variant="outline">{{ editorSettings.lineHeight[0] }}</Badge>
-                    </div>
-                    <Slider 
-                      id="line-height" 
-                      v-model="editorSettings.lineHeight" 
-                      :min="1" 
-                      :max="2" 
-                      :step="0.1" 
-                      class="flex-1"
-                      @update:modelValue="saveEditorSettings"
-                    />
-                  </div>
-                  
-                  <Separator />
-                  
-                  <div class="flex items-center justify-between">
-                    <div class="space-y-0.5">
-                      <Label for="word-wrap">Word Wrap</Label>
-                      <p class="text-sm text-muted-foreground">Wrap text to fit the editor width</p>
-                    </div>
-                    <Switch 
-                      id="word-wrap" 
-                      v-model="editorSettings.wordWrap" 
-                      @update:modelValue="saveEditorSettings"
-                    />
-                  </div>
-                  
-                  <div class="flex items-center justify-between">
-                    <div class="space-y-0.5">
-                      <Label for="spell-check">Spell Check</Label>
-                      <p class="text-sm text-muted-foreground">Enable spell checking in the editor</p>
-                    </div>
-                    <Switch 
-                      id="spell-check" 
-                      v-model="editorSettings.spellCheck" 
-                      @update:modelValue="saveEditorSettings"
-                    />
-                  </div>
-
-                  <div class="flex items-center justify-between">
-                    <div class="space-y-0.5">
-                      <Label for="show-line-numbers">Show Line Numbers</Label>
-                      <p class="text-sm text-muted-foreground">Display line numbers in code blocks</p>
-                    </div>
-                    <Switch 
-                      id="show-line-numbers" 
-                      v-model="interfaceSettings.showLineNumbers" 
-                      @update:modelValue="saveInterfaceSettings"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <!-- Code Editing Card -->
-            <Card class="border-2 hover:border-primary/50 transition-all">
-              <CardHeader class="bg-muted/50">
-                <CardTitle class="flex items-center gap-2">
-                  <Cpu class="h-5 w-5 text-primary" />
-                  Code Editing
-                </CardTitle>
-                <CardDescription>Configure coding and formatting preferences</CardDescription>
-              </CardHeader>
-              <CardContent class="pt-6">
-                <div class="space-y-6">
-                  <div class="space-y-2">
-                    <div class="flex items-center justify-between">
-                      <Label for="tab-size">Tab Size</Label>
-                      <Badge variant="outline">{{ editorSettings.tabSize[0] }} spaces</Badge>
-                    </div>
-                    <Slider 
-                      id="tab-size" 
-                      v-model="editorSettings.tabSize" 
-                      :min="2" 
-                      :max="8" 
-                      :step="2" 
-                      class="flex-1"
-                      @update:modelValue="saveEditorSettings"
-                    />
-                  </div>
-                  
-                  <div class="space-y-2">
-                    <div class="flex items-center justify-between">
-                      <Label for="drag-handle-width">Drag Handle Width</Label>
-                      <Badge variant="outline">{{ editorSettings.dragHandleWidth[0] }}px</Badge>
-                    </div>
-                    <Slider 
-                      id="drag-handle-width" 
-                      v-model="editorSettings.dragHandleWidth" 
-                      :min="16" 
-                      :max="40" 
-                      :step="2" 
-                      class="flex-1"
-                      @update:modelValue="saveEditorSettings"
-                    />
-                  </div>
-                  
-                  <Separator />
-                  
-                  <div class="flex items-center justify-between">
-                    <div class="space-y-0.5">
-                      <Label for="indent-with-tabs">Indent with Tabs</Label>
-                      <p class="text-sm text-muted-foreground">Use tabs instead of spaces for indentation</p>
-                    </div>
-                    <Switch 
-                      id="indent-with-tabs" 
-                      v-model="editorSettings.indentWithTabs" 
-                      @update:modelValue="saveEditorSettings"
-                    />
-                  </div>
-                  
-                  <div class="flex items-center justify-between">
-                    <div class="space-y-0.5">
-                      <Label for="auto-save">Auto Save</Label>
-                      <p class="text-sm text-muted-foreground">Automatically save changes as you type</p>
-                    </div>
-                    <Switch 
-                      id="auto-save" 
-                      v-model="editorSettings.autoSave" 
-                      @update:modelValue="saveEditorSettings"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <WorkspaceSettings ref="workspaceSettingsRef" />
         </TabsContent>
 
         <!-- AI Tab -->
