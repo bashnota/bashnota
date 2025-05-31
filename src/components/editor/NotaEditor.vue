@@ -597,6 +597,12 @@ onMounted(() => {
     }
   }) as EventListener)
 
+  // Add event listener for opening Jupyter sidebar from confusion matrix blocks
+  window.addEventListener('open-jupyter-sidebar', (() => {
+    // Open the Jupyter sidebar
+    sidebars.jupyter.isOpen = true;
+  }) as EventListener)
+
   // Load saved sidebar states and widths
   try {
     // Load sidebar open/closed states from localStorage
@@ -704,6 +710,7 @@ onUnmounted(() => {
   document.removeEventListener('keydown', handleKeyboardShortcuts)
   window.removeEventListener('toggle-references', (() => { }) as EventListener)
   window.removeEventListener('activate-ai-assistant', (() => { }) as EventListener)
+  window.removeEventListener('open-jupyter-sidebar', (() => { }) as EventListener)
   codeExecutionStore.cleanup()
 })
 

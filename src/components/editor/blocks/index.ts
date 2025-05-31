@@ -17,6 +17,15 @@ import TheoremExtension, {
   TheoremBlock,
 } from './theorem-block'
 
+import {
+  ConfusionMatrixExtension,
+  ConfusionMatrixBlock,
+  FileUpload,
+  JupyterFileBrowser,
+  InteractiveMatrix,
+  StatsVisualization,
+} from './confusion-matrix'
+
 import Citation from './Citation.vue'
 import Bibliography from './Bibliography.vue'
 import SubNotaDialog from './SubNotaDialog.vue'
@@ -47,6 +56,14 @@ export {
   
   // Dialog components
   SubNotaDialog,
+
+  // Confusion Matrix components
+  ConfusionMatrixExtension,
+  ConfusionMatrixBlock,
+  FileUpload,
+  JupyterFileBrowser,
+  InteractiveMatrix,
+  StatsVisualization,
 }
 
 // Export a map of all extensions for easier registration
@@ -54,6 +71,7 @@ export const blockExtensions = {
   subfigure: SubfigureExtension,
   math: MathExtension,
   theorem: TheoremExtension,
+  confusionMatrix: ConfusionMatrixExtension,
 }
 
 export default blockExtensions

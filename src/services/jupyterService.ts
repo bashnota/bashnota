@@ -1,9 +1,289 @@
 import axios, { AxiosError } from 'axios'
-import type { JupyterServer, ExecutionResult, KernelSpec, WSMessage } from '@/types/jupyter'
+import type { 
+  JupyterServer, 
+  ExecutionResult, 
+  KernelSpec, 
+  WSMessage,
+  ManagedJupyterServer,
+  JupyterFile,
+  JupyterDirectory,
+  JupyterKernel,
+  JupyterSession
+} from '@/types/jupyter'
 import { v4 as uuidv4 } from 'uuid'
 import { logger } from '@/services/logger'
 
 export class JupyterService {
+  private servers: Map<string, ManagedJupyterServer> = new Map()
+  private connectedServers: Set<string> = new Set()
+
+  /**
+   * Add a Jupyter server configuration
+   */
+  addServer(server: Omit<ManagedJupyterServer, 'id' | 'status'>): string {
+    const id = crypto.randomUUID()
+    const jupyterServer: ManagedJupyterServer = {
+      ...server,
+      id,
+      status: 'disconnected',
+    }
+    this.servers.set(id, jupyterServer)
+    return id
+  }
+
+  /**
+   * Get all configured servers
+   */
+  getServers(): ManagedJupyterServer[] {
+    return Array.from(this.servers.values())
+  }
+
+  /**
+   * Get a specific server by ID
+   */
+  getServer(id: string): ManagedJupyterServer | undefined {
+    return this.servers.get(id)
+  }
+
+  /**
+   * Remove a server configuration
+   */
+  removeServer(id: string): boolean {
+    this.connectedServers.delete(id)
+    return this.servers.delete(id)
+  }
+
+  /**
+   * Get list of connected servers
+   */
+  getConnectedServers(): ManagedJupyterServer[] {
+    return Array.from(this.connectedServers)
+      .map(id => this.servers.get(id))
+      .filter(Boolean) as ManagedJupyterServer[]
+  }
+
+  /**
+   * Browse files and directories on a Jupyter server
+   */
+  async browseDirectory(serverId: string, path: string = ''): Promise<JupyterDirectory> {
+    const server = this.servers.get(serverId)
+    if (!server) {
+      throw new Error('Server not found')
+    }
+
+    if (!this.connectedServers.has(serverId)) {
+      const connected = await this.testConnectionById(serverId)
+      if (!connected) {
+        throw new Error('Failed to connect to Jupyter server')
+      }
+    }
+
+    try {
+      const encodedPath = encodeURIComponent(path)
+      const response = await this.makeRequest(
+        server, 
+        `/contents/${encodedPath}`, 
+        'GET'
+      )
+
+      if (!response.ok) {
+        throw new Error(`Failed to browse directory: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      
+      if (data.type !== 'directory') {
+        throw new Error('Path is not a directory')
+      }
+
+      const files: JupyterFile[] = data.content.map((item: any) => ({
+        name: item.name,
+        path: item.path,
+        type: item.type,
+        size: item.size,
+        lastModified: item.last_modified,
+      }))
+
+      return {
+        path: data.path,
+        files,
+      }
+    } catch (error) {
+      logger.error('Failed to browse directory:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Get file content from Jupyter server
+   */
+  async getFileContent(serverId: string, filePath: string): Promise<string> {
+    const server = this.servers.get(serverId)
+    if (!server) {
+      throw new Error('Server not found')
+    }
+
+    if (!this.connectedServers.has(serverId)) {
+      const connected = await this.testConnectionById(serverId)
+      if (!connected) {
+        throw new Error('Failed to connect to Jupyter server')
+      }
+    }
+
+    try {
+      const encodedPath = encodeURIComponent(filePath)
+      const response = await this.makeRequest(
+        server, 
+        `/contents/${encodedPath}`, 
+        'GET'
+      )
+
+      if (!response.ok) {
+        throw new Error(`Failed to get file content: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      
+      if (data.type !== 'file') {
+        throw new Error('Path is not a file')
+      }
+
+      // Jupyter returns base64 encoded content for binary files
+      if (data.format === 'base64') {
+        return atob(data.content)
+      }
+      
+      return data.content || ''
+    } catch (error) {
+      logger.error('Failed to get file content:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Check if a file is a CSV file
+   */
+  isCSVFile(fileName: string): boolean {
+    return fileName.toLowerCase().endsWith('.csv')
+  }
+
+  /**
+   * Filter files to show only CSV files and directories
+   */
+  filterCSVFiles(files: JupyterFile[]): JupyterFile[] {
+    return files.filter(file => 
+      file.type === 'directory' || this.isCSVFile(file.name)
+    )
+  }
+
+  /**
+   * Auto-discover local Jupyter servers
+   */
+  async discoverLocalServers(): Promise<ManagedJupyterServer[]> {
+    const commonPorts = [8888, 8889, 8890, 8891, 8892]
+    const discovered: ManagedJupyterServer[] = []
+
+    for (const port of commonPorts) {
+      try {
+        const url = `http://localhost:${port}`
+        const testServer: JupyterServer = {
+          ip: 'localhost',
+          port: port.toString(),
+          token: '',
+        }
+
+        const result = await this.testConnection(testServer)
+        if (result.success) {
+          discovered.push({
+            id: `local-${port}`,
+            name: `Local Jupyter (${port})`,
+            url,
+            ip: 'localhost',
+            port: port.toString(),
+            token: '',
+            status: 'connected',
+          })
+        }
+      } catch (error) {
+        // Server not available on this port
+        continue
+      }
+    }
+
+    return discovered
+  }
+
+  /**
+   * Test connection to a managed server by ID
+   */
+  async testConnectionById(serverId: string): Promise<boolean> {
+    const server = this.servers.get(serverId)
+    if (!server) {
+      throw new Error('Server not found')
+    }
+
+    try {
+      server.status = 'connecting'
+      this.servers.set(serverId, { ...server })
+
+      const result = await this.testConnection({
+        ip: server.ip,
+        port: server.port,
+        token: server.token
+      })
+      
+      if (result.success) {
+        server.status = 'connected'
+        this.connectedServers.add(serverId)
+      } else {
+        server.status = 'disconnected'
+        this.connectedServers.delete(serverId)
+      }
+      
+      this.servers.set(serverId, { ...server })
+      return result.success
+    } catch (error) {
+      server.status = 'disconnected'
+      this.connectedServers.delete(serverId)
+      this.servers.set(serverId, { ...server })
+      logger.error('Connection test failed:', error)
+      return false
+    }
+  }
+
+  /**
+   * Make HTTP request to managed Jupyter server
+   */
+  private async makeRequest(
+    server: ManagedJupyterServer, 
+    endpoint: string, 
+    method: 'GET' | 'POST' = 'GET',
+    body?: any
+  ): Promise<Response> {
+    const baseUrl = server.url || `http://${server.ip}:${server.port}`
+    const url = `${baseUrl.replace(/\/$/, '')}/api${endpoint}`
+    
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    }
+
+    if (server.token) {
+      headers['Authorization'] = `token ${server.token}`
+    }
+
+    const options: RequestInit = {
+      method,
+      headers,
+      mode: 'cors',
+    }
+
+    if (body && method === 'POST') {
+      options.body = JSON.stringify(body)
+    }
+
+    return fetch(url, options)
+  }
+
   /**
    * Parse a Jupyter URL into a JupyterServer object
    * Handles both standard Jupyter URLs and Kaggle Jupyter URLs
@@ -245,7 +525,7 @@ export class JupyterService {
     for (const msg of messages) {
       switch (msg.msg_type) {
         case 'execute_input':
-          result.content.execution_count = msg.content.execution_count
+          result.content.execution_count = msg.content.execution_count || 0
           break
         case 'stream':
           if (msg.content.name === 'stdout') {
@@ -324,7 +604,7 @@ export class JupyterService {
     }
   }
 
-  async getRunningKernels(server: JupyterServer) {
+  async getRunningKernels(server: JupyterServer): Promise<JupyterKernel[]> {
     try {
       const response = await axios.get(this.getUrlWithToken(server, '/kernels'))
       return response.data.map((kernel: any) => ({
@@ -339,7 +619,7 @@ export class JupyterService {
     }
   }
 
-  async getActiveSessions(server: JupyterServer) {
+  async getActiveSessions(server: JupyterServer): Promise<JupyterSession[]> {
     try {
       const response = await axios.get(this.getUrlWithToken(server, '/sessions'))
       return response.data.map((session: any) => ({
@@ -357,3 +637,33 @@ export class JupyterService {
     }
   }
 }
+
+// Create and export a singleton instance of the JupyterService
+export const jupyterService = new JupyterService()
+
+// Re-export types for convenience
+export type {
+  JupyterFile,
+  JupyterDirectory,
+  ManagedJupyterServer,
+  JupyterKernel,
+  JupyterSession
+} from '@/types/jupyter'
+
+// Default servers for common setups
+export const defaultJupyterServers = [
+  {
+    name: 'Local Jupyter Lab',
+    url: 'http://localhost:8888',
+    ip: 'localhost',
+    port: '8888',
+    token: '',
+  },
+  {
+    name: 'Local Jupyter Notebook',
+    url: 'http://localhost:8889',
+    ip: 'localhost', 
+    port: '8889',
+    token: '',
+  },
+]

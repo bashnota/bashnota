@@ -28,6 +28,7 @@ import GlobalDragHandle from './DragHandlePlugin'
 import { InlineAIGenerationExtension } from './InlineAIGenerationExtension'
 import { CitationExtension, BibliographyExtension } from './CitationExtension'
 import { TheoremExtension } from '../blocks/theorem-block'
+import { ConfusionMatrixExtension } from '../blocks/confusion-matrix'
 
 // Import command-related extensions
 import SlashCommands from './Commands'
@@ -110,6 +111,7 @@ export function getEditorExtensions() {
     CitationExtension,
     BibliographyExtension,
     TheoremExtension,
+    ConfusionMatrixExtension,
   ]
 }
 
@@ -169,5 +171,6 @@ export function getViewerExtensions() {
       },
     }),
     TheoremExtension,
+    ConfusionMatrixExtension,
   ]
 }
