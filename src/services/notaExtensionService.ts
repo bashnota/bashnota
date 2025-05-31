@@ -127,31 +127,7 @@ export class NotaExtensionService {
     })
   }
 
-  /**
-   * Insert a Vibe block
-   * @param query Initial query for the Vibe block
-   * @returns Success status
-   */
-  public insertVibe(query: string = ''): boolean {
-    this.ensureEditor()
-    return this.editor!.commands.insertContent({
-      type: 'vibe',
-      attrs: {
-        query,
-        isActive: false,
-      },
-    })
-  }
-
-  /**
-   * Update a Vibe block
-   * @param attrs Attributes to update
-   * @returns Success status
-   */
-  public updateVibe(attrs: Record<string, any>): boolean {
-    this.ensureEditor()
-    return this.editor!.commands.updateAttributes('vibe', attrs)
-  }
+ 
 
   /**
    * Set the current selection to heading of specified level

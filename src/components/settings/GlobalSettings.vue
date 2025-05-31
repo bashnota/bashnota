@@ -33,7 +33,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import UnifiedAISettings from '@/components/settings/ai/UnifiedAISettings.vue'
 import JupyterSettings from '@/components/settings/JupyterSettings.vue'
-import VibeSettings from '@/components/settings/VibeSettings.vue'
 import UserTagEditor from '@/components/auth/UserTagEditor.vue'
 import WorkspaceSettings from '@/components/settings/workspace/WorkspaceSettings.vue'
 import { logger } from '@/services/logger'
@@ -288,20 +287,6 @@ function formatShortcutKey(key: string) {
               </CardHeader>
               <CardContent class="pt-6">
                 <UnifiedAISettings />
-              </CardContent>
-            </Card>
-
-            <!-- Vibe AI System Card -->
-            <Card class="border-2 hover:border-primary/50 transition-all">
-              <CardHeader class="bg-muted/50">
-                <CardTitle class="flex items-center gap-2">
-                  <Brain class="h-5 w-5 text-primary" />
-                  Vibe AI System
-                </CardTitle>
-                <CardDescription>Configure AI actors, models, and behavioral settings for the multi-agent system</CardDescription>
-              </CardHeader>
-              <CardContent class="pt-6">
-                <VibeSettings />
               </CardContent>
             </Card>
           </div>
