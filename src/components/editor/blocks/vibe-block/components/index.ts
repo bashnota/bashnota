@@ -1,6 +1,0 @@
-export { default as VibeBlockHeader } from './VibeBlockHeader.vue'
-export { default as VibeInputPanel } from './VibeInputPanel.vue'
-export { default as VibeTaskList } from './VibeTaskList.vue'
-export { default as VibeTaskBoard } from './VibeTaskBoard.vue'
-export { default as VibeTaskDetails } from './VibeTaskDetails.vue'
-export { default as VibeDatabaseView } from './VibeDatabaseView.vue' 
