@@ -6,8 +6,6 @@ import {
   Keyboard, 
   Code2, 
   Database, 
-  Palette, 
-  Monitor, 
   Cpu, 
   SparklesIcon,
   Server,
@@ -15,17 +13,15 @@ import {
   RotateCw,
   Trash2,
   Copy,
-  Terminal,
-  Paintbrush,
   Settings2,
   Pencil,
   Brain,
-  User
+  User,
+  Palette
 } from 'lucide-vue-next'
 import { useShortcutsStore } from '@/stores/shortcutsStore'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -35,29 +31,27 @@ import { Separator } from '@/components/ui/separator'
 import { toast } from '@/components/ui/toast'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import AISettings from '@/components/settings/AISettings.vue'
+import UnifiedAISettings from '@/components/settings/ai/UnifiedAISettings.vue'
 import JupyterSettings from '@/components/settings/JupyterSettings.vue'
 import VibeSettings from '@/components/settings/VibeSettings.vue'
 import UserTagEditor from '@/components/auth/UserTagEditor.vue'
 import { logger } from '@/services/logger'
 import { useAuthStore } from '@/stores/auth'
-import { useTheme, useThemeColor, useDarkMode } from '@/composables/theme'
+import { useTheme } from '@/composables/theme'
 import ThemeSelector from '@/components/layout/ThemeSelector.vue'
 import ThemeModeSelector from '@/components/layout/ThemeModeSelector.vue'
 import DarkIntensitySelector from '@/components/layout/DarkIntensitySelector.vue'
 
-// Use shortcuts from the store instead of duplicating them
+// Stores and composables
 const shortcutsStore = useShortcutsStore()
 const notaStore = useNotaStore()
 const authStore = useAuthStore()
+const { isDark } = useTheme()
 
-// Get current user
+// Computed properties
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 
-// Use theme composable
-const { themeColor, themeMode, darkIntensity, isDark, setThemeColor, setThemeMode, setDarkIntensity } = useTheme()
-
-// Interface settings
+// Settings state
 const interfaceSettings = ref({
   sidebarWidth: [280],
   animationSpeed: [0.5],
@@ -65,7 +59,6 @@ const interfaceSettings = ref({
   showLineNumbers: true,
 })
 
-// Editor settings
 const editorSettings = ref({
   autoSave: true,
   dragHandleWidth: [24],
@@ -77,19 +70,18 @@ const editorSettings = ref({
   wordWrap: true,
 })
 
-// Keyboard shortcuts
+// Shortcuts editing state
 const isEditingShortcut = ref(false)
 const currentEditingShortcut = ref<{ id?: string; key: string; description: string; category?: string } | null>(null)
 const newShortcutKey = ref('')
 
-// Computed properties for display
+// Computed properties
 const animationSpeedLabel = computed(() => {
   if (interfaceSettings.value.animationSpeed[0] < 0.3) return 'Slow'
   if (interfaceSettings.value.animationSpeed[0] > 0.7) return 'Fast'
   return 'Normal'
 })
 
-// Add these computed properties to access browser information safely
 const browserInfo = computed(() => {
   if (typeof navigator !== 'undefined') {
     return {
@@ -104,7 +96,7 @@ const browserInfo = computed(() => {
   return { browser: 'Unknown', platform: 'Unknown' }
 })
 
-// Computed properties to filter shortcuts by category
+// Shortcuts filtering
 const editorShortcuts = computed(() => {
   return shortcutsStore.shortcuts.filter(shortcut => 
     shortcut.category === 'editor' || 
@@ -126,8 +118,17 @@ const otherShortcuts = computed(() => {
   )
 })
 
+// Lifecycle
 onMounted(() => {
-  // Load saved interface settings
+  // Load settings from localStorage
+  loadSettings()
+  // Load shortcuts
+  shortcutsStore.loadShortcuts()
+})
+
+// Settings management
+const loadSettings = () => {
+  // Load interface settings
   const savedInterfaceSettings = localStorage.getItem('interface-settings')
   if (savedInterfaceSettings) {
     try {
@@ -137,7 +138,7 @@ onMounted(() => {
     }
   }
   
-  // Load saved editor settings
+  // Load editor settings
   const savedEditorSettings = localStorage.getItem('editor-settings')
   if (savedEditorSettings) {
     try {
@@ -146,35 +147,12 @@ onMounted(() => {
       logger.error('Failed to parse saved editor settings', e)
     }
   }
-
-  // Load shortcuts on mount
-  shortcutsStore.loadShortcuts()
-})
-
-// Update theme
-const updateThemeMode = (mode: string) => {
-  setThemeMode(mode as any)
-  toast({
-    title: 'Theme Mode Updated',
-    description: `Theme mode set to ${mode}`,
-    variant: 'default'
-  })
 }
 
-const updateThemeColor = (color: string) => {
-  setThemeColor(color as any)
-  toast({
-    title: 'Theme Color Updated',
-    description: `Theme color set to ${color}`,
-    variant: 'default'
-  })
-}
-
-// Update interface settings
 const saveInterfaceSettings = () => {
   localStorage.setItem('interface-settings', JSON.stringify(interfaceSettings.value))
   
-  // Apply sidebar width immediately
+  // Apply settings immediately
   if (window.dispatchEvent) {
     window.dispatchEvent(new CustomEvent('interface-settings-changed', { 
       detail: interfaceSettings.value 
@@ -182,11 +160,10 @@ const saveInterfaceSettings = () => {
   }
 }
 
-// Update editor settings
 const saveEditorSettings = () => {
   localStorage.setItem('editor-settings', JSON.stringify(editorSettings.value))
   
-  // Apply editor settings immediately
+  // Apply settings immediately
   if (window.dispatchEvent) {
     window.dispatchEvent(new CustomEvent('editor-settings-changed', { 
       detail: editorSettings.value 
@@ -194,7 +171,7 @@ const saveEditorSettings = () => {
   }
 }
 
-// Clear cache
+// Utility functions
 const clearCache = () => {
   localStorage.removeItem('recent-searches')
   localStorage.removeItem('temp-data')
@@ -205,13 +182,25 @@ const clearCache = () => {
   })
 }
 
-// Reset all settings
+const formatStorageSize = () => {
+  try {
+    // Get localStorage usage estimate
+    let totalSize = 0
+    for (let key in localStorage) {
+      if (localStorage.hasOwnProperty(key)) {
+        totalSize += localStorage[key].length + key.length
+      }
+    }
+    // Convert to MB
+    const sizeInMB = (totalSize / (1024 * 1024)).toFixed(1)
+    return `${sizeInMB} MB`
+  } catch (error) {
+    return 'Unknown'
+  }
+}
+
 const resetAllSettings = () => {
   if (confirm('Are you sure you want to reset all settings to default?')) {
-    // Reset theme
-    setThemeMode('system')
-    setThemeColor('slate')
-    
     // Reset interface settings
     interfaceSettings.value = {
       sidebarWidth: [280],
@@ -242,17 +231,15 @@ const resetAllSettings = () => {
   }
 }
 
-// Add this function to edit a shortcut
+// Shortcut editing functions
 function editShortcut(shortcut: { id?: string; key: string; description: string; category?: string }) {
   currentEditingShortcut.value = shortcut
   newShortcutKey.value = shortcut.key
   isEditingShortcut.value = true
 }
 
-// Add this function to save the edited shortcut
 function saveShortcut() {
   if (currentEditingShortcut.value && newShortcutKey.value) {
-    // Add a check for id existence or provide a default
     const shortcutId = currentEditingShortcut.value.id || '';
     
     shortcutsStore.updateShortcut(
@@ -272,7 +259,6 @@ function saveShortcut() {
   newShortcutKey.value = ''
 }
 
-// Update the captureKey function to provide visual feedback
 function captureKey(event: KeyboardEvent) {
   event.preventDefault()
   event.stopPropagation()
@@ -303,13 +289,12 @@ function captureKey(event: KeyboardEvent) {
     return
   }
   
-  // Update the shortcut key with visual feedback
+  // Update the shortcut key
   newShortcutKey.value = `${meta}${ctrl}${alt}${shift}${key}`
   
-  // Add visual feedback
+  // Visual feedback
   const inputElement = document.getElementById('shortcut-input')
   if (inputElement) {
-    // Add a flash effect
     inputElement.classList.add('shortcut-flash')
     setTimeout(() => {
       inputElement.classList.remove('shortcut-flash')
@@ -317,7 +302,6 @@ function captureKey(event: KeyboardEvent) {
   }
 }
 
-// Add this function to reset shortcuts
 function resetShortcuts() {
   if (confirm('Are you sure you want to reset all keyboard shortcuts to default?')) {
     shortcutsStore.resetToDefaults()
@@ -329,7 +313,6 @@ function resetShortcuts() {
   }
 }
 
-// Add this function to format the shortcut key for display
 function formatShortcutKey(key: string) {
   return key.split('+').map(part => {
     return `<kbd class="px-2 py-1 mx-1 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg dark:bg-gray-600 dark:text-gray-100 dark:border-gray-500">${part}</kbd>`
@@ -351,18 +334,18 @@ function formatShortcutKey(key: string) {
         </Button>
       </div>
 
-      <Tabs default-value="appearance" class="w-full">
-        <TabsList class="grid w-full grid-cols-7">
-          <TabsTrigger value="appearance" class="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+      <Tabs default-value="workspace" class="w-full">
+        <TabsList class="grid w-full grid-cols-4">
+          <TabsTrigger value="workspace" class="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <div class="flex items-center justify-center gap-2 p-2">
-              <Paintbrush class="w-4 h-4 shrink-0" />
-              <span class="text-sm font-medium">Appearance</span>
+              <Settings2 class="w-4 h-4 shrink-0" />
+              <span class="text-sm font-medium">Workspace</span>
             </div>
           </TabsTrigger>
-          <TabsTrigger value="editor" class="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <TabsTrigger value="ai" class="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <div class="flex items-center justify-center gap-2 p-2">
-              <Code2 class="w-4 h-4 shrink-0" />
-              <span class="text-sm font-medium">Editor</span>
+              <SparklesIcon class="w-4 h-4 shrink-0" />
+              <span class="text-sm font-medium">AI</span>
             </div>
           </TabsTrigger>
           <TabsTrigger value="shortcuts" class="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
@@ -377,37 +360,19 @@ function formatShortcutKey(key: string) {
               <span class="text-sm font-medium">Advanced</span>
             </div>
           </TabsTrigger>
-          <TabsTrigger value="ai" class="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            <div class="flex items-center justify-center gap-2 p-2">
-              <SparklesIcon class="h-4 w-4 shrink-0" />
-              <span class="text-sm font-medium">AI Generation</span>
-            </div>
-          </TabsTrigger>
-          <TabsTrigger value="vibe" class="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            <div class="flex items-center justify-center gap-2 p-2">
-              <Brain class="h-4 w-4 shrink-0" />
-              <span class="text-sm font-medium">Vibe</span>
-            </div>
-          </TabsTrigger>
-          <TabsTrigger value="jupyter">
-            <div class="flex items-center justify-center gap-2 p-1">
-              <Server class="h-4 w-4 shrink-0" />
-              <span class="text-sm">Jupyter</span>
-            </div>
-          </TabsTrigger>
         </TabsList>
 
-        <!-- Appearance Tab -->
-        <TabsContent value="appearance" class="space-y-6">
+        <!-- Workspace Tab -->
+        <TabsContent value="workspace" class="space-y-6">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- Theme Card -->
+            <!-- Theme & Appearance Card -->
             <Card class="border-2 hover:border-primary/50 transition-all">
               <CardHeader class="bg-muted/50">
                 <CardTitle class="flex items-center gap-2">
                   <Palette class="h-5 w-5 text-primary" />
-                  Theme
+                  Theme & Appearance
                 </CardTitle>
-                <CardDescription>Customize the look and feel</CardDescription>
+                <CardDescription>Customize the look and feel of the application</CardDescription>
               </CardHeader>
               <CardContent class="pt-6">
                 <ThemeSelector />
@@ -420,34 +385,17 @@ function formatShortcutKey(key: string) {
               </CardContent>
             </Card>
 
-            <!-- Interface Card -->
+            <!-- Interface Behavior Card -->
             <Card class="border-2 hover:border-primary/50 transition-all">
               <CardHeader class="bg-muted/50">
                 <CardTitle class="flex items-center gap-2">
                   <Settings class="h-5 w-5 text-primary" />
-                  Interface
+                  Interface Behavior
                 </CardTitle>
-                <CardDescription>Adjust the user interface</CardDescription>
+                <CardDescription>Configure interface animations and interactions</CardDescription>
               </CardHeader>
               <CardContent class="pt-6">
                 <div class="space-y-6">
-                  <div class="space-y-2">
-                    <div class="flex items-center justify-between">
-                      <Label for="sidebar-width">Sidebar Width</Label>
-                      <Badge variant="outline">{{ interfaceSettings.sidebarWidth[0] }}px</Badge>
-                    </div>
-                    <Slider 
-                      id="sidebar-width" 
-                      v-model="interfaceSettings.sidebarWidth" 
-                      :min="200" 
-                      :max="400" 
-                      :step="10"
-                      @update:modelValue="(value) => { 
-                        saveInterfaceSettings()
-                      }"
-                    />
-                  </div>
-                  
                   <div class="space-y-2">
                     <div class="flex items-center justify-between">
                       <Label for="animation-speed">Animation Speed</Label>
@@ -459,6 +407,22 @@ function formatShortcutKey(key: string) {
                       :min="0.1" 
                       :max="2" 
                       :step="0.1"
+                      @update:modelValue="saveInterfaceSettings"
+                    />
+                  </div>
+                  
+                  <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                      <Label for="sidebar-width">Sidebar Width</Label>
+                      <Badge variant="outline">{{ interfaceSettings.sidebarWidth[0] }}px</Badge>
+                    </div>
+                    <Slider 
+                      id="sidebar-width" 
+                      v-model="interfaceSettings.sidebarWidth" 
+                      :min="200" 
+                      :max="400" 
+                      :step="10"
+                      @update:modelValue="saveInterfaceSettings"
                     />
                   </div>
                   
@@ -475,7 +439,82 @@ function formatShortcutKey(key: string) {
                       @update:modelValue="saveInterfaceSettings"
                     />
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <!-- Editor Settings Row -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Text Editing Card -->
+            <Card class="border-2 hover:border-primary/50 transition-all">
+              <CardHeader class="bg-muted/50">
+                <CardTitle class="flex items-center gap-2">
+                  <Code2 class="h-5 w-5 text-primary" />
+                  Text Editing
+                </CardTitle>
+                <CardDescription>Configure text editing and display preferences</CardDescription>
+              </CardHeader>
+              <CardContent class="pt-6">
+                <div class="space-y-6">
+                  <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                      <Label for="font-size">Font Size</Label>
+                      <Badge variant="outline">{{ editorSettings.fontSize[0] }}px</Badge>
+                    </div>
+                    <Slider 
+                      id="font-size" 
+                      v-model="editorSettings.fontSize" 
+                      :min="12" 
+                      :max="24" 
+                      :step="1" 
+                      class="flex-1"
+                      @update:modelValue="saveEditorSettings"
+                    />
+                  </div>
                   
+                  <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                      <Label for="line-height">Line Height</Label>
+                      <Badge variant="outline">{{ editorSettings.lineHeight[0] }}</Badge>
+                    </div>
+                    <Slider 
+                      id="line-height" 
+                      v-model="editorSettings.lineHeight" 
+                      :min="1" 
+                      :max="2" 
+                      :step="0.1" 
+                      class="flex-1"
+                      @update:modelValue="saveEditorSettings"
+                    />
+                  </div>
+                  
+                  <Separator />
+                  
+                  <div class="flex items-center justify-between">
+                    <div class="space-y-0.5">
+                      <Label for="word-wrap">Word Wrap</Label>
+                      <p class="text-sm text-muted-foreground">Wrap text to fit the editor width</p>
+                    </div>
+                    <Switch 
+                      id="word-wrap" 
+                      v-model="editorSettings.wordWrap" 
+                      @update:modelValue="saveEditorSettings"
+                    />
+                  </div>
+                  
+                  <div class="flex items-center justify-between">
+                    <div class="space-y-0.5">
+                      <Label for="spell-check">Spell Check</Label>
+                      <p class="text-sm text-muted-foreground">Enable spell checking in the editor</p>
+                    </div>
+                    <Switch 
+                      id="spell-check" 
+                      v-model="editorSettings.spellCheck" 
+                      @update:modelValue="saveEditorSettings"
+                    />
+                  </div>
+
                   <div class="flex items-center justify-between">
                     <div class="space-y-0.5">
                       <Label for="show-line-numbers">Show Line Numbers</Label>
@@ -488,6 +527,111 @@ function formatShortcutKey(key: string) {
                     />
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            <!-- Code Editing Card -->
+            <Card class="border-2 hover:border-primary/50 transition-all">
+              <CardHeader class="bg-muted/50">
+                <CardTitle class="flex items-center gap-2">
+                  <Cpu class="h-5 w-5 text-primary" />
+                  Code Editing
+                </CardTitle>
+                <CardDescription>Configure coding and formatting preferences</CardDescription>
+              </CardHeader>
+              <CardContent class="pt-6">
+                <div class="space-y-6">
+                  <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                      <Label for="tab-size">Tab Size</Label>
+                      <Badge variant="outline">{{ editorSettings.tabSize[0] }} spaces</Badge>
+                    </div>
+                    <Slider 
+                      id="tab-size" 
+                      v-model="editorSettings.tabSize" 
+                      :min="2" 
+                      :max="8" 
+                      :step="2" 
+                      class="flex-1"
+                      @update:modelValue="saveEditorSettings"
+                    />
+                  </div>
+                  
+                  <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                      <Label for="drag-handle-width">Drag Handle Width</Label>
+                      <Badge variant="outline">{{ editorSettings.dragHandleWidth[0] }}px</Badge>
+                    </div>
+                    <Slider 
+                      id="drag-handle-width" 
+                      v-model="editorSettings.dragHandleWidth" 
+                      :min="16" 
+                      :max="40" 
+                      :step="2" 
+                      class="flex-1"
+                      @update:modelValue="saveEditorSettings"
+                    />
+                  </div>
+                  
+                  <Separator />
+                  
+                  <div class="flex items-center justify-between">
+                    <div class="space-y-0.5">
+                      <Label for="indent-with-tabs">Indent with Tabs</Label>
+                      <p class="text-sm text-muted-foreground">Use tabs instead of spaces for indentation</p>
+                    </div>
+                    <Switch 
+                      id="indent-with-tabs" 
+                      v-model="editorSettings.indentWithTabs" 
+                      @update:modelValue="saveEditorSettings"
+                    />
+                  </div>
+                  
+                  <div class="flex items-center justify-between">
+                    <div class="space-y-0.5">
+                      <Label for="auto-save">Auto Save</Label>
+                      <p class="text-sm text-muted-foreground">Automatically save changes as you type</p>
+                    </div>
+                    <Switch 
+                      id="auto-save" 
+                      v-model="editorSettings.autoSave" 
+                      @update:modelValue="saveEditorSettings"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <!-- AI Tab -->
+        <TabsContent value="ai" class="space-y-6">
+          <div class="grid grid-cols-1 gap-6">
+            <!-- AI Generation Card -->
+            <Card class="border-2 hover:border-primary/50 transition-all">
+              <CardHeader class="bg-muted/50">
+                <CardTitle class="flex items-center gap-2">
+                  <SparklesIcon class="h-5 w-5 text-primary" />
+                  AI Generation
+                </CardTitle>
+                <CardDescription>Configure AI providers and generation settings</CardDescription>
+              </CardHeader>
+              <CardContent class="pt-6">
+                <UnifiedAISettings />
+              </CardContent>
+            </Card>
+
+            <!-- Vibe AI System Card -->
+            <Card class="border-2 hover:border-primary/50 transition-all">
+              <CardHeader class="bg-muted/50">
+                <CardTitle class="flex items-center gap-2">
+                  <Brain class="h-5 w-5 text-primary" />
+                  Vibe AI System
+                </CardTitle>
+                <CardDescription>Configure AI actors, models, and behavioral settings for the multi-agent system</CardDescription>
+              </CardHeader>
+              <CardContent class="pt-6">
+                <VibeSettings />
               </CardContent>
             </Card>
           </div>
@@ -611,160 +755,27 @@ function formatShortcutKey(key: string) {
           </Card>
         </TabsContent>
 
-        <!-- Editor Tab -->
-        <TabsContent value="editor" class="space-y-6">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- Text Editing Card -->
-            <Card class=" border-2 hover:border-primary/50 transition-all">
+        <!-- Advanced Tab -->
+        <TabsContent value="advanced" class="space-y-6">
+          <div class="grid grid-cols-1 gap-6">
+            <!-- Jupyter Integration Card -->
+            <Card class="border-2 hover:border-primary/50 transition-all">
               <CardHeader class="bg-muted/50">
                 <CardTitle class="flex items-center gap-2">
-                  <Code2 class="h-5 w-5 text-primary" />
-                  Text Editing
+                  <Server class="h-5 w-5 text-primary" />
+                  Jupyter Integration
                 </CardTitle>
-                <CardDescription>Configure text editing preferences</CardDescription>
+                <CardDescription>Connect to Jupyter servers for code execution and data analysis</CardDescription>
               </CardHeader>
               <CardContent class="pt-6">
-                <div class="space-y-6">
-                  <div class="space-y-2">
-                    <div class="flex items-center justify-between">
-                      <Label for="font-size">Font Size</Label>
-                      <Badge variant="outline">{{ editorSettings.fontSize[0] }}px</Badge>
-                    </div>
-                    <Slider 
-                      id="font-size" 
-                      v-model="editorSettings.fontSize" 
-                      :min="12" 
-                      :max="24" 
-                      :step="1" 
-                      class="flex-1"
-                      @update:modelValue="saveEditorSettings"
-                    />
-                  </div>
-                  
-                  <div class="space-y-2">
-                    <div class="flex items-center justify-between">
-                      <Label for="line-height">Line Height</Label>
-                      <Badge variant="outline">{{ editorSettings.lineHeight[0] }}</Badge>
-                    </div>
-                    <Slider 
-                      id="line-height" 
-                      v-model="editorSettings.lineHeight" 
-                      :min="1" 
-                      :max="2" 
-                      :step="0.1" 
-                      class="flex-1"
-                      @update:modelValue="saveEditorSettings"
-                    />
-                  </div>
-                  
-                  <Separator />
-                  
-                  <div class="flex items-center justify-between">
-                    <div class="space-y-0.5">
-                      <Label for="word-wrap">Word Wrap</Label>
-                      <p class="text-sm text-muted-foreground">Wrap text to fit the editor width</p>
-                    </div>
-                    <Switch 
-                      id="word-wrap" 
-                      v-model="editorSettings.wordWrap" 
-                      @update:modelValue="saveEditorSettings"
-                    />
-                  </div>
-                  
-                  <div class="flex items-center justify-between">
-                    <div class="space-y-0.5">
-                      <Label for="spell-check">Spell Check</Label>
-                      <p class="text-sm text-muted-foreground">Enable spell checking in the editor</p>
-                    </div>
-                    <Switch 
-                      id="spell-check" 
-                      v-model="editorSettings.spellCheck" 
-                      @update:modelValue="saveEditorSettings"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <!-- Code Editing Card -->
-            <Card class=" border-2 hover:border-primary/50 transition-all">
-              <CardHeader class="bg-muted/50">
-                <CardTitle class="flex items-center gap-2">
-                  <Cpu class="h-5 w-5 text-primary" />
-                  Code Editing
-                </CardTitle>
-                <CardDescription>Configure code-specific settings</CardDescription>
-              </CardHeader>
-              <CardContent class="pt-6">
-                <div class="space-y-6">
-                  <div class="space-y-2">
-                    <div class="flex items-center justify-between">
-                      <Label for="tab-size">Tab Size</Label>
-                      <Badge variant="outline">{{ editorSettings.tabSize[0] }} spaces</Badge>
-                    </div>
-                    <Slider 
-                      id="tab-size" 
-                      v-model="editorSettings.tabSize" 
-                      :min="2" 
-                      :max="8" 
-                      :step="2" 
-                      class="flex-1"
-                      @update:modelValue="saveEditorSettings"
-                    />
-                  </div>
-                  
-                  <div class="space-y-2">
-                    <div class="flex items-center justify-between">
-                      <Label for="drag-handle-width">Drag Handle Width</Label>
-                      <Badge variant="outline">{{ editorSettings.dragHandleWidth[0] }}px</Badge>
-                    </div>
-                    <Slider 
-                      id="drag-handle-width" 
-                      v-model="editorSettings.dragHandleWidth" 
-                      :min="16" 
-                      :max="40" 
-                      :step="2" 
-                      class="flex-1"
-                      @update:modelValue="saveEditorSettings"
-                    />
-                  </div>
-                  
-                  <Separator />
-                  
-                  <div class="flex items-center justify-between">
-                    <div class="space-y-0.5">
-                      <Label for="indent-with-tabs">Indent with Tabs</Label>
-                      <p class="text-sm text-muted-foreground">Use tabs instead of spaces for indentation</p>
-                    </div>
-                    <Switch 
-                      id="indent-with-tabs" 
-                      v-model="editorSettings.indentWithTabs" 
-                      @update:modelValue="saveEditorSettings"
-                    />
-                  </div>
-                  
-                  <div class="flex items-center justify-between">
-                    <div class="space-y-0.5">
-                      <Label for="auto-save">Auto Save</Label>
-                      <p class="text-sm text-muted-foreground">Automatically save changes as you type</p>
-                    </div>
-                    <Switch 
-                      id="auto-save" 
-                      v-model="editorSettings.autoSave" 
-                      @update:modelValue="saveEditorSettings"
-                    />
-                  </div>
-                </div>
+                <JupyterSettings />
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
 
-        <!-- Advanced Tab -->
-        <TabsContent value="advanced" class="space-y-6">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- Profile Settings Card -->
-            <Card v-if="isAuthenticated" class=" border-2 hover:border-primary/50 transition-all">
+            <Card v-if="isAuthenticated" class="border-2 hover:border-primary/50 transition-all">
               <CardHeader class="bg-muted/50">
                 <CardTitle class="flex items-center gap-2">
                   <User class="h-5 w-5 text-primary" />
@@ -815,7 +826,7 @@ function formatShortcutKey(key: string) {
             <Card class="border-2 hover:border-primary/50 transition-all">
               <CardHeader class="bg-muted/50">
                 <CardTitle class="flex items-center gap-2">
-                  <Server class="h-5 w-5 text-primary" />
+                  <Settings class="h-5 w-5 text-primary" />
                   System Information
                 </CardTitle>
                 <CardDescription>View system details and performance</CardDescription>
@@ -829,7 +840,7 @@ function formatShortcutKey(key: string) {
                     </div>
                     <div class="space-y-1">
                       <p class="text-sm text-muted-foreground">Storage Used</p>
-                      <p class="font-medium">2.4 MB</p>
+                      <p class="font-medium">{{ formatStorageSize() }}</p>
                     </div>
                     <div class="space-y-1">
                       <p class="text-sm text-muted-foreground">Browser</p>
@@ -844,7 +855,7 @@ function formatShortcutKey(key: string) {
                   <Separator />
                   
                   <div class="space-y-2">
-                    <h3 class="text-base font-medium">Reset Application</h3>
+                    <h3 class="text-base font-medium">Application Reset</h3>
                     <p class="text-sm text-muted-foreground mb-2">Reset all settings to their default values</p>
                     <Button variant="destructive" @click="resetAllSettings" class="w-full flex items-center justify-center gap-2">
                       <RotateCw class="h-4 w-4" />
@@ -855,21 +866,6 @@ function formatShortcutKey(key: string) {
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
-
-        <!-- AI Generation Tab -->
-        <TabsContent value="ai">
-          <AISettings />
-        </TabsContent>
-
-        <!-- Vibe Tab -->
-        <TabsContent value="vibe">
-          <VibeSettings />
-        </TabsContent>
-
-        <!-- Jupyter Tab -->
-        <TabsContent value="jupyter" class="space-y-6">
-          <JupyterSettings />
         </TabsContent>
       </Tabs>
     </div>
