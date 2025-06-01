@@ -564,6 +564,31 @@ function createAdvancedCommands(): CommandItem[] {
           .run();
       },
     },
+    {
+      title: 'Confusion Matrix',
+      category: 'Data Science',
+      icon: ChartScatter,
+      keywords: ['confusion', 'matrix', 'classification', 'ml', 'machine learning', 'accuracy', 'precision', 'recall'],
+      description: 'Insert a confusion matrix visualization with CSV upload or Jupyter integration',
+      command: ({ editor, range }: CommandArgs) => {
+        editor
+          .chain()
+          .focus()
+          .deleteRange(range)
+          .insertContent({
+            type: 'confusionMatrix',
+            attrs: {
+              title: 'Confusion Matrix',
+              matrixData: null,
+              labels: null,
+              source: 'upload',
+              filePath: null,
+              stats: null
+            }
+          } as any)
+          .run();
+      },
+    },
     // Sub Nota command defined separately for clarity
   ];
 }

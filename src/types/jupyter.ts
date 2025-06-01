@@ -5,6 +5,29 @@ export interface JupyterServer {
   name?: string
 }
 
+// Extended server interface for managed servers with additional metadata
+export interface ManagedJupyterServer extends JupyterServer {
+  id: string
+  name: string
+  url: string
+  status: 'connected' | 'disconnected' | 'connecting'
+}
+
+// File management interfaces
+export interface JupyterFile {
+  name: string
+  path: string
+  type: 'file' | 'directory'
+  size?: number
+  lastModified?: string
+  content?: string
+}
+
+export interface JupyterDirectory {
+  path: string
+  files: JupyterFile[]
+}
+
 export interface ExecutionResult {
   content: {
     execution_count: number
@@ -59,19 +82,62 @@ export interface KernelSpec {
   }
 }
 
+// Jupyter runtime information interfaces
+export interface JupyterKernel {
+  id: string
+  name: string
+  lastActivity: string
+  executionState: string
+  connections: number
+}
+
+export interface JupyterSession {
+  id: string
+  name: string
+  path: string
+  kernel: {
+    id: string
+    name: string
+    lastActivity: string
+  }
+}
+
 export interface WSMessage {
   msg_type: string
+  parent_header: {
+    msg_id?: string
+    [key: string]: any
+  }
+  header?: {
+    msg_id: string
+    username: string
+    session: string
+    msg_type: string
+    version: string
+    [key: string]: any
+  }
+  metadata?: Record<string, any>
   content: {
-    execution_count: number
+    execution_count?: number
+    execution_state?: string
     data?: {
       'text/plain'?: string
       'text/html'?: string
       'image/png'?: string
+      [key: string]: any
     }
     name?: string
     text?: string
     ename?: string
     evalue?: string
     traceback?: string[]
+    code?: string
+    silent?: boolean
+    store_history?: boolean
+    user_expressions?: Record<string, any>
+    allow_stdin?: boolean
+    [key: string]: any
   }
+  channel?: string
+  [key: string]: any
 }
