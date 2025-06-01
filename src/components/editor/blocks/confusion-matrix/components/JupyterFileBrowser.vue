@@ -1,218 +1,276 @@
 <template>
-  <div class="jupyter-file-browser">
-    <!-- Server Selection -->
-    <div class="server-section">
-      <div class="section-header">
-        <h4 class="section-title">Jupyter Servers</h4>
-        <button 
-          @click="openJupyterSidebar" 
-          class="manage-servers-button"
-          title="Manage servers in sidebar"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path>
-          </svg>
-          Manage
-        </button>
-      </div>
-      
-      <!-- No servers state -->
-      <div v-if="!hasServers" class="empty-state">
-        <div class="empty-icon">
-          <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
-          </svg>
-        </div>
-        <h5 class="empty-title">No Jupyter Servers Available</h5>
-        <p class="empty-description">
-          Add a Jupyter server to browse and load CSV files from your Jupyter environment.
-        </p>
-        <button @click="openJupyterSidebar" class="add-server-cta">
-          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-          </svg>
-          Add Jupyter Server
-        </button>
-      </div>
-
-      <!-- Server List -->
-      <div v-else class="server-list">
-        <div
-          v-for="server in availableServers"
-          :key="createServerKey(server)"
-          :class="[
-            'server-item',
-            {
-              'selected': selectedServer && createServerKey(selectedServer) === createServerKey(server),
-              'connected': getConnectionStatus(server) === 'connected',
-              'connecting': getConnectionStatus(server) === 'connecting'
-            }
-          ]"
-          @click="selectServer(server)"
-        >
-          <div class="server-info">
-            <div class="server-name">{{ getServerDisplayName(server) }}</div>
-            <div class="server-url">{{ getServerDisplayUrl(server) }}</div>
-          </div>
-          <div class="server-status">
-            <div v-if="getConnectionStatus(server) === 'connected'" class="status-indicator connected">
-              <div class="status-dot"></div>
-              <span>Connected</span>
-            </div>
-            <div v-else-if="getConnectionStatus(server) === 'connecting'" class="status-indicator connecting">
-              <div class="spinner-small"></div>
-              <span>Connecting</span>
-            </div>
-            <div v-else class="status-indicator disconnected">
-              <div class="status-dot"></div>
-              <span>Disconnected</span>
-            </div>
-          </div>
-          <div class="server-actions">
-            <button
-              @click.stop="testConnection(server)"
-              :disabled="getConnectionStatus(server) === 'connecting'"
-              class="test-button"
-            >
-              Test
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- File Browser -->
-    <div v-if="selectedServer && getConnectionStatus(selectedServer) === 'connected'" class="file-browser-section">
-      <h4 class="section-title">Browse Files</h4>
-      
-      <!-- Navigation -->
-      <div class="navigation">
-        <div class="path-breadcrumb">
-          <button
-            v-for="(segment, index) in pathSegments"
-            :key="index"
-            @click="navigateToPath(getPathFromSegments(index + 1))"
-            class="breadcrumb-item"
+  <Card class="w-full">
+    <CardContent class="p-6 space-y-6">
+      <!-- Server Selection -->
+      <div class="space-y-4">
+        <div class="flex items-center justify-between">
+          <h4 class="text-lg font-semibold flex items-center gap-2">
+            <Server class="w-5 h-5 text-primary" />
+            Jupyter Servers
+          </h4>
+          <Button
+            @click="openJupyterSidebar"
+            variant="outline"
+            size="sm"
           >
-            {{ segment || 'Home' }}
-          </button>
+            <Settings class="w-4 h-4 mr-2" />
+            Manage
+          </Button>
         </div>
-        <button @click="refreshDirectory" class="refresh-button" :disabled="isLoading">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-          </svg>
-        </button>
-      </div>
-
-      <!-- Loading State -->
-      <div v-if="isLoading" class="loading-state">
-        <div class="spinner"></div>
-        <span>Loading files...</span>
-      </div>
-
-      <!-- Error State -->
-      <div v-else-if="browserError" class="error-state">
-        <div class="error-icon">⚠️</div>
-        <div class="error-message">{{ browserError }}</div>
-        <button @click="refreshDirectory" class="retry-button">Retry</button>
-      </div>
-
-      <!-- File List -->
-      <div v-else-if="currentDirectory" class="file-list">
-        <div v-if="filteredFiles.length === 0" class="empty-directory">
-          <p>No CSV files found in this directory</p>
+        
+        <!-- No servers state -->
+        <div v-if="!hasServers" class="text-center p-8 bg-muted/30 rounded-lg border border-dashed">
+          <div class="w-16 h-16 mx-auto mb-4 bg-muted/50 rounded-full flex items-center justify-center">
+            <Server class="w-8 h-8 text-muted-foreground" />
+          </div>
+          <h5 class="text-lg font-semibold mb-2">No Jupyter Servers Available</h5>
+          <p class="text-muted-foreground mb-4">
+            Add a Jupyter server to browse and load CSV files from your Jupyter environment.
+          </p>
+          <Button @click="openJupyterSidebar">
+            <Plus class="w-4 h-4 mr-2" />
+            Add Jupyter Server
+          </Button>
         </div>
 
-        <div
-          v-for="file in filteredFiles"
-          :key="file.path"
-          :class="[
-            'file-item',
-            {
-              'selected': selectedFile?.path === file.path,
-              'directory': file.type === 'directory'
-            }
-          ]"
-          @click="handleFileClick(file)"
-          @dblclick="handleFileDoubleClick(file)"
-        >
-          <div class="file-icon">
-            <svg v-if="file.type === 'directory'" class="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
-            </svg>
-            <svg v-else class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"></path>
-            </svg>
-          </div>
-          <div class="file-info">
-            <div class="file-name">{{ file.name }}</div>
-            <div v-if="file.type === 'file'" class="file-details">
-              <span v-if="file.size">{{ formatFileSize(file.size) }}</span>
-              <span v-if="file.lastModified">{{ formatDate(file.lastModified) }}</span>
-            </div>
-          </div>
-          <div v-if="file.type === 'file'" class="file-actions">
-            <button
-              @click.stop="selectFile(file)"
-              class="select-button"
-              :disabled="isLoadingFile"
-            >
-              {{ selectedFile?.path === file.path ? 'Selected' : 'Select' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Selected File Preview -->
-    <div v-if="selectedFile && fileContent" class="file-preview-section">
-      <h4 class="section-title">File Preview</h4>
-      <div class="preview-container">
-        <div class="preview-info">
-          <div class="info-row">
-            <span class="info-label">File:</span>
-            <span class="info-value">{{ selectedFile.name }}</span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">Path:</span>
-            <span class="info-value">{{ selectedFile.path }}</span>
-          </div>
-          <div v-if="parsedData" class="info-row">
-            <span class="info-label">Matrix Size:</span>
-            <span class="info-value">{{ parsedData.matrix.length }}×{{ parsedData.matrix[0]?.length || 0 }}</span>
-          </div>
-        </div>
-
-        <!-- Content Preview -->
-        <div class="content-preview">
-          <h5 class="preview-subtitle">Raw Content (first 10 lines)</h5>
-          <pre class="content-text">{{ previewText }}</pre>
-        </div>
-
-        <!-- Use File Button -->
-        <div class="file-actions-final">
-          <button
-            @click="useFile"
-            :disabled="!parsedData || isLoadingFile"
-            class="use-file-button"
+        <!-- Server List -->
+        <div v-else class="space-y-2">
+          <Card
+            v-for="server in servers"
+            :key="createServerKey(server)"
+            :class="[
+              'cursor-pointer transition-all hover:shadow-md',
+              {
+                'border-primary ring-2 ring-primary/20': selectedServer && createServerKey(selectedServer) === createServerKey(server),
+                'border-green-500 bg-green-50 dark:bg-green-950/20': getConnectionStatus(server) === 'connected',
+                'border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20': getConnectionStatus(server) === 'connecting'
+              }
+            ]"
+            @click="selectServer(server)"
           >
-            Use This File
-          </button>
-          <button @click="clearSelection" class="clear-button">
-            Clear Selection
-          </button>
+            <CardContent class="p-4">
+              <div class="flex items-center justify-between">
+                <div class="flex-1">
+                  <div class="font-medium">{{ getServerDisplayName(server) }}</div>
+                  <div class="text-sm text-muted-foreground">{{ getServerDisplayUrl(server) }}</div>
+                </div>
+                <div class="flex items-center gap-3">
+                  <div class="flex items-center gap-2">
+                    <div v-if="getConnectionStatus(server) === 'connected'" class="flex items-center gap-1 text-green-600">
+                      <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span class="text-xs font-medium">Connected</span>
+                    </div>
+                    <div v-else-if="getConnectionStatus(server) === 'connecting'" class="flex items-center gap-1 text-yellow-600">
+                      <div class="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                      <span class="text-xs font-medium">Connecting</span>
+                    </div>
+                    <div v-else class="flex items-center gap-1 text-gray-400">
+                      <div class="w-2 h-2 bg-gray-400 rounded-full"></div>
+                      <span class="text-xs font-medium">Disconnected</span>
+                    </div>
+                  </div>
+                  <Button
+                    @click.stop="testConnection(server)"
+                    :disabled="getConnectionStatus(server) === 'connecting'"
+                    variant="outline"
+                    size="sm"
+                  >
+                    Test
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
-    </div>
-  </div>
+
+      <!-- File Browser -->
+      <div v-if="selectedServer && getConnectionStatus(selectedServer) === 'connected'" class="space-y-4">
+        <div class="flex items-center justify-between">
+          <h4 class="text-lg font-semibold flex items-center gap-2">
+            <FolderOpen class="w-5 h-5 text-primary" />
+            Browse Files
+          </h4>
+          <Button @click="refreshDirectory" :disabled="isLoading" variant="outline" size="sm">
+            <RotateCcw class="w-4 h-4" />
+          </Button>
+        </div>
+        
+        <!-- Navigation -->
+        <div class="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
+          <Home class="w-4 h-4 text-muted-foreground" />
+          <div class="flex items-center gap-1 text-sm">
+            <Button
+              v-for="(segment, index) in pathSegments"
+              :key="index"
+              @click="navigateToPath(getPathFromSegments(index + 1))"
+              variant="ghost"
+              size="sm"
+              class="h-auto p-1 text-xs"
+            >
+              {{ segment || 'Home' }}
+            </Button>
+          </div>
+        </div>
+
+        <!-- Loading State -->
+        <div v-if="isLoading" class="flex items-center justify-center p-8 text-muted-foreground">
+          <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mr-3"></div>
+          <span>Loading files...</span>
+        </div>
+
+        <!-- Error State -->
+        <Alert v-else-if="browserError" variant="destructive">
+          <AlertCircle class="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription class="flex items-center justify-between">
+            <span>{{ browserError }}</span>
+            <Button @click="refreshDirectory" variant="ghost" size="sm">
+              Retry
+            </Button>
+          </AlertDescription>
+        </Alert>
+
+        <!-- File List -->
+        <div v-else-if="currentDirectory" class="space-y-2">
+          <div v-if="filteredFiles.length === 0" class="text-center p-8 text-muted-foreground">
+            <FileX class="w-12 h-12 mx-auto mb-2 text-muted-foreground/50" />
+            <p>No CSV files found in this directory</p>
+          </div>
+
+          <Card
+            v-for="file in filteredFiles"
+            :key="file.path"
+            :class="[
+              'cursor-pointer transition-all hover:shadow-sm',
+              {
+                'border-primary ring-2 ring-primary/20': selectedFile?.path === file.path,
+                'hover:bg-muted/50': file.type === 'directory'
+              }
+            ]"
+            @click="handleFileClick(file)"
+            @dblclick="handleFileDoubleClick(file)"
+          >
+            <CardContent class="p-3">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 flex items-center justify-center rounded bg-muted/50">
+                    <Folder v-if="file.type === 'directory'" class="w-4 h-4 text-blue-600" />
+                    <FileText v-else class="w-4 h-4 text-green-600" />
+                  </div>
+                  <div>
+                    <div class="font-medium text-sm">{{ file.name }}</div>
+                    <div v-if="file.type === 'file'" class="text-xs text-muted-foreground flex gap-2">
+                      <span v-if="file.size">{{ formatFileSize(file.size) }}</span>
+                      <span v-if="file.lastModified">{{ formatDate(file.lastModified) }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div v-if="file.type === 'file'">
+                  <Button
+                    @click.stop="selectFile(file)"
+                    :disabled="isLoadingFile"
+                    variant="outline"
+                    size="sm"
+                  >
+                    {{ selectedFile?.path === file.path ? 'Selected' : 'Select' }}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      <!-- Selected File Preview -->
+      <div v-if="selectedFile && fileContent" class="space-y-4">
+        <h4 class="text-lg font-semibold flex items-center gap-2">
+          <Eye class="w-5 h-5 text-primary" />
+          File Preview
+        </h4>
+        
+        <Card>
+          <CardContent class="p-4 space-y-4">
+            <div class="grid gap-3 text-sm">
+              <div class="flex justify-between">
+                <span class="font-medium">File:</span>
+                <span class="text-muted-foreground">{{ selectedFile.name }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="font-medium">Path:</span>
+                <span class="text-muted-foreground truncate ml-2">{{ selectedFile.path }}</span>
+              </div>
+              <div v-if="parsedData" class="flex justify-between">
+                <span class="font-medium">Matrix Size:</span>
+                <Badge variant="outline">{{ parsedData.matrix.length }}×{{ parsedData.matrix[0]?.length || 0 }}</Badge>
+              </div>
+            </div>
+
+            <!-- Content Preview -->
+            <div>
+              <h5 class="font-medium mb-2 flex items-center gap-2">
+                <Code class="w-4 h-4" />
+                Raw Content (first 10 lines)
+              </h5>
+              <div class="bg-muted/30 rounded p-3 text-xs font-mono overflow-x-auto">
+                <pre>{{ previewText }}</pre>
+              </div>
+            </div>
+
+            <!-- Use File Button -->
+            <div class="flex justify-end pt-2">
+              <Button
+                @click="useFile"
+                :disabled="!parsedData || isLoadingFile"
+                class="w-full sm:w-auto"
+              >
+                <CheckCircle class="w-4 h-4 mr-2" />
+                Use This File
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </CardContent>
+  </Card>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useJupyterStore } from '@/stores/jupyterStore'
-import { jupyterService } from '../services/jupyterService'
-import type { JupyterServer, JupyterFile, JupyterDirectory } from '@/types/jupyter'
+import {
+  Card,
+  CardContent,
+} from '@/components/ui/card'
+import {
+  Button
+} from '@/components/ui/button'
+import {
+  Badge
+} from '@/components/ui/badge'
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from '@/components/ui/alert'
+import {
+  Server,
+  Settings,
+  Plus,
+  FolderOpen,
+  RotateCcw,
+  Home,
+  AlertCircle,
+  FileX,
+  Folder,
+  FileText,
+  Eye,
+  Code,
+  CheckCircle
+} from 'lucide-vue-next'
 import { parseConfusionMatrixCSV, validateConfusionMatrix, type ConfusionMatrixData } from '../utils/confusionMatrixUtils'
+import { useJupyterServers } from '@/composables/useJupyterServers'
+import { JupyterService } from '@/services/jupyterService'
+import type { JupyterServer, JupyterFile, JupyterDirectory } from '@/types/jupyter'
 
 interface Emits {
   (e: 'file-selected', data: ConfusionMatrixData & { filePath: string }): void
@@ -222,253 +280,176 @@ interface Emits {
 
 const emit = defineEmits<Emits>()
 
-// Store
-const jupyterStore = useJupyterStore()
+// Use the same composable as the sidebar
+const {
+  servers,
+  hasServers,
+  testConnection: testServerConnection,
+  getTestResultForServer,
+  createServerKey
+} = useJupyterServers({
+  autoLoadKernels: false,
+  showToasts: false
+})
+
+// Create a separate service instance for file operations
+const jupyterService = new JupyterService()
 
 // Reactive state
 const selectedServer = ref<JupyterServer | null>(null)
 const currentDirectory = ref<JupyterDirectory | null>(null)
+const currentPath = ref('')
 const selectedFile = ref<JupyterFile | null>(null)
 const fileContent = ref<string>('')
 const parsedData = ref<ConfusionMatrixData | null>(null)
-const currentPath = ref<string>('')
 const isLoading = ref(false)
 const isLoadingFile = ref(false)
-const browserError = ref<string>('')
-const connectionStatuses = ref<Record<string, 'connected' | 'disconnected' | 'connecting'>>({})
+const browserError = ref('')
 
 // Computed properties
-const availableServers = computed(() => jupyterStore.jupyterServers)
-const hasServers = computed(() => availableServers.value.length > 0)
-
 const pathSegments = computed(() => {
+  if (!currentPath.value) return ['']
   return currentPath.value.split('/').filter(Boolean)
 })
 
 const filteredFiles = computed(() => {
   if (!currentDirectory.value) return []
-  
-  return jupyterService.filterCSVFiles(currentDirectory.value.files)
-    .sort((a, b) => {
-      // Directories first, then files
-      if (a.type !== b.type) {
-        return a.type === 'directory' ? -1 : 1
-      }
-      return a.name.localeCompare(b.name)
-    })
+  return currentDirectory.value.files
 })
 
 const previewText = computed(() => {
   if (!fileContent.value) return ''
-  return fileContent.value.split('\n').slice(0, 10).join('\n')
+  const lines = fileContent.value.split('\n').slice(0, 10)
+  return lines.join('\n')
 })
 
-// Utility functions
-function createServerKey(server: JupyterServer): string {
-  return `${server.ip}:${server.port}`
-}
-
+// Methods
 function getServerDisplayName(server: JupyterServer): string {
-  return server.name || `Jupyter Server (${server.ip}:${server.port})`
+  return server.name || `${server.ip}:${server.port}`
 }
 
 function getServerDisplayUrl(server: JupyterServer): string {
-  const protocol = server.ip.startsWith('http') ? '' : 'http://'
-  return `${protocol}${server.ip}:${server.port}`
+  return `${server.ip}:${server.port}`
 }
 
-function getConnectionStatus(server: JupyterServer): 'connected' | 'disconnected' | 'connecting' {
-  const key = createServerKey(server)
-  return connectionStatuses.value[key] || 'disconnected'
-}
-
-function setConnectionStatus(server: JupyterServer, status: 'connected' | 'disconnected' | 'connecting') {
-  const key = createServerKey(server)
-  connectionStatuses.value[key] = status
-}
-
-// Server operations
-async function testConnection(server: JupyterServer) {
-  try {
-    setConnectionStatus(server, 'connecting')
-    const result = await jupyterService.testConnection(server)
-    setConnectionStatus(server, result.success ? 'connected' : 'disconnected')
-    
-    if (!result.success) {
-      emit('error', `Connection failed: ${result.message}`)
-    }
-  } catch (error) {
-    setConnectionStatus(server, 'disconnected')
-    emit('error', error instanceof Error ? error.message : 'Connection test failed')
-  }
+function getConnectionStatus(server: JupyterServer): 'connected' | 'connecting' | 'disconnected' {
+  const testResult = getTestResultForServer(server)
+  if (!testResult) return 'disconnected'
+  return testResult.success ? 'connected' : 'disconnected'
 }
 
 async function selectServer(server: JupyterServer) {
-  const currentStatus = getConnectionStatus(server)
-  
-  if (currentStatus !== 'connected') {
-    await testConnection(server)
-    
-    // Check if connection was successful
-    if (getConnectionStatus(server) !== 'connected') {
-      return
-    }
-  }
-  
   selectedServer.value = server
-  await navigateToPath('')
+  currentPath.value = ''
+  currentDirectory.value = null
+  selectedFile.value = null
+  fileContent.value = ''
+  parsedData.value = null
+  
+  if (getConnectionStatus(server) === 'connected') {
+    await loadDirectory('')
+  } else {
+    await testConnection(server)
+  }
 }
 
-function openJupyterSidebar() {
-  emit('open-jupyter-sidebar')
+async function testConnection(server: JupyterServer) {
+  try {
+    const result = await testServerConnection(server)
+    if (result.success) {
+      await loadDirectory('')
+    } else {
+      emit('error', `Failed to connect to ${getServerDisplayName(server)}: ${result.message}`)
+    }
+  } catch (error) {
+    emit('error', `Connection error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+  }
 }
 
-// File navigation methods
-function getPathFromSegments(endIndex: number): string {
-  return pathSegments.value.slice(0, endIndex).join('/')
-}
-
-async function navigateToPath(path: string) {
+async function loadDirectory(path: string) {
   if (!selectedServer.value) return
   
   isLoading.value = true
   browserError.value = ''
   
   try {
-    // Direct API call using the JupyterServer object
-    const encodedPath = encodeURIComponent(path)
-    const baseUrl = selectedServer.value.ip.startsWith('http') 
-      ? `${selectedServer.value.ip}:${selectedServer.value.port}`
-      : `http://${selectedServer.value.ip}:${selectedServer.value.port}`
+    const directory = await jupyterService.browseDirectoryDirect(selectedServer.value, path)
     
-    const url = selectedServer.value.token 
-      ? `${baseUrl}/api/contents/${encodedPath}?token=${selectedServer.value.token}`
-      : `${baseUrl}/api/contents/${encodedPath}`
+    // Filter for CSV files and directories using service method
+    const filteredFiles = jupyterService.filterCSVFiles(directory.files)
     
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      mode: 'cors'
-    })
-
-    if (!response.ok) {
-      throw new Error(`Failed to browse directory: ${response.statusText}`)
-    }
-
-    const data = await response.json()
-    
-    if (data.type !== 'directory') {
-      throw new Error('Path is not a directory')
-    }
-
-    const files: JupyterFile[] = data.content.map((item: any) => ({
-      name: item.name,
-      path: item.path,
-      type: item.type,
-      size: item.size,
-      lastModified: item.last_modified,
-    }))
-
-    currentDirectory.value = {
-      path: data.path,
-      files,
+    currentDirectory.value = { 
+      path: directory.path, 
+      files: filteredFiles 
     }
     currentPath.value = path
   } catch (error) {
     browserError.value = error instanceof Error ? error.message : 'Failed to load directory'
+    emit('error', browserError.value)
   } finally {
     isLoading.value = false
   }
 }
 
-async function refreshDirectory() {
-  if (selectedServer.value) {
-    await navigateToPath(currentPath.value)
+function getPathFromSegments(endIndex: number): string {
+  return pathSegments.value.slice(0, endIndex).join('/')
+}
+
+function navigateToPath(path: string) {
+  loadDirectory(path)
+}
+
+function refreshDirectory() {
+  if (selectedServer.value && getConnectionStatus(selectedServer.value) === 'connected') {
+    loadDirectory(currentPath.value)
   }
 }
 
 function handleFileClick(file: JupyterFile) {
   if (file.type === 'file') {
-    if (selectedFile.value?.path !== file.path) {
-      selectedFile.value = file
-      loadFileContent(file)
-    }
+    selectFile(file)
   }
 }
 
 function handleFileDoubleClick(file: JupyterFile) {
   if (file.type === 'directory') {
-    navigateToPath(file.path)
+    loadDirectory(file.path)
   } else {
     selectFile(file)
   }
 }
 
-async function loadFileContent(file: JupyterFile) {
-  if (!selectedServer.value) return
+async function selectFile(file: JupyterFile) {
+  if (file.type !== 'file' || !selectedServer.value) return
   
+  selectedFile.value = file
   isLoadingFile.value = true
+  fileContent.value = ''
+  parsedData.value = null
   
   try {
-    // Direct API call using the JupyterServer object
-    const encodedPath = encodeURIComponent(file.path)
-    const baseUrl = selectedServer.value.ip.startsWith('http') 
-      ? `${selectedServer.value.ip}:${selectedServer.value.port}`
-      : `http://${selectedServer.value.ip}:${selectedServer.value.port}`
-    
-    const url = selectedServer.value.token 
-      ? `${baseUrl}/api/contents/${encodedPath}?token=${selectedServer.value.token}`
-      : `${baseUrl}/api/contents/${encodedPath}`
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      mode: 'cors'
-    })
-
-    if (!response.ok) {
-      throw new Error(`Failed to get file content: ${response.statusText}`)
-    }
-
-    const data = await response.json()
-    
-    if (data.type !== 'file') {
-      throw new Error('Path is not a file')
-    }
-
-    // Jupyter returns base64 encoded content for binary files
-    if (data.format === 'base64') {
-      fileContent.value = atob(data.content)
-    } else {
-      fileContent.value = data.content || ''
-    }
+    const content = await jupyterService.getFileContentDirect(selectedServer.value, file.path)
+    fileContent.value = content
     
     // Try to parse as confusion matrix
     try {
-      const data = parseConfusionMatrixCSV(fileContent.value)
-      const validationErrors = validateConfusionMatrix(data.matrix, data.labels)
+      const parsedMatrix = parseConfusionMatrixCSV(content)
+      const errors = validateConfusionMatrix(parsedMatrix.matrix, parsedMatrix.labels)
       
-      if (validationErrors.length > 0) {
-        throw new Error(`Invalid confusion matrix: ${validationErrors[0]}`)
+      if (errors.length === 0) {
+        parsedData.value = parsedMatrix
+      } else {
+        emit('error', `Invalid confusion matrix: ${errors[0]}`)
       }
-      
-      parsedData.value = data
     } catch (parseError) {
-      parsedData.value = null
-      console.warn('Failed to parse as confusion matrix:', parseError)
+      emit('error', `Failed to parse CSV: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`)
     }
+    
   } catch (error) {
-    fileContent.value = ''
-    parsedData.value = null
-    emit('error', error instanceof Error ? error.message : 'Failed to load file')
+    emit('error', `Failed to load file: ${error instanceof Error ? error.message : 'Unknown error'}`)
   } finally {
     isLoadingFile.value = false
   }
-}
-
-function selectFile(file: JupyterFile) {
-  selectedFile.value = file
-  loadFileContent(file)
 }
 
 function useFile() {
@@ -480,17 +461,15 @@ function useFile() {
   })
 }
 
-function clearSelection() {
-  selectedFile.value = null
-  fileContent.value = ''
-  parsedData.value = null
+function openJupyterSidebar() {
+  emit('open-jupyter-sidebar')
 }
 
 function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 Bytes'
+  if (bytes === 0) return '0 B'
   
   const k = 1024
-  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const sizes = ['B', 'KB', 'MB', 'GB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
@@ -505,271 +484,7 @@ function formatDate(dateString: string): string {
 }
 
 // Lifecycle
-onMounted(async () => {
-  // Servers are automatically loaded from the store
-  // Test connections for existing servers
-  for (const server of availableServers.value) {
-    try {
-      const result = await jupyterService.testConnection(server)
-      setConnectionStatus(server, result.success ? 'connected' : 'disconnected')
-    } catch (error) {
-      setConnectionStatus(server, 'disconnected')
-    }
-  }
+onMounted(() => {
+  // Servers are now loaded through the useJupyterServers composable
 })
-</script>
-
-<style scoped>
-.jupyter-file-browser {
-  @apply space-y-6;
-}
-
-.section-title {
-  @apply text-lg font-semibold text-gray-900 mb-3;
-}
-
-.server-section {
-  @apply space-y-4;
-}
-
-.section-header {
-  @apply flex items-center justify-between;
-}
-
-.manage-servers-button {
-  @apply p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors;
-}
-
-.server-list {
-  @apply space-y-2;
-}
-
-.empty-state {
-  @apply text-center py-8;
-}
-
-.empty-icon {
-  @apply text-4xl mb-4;
-}
-
-.empty-title {
-  @apply text-lg font-semibold text-gray-900 mb-2;
-}
-
-.empty-description {
-  @apply text-gray-500;
-}
-
-.add-server-cta {
-  @apply px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors;
-}
-
-.server-item {
-  @apply flex items-center gap-4 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors;
-}
-
-.server-item.selected {
-  @apply border-blue-500 bg-blue-50;
-}
-
-.server-item.connected {
-  @apply border-green-200 bg-green-50;
-}
-
-.server-info {
-  @apply flex-1;
-}
-
-.server-name {
-  @apply font-medium text-gray-900;
-}
-
-.server-url {
-  @apply text-sm text-gray-500;
-}
-
-.server-status {
-  @apply flex-shrink-0;
-}
-
-.status-indicator {
-  @apply flex items-center gap-2 text-sm;
-}
-
-.status-indicator.connected {
-  @apply text-green-600;
-}
-
-.status-indicator.connecting {
-  @apply text-blue-600;
-}
-
-.status-indicator.disconnected {
-  @apply text-gray-500;
-}
-
-.status-dot {
-  @apply w-2 h-2 rounded-full;
-}
-
-.status-indicator.connected .status-dot {
-  @apply bg-green-500;
-}
-
-.status-indicator.disconnected .status-dot {
-  @apply bg-gray-400;
-}
-
-.spinner-small {
-  @apply w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin;
-}
-
-.server-actions {
-  @apply flex gap-2;
-}
-
-.test-button {
-  @apply px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors;
-}
-
-.file-browser-section {
-  @apply space-y-4;
-}
-
-.navigation {
-  @apply flex items-center justify-between;
-}
-
-.path-breadcrumb {
-  @apply flex items-center gap-1;
-}
-
-.breadcrumb-item {
-  @apply px-2 py-1 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors;
-}
-
-.breadcrumb-item:not(:last-child)::after {
-  content: '/';
-  @apply ml-1 text-gray-400;
-}
-
-.refresh-button {
-  @apply p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors;
-}
-
-.loading-state {
-  @apply flex items-center justify-center gap-3 py-8 text-gray-600;
-}
-
-.spinner {
-  @apply w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin;
-}
-
-.error-state {
-  @apply text-center py-8 space-y-4;
-}
-
-.error-icon {
-  @apply text-4xl;
-}
-
-.error-message {
-  @apply text-red-600;
-}
-
-.retry-button {
-  @apply px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors;
-}
-
-.file-list {
-  @apply space-y-1;
-}
-
-.empty-directory {
-  @apply text-center py-8 text-gray-500;
-}
-
-.file-item {
-  @apply flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors;
-}
-
-.file-item.selected {
-  @apply bg-blue-50 border border-blue-200;
-}
-
-.file-item.directory:hover {
-  @apply bg-blue-50;
-}
-
-.file-icon {
-  @apply flex-shrink-0;
-}
-
-.file-info {
-  @apply flex-1 min-w-0;
-}
-
-.file-name {
-  @apply font-medium text-gray-900 truncate;
-}
-
-.file-details {
-  @apply text-sm text-gray-500 space-x-2;
-}
-
-.file-actions {
-  @apply flex-shrink-0;
-}
-
-.select-button {
-  @apply px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors;
-}
-
-.file-preview-section {
-  @apply space-y-4;
-}
-
-.preview-container {
-  @apply bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-4;
-}
-
-.preview-info {
-  @apply space-y-2;
-}
-
-.info-row {
-  @apply flex;
-}
-
-.info-label {
-  @apply text-sm font-medium text-gray-500 w-20;
-}
-
-.info-value {
-  @apply text-sm text-gray-900 flex-1 truncate;
-}
-
-.content-preview {
-  @apply space-y-2;
-}
-
-.preview-subtitle {
-  @apply text-sm font-medium text-gray-700;
-}
-
-.content-text {
-  @apply text-xs font-mono bg-white border border-gray-200 rounded p-3 max-h-40 overflow-auto;
-}
-
-.file-actions-final {
-  @apply flex gap-3;
-}
-
-.use-file-button {
-  @apply px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors;
-}
-
-.clear-button {
-  @apply px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors;
-}
-</style> 
+</script> 

@@ -177,43 +177,6 @@ export class JupyterService {
   }
 
   /**
-   * Auto-discover local Jupyter servers
-   */
-  async discoverLocalServers(): Promise<ManagedJupyterServer[]> {
-    const commonPorts = [8888, 8889, 8890, 8891, 8892]
-    const discovered: ManagedJupyterServer[] = []
-
-    for (const port of commonPorts) {
-      try {
-        const url = `http://localhost:${port}`
-        const testServer: JupyterServer = {
-          ip: 'localhost',
-          port: port.toString(),
-          token: '',
-        }
-
-        const result = await this.testConnection(testServer)
-        if (result.success) {
-          discovered.push({
-            id: `local-${port}`,
-            name: `Local Jupyter (${port})`,
-            url,
-            ip: 'localhost',
-            port: port.toString(),
-            token: '',
-            status: 'connected',
-          })
-        }
-      } catch (error) {
-        // Server not available on this port
-        continue
-      }
-    }
-
-    return discovered
-  }
-
-  /**
    * Test connection to a managed server by ID
    */
   async testConnectionById(serverId: string): Promise<boolean> {
@@ -636,6 +599,66 @@ export class JupyterService {
       this.handleError(error, 'Failed to get active sessions')
     }
   }
+
+  /**
+   * Browse files and directories on a Jupyter server (direct server access)
+   */
+  async browseDirectoryDirect(server: JupyterServer, path: string = ''): Promise<JupyterDirectory> {
+    try {
+      const encodedPath = encodeURIComponent(path)
+      const url = this.getUrlWithToken(server, `/contents/${encodedPath}`)
+      
+      const response = await axios.get(url)
+      const data = response.data
+      
+      if (data.type !== 'directory') {
+        throw new Error('Path is not a directory')
+      }
+
+      const files: JupyterFile[] = data.content.map((item: any) => ({
+        name: item.name,
+        path: item.path,
+        type: item.type,
+        size: item.size,
+        lastModified: item.last_modified,
+      }))
+
+      return {
+        path: data.path,
+        files,
+      }
+    } catch (error) {
+      logger.error('Failed to browse directory:', error)
+      this.handleError(error, 'Failed to browse directory')
+    }
+  }
+
+  /**
+   * Get file content from Jupyter server (direct server access)
+   */
+  async getFileContentDirect(server: JupyterServer, filePath: string): Promise<string> {
+    try {
+      const encodedPath = encodeURIComponent(filePath)
+      const url = this.getUrlWithToken(server, `/contents/${encodedPath}`)
+      
+      const response = await axios.get(url)
+      const data = response.data
+      
+      if (data.type !== 'file') {
+        throw new Error('Path is not a file')
+      }
+
+      // Jupyter returns base64 encoded content for binary files
+      if (data.format === 'base64') {
+        return atob(data.content)
+      }
+      
+      return data.content || ''
+    } catch (error) {
+      logger.error('Failed to get file content:', error)
+      this.handleError(error, 'Failed to get file content')
+    }
+  }
 }
 
 // Create and export a singleton instance of the JupyterService
@@ -649,21 +672,3 @@ export type {
   JupyterKernel,
   JupyterSession
 } from '@/types/jupyter'
-
-// Default servers for common setups
-export const defaultJupyterServers = [
-  {
-    name: 'Local Jupyter Lab',
-    url: 'http://localhost:8888',
-    ip: 'localhost',
-    port: '8888',
-    token: '',
-  },
-  {
-    name: 'Local Jupyter Notebook',
-    url: 'http://localhost:8889',
-    ip: 'localhost', 
-    port: '8889',
-    token: '',
-  },
-]

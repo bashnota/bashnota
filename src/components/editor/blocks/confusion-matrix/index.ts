@@ -4,9 +4,6 @@ export { default as ConfusionMatrixBlock } from './ConfusionMatrixBlock.vue'
 // Export utility functions
 export * from './utils/confusionMatrixUtils'
 
-// Export service
-export * from './services/jupyterService'
-
 // Export components
 export { default as FileUpload } from './components/FileUpload.vue'
 export { default as JupyterFileBrowser } from './components/JupyterFileBrowser.vue'
