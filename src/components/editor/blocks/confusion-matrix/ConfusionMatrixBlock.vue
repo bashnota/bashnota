@@ -365,6 +365,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { NodeViewWrapper } from '@tiptap/vue-3'
+import type { NodeViewProps } from '@tiptap/vue-3'
 import {
   Card,
   CardContent,
@@ -449,13 +450,7 @@ import ModelComparisonPanel from './components/ModelComparisonPanel.vue'
 import { calculateConfusionMatrixStats, formatNumber, generateSampleConfusionMatrix, type ConfusionMatrixData, type ConfusionMatrixStats } from './utils/confusionMatrixUtils'
 
 // Props and emits
-interface Props {
-  node: any
-  updateAttributes: (attributes: Record<string, any>) => void
-  deleteNode: () => void
-}
-
-const props = defineProps<Props>()
+const props = defineProps<NodeViewProps>()
 
 // Reactive state
 const editingTitle = ref(false)
