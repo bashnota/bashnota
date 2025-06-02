@@ -23,7 +23,11 @@ app.use(
   cors({
     origin:
       process.env.NODE_ENV === 'production'
-        ? ['https://offline.bashnota.com', 'https://bashnota.web.app']
+        ? [
+            'https://offline.bashnota.com',
+            'https://bashnota.web.app',
+            'https://bashhub.bashnota.com',
+          ]
         : '*',
   }),
 )
