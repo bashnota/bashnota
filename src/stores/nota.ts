@@ -9,6 +9,7 @@ import { fetchAPI } from '@/services/axios'
 import { processNotaContent } from '@/services/publishNotaUtilities'
 import { statisticsService } from '@/services/statisticsService'
 import { logger } from '@/services/logger'
+import { FILE_EXTENSIONS, ERROR_MESSAGES, SUCCESS_MESSAGES } from '@/constants/app'
 
 // Helper functions to convert dates and ensure data is serializable
 const serializeNota = (nota: Partial<Nota> & { id: string }): any => {
@@ -309,89 +310,146 @@ export const useNotaStore = defineStore('nota', {
       }
     },
 
-    async exportNota(id: string): Promise<Nota[]> {
-      const nota = this.getCurrentNota(id)
-      if (!nota) return []
-
-      const exportedNotas = [nota]
-      const children = this.getChildren(id)
-
-      // Recursively get all children
-      for (const child of children) {
-        const childExport = await this.exportNota(child.id)
-        exportedNotas.push(...childExport)
-      }
-
-      toast(`Nota "${nota.title}" exported successfully`)
-
-      return exportedNotas
-    },
-
-    async importNotas(file: File) {
-      try {
-        const content = await file.text()
-        const notas = JSON.parse(content)
-
-        // Validate the imported data
-        if (!Array.isArray(notas)) throw new Error('Invalid nota file format')
-
-        // Import each nota
-        for (const nota of notas) {
-          if (!nota.id || !nota.title) continue
-
-          // Check if nota already exists
-          const existingNota = await db.notas.get(nota.id)
-          if (existingNota) continue
-
-          // Ensure dates are properly formatted
-          const notaToSave = {
-            ...nota,
-            createdAt: new Date(nota.createdAt),
-            updatedAt: new Date(nota.updatedAt),
-            tags: Array.isArray(nota.tags) ? nota.tags : [],
-          }
-
-          await db.notas.add(notaToSave)
-          this.items.push(notaToSave)
+    async exportNota(id: string): Promise<void> {
+      const nota = this.getItem(id)
+      if (nota) {
+        try {
+          const serialized = serializeNota(nota)
+          const dataStr = JSON.stringify(serialized, null, 2)
+          const blob = new Blob([dataStr], { type: 'application/json' })
+          const url = URL.createObjectURL(blob)
+          const link = document.createElement('a')
+          link.href = url
+          link.download = `${nota.title.replace(/[^a-z0-9]/gi, '_') || 'nota'}${FILE_EXTENSIONS.json}`
+          link.click()
+          URL.revokeObjectURL(url)
+        } catch (error) {
+          logger.error('Failed to prepare nota for export:', error)
+          toast(ERROR_MESSAGES.notas.exportFailed)
         }
-
-        toast('Notas imported successfully')
-
-        return true
-      } catch (error) {
-        logger.error('Failed to import notas:', error)
-        return false
+      } else {
+        toast('Nota not found for export.')
       }
     },
 
-    async exportAllNotas() {
+    async importNotas(file: File): Promise<Nota[]> {
+      return new Promise<Nota[]>(async (resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = async (e) => {
+          try {
+            const text = e.target?.result as string
+            if (!text) {
+              toast(ERROR_MESSAGES.notas.importFailed + ': Empty file content.')
+              return resolve([])
+            }
+            
+            const importedData = JSON.parse(text)
+            const rawNotasToImport: any[] = Array.isArray(importedData) ? importedData : [importedData]
+
+            const allCurrentNotaIds = new Set(this.items.map(item => item.id))
+            const importedNotaIdsInBatch = new Set(rawNotasToImport.map(n => n.id).filter(id => id != null))
+            
+            const cleanedNotas: Nota[] = [];
+            const validNotasToProcess: Nota[] = []
+            const successfullyImportedNotas: Nota[] = []
+
+            for (const notaData of rawNotasToImport) {
+              const deserializedNota = deserializeNota(notaData)
+              
+              if (deserializedNota.parentId) {
+                const parentExistsInStore = allCurrentNotaIds.has(deserializedNota.parentId)
+                const parentExistsInBatch = importedNotaIdsInBatch.has(deserializedNota.parentId)
+                if (!parentExistsInStore && !parentExistsInBatch) {
+                  cleanedNotas.push(JSON.parse(JSON.stringify(deserializedNota)));
+                  deserializedNota.parentId = null;
+                }
+              }
+              validNotasToProcess.push(deserializedNota)
+            }
+
+            if (cleanedNotas.length > 0) {
+              const cleanedTitles = cleanedNotas.map(n => `"${n.title || n.id}"`).join(', ')
+              toast(
+                `${cleanedNotas.length} sub-nota(s) had their parent reference removed and were imported as root notas: ${cleanedTitles}.`
+              )
+            }
+            
+            for (const notaToSave of validNotasToProcess) {
+              const existingNota = this.getItem(notaToSave.id)
+
+              if (existingNota) {
+                const mergedNota = deserializeNota({
+                    ...serializeNota(existingNota),
+                    ...serializeNota(notaToSave),
+                    createdAt: existingNota.createdAt,
+                    updatedAt: new Date()
+                });
+                await db.notas.put(serializeNota(mergedNota));
+                const index = this.items.findIndex((n) => n.id === mergedNota.id)
+                if (index !== -1) {
+                  this.items[index] = mergedNota
+                } else { 
+                  this.items.push(mergedNota)
+                }
+                successfullyImportedNotas.push(mergedNota);
+              } else {
+                const newNota = deserializeNota({
+                    ...serializeNota(notaToSave),
+                    id: notaToSave.id || nanoid(),
+                    createdAt: notaToSave.createdAt ? new Date(notaToSave.createdAt) : new Date(),
+                    updatedAt: new Date()
+                });
+                await db.notas.add(serializeNota(newNota))
+                this.items.push(newNota)
+                successfullyImportedNotas.push(newNota);
+              }
+            }
+
+            if (cleanedNotas.length > 0 && successfullyImportedNotas.length === 0 && rawNotasToImport.length === cleanedNotas.length) {
+            } else if (rawNotasToImport.length > 0 && successfullyImportedNotas.length === 0 && cleanedNotas.length === 0) {
+               toast(ERROR_MESSAGES.notas.importFailed + ': No valid notas found in file or processed.')
+            }
+
+            resolve(successfullyImportedNotas)
+          } catch (error: any) {
+            logger.error('Import error in store:', error)
+            let message = ERROR_MESSAGES.notas.importFailed;
+            if (error instanceof SyntaxError) {
+                message += ': Invalid JSON format.';
+            } else if (error.message) {
+                message += `: ${error.message}`;
+            }
+            toast(message)
+            resolve([])
+          }
+        }
+        reader.onerror = (error) => {
+          logger.error('File reading error:', error)
+          toast(ERROR_MESSAGES.notas.importFailed + ': Could not read file.')
+          resolve([])
+        }
+        reader.readAsText(file)
+      })
+    },
+
+    async exportAllNotas(): Promise<void> {
+      if (this.items.length === 0) {
+        toast('No notas to export.')
+        return
+      }
       try {
-        // Get all notas
-        const allNotas = [...this.items]
-
-        // Create a JSON file
-        const data = JSON.stringify(allNotas, null, 2)
-        const blob = new Blob([data], { type: 'application/json' })
+        const exportData = this.items.map(serializeNota)
+        const dataStr = JSON.stringify(exportData, null, 2)
+        const blob = new Blob([dataStr], { type: 'application/json' })
         const url = URL.createObjectURL(blob)
-
-        // Create a download link and trigger it
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `notas-export-${new Date().toISOString().split('T')[0]}.json`
-        document.body.appendChild(a)
-        a.click()
-
-        // Clean up
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `bashnota_export_${new Date().toISOString().split('T')[0]}${FILE_EXTENSIONS.json}`
+        link.click()
         URL.revokeObjectURL(url)
-        document.body.removeChild(a)
-
-        toast('All notas exported successfully')
-
-        return allNotas
       } catch (error) {
-        logger.error('Failed to export notas:', error)
-        toast('Failed to export notas')
-        return []
+        logger.error('Failed to prepare notas for export:', error)
+        toast(ERROR_MESSAGES.notas.exportFailed)
       }
     },
 

@@ -223,7 +223,7 @@ const handlePageChange = (page: number) => {
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        @click="handleImport"
+                        @click="() => handleImport()"
                         title="Import notas from JSON file"
                         class="hover:bg-blue-50 dark:hover:bg-blue-900/20 text-xs sm:text-sm px-2 sm:px-3"
                       >
@@ -284,7 +284,7 @@ const handlePageChange = (page: number) => {
                   <HomeQuickActions 
                     :notas="store.rootItems"
                     @create-nota="createNewNota"
-                    @import-notas="handleImport"
+                    @import-notas="() => handleImport()"
                     @export-notas="handleExport"
                   />
                 </CardContent>
