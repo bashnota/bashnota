@@ -90,17 +90,17 @@ export function useNotaActions() {
         const file = (event.target as HTMLInputElement).files?.[0]
         if (file) {
           try {
-            const success = await store.importNotas(file)
-            if (success) {
+            const importedNotas = await store.importNotas(file)
+            if (importedNotas.length > 0) {
               await store.loadNotas()
               toast(SUCCESS_MESSAGES.notas.imported)
+              router.push(`/nota/${importedNotas[0].id}`)
               resolve(true)
             } else {
-              toast(ERROR_MESSAGES.notas.importFailed)
               resolve(false)
             }
           } catch (error) {
-            console.error('Import failed:', error)
+            console.error('Import failed in useNotaActions:', error)
             toast(ERROR_MESSAGES.notas.importFailed)
             resolve(false)
           }
