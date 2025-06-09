@@ -26,7 +26,7 @@ app.use(
         ? [
             'https://offline.bashnota.com',
             'https://bashnota.web.app',
-            'https://bashhub.bashnota.com',
+            'https://www.bashnota.com',
           ]
         : '*',
   }),
