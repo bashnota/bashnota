@@ -76,7 +76,7 @@ export class NotaExtensionService {
   public insertMathBlock(latex: string): boolean {
     this.ensureEditor()
     return this.editor!.commands.insertContent({
-      type: 'mathBlock',
+      type: 'math',
       attrs: {
         latex,
       },

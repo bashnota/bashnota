@@ -10,6 +10,7 @@
       <CardContent class="p-4">
         <MathDisplay 
           v-if="!isEditing" 
+          :key="latex"
           :latex="latex" 
           :isReadOnly="isReadOnly"
           :numbered="true"
@@ -28,6 +29,7 @@
     
     <div v-else>
       <MathDisplay 
+        :key="latex"
         :latex="latex" 
         :isReadOnly="isReadOnly"
         :numbered="true"

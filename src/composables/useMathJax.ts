@@ -1,10 +1,34 @@
 import { ref, onMounted, watch } from 'vue'
-import 'mathjax/es5/tex-svg'
 import { logger } from '@/services/logger'
 
 declare global {
   interface Window {
     MathJax: any
+  }
+}
+
+// Initialize MathJax configuration
+if (typeof window !== 'undefined') {
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      displayMath: [['$$', '$$'], ['\\[', '\\]']],
+      processEscapes: true,
+      processEnvironments: true
+    },
+    svg: {
+      fontCache: 'global'
+    },
+    options: {
+      ignoreHtmlClass: 'tex2jax_ignore',
+      processHtmlClass: 'tex2jax_process'
+    },
+    startup: {
+      ready: () => {
+        console.log('MathJax is loaded and ready')
+        window.MathJax.startup.defaultReady()
+      }
+    }
   }
 }
 
@@ -29,20 +53,41 @@ export function useMathJax() {
   // Initialize MathJax
   const initMathJax = () => {
     return new Promise<boolean>((resolve) => {
-      const check = () => {
-        try {
-          if (checkMathJaxLoaded()) {
-            resolve(true)
-          } else {
-            setTimeout(check, 100)
+      try {
+        // Check if MathJax is already loaded
+        if (window.MathJax && window.MathJax.tex2svg) {
+          isMathJaxLoaded.value = true
+          resolve(true)
+          return
+        }
+
+        // Dynamically load MathJax
+        const script = document.createElement('script')
+        script.src = 'https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js'
+        script.async = true
+        script.onload = () => {
+          // Wait for MathJax to be fully initialized
+          const checkReady = () => {
+            if (window.MathJax && window.MathJax.tex2svg) {
+              isMathJaxLoaded.value = true
+              resolve(true)
+            } else {
+              setTimeout(checkReady, 50)
+            }
           }
-        } catch (err) {
-          error.value = err instanceof Error ? err : new Error(String(err))
-          logger.error('Error initializing MathJax:', err)
+          checkReady()
+        }
+        script.onerror = () => {
+          error.value = new Error('Failed to load MathJax')
+          logger.error('Failed to load MathJax script')
           resolve(false)
         }
+        document.head.appendChild(script)
+      } catch (err) {
+        error.value = err instanceof Error ? err : new Error(String(err))
+        logger.error('Error initializing MathJax:', err)
+        resolve(false)
       }
-      check()
     })
   }
 
@@ -61,10 +106,15 @@ export function useMathJax() {
     }
     
     try {
+      // Use MathJax v3 API
       const output = window.MathJax.tex2svg(latex, { display })
-      element.innerHTML = ''
-      element.appendChild(output)
-      return true
+      if (output) {
+        element.innerHTML = ''
+        element.appendChild(output)
+        return true
+      } else {
+        throw new Error('MathJax failed to render LaTeX')
+      }
     } catch (err) {
       error.value = err instanceof Error ? err : new Error(String(err))
       logger.error('Error rendering LaTeX:', err)

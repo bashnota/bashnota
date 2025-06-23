@@ -91,7 +91,11 @@ export function getEditorExtensions() {
         class: 'data-table',
       },
     }),
-    MathExtension,
+    MathExtension.configure({
+      HTMLAttributes: {
+        class: 'math-block',
+      },
+    }),
     GlobalDragHandle.configure({
       dragHandleWidth: 24,
       shouldShow: () => true,
@@ -154,7 +158,11 @@ export function getViewerExtensions() {
         class: 'data-table',
       },
     }),
-    MathExtension,
+    MathExtension.configure({
+      HTMLAttributes: {
+        class: 'math-block',
+      },
+    }),
     MarkdownExtension,
     Youtube,
     SubfigureExtension,

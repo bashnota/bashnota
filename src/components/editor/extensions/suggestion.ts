@@ -384,17 +384,15 @@ function createAdvancedCommands(): CommandItem[] {
       category: 'Basic Blocks',
       icon: FunctionSquare,
       keywords: ['math', 'equation', 'latex', 'formula', '$', '$$'],
+      description: 'Embed mathematical equations using LaTeX.',
       command: ({ editor, range }: CommandArgs) => {
         editor
           .chain()
           .focus()
           .deleteRange(range)
-          .insertContent({
-            type: 'mathBlock',
-            attrs: {
-              latex: 'ⵟ(a,b) = \\frac{(a \\cdot b)^2}{||a - b||^2}, \\forall a,b \\in \\mathbb{R}^n, a \\neq b',
-            },
-          } as any)
+          .setMath({ 
+            latex: 'ⵟ(a,b) = \\frac{(a \\cdot b)^2}{||a - b||^2}, \\forall a,b \\in \\mathbb{R}^n, a \\neq b' 
+          })
           .run();
       },
     },
