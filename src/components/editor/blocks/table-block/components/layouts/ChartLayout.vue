@@ -14,7 +14,7 @@ import {
   PieChart,
   ScatterChart,
 } from 'lucide-vue-next'
-import type { TableData } from '@/components/editor/extensions/TableExtension'
+import type { TableData } from '@/components/editor/blocks/table-block/TableExtension'
 import DataChart from './charts/DataChart.vue'
 import SelectWrapper from './SelectWrapper.vue'
 

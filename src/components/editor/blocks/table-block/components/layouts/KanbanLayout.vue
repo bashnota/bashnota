@@ -4,7 +4,7 @@ import { useDraggable } from '@vueuse/core'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Plus, Trash2, GripVertical } from 'lucide-vue-next'
-import type { TableData } from '@/components/editor/extensions/TableExtension'
+import type { TableData } from '@/components/editor/blocks/table-block/TableExtension'
 
 const props = defineProps<{
   tableData: TableData

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { openDB, type DBSchema } from 'idb'
-import type { TableData } from '@/components/editor/extensions/TableExtension'
+import type { TableData } from '@/components/editor/blocks/table-block/TableExtension'
 
 interface NotaDBSchema extends DBSchema {
   tables: {

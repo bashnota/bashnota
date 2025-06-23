@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import type { TableData } from '@/components/editor/extensions/TableExtension'
+import type { TableData } from '@/components/editor/blocks/table-block/TableExtension'
 
 const props = defineProps<{
   tableData: TableData
@@ -19,7 +19,7 @@ const copySelectedCells = () => {
   // If only one cell is selected, use the existing copy function
   if (props.selectedCells.length === 1) {
     const { rowId, columnId } = props.selectedCells[0]
-    const cellValue = props.tableData.rows.find(row => row.id === rowId)?.cells[columnId]
+    const cellValue = props.tableData.rows.find((row: any) => row.id === rowId)?.cells[columnId]
     
     if (cellValue !== undefined) {
       clipboard.value = { value: cellValue, rowId, columnId }
@@ -37,7 +37,7 @@ const copySelectedCells = () => {
   let csvData = ''
   
   for (const rowId of rowArray) {
-    const row = props.tableData.rows.find(r => r.id === rowId)
+    const row = props.tableData.rows.find((r: any) => r.id === rowId)
     if (!row) continue
     
     const rowData = colArray.map(colId => {
@@ -77,8 +77,8 @@ const pasteSelectedCells = () => {
     const rows = csvData.trim().split('\n')
     
     // Get the starting position
-    const startRowIndex = props.tableData.rows.findIndex(row => row.id === props.selectedCells[0].rowId)
-    const startColIndex = props.tableData.columns.findIndex(col => col.id === props.selectedCells[0].columnId)
+    const startRowIndex = props.tableData.rows.findIndex((row: any) => row.id === props.selectedCells[0].rowId)
+    const startColIndex = props.tableData.columns.findIndex((col: any) => col.id === props.selectedCells[0].columnId)
     
     // Parse and paste each row
     rows.forEach((row: string, rowOffset: number) => {

@@ -1,5 +1,5 @@
 import { ref, type Ref, watch } from 'vue'
-import type { TableData } from '@/components/editor/extensions/TableExtension'
+import type { TableData } from '@/components/editor/blocks/table-block/TableExtension'
 
 export type ColumnType = 'text' | 'number' | 'select' | 'date'
 

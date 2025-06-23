@@ -11,7 +11,7 @@ import {
 import {
   DropdownMenu,
 } from '@/components/ui/dropdown-menu'
-import type { TableData } from '@/components/editor/extensions/TableExtension'
+import type { TableData } from '@/components/editor/blocks/table-block/TableExtension'
 import type { ColumnType } from '../composables/useTableOperations'
 
 // Import new components

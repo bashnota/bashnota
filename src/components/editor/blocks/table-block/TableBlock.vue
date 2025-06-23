@@ -2,7 +2,7 @@
 import { onMounted, watch, ref } from 'vue'
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
-import type { TableData } from '@/components/editor/extensions/TableExtension'
+import type { TableData } from '@/components/editor/blocks/table-block/TableExtension'
 import type { NodeViewProps } from '@tiptap/vue-3'
 import { logger } from '@/services/logger'
 

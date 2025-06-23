@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { ChevronDown, Calendar as CalendarIcon } from 'lucide-vue-next'
 import Calendar from '@/components/ui/calendar.vue'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import type { TableData } from '@/components/editor/extensions/TableExtension'
+import type { TableData } from '@/components/editor/blocks/table-block/TableExtension'
 import { cn } from '@/lib/utils'
 
 const props = defineProps<{
@@ -41,8 +41,8 @@ const uniqueValues = computed(() => {
   
   // Collect all non-empty values from the column
   const values = props.tableData.rows
-    .map(row => row.cells[props.columnId])
-    .filter(value => value !== undefined && value !== null && value !== '')
+    .map((row: any) => row.cells[props.columnId])
+    .filter((value: any) => value !== undefined && value !== null && value !== '')
   
   // Return unique values, sorted alphabetically
   return [...new Set(values)].sort((a, b) => String(a).localeCompare(String(b)))
@@ -178,7 +178,7 @@ const handleCellClick = () => {
           </div>
           <DropdownMenuItem
             v-for="option in uniqueValues"
-            :key="option"
+            :key="String(option)"
             @click="emit('update', option)"
           >
             {{ option }}

@@ -1,6 +1,6 @@
 import { ref, watch } from 'vue'
 import { useTableStore } from '@/stores/tableStore'
-import type { TableData } from '@/components/editor/extensions/TableExtension'
+import type { TableData } from '@/components/editor/blocks/table-block/TableExtension'
 
 export function useTableData(tableId: string, notaId: string) {
   const tableStore = useTableStore()

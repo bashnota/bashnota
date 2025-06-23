@@ -26,7 +26,6 @@ import { TableExtension } from '../blocks/table-block/TableExtension'
 import { MathExtension } from '../blocks/math-block'
 import { Youtube } from '../blocks/youtube-block/youtube-extension'
 import { SubfigureExtension } from '../blocks'
-import { InlineAIGenerationExtension } from '../blocks/inline-generation-block/InlineAIGenerationExtension'
 import { CitationExtension, BibliographyExtension } from '../blocks/citation-block/CitationExtension'
 import { TheoremExtension } from '../blocks/theorem-block'
 import { ConfusionMatrixExtension } from '../blocks/confusion-matrix'
@@ -112,7 +111,6 @@ export function getEditorExtensions() {
     }),
     Blockquote,
     HorizontalRule,
-    InlineAIGenerationExtension,
     CitationExtension,
     BibliographyExtension,
     TheoremExtension,
