@@ -18,15 +18,16 @@ import Document from '@tiptap/extension-document'
 
 // Import custom extensions
 import { PageLink } from './PageLinkExtension'
-import { ExecutableCodeBlockExtension } from './ExecutableCodeBlockExtension'
-import { TableExtension } from './TableExtension'
-import { MathExtension } from './MathExtension'
 import { MarkdownExtension } from './MarkdownExtension'
-import { Youtube } from './youtube'
-import { SubfigureExtension } from '../blocks'
 import GlobalDragHandle from './DragHandlePlugin'
-import { InlineAIGenerationExtension } from './InlineAIGenerationExtension'
-import { CitationExtension, BibliographyExtension } from './CitationExtension'
+
+import { ExecutableCodeBlockExtension } from '../blocks/executable-code-block/ExecutableCodeBlockExtension'
+import { TableExtension } from '../blocks/table-block/TableExtension'
+import { MathExtension } from '../blocks/math-block'
+import { Youtube } from '../blocks/youtube-block/youtube-extension'
+import { SubfigureExtension } from '../blocks'
+import { InlineAIGenerationExtension } from '../blocks/inline-generation-block/InlineAIGenerationExtension'
+import { CitationExtension, BibliographyExtension } from '../blocks/citation-block/CitationExtension'
 import { TheoremExtension } from '../blocks/theorem-block'
 import { ConfusionMatrixExtension } from '../blocks/confusion-matrix'
 

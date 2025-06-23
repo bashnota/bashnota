@@ -26,8 +26,9 @@ import {
   StatsVisualization,
 } from './confusion-matrix'
 
-import Citation from './Citation.vue'
-import Bibliography from './Bibliography.vue'
+import { CitationExtension, BibliographyExtension } from './citation-block/CitationExtension'
+import Citation from './citation-block/Citation.vue'
+import Bibliography from './citation-block/Bibliography.vue'
 import SubNotaDialog from './SubNotaDialog.vue'
 
 // Re-export everything
@@ -72,6 +73,8 @@ export const blockExtensions = {
   math: MathExtension,
   theorem: TheoremExtension,
   confusionMatrix: ConfusionMatrixExtension,
+  citation: CitationExtension,
+  bibliography: BibliographyExtension,
 }
 
 export default blockExtensions

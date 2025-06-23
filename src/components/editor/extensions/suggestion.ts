@@ -2,7 +2,7 @@ import { Editor, VueRenderer, type Range } from '@tiptap/vue-3'
 import tippy, { type Instance, type Props } from 'tippy.js'
 import CommandsList from '@/components/editor/blocks/CommandsList.vue'
 import SubNotaDialog from '@/components/editor/blocks/SubNotaDialog.vue'
-import CitationPicker from '@/components/editor/blocks/CitationPicker.vue'
+import CitationPicker from '@/components/editor/blocks/citation-block/CitationPicker.vue'
 import type { CitationEntry } from '@/types/nota'
 import 'tippy.js/dist/tippy.css'
 import router from '@/router'
@@ -31,7 +31,11 @@ import {
   PenTool,
   SparklesIcon,
   BookIcon,
-  FileText
+  FileText,
+  Folder,
+  MessageSquare,
+  Youtube,
+  type LucideIcon,
 } from 'lucide-vue-next'
 import { toast } from '@/lib/utils'
 import { logger } from '@/services/logger'

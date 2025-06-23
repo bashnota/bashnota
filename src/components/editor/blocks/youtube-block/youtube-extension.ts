@@ -1,6 +1,6 @@
 import { Node } from '@tiptap/core'
 import { VueNodeViewRenderer } from '@tiptap/vue-3'
-import YoutubeBlock from '../blocks/youtube-block/YoutubeBlock.vue'
+import YoutubeBlock from './YoutubeBlock.vue'
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {

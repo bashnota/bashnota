@@ -1,7 +1,8 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import type { RawCommands } from '@tiptap/core'
 import { VueNodeViewRenderer } from '@tiptap/vue-3'
-import { Citation, Bibliography } from '@/components/editor/blocks'
+import Citation from './Citation.vue'
+import Bibliography from './Bibliography.vue'
 import type { CitationEntry } from '@/types/nota'
 
 // Citation inline node
