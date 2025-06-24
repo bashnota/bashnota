@@ -13,7 +13,7 @@ import { auth, firestore } from '@/services/firebase'
 import { toast } from '@/lib/utils'
 import { logAnalyticsEvent } from '@/services/firebase'
 import type { UserProfile } from '@/types/user'
-import { collection, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore'
+import { collection, doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore'
 import { generateUniqueUserTag } from '@/utils/userTagGenerator'
 
 export class AuthService {
@@ -154,7 +154,6 @@ export class AuthService {
         
         if (oldTagDoc.exists()) {
           // Completely delete the old tag document instead of just marking it as available
-          const { deleteDoc } = await import('firebase/firestore')
           await deleteDoc(oldTagRef)
           console.log(`Previous user tag "${oldTag}" has been deleted`)
         }

@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid'
 import { useAISettingsStore } from '@/stores/aiSettingsStore'
 import { logger } from '@/services/logger'
 import { useConversationManager } from './useConversationManager'
+import { aiConversationService } from '@/services/aiConversationService'
 
 export interface ConversationMessage {
   id: string
@@ -162,8 +163,6 @@ export function useConversation(editor: any, notaId: string) {
       const sessionId = conversationManager.generateBlockId()
       
       // Create a conversation in the database for this session
-      // Import the service directly since it's not exposed by conversation manager
-      const { aiConversationService } = await import('@/services/aiConversationService')
       await aiConversationService.getOrCreateConversation({
         notaId,
         blockId: sessionId
