@@ -2,6 +2,7 @@ import { ref, computed, watch } from 'vue'
 import { nanoid } from 'nanoid'
 import { useAISettingsStore } from '@/stores/aiSettingsStore'
 import { logger } from '@/services/logger'
+import { useConversationManager } from './useConversationManager'
 
 export interface ConversationMessage {
   id: string
@@ -19,6 +20,7 @@ export interface AIBlock {
       error?: string
       lastUpdated?: string
       conversation?: ConversationMessage[]
+      blockId?: string
     }
   }
   type: string
@@ -33,6 +35,9 @@ export function useConversation(editor: any, notaId: string) {
   // Get AI settings store for token limits
   const aiSettings = useAISettingsStore()
   
+  // Initialize conversation manager
+  const conversationManager = useConversationManager(editor, notaId)
+  
   // State management
   const activeAIBlock = ref<AIBlock | null>(null)
   const promptInput = ref('')
@@ -42,7 +47,6 @@ export function useConversation(editor: any, notaId: string) {
   const isEditing = ref(false)
   const selectedText = ref('')
   const copied = ref(false)
-  const conversationHistory = ref<ConversationMessage[]>([])
   const isLoading = ref(false)
   
   // Max tokens from settings or default
@@ -116,12 +120,8 @@ export function useConversation(editor: any, notaId: string) {
   }
   
   // Load conversation from an existing block
-  const loadConversationFromBlock = (block: AIBlock) => {
+  const loadConversationFromBlock = async (block: AIBlock) => {
     if (!block) return
-    
-    // Create a logger for debugging this function
-    const convLogger = logger.createPrefixedLogger('useConversation');
-    convLogger.debug('Loading conversation from block:', block.node.attrs);
     
     // Set active block
     activeAIBlock.value = block
@@ -133,49 +133,8 @@ export function useConversation(editor: any, notaId: string) {
     isEditing.value = false
     isContinuing.value = false
     
-    // Load conversation history from block
-    if (block.node.attrs.conversation && Array.isArray(block.node.attrs.conversation) && block.node.attrs.conversation.length > 0) {
-      // Convert ISO strings back to Date objects
-      convLogger.debug('Block has stored conversation history, length:', block.node.attrs.conversation.length);
-      const processedHistory = block.node.attrs.conversation.map((msg: any) => {
-        const processedMsg = {
-          ...msg,
-          id: msg.id || `${msg.role}-${Date.now()}`,
-          timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date()
-        };
-        convLogger.debug('Processed message:', processedMsg);
-        return processedMsg;
-      });
-      conversationHistory.value = processedHistory;
-      convLogger.info('Loaded conversation history from block.node.attrs.conversation, message count:', conversationHistory.value.length);
-    } else if (block.node.attrs.prompt) {
-      // Create a basic conversation if only prompt exists
-      convLogger.debug('No stored conversation history, creating from prompt/result');
-      conversationHistory.value = [
-        {
-          id: `user-${Date.now()}`,
-          role: 'user',
-          content: block.node.attrs.prompt,
-          timestamp: block.node.attrs.lastUpdated ? new Date(block.node.attrs.lastUpdated) : new Date()
-        }
-      ]
-      
-      // Add assistant message if result exists
-      if (block.node.attrs.result) {
-        conversationHistory.value.push({
-          id: `assistant-${Date.now()}`,
-          role: 'assistant',
-          content: block.node.attrs.result,
-          timestamp: block.node.attrs.lastUpdated ? new Date(block.node.attrs.lastUpdated) : new Date()
-        })
-      }
-      
-      convLogger.info('Created conversation history from prompt/result, message count:', conversationHistory.value.length);
-    } else {
-      // No conversation history or prompt
-      convLogger.warn('No conversation history or prompt found in block');
-      conversationHistory.value = [];
-    }
+    // Load conversation history using conversation manager
+    await conversationManager.loadConversationFromBlock(block)
     
     // Set loading state
     isLoading.value = !!block.node.attrs.loading
@@ -189,20 +148,49 @@ export function useConversation(editor: any, notaId: string) {
     resultInput.value = ''
     isContinuing.value = false
     isEditing.value = false
-    conversationHistory.value = []
+    conversationManager.clearConversation()
     isLoading.value = false
   }
   
-  // Create a new AI session
-  const createNewSession = () => {
-    // First check if editor is available
-    if (!editor) {
-      console.error('Editor not available')
-      return
-    }
-    
+    // Create a new AI session
+  const createNewSession = async () => {
     try {
+      // Clear any existing active block
       clearActiveBlock()
+      
+      // Generate a unique session ID for the sidebar-only conversation
+      const sessionId = conversationManager.generateBlockId()
+      
+      // Create a conversation in the database for this session
+      // Import the service directly since it's not exposed by conversation manager
+      const { aiConversationService } = await import('@/services/aiConversationService')
+      await aiConversationService.getOrCreateConversation({
+        notaId,
+        blockId: sessionId
+      })
+      
+      // Create a virtual block object for the sidebar session
+      const virtualBlock = {
+        node: {
+          attrs: {
+            blockId: sessionId,
+            prompt: '',
+            result: '',
+            loading: false,
+            error: ''
+          }
+        },
+        type: 'aiGeneration'
+      }
+      
+      // Set the virtual block as active
+      activeAIBlock.value = virtualBlock
+      
+      // Initialize empty conversation history
+      conversationManager.conversationHistory.value = []
+      
+      console.log('Created new AI sidebar session with ID:', sessionId)
+      
     } catch (error) {
       console.error('Error creating new AI session:', error)
     }
@@ -230,8 +218,8 @@ export function useConversation(editor: any, notaId: string) {
     }
   }
   
-  // Save edited text
-  const saveEditedText = () => {
+      // Save edited text
+  const saveEditedText = async () => {
     if (!activeAIBlock.value || !isEditing.value) return
     
     try {
@@ -241,21 +229,18 @@ export function useConversation(editor: any, notaId: string) {
         lastUpdated: new Date().toISOString()
       })
       
-      // Update conversation history
-      if (conversationHistory.value.length > 0) {
-        const lastMessage = conversationHistory.value[conversationHistory.value.length - 1]
+      // Update conversation history using conversation manager
+      const currentHistory = conversationManager.conversationHistory.value
+      if (currentHistory.length > 0) {
+        const lastMessage = currentHistory[currentHistory.length - 1]
         if (lastMessage.role === 'assistant') {
           lastMessage.content = resultInput.value
           lastMessage.timestamp = new Date()
         }
         
-        // Update block with new conversation history
-        editor.commands.updateAttributes('aiGeneration', {
-          conversation: conversationHistory.value.map(msg => ({
-            ...msg,
-            timestamp: msg.timestamp?.toISOString()
-          }))
-        })
+        // Get block ID and update conversation in database
+        const blockId = conversationManager.getOrCreateBlockId(activeAIBlock.value)
+        await conversationManager.updateConversationHistory(blockId, currentHistory)
       }
       
       // Exit editing mode
@@ -281,7 +266,7 @@ export function useConversation(editor: any, notaId: string) {
     isEditing,
     selectedText,
     copied,
-    conversationHistory,
+    conversationHistory: conversationManager.conversationHistory,
     promptTokenCount,
     isPromptEmpty,
     isLoading,
@@ -293,6 +278,7 @@ export function useConversation(editor: any, notaId: string) {
     createNewSession,
     toggleContinuing,
     toggleEditing,
-    saveEditedText
+    saveEditedText,
+    conversationManager
   }
 }

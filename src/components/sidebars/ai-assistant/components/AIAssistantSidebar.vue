@@ -107,7 +107,7 @@ const {
   regenerateText: regenerateAction,
   removeBlock: removeBlockAction,
   currentStreamingText: streamingText
-} = useAIGeneration(props.editor)
+} = useAIGeneration(props.editor, props.notaId)
 
 // Format progress percentage
 const formattedProgress = computed(() => {
@@ -750,7 +750,7 @@ onMounted(() => {
         <!-- Empty State when no active conversation -->
         <EmptyState 
           v-if="!activeAIBlock" 
-          @create-session="createNewSession"
+          @create-session="() => createNewSession()"
           class="h-full overflow-y-auto"
         />
         
@@ -766,7 +766,7 @@ onMounted(() => {
               :notaId="props.notaId"
               :active-block-id="activeBlockId"
               @select-chat="handleSelectChat"
-              @create-new="createNewSession"
+              @create-new="() => createNewSession()"
             />
           </ScrollArea>
           

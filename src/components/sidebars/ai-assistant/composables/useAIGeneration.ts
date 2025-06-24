@@ -9,6 +9,7 @@ import { useAIErrorHandling } from './useAIErrorHandling'
 import { useAIRequest } from './useAIRequest'
 import { useAIProviders } from './useAIProviders'
 import { useStreamingMode } from './useStreamingMode'
+import { useConversationManager } from './useConversationManager'
 
 // Define error types for better error handling
 type AIGenerationErrorType = 
@@ -27,11 +28,14 @@ interface AIGenerationError {
   originalError?: Error;
 }
 
-export function useAIGeneration(editor: any) {
+export function useAIGeneration(editor: any, notaId: string) {
   const isLoading = ref(false)
   const aiSettings = useAISettingsStore()
   const { errorMessage, handleGenerationError } = useAIErrorHandling()
   const { createRequestWithTimeout, abortRequest, abortAllRequests } = useAIRequest()
+  
+  // Initialize conversation manager
+  const conversationManager = useConversationManager(editor, notaId)
   
   // Get all needed functions from useAIProviders at the top level
   const { 
@@ -153,21 +157,26 @@ export function useAIGeneration(editor: any) {
     try {
       isLoading.value = true
       
+      // Get or create block ID
+      const blockId = conversationManager.getOrCreateBlockId(block)
+      
       // Update block to show loading state
       editor.commands.updateAttributes('aiGeneration', {
         loading: true,
         error: ''
       })
 
-      // Add user message to history
-      const newHistory = [...conversationHistory]
+      // Create user message
       const userMessage: ConversationMessage = {
         id: `user-${Date.now()}`,
         role: 'user',
         content: prompt,
         timestamp: new Date()
       }
-      newHistory.push(userMessage)
+
+      // Add user message to database and get updated history
+      await conversationManager.addMessage(blockId, userMessage)
+      const newHistory = [...conversationManager.conversationHistory.value]
 
       // Ensure we have a valid provider before generating
       let providerId = forcedProvider
@@ -197,16 +206,13 @@ export function useAIGeneration(editor: any) {
         options.safetyThreshold = aiSettings.settings.geminiSafetyThreshold
       }
       
-      // Create a new AI message ready for streaming content
-      const aiMessage: ConversationMessage = {
-        id: `assistant-${Date.now()}`,
-        role: 'assistant',
-        content: '',
-        timestamp: new Date()
-      }
-      
-      // Add empty AI message to history
-      newHistory.push(aiMessage)
+              // Create a new AI message ready for streaming content
+        const aiMessage: ConversationMessage = {
+          id: `assistant-${Date.now()}`,
+          role: 'assistant',
+          content: '',
+          timestamp: new Date()
+        }
       
       let generationResult: GenerationResult
       
@@ -233,16 +239,18 @@ export function useAIGeneration(editor: any) {
             editor.commands.updateAttributes('aiGeneration', {
               result: fullResult,
               loading: true,
-              lastUpdated: new Date().toISOString(),
-              conversation: newHistory.map(msg => ({ 
-                ...msg, 
-                timestamp: msg.timestamp?.toISOString() 
-              }))
+              lastUpdated: new Date().toISOString()
             })
           },
-          onComplete: (result: GenerationResult) => {
+          onComplete: async (result: GenerationResult) => {
             // Streaming complete
             completeStreaming()
+            
+            // Set final AI message content
+            aiMessage.content = result.text
+            
+            // Add AI message to database
+            await conversationManager.addMessage(blockId, aiMessage)
             
             // Get the full result now that we're complete
             const fullResult = block.node.attrs.result 
@@ -253,11 +261,7 @@ export function useAIGeneration(editor: any) {
             editor.commands.updateAttributes('aiGeneration', {
               result: fullResult,
               loading: false,
-              lastUpdated: new Date().toISOString(),
-              conversation: newHistory.map(msg => ({ 
-                ...msg, 
-                timestamp: msg.timestamp?.toISOString() 
-              }))
+              lastUpdated: new Date().toISOString()
             })
           },
           onError: (error: Error) => {
@@ -273,7 +277,7 @@ export function useAIGeneration(editor: any) {
         )
         
         // Return updated conversation history
-        return newHistory
+        return conversationManager.conversationHistory.value
       } else {
         // Use non-streaming API with timeout
         generationResult = await createRequestWithTimeout<GenerationResult>(
@@ -282,26 +286,25 @@ export function useAIGeneration(editor: any) {
           false
         )
         
-        // Update AI message content
+                // Update AI message content
         aiMessage.content = generationResult.text
+        
+        // Add AI message to database
+        await conversationManager.addMessage(blockId, aiMessage)
         
         // Get the full result (original + new text)
         const fullResult = block.node.attrs.result 
           ? `${block.node.attrs.result}\n\n${generationResult.text}`
           : generationResult.text
-  
+
         // Update block with result
         editor.commands.updateAttributes('aiGeneration', {
           result: fullResult,
           loading: false,
-          lastUpdated: new Date().toISOString(),
-          conversation: newHistory.map(msg => ({ 
-            ...msg, 
-            timestamp: msg.timestamp?.toISOString() 
-          }))
+          lastUpdated: new Date().toISOString()
         })
         
-        return newHistory
+        return conversationManager.conversationHistory.value
       }
     } catch (error) {
       return handleGenerationError(error, editor, block, conversationHistory)
@@ -327,21 +330,25 @@ export function useAIGeneration(editor: any) {
     try {
       isLoading.value = true
       
+      // Get or create block ID
+      const blockId = conversationManager.getOrCreateBlockId(block)
+      
       // Update block to show loading state
       editor.commands.updateAttributes('aiGeneration', {
         loading: true,
         error: ''
       })
 
-      // Add user message to history
-      const newHistory = [...conversationHistory]
+      // Create user message
       const userMessage: ConversationMessage = {
         id: `user-${Date.now()}`,
         role: 'user',
         content: prompt,
         timestamp: new Date()
       }
-      newHistory.push(userMessage)
+
+      // Add user message to database
+      await conversationManager.addMessage(blockId, userMessage)
 
       // Ensure we have a valid provider before generating
       let providerId = forcedProvider
@@ -376,14 +383,16 @@ export function useAIGeneration(editor: any) {
         aiService.generateText(providerId, options, apiKey)
       )
 
-      // Add AI response to history
+      // Create AI response message
       const aiMessage: ConversationMessage = {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
         content: generationResult.text,
         timestamp: new Date()
       }
-      newHistory.push(aiMessage)
+
+      // Add AI message to database
+      await conversationManager.addMessage(blockId, aiMessage)
 
       // Get the full result (original + new text)
       const fullResult = block.node.attrs.result 
@@ -394,14 +403,10 @@ export function useAIGeneration(editor: any) {
       editor.commands.updateAttributes('aiGeneration', {
         result: fullResult,
         loading: false,
-        lastUpdated: new Date().toISOString(),
-        conversation: newHistory.map(msg => ({ 
-          ...msg, 
-          timestamp: msg.timestamp?.toISOString() 
-        }))
+        lastUpdated: new Date().toISOString()
       })
 
-      return newHistory
+      return conversationManager.conversationHistory.value
     } catch (error) {
       return handleGenerationError(error, editor, block, conversationHistory)
     } finally {
@@ -424,14 +429,20 @@ export function useAIGeneration(editor: any) {
     try {
       isLoading.value = true
       
+      // Get or create block ID
+      const blockId = conversationManager.getOrCreateBlockId(block)
+      
       // Update block to show loading state
       editor.commands.updateAttributes('aiGeneration', {
         loading: true,
         error: ''
       })
 
+      // Get current conversation history
+      const currentHistory = conversationManager.conversationHistory.value
+      
       // Filter history to exclude the last assistant message
-      const filteredHistory = [...conversationHistory]
+      const filteredHistory = [...currentHistory]
       if (filteredHistory.length > 0 && filteredHistory[filteredHistory.length - 1].role === 'assistant') {
         filteredHistory.pop()
       }
@@ -474,28 +485,25 @@ export function useAIGeneration(editor: any) {
         aiService.generateText(providerId, options, apiKey)
       )
 
-      // Add AI response to history
-      const newHistory = [...filteredHistory]
+      // Create AI response message
       const aiMessage: ConversationMessage = {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
         content: generationResult.text,
         timestamp: new Date()
       }
-      newHistory.push(aiMessage)
+
+      // Update conversation history in database (remove last assistant message and add new one)
+      await conversationManager.updateConversationHistory(blockId, [...filteredHistory, aiMessage])
 
       // Update block with result
       editor.commands.updateAttributes('aiGeneration', {
         result: generationResult.text,
         loading: false,
-        lastUpdated: new Date().toISOString(),
-        conversation: newHistory.map(msg => ({ 
-          ...msg, 
-          timestamp: msg.timestamp?.toISOString() 
-        }))
+        lastUpdated: new Date().toISOString()
       })
 
-      return newHistory
+      return conversationManager.conversationHistory.value
     } catch (error) {
       return handleGenerationError(error, editor, block, conversationHistory)
     } finally {
@@ -549,6 +557,9 @@ export function useAIGeneration(editor: any) {
     
     // Add data about the current provider
     getCurrentProvider: () => aiSettings.settings.preferredProviderId,
-    getAvailableProviders: () => availableProviders.value
+    getAvailableProviders: () => availableProviders.value,
+    
+    // Expose conversation manager
+    conversationManager
   }
 }
