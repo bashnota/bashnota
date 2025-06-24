@@ -17,7 +17,6 @@ import {
   ChevronDown, 
   ChevronRight, 
   Copy,
-  Link,
   Check,
   Info
 } from 'lucide-vue-next'

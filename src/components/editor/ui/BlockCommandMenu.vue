@@ -9,10 +9,10 @@ import {
 import { Trash2Icon, ScissorsIcon, CopyIcon, StarIcon } from 'lucide-vue-next'
 import { onMounted, onUnmounted, ref } from 'vue'
 import type { EditorView } from '@tiptap/pm/view'
-import { serializeForClipboard } from './extensions/DragHandlePlugin'
+import { serializeForClipboard } from '../extensions/DragHandlePlugin'
 import type { Selection } from '@tiptap/pm/state'
 import { useFavoriteBlocksStore } from '@/stores/favoriteBlocksStore'
-import AddToFavoritesModal from './AddToFavoritesModal.vue'
+import AddToFavoritesModal from '../dialogs/AddToFavoritesModal.vue'
 import { toast } from '@/components/ui/toast'
 import { logger } from '@/services/logger'
 

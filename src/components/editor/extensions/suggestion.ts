@@ -6,9 +6,6 @@ import CitationPicker from '@/components/editor/blocks/citation-block/CitationPi
 import type { CitationEntry } from '@/types/nota'
 import 'tippy.js/dist/tippy.css'
 import router from '@/router'
-import { useNotaStore } from '@/stores/nota'
-import { useCitationStore } from '@/stores/citationStore'
-import { createSubNota } from '@/services/subNotaService'
 import {
   TextIcon,
   Heading1,
@@ -32,10 +29,6 @@ import {
   SparklesIcon,
   BookIcon,
   FileText,
-  Folder,
-  MessageSquare,
-  Youtube,
-  type LucideIcon,
 } from 'lucide-vue-next'
 import { toast } from '@/lib/utils'
 import { logger } from '@/services/logger'
@@ -474,24 +467,15 @@ function createAdvancedCommands(): CommandItem[] {
       },
     },
     {
-      title: 'AI Generation',
-      description: 'Insert an inline AI generation block',
-      category: 'Advanced',
+      title: 'AI Assistant',
+      category: 'AI',
       icon: SparklesIcon,
-      keywords: ['ai', 'generate', 'gpt', 'assistant', 'complete'],
+      keywords: ['ai', 'assistant', 'generate', 'chat'],
+      description: 'Open the AI assistant sidebar',
       command: ({ editor, range }: CommandArgs) => {
-        // Delete the range first
-        editor.chain().focus().deleteRange(range).run();
-        
-        if (editor.can().insertInlineAIGeneration?.()) {
-          // Use the specialized extension if available
-          editor.commands.insertInlineAIGeneration();
-        } else {
-          // Fallback: Use transaction to insert text directly
-          const transaction = editor.state.tr;
-          transaction.insertText('🤖 AI Generation');
-          editor.view.dispatch(transaction);
-        }
+        // Emit a custom event to toggle the AI sidebar
+        editor.emit('toggle-ai-sidebar', () => {})
+        editor.chain().focus().deleteRange(range).run()
       },
     },
     {

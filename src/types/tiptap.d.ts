@@ -1,4 +1,5 @@
 import '@tiptap/core'
+import type { EditorEvents } from '@tiptap/vue-3'
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -23,5 +24,11 @@ declare module '@tiptap/core' {
        */
       generateText: (prompt: string) => ReturnType
     }
+  }
+}
+
+declare module '@tiptap/vue-3' {
+  interface EditorEvents {
+    'toggle-ai-sidebar': () => void
   }
 } 

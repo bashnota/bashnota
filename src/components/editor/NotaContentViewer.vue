@@ -6,11 +6,9 @@ import { Button } from '@/components/ui/button'
 import { ListIcon } from 'lucide-vue-next'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import { getViewerExtensions } from './extensions'
-import TableOfContents from './TableOfContents.vue'
+import TableOfContents from './ui/TableOfContents.vue'
 import { logger } from '@/services/logger'
 import { useCitationStore } from '@/stores/citationStore'
-import { useNotaStore } from '@/stores/nota'
-import { useRouter } from 'vue-router'
 import { Editor } from '@tiptap/core'
 import type { EditorOptions } from '@tiptap/core'
 import { Node as ProseMirrorNode } from 'prosemirror-model'
@@ -38,9 +36,6 @@ const isSidebarOpen = ref(false)
 // Initialize citations if provided
 const initializeCitations = () => {
   if (props.citations) {
-    // Get the current nota ID from the route
-    const currentRoute = useRouter().currentRoute.value
-    
     // Set public citations
     citationStore.setPublicCitations(props.citations || [])
   }

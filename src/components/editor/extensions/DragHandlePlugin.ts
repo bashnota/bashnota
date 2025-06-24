@@ -4,7 +4,7 @@ import { Fragment, Slice, Node } from '@tiptap/pm/model'
 import { EditorView } from '@tiptap/pm/view'
 import * as pmView from '@tiptap/pm/view'
 import { createApp, h } from 'vue'
-import BlockCommandMenu from '../BlockCommandMenu.vue'
+import BlockCommandMenu from '../ui/BlockCommandMenu.vue'
 import { logger } from '@/services/logger'
 
 function getPmView() {

@@ -4,20 +4,20 @@ import { TagsInput } from '@/components/ui/tags-input'
 import { RotateCw, CheckCircle, Star, Share2, Download, PlayCircle, Loader2, Save, Clock, Sparkles, Book, Server, Tag, Link2 } from 'lucide-vue-next'
 import { useNotaStore } from '@/stores/nota'
 import { useJupyterStore } from '@/stores/jupyterStore'
-import EditorToolbar from './EditorToolbar.vue'
+import EditorToolbar from './ui/EditorToolbar.vue'
 import { ref, watch, computed, onUnmounted, onMounted, reactive, provide } from 'vue'
 import SidebarsGroup from '@/components/sidebars/SidebarsGroup.vue'
 import 'highlight.js/styles/github.css'
 import { useRouter } from 'vue-router'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
-import TableOfContents from './TableOfContents.vue'
+import TableOfContents from './ui/TableOfContents.vue'
 import JupyterServersSidebar from '@/components/sidebars/JupyterServersSidebar.vue'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { BookIcon, ServerIcon, BrainIcon } from 'lucide-vue-next'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
 import { getURLWithoutProtocol, toast } from '@/lib/utils'
-import VersionHistoryDialog from './VersionHistoryDialog.vue'
+import VersionHistoryDialog from './dialogs/VersionHistoryDialog.vue'
 import FavoriteBlocksSidebar from '@/components/sidebars/FavoriteBlocksSidebar.vue'
 import ReferencesSidebar from '@/components/sidebars/ReferencesSidebar.vue'
 import AIAssistantSidebar from '@/components/sidebars/AIAssistantSidebar.vue'
@@ -569,7 +569,14 @@ const handleKeyboardShortcuts = (event: KeyboardEvent) => {
   }
 };
 
+// Listen for custom event to open AI sidebar
 onMounted(() => {
+  if (editor.value) {
+    editor.value.on('toggle-ai-sidebar', () => {
+      toggleSidebar('ai')
+    })
+  }
+
   // Add keyboard shortcut event listener
   document.addEventListener('keydown', handleKeyboardShortcuts)
 
@@ -706,6 +713,11 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  if (editor.value) {
+    // Remove the event listener
+    editor.value.off('toggle-ai-sidebar')
+  }
+
   // Clean up event listeners
   document.removeEventListener('keydown', handleKeyboardShortcuts)
   window.removeEventListener('toggle-references', (() => { }) as EventListener)

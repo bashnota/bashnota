@@ -23,7 +23,7 @@ import { Separator } from '@/components/ui/separator'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import type { FunctionalComponent } from 'vue'
 import { ref, onMounted } from 'vue'
-import { toggleRenderMathState } from './extensions/MarkdownExtension'
+import { toggleRenderMathState } from '../extensions/MarkdownExtension'
 
 const emit = defineEmits([
   'run-all',

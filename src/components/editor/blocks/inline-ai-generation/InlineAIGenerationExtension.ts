@@ -1,6 +1,6 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import { VueNodeViewRenderer } from '@tiptap/vue-3'
-import InlineAIGenerationComponent from '@/components/editor/blocks/InlineAIGeneration.vue'
+import InlineAIGenerationComponent from './InlineAIGeneration.vue'
 import { aiService } from '@/services/aiService'
 import { useAISettingsStore } from '@/stores/aiSettingsStore'
 import { toast } from '@/components/ui/toast'
@@ -16,13 +16,9 @@ export interface InlineAIGenerationAttributes {
 
 export const InlineAIGenerationExtension = Node.create({
   name: 'inlineAIGeneration',
-  
   group: 'block',
-  
-  content: '',
-  
   atom: true,
-  
+
   addAttributes() {
     return {
       prompt: {
@@ -36,10 +32,10 @@ export const InlineAIGenerationExtension = Node.create({
       },
       error: {
         default: '',
-      }
+      },
     }
   },
-  
+
   parseHTML() {
     return [
       {
@@ -47,15 +43,15 @@ export const InlineAIGenerationExtension = Node.create({
       },
     ]
   },
-  
+
   renderHTML({ HTMLAttributes }) {
-    return ['div', mergeAttributes(HTMLAttributes, { 'data-type': 'inline-ai-generation' }), 0]
+    return ['div', mergeAttributes(HTMLAttributes, { 'data-type': 'inline-ai-generation' })]
   },
-  
+
   addNodeView() {
     return VueNodeViewRenderer(InlineAIGenerationComponent)
   },
-  
+
   addCommands() {
     return {
       insertInlineAIGeneration: () => ({ commands }: { commands: any }) => {
@@ -69,19 +65,19 @@ export const InlineAIGenerationExtension = Node.create({
           }
         })
       },
-      
+
       generateInlineAI: (nodePos, prompt, isContinuation = false) => ({ editor }) => {
         logger.log('generateInlineAI called with:', nodePos, prompt, isContinuation)
-        
+
         const aiSettings = useAISettingsStore()
         const providerId = aiSettings.settings.preferredProviderId
         const apiKey = aiSettings.getApiKey(providerId)
         const provider = aiSettings.preferredProvider
-        
+
         if (provider?.requiresApiKey && !apiKey) {
           // Update node with error
           logger.error('API key required for', provider.name)
-          
+
           // Find the node and update it directly
           if (nodePos !== undefined && nodePos >= 0 && nodePos < editor.state.doc.content.size) {
             const node = editor.state.doc.nodeAt(nodePos)
@@ -95,19 +91,19 @@ export const InlineAIGenerationExtension = Node.create({
               )
             }
           }
-          
+
           toast({
             title: 'API Key Required',
             description: `Please set your API key for ${provider.name} in the settings.`,
             variant: 'destructive'
           })
-          
+
           return false
         }
-        
+
         // Set loading state
         logger.log('Setting loading state at position:', nodePos)
-        
+
         // Get the node at the position
         const { state } = editor.view
         const node = state.doc.nodeAt(nodePos)
@@ -119,13 +115,13 @@ export const InlineAIGenerationExtension = Node.create({
           })
           editor.view.dispatch(transaction)
         }
-        
+
         // Show loading toast
         toast({
           title: 'Generating...',
           description: `Using ${provider?.name} to generate text.`
         })
-        
+
         // Generate text
         aiService.generateText(
           providerId,
@@ -139,7 +135,7 @@ export const InlineAIGenerationExtension = Node.create({
           providerId === 'gemini' ? aiSettings.settings.geminiSafetyThreshold : undefined
         ).then(result => {
           logger.log('Generation successful:', result)
-          
+
           // Update node with result
           if (nodePos !== undefined && nodePos >= 0 && nodePos < editor.state.doc.content.size) {
             const updatedNode = editor.state.doc.nodeAt(nodePos)
@@ -154,15 +150,15 @@ export const InlineAIGenerationExtension = Node.create({
               )
             }
           }
-          
+
           // Show success toast
           toast({
             title: 'Text Generated',
             description: `Generated ${result.text.length} characters with ${provider?.name}.`
           })
         }).catch(error => {
-          logger.error('Generation failed:', error)
-          
+          logger.error('Error generating inline AI text:', error)
+
           // Update node with error
           if (nodePos !== undefined && nodePos >= 0 && nodePos < editor.state.doc.content.size) {
             const updatedNode = editor.state.doc.nodeAt(nodePos)
@@ -170,31 +166,23 @@ export const InlineAIGenerationExtension = Node.create({
               editor.view.dispatch(
                 editor.state.tr.setNodeMarkup(nodePos, undefined, {
                   ...updatedNode.attrs,
-                  error: error instanceof Error ? error.message : 'Unknown error occurred',
+                  error: error.message,
                   isLoading: false
                 })
               )
             }
           }
-          
+
           // Show error toast
           toast({
             title: 'Generation Failed',
-            description: error instanceof Error ? error.message : 'Unknown error occurred',
+            description: error.message,
             variant: 'destructive'
           })
         })
-        
+
         return true
       },
-
-      deleteInlineAIGeneration: (pos: number) => ({ commands, state }: CommandProps) => {
-        const node = state.doc.nodeAt(pos)
-        if (node && node.type.name === 'inlineAIGeneration') {
-          return commands.deleteNode('inlineAIGeneration')
-        }
-        return false
-      }
     }
-  }
+  },
 }) 

@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import NotaEditor from '@/components/editor/NotaEditor.vue'
 import NotaConfigModal from '@/components/editor/blocks/nota-config/NotaConfigModal.vue'
-import NotaMetadata from '@/components/editor/NotaMetadata.vue'
 import { ref, onMounted, watch, computed } from 'vue'
 import { useNotaStore } from '@/stores/nota'
 import { useJupyterStore } from '@/stores/jupyterStore'
 import { useTabsStore } from '@/stores/tabsStore'
 import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
 import { toast } from '@/components/ui/toast'
-import PublishNotaModal from '@/components/editor/PublishNotaModal.vue'
+import PublishNotaModal from '@/components/editor/dialogs/PublishNotaModal.vue'
 import { logger } from '@/services/logger'
 
 const props = defineProps<{

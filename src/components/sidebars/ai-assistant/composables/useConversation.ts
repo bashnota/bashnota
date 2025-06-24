@@ -202,34 +202,7 @@ export function useConversation(editor: any, notaId: string) {
     }
     
     try {
-      // Instead of inserting "/gen " as text, directly use the command to insert an AI block
-      editor.chain()
-        .focus()
-        .insertInlineAIGeneration() // This directly calls the extension's command
-        .run()
-      
-      // Find the newly created block
-      const { state } = editor
-      const { doc } = state
-      let newBlock = null
-      
-      doc.descendants((node: any, pos: number) => {
-        if (node.type.name === 'inlineAIGeneration' && !node.attrs.prompt) {
-          // This is likely our new node
-          newBlock = {
-            node,
-            type: node.type.name,
-            pos
-          }
-          return false // Stop traversal
-        }
-        return true // Continue traversal
-      })
-      
-      if (newBlock) {
-        // Load the new block
-        loadConversationFromBlock(newBlock)
-      }
+      clearActiveBlock()
     } catch (error) {
       console.error('Error creating new AI session:', error)
     }
