@@ -8,6 +8,7 @@ import { toast } from '@/components/ui/toast'
 
 // Import composables
 import { useConversation } from '../../ai-assistant/composables/useConversation'
+import type { ChatHistoryItem } from '../../ai-assistant/composables/useConversation'
 import { useAIGeneration } from '../../ai-assistant/composables/useAIGeneration'
 import { useMentions } from '../../ai-assistant/composables/useMentions'
 import { useAIProviders } from '../composables/useAIProviders'
@@ -663,21 +664,44 @@ onBeforeUnmount(() => {
 const showChatList = ref(false)
 
 // Function to handle loading a specific chat from the chat list
-const handleSelectChat = (block: any) => {
-  loadConversationFromBlock(block)
+const handleSelectChat = (chatItem: ChatHistoryItem) => {
+  // Create a virtual block object compatible with loadConversationFromBlock
+  const virtualBlock = {
+    node: {
+      attrs: {
+        blockId: chatItem.blockId,
+        prompt: chatItem.title,
+        result: chatItem.preview,
+        loading: false,
+        error: '',
+        lastUpdated: chatItem.updatedAt?.toISOString?.() || new Date().toISOString()
+      }
+    },
+    type: 'aiGeneration'
+  }
+  
+  loadConversationFromBlock(virtualBlock)
   showChatList.value = false
 }
 
 // Get ID for the active block for highlighting in the list
 const activeBlockId = computed(() => {
   if (!activeAIBlock.value) return undefined
-  // Use a property that exists on the activeAIBlock object
-  return `ai-${activeAIBlock.value.node.attrs.lastUpdated || Date.now()}`
+  // Use the blockId if available, otherwise fall back to a generated ID
+  return activeAIBlock.value.node.attrs.blockId || `ai-${activeAIBlock.value.node.attrs.lastUpdated || Date.now()}`
 })
 
 // Toggle between chat list and current conversation
 const toggleChatList = () => {
   showChatList.value = !showChatList.value
+}
+
+// Handle deleting a chat from the chat list
+const handleDeleteChat = (chatItem: ChatHistoryItem) => {
+  // If we're deleting the currently active chat, clear the active block
+  if (activeAIBlock.value?.node.attrs.blockId === chatItem.blockId) {
+    clearActiveBlock()
+  }
 }
 
 // Auto-scroll to bottom when new messages arrive
@@ -767,6 +791,7 @@ onMounted(() => {
               :active-block-id="activeBlockId"
               @select-chat="handleSelectChat"
               @create-new="() => createNewSession()"
+              @delete-chat="handleDeleteChat"
             />
           </ScrollArea>
           

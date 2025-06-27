@@ -12,6 +12,18 @@ export interface ConversationMessage {
   timestamp?: Date
 }
 
+export interface ChatHistoryItem {
+  id: string
+  blockId: string
+  title: string
+  preview: string
+  messageCount: number
+  lastMessage?: ConversationMessage
+  createdAt: Date
+  updatedAt: Date
+  isActive: boolean
+}
+
 export interface AIBlock {
   node: {
     attrs: {
