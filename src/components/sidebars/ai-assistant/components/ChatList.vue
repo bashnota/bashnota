@@ -2,11 +2,13 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
-import { Search, MessageSquare, Bot, Plus, Calendar } from 'lucide-vue-next'
+import { Search, MessageSquare, Bot, Plus, Calendar, Trash2, Clock } from 'lucide-vue-next'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { format } from 'date-fns'
 import { logger } from '@/services/logger'
+import { useChatHistory } from '../composables/useChatHistory'
+import type { ChatHistoryItem } from '../composables/useConversation'
 
 const props = defineProps<{
   editor: any
@@ -14,47 +16,31 @@ const props = defineProps<{
   activeBlockId?: string
 }>()
 
-const emit = defineEmits(['select-chat', 'create-new'])
+const emit = defineEmits(['select-chat', 'create-new', 'delete-chat'])
 
-// State
-const searchQuery = ref('')
-const aiBlocks = ref<any[]>([])
-const isLoading = ref(false)
+// Use chat history composable
+const {
+  chatHistoryItems,
+  filteredChatHistory,
+  isLoading,
+  error,
+  searchQuery,
+  hasConversations,
+  hasFilteredResults,
+  deleteConversation,
+  clearSearch,
+  refresh
+} = useChatHistory(props.notaId, props.activeBlockId)
 
-// Find all AI blocks in the editor
-const findAIBlocks = () => {
-  isLoading.value = true
-  const blocks: any[] = []
+// Handle delete conversation
+const handleDeleteConversation = async (item: ChatHistoryItem, event: Event) => {
+  event.stopPropagation() // Prevent selecting the chat
   
   try {
-    if (!props.editor) return []
-    
-    const { state } = props.editor
-    const { doc } = state
-    
-    doc.descendants((node: any, pos: number) => {
-      if (node.type.name === 'inlineAIGeneration' && node.attrs.prompt) {
-        blocks.push({
-          node,
-          type: node.type.name,
-          pos,
-          id: `ai-${pos}`,
-          prompt: node.attrs.prompt,
-          result: node.attrs.result,
-          timestamp: node.attrs.lastUpdated ? new Date(node.attrs.lastUpdated) : new Date(),
-          preview: node.attrs.prompt.slice(0, 80) + (node.attrs.prompt.length > 80 ? '...' : '')
-        })
-      }
-      return true // Continue traversal
-    })
-    
-    // Sort blocks by timestamp, newest first
-    blocks.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
-    aiBlocks.value = blocks
+    await deleteConversation(item.id)
+    emit('delete-chat', item)
   } catch (error) {
-    logger.error('Error finding AI blocks:', error)
-  } finally {
-    isLoading.value = false
+    logger.error('Error deleting conversation:', error)
   }
 }
 
@@ -83,22 +69,9 @@ const formatDate = (date: Date) => {
   return format(date, 'MMM d, yyyy')
 }
 
-// Filtered blocks based on search query
-const filteredBlocks = computed(() => {
-  if (!searchQuery.value.trim()) {
-    return aiBlocks.value
-  }
-  
-  const query = searchQuery.value.toLowerCase()
-  return aiBlocks.value.filter(block => 
-    block.prompt.toLowerCase().includes(query) || 
-    (block.result && block.result.toLowerCase().includes(query))
-  )
-})
-
 // Handle chat selection
-const selectChat = (block: any) => {
-  emit('select-chat', block)
+const selectChat = (item: ChatHistoryItem) => {
+  emit('select-chat', item)
 }
 
 // Create a new chat
@@ -106,15 +79,10 @@ const createNew = () => {
   emit('create-new')
 }
 
-// Load blocks on component mount
-onMounted(() => {
-  findAIBlocks()
-})
-
-// Refresh the list when activeBlockId changes
-watch(() => props.activeBlockId, () => {
-  findAIBlocks()
-})
+// Handle refresh
+const handleRefresh = async () => {
+  await refresh()
+}
 </script>
 
 <template>
@@ -155,7 +123,19 @@ watch(() => props.activeBlockId, () => {
           Loading conversations...
         </div>
         
-        <div v-else-if="filteredBlocks.length === 0" class="text-center py-8">
+        <div v-else-if="error" class="text-center py-4 text-destructive text-sm">
+          {{ error }}
+          <Button 
+            variant="outline" 
+            size="sm"
+            class="mt-2 block mx-auto"
+            @click="handleRefresh"
+          >
+            Try Again
+          </Button>
+        </div>
+        
+        <div v-else-if="!hasFilteredResults" class="text-center py-8">
           <Bot class="h-12 w-12 mx-auto text-muted-foreground/20 mb-3" />
           <p class="text-muted-foreground text-sm">
             {{ searchQuery ? 'No conversations match your search' : 'No AI conversations found' }}
@@ -172,25 +152,38 @@ watch(() => props.activeBlockId, () => {
         </div>
         
         <div 
-          v-for="block in filteredBlocks"
-          :key="block.id"
-          class="border rounded-md p-2.5 hover:bg-accent/40 cursor-pointer transition-colors"
-          :class="{'bg-accent/80': block.id === props.activeBlockId}"
-          @click="selectChat(block)"
+          v-for="item in filteredChatHistory"
+          :key="item.id"
+          class="group border rounded-md p-2.5 hover:bg-accent/40 cursor-pointer transition-colors relative"
+          :class="{'bg-accent/80': item.isActive}"
+          @click="selectChat(item)"
         >
           <div class="flex justify-between gap-2 mb-1">
-            <h4 class="font-medium text-sm line-clamp-1">{{ block.preview }}</h4>
-            <span class="text-xs text-muted-foreground whitespace-nowrap flex items-center gap-1">
-              <Calendar class="h-3 w-3" />
-              {{ formatDate(block.timestamp) }}
-            </span>
+            <h4 class="font-medium text-sm line-clamp-1 pr-8">{{ item.title }}</h4>
+            <div class="flex items-center gap-1">
+              <span class="text-xs text-muted-foreground whitespace-nowrap flex items-center gap-1">
+                <Clock class="h-3 w-3" />
+                {{ formatDate(item.updatedAt) }}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                class="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                @click="(e) => handleDeleteConversation(item, e)"
+              >
+                <Trash2 class="h-3 w-3 text-muted-foreground hover:text-destructive" />
+              </Button>
+            </div>
           </div>
           <p class="text-xs text-muted-foreground line-clamp-2">
-            {{ block.result ? block.result.slice(0, 120) + (block.result.length > 120 ? '...' : '') : 'No response yet' }}
+            {{ item.preview }}
           </p>
           <div class="flex gap-1 mt-1.5">
             <Badge variant="outline" class="text-[10px] px-1.5 py-0.5 bg-primary/5">
-              {{ block.result ? Math.round(block.result.length / 4) : 0 }} tokens
+              {{ item.messageCount }} {{ item.messageCount === 1 ? 'message' : 'messages' }}
+            </Badge>
+            <Badge variant="outline" class="text-[10px] px-1.5 py-0.5 bg-secondary/5">
+              {{ Math.round((item.lastMessage?.content.length || 0) / 4) }} tokens
             </Badge>
           </div>
         </div>
