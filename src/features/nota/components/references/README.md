@@ -1,6 +1,16 @@
-# References Sidebar
+# References Components (`src/features/nota/components/references`)
 
-A modular and improved references management system for the Nota application.
+This directory contains the components for managing bibliographic references within a document.
+
+## Components
+
+-   **`EmptyReferencesState.vue`**: A component displayed when there are no references in the current document, guiding the user on how to add them.
+-   **`ReferenceDialog.vue`**: A modal dialog for adding a new reference manually or importing from a BibTeX file. It also handles editing existing references.
+-   **`ReferencesList.vue`**: Displays the list of all references for the current document, with actions to edit, delete, or insert a citation into the editor.
+
+## Index
+
+-   **`index.ts`**: Exports the components from this directory.
 
 ## Features
 
@@ -25,71 +35,6 @@ A modular and improved references management system for the Nota application.
 - **Duplicate detection** for citation keys
 - **Rich metadata support** (DOI, URL, volume, pages, etc.)
 - **Multiple citation formats** support
-
-## Components
-
-### Core Components
-
-#### `ReferencesSidebar.vue`
-Main sidebar component that orchestrates all functionality.
-
-#### `ReferencesList.vue`
-Displays the list of references with actions (edit, delete, insert, copy).
-
-#### `ReferenceDialog.vue`
-Modal dialog for adding/editing references with tabs for manual entry and BibTeX import.
-
-#### `EmptyReferencesState.vue`
-Friendly empty state component to guide users when no references exist.
-
-### Composables
-
-#### `useReferencesSearch.ts`
-Handles search functionality across citation fields.
-
-```typescript
-const { searchQuery, filteredCitations, clearSearch } = useReferencesSearch(citations)
-```
-
-#### `useReferenceDialog.ts`
-Manages dialog state and operations.
-
-```typescript
-const { 
-  showAddDialog, 
-  isEditing, 
-  currentCitation, 
-  openAddDialog, 
-  editCitation, 
-  closeDialog 
-} = useReferenceDialog()
-```
-
-#### `useReferenceForm.ts`
-Handles form data, validation, and state management.
-
-```typescript
-const { 
-  formData, 
-  validationErrors, 
-  validateForm, 
-  resetForm, 
-  populateForm 
-} = useReferenceForm(existingCitations, getCurrentCitation)
-```
-
-#### `useBibTexParser.ts`
-Parses BibTeX entries into structured data.
-
-```typescript
-const { 
-  bibtexInput, 
-  isParsing, 
-  parseError, 
-  parseBibTex, 
-  clearBibTex 
-} = useBibTexParser(onParsed)
-```
 
 ## Usage
 

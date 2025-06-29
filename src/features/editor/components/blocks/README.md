@@ -1,24 +1,24 @@
-# Editor Blocks
+# Editor Blocks (`src/features/editor/components/blocks`)
 
-This directory contains custom content blocks for the Tiptap editor. Each block is typically a combination of a Vue component and a Tiptap extension.
+This directory contains all the custom content blocks available in the rich text editor. Each block is a self-contained feature, usually consisting of a Tiptap Node extension and a Vue component to render it.
 
-## Files
+## General Components
 
-- **`index.ts`**: Exports all the block-related components and extensions for easy importing.
-- **`CommandsList.vue`**: A component that displays a list of available slash commands within the editor.
-- **`SubNotaDialog.vue`**: A dialog component likely used for creating or editing 'sub-notas'.
+-   **`CommandsList.vue`**: A UI component that renders the list of available slash commands (`/`) that the user can trigger to insert different blocks.
+-   **`index.ts`**: A central file that exports all the block extensions, making them easy to register with the main Tiptap editor instance.
+-   **`SubNotaDialog.vue`**: A dialog component used for creating or linking "sub-notas," which are likely nested or related documents.
 
 ## Block Subdirectories
 
-Each subdirectory contains the necessary files (Vue components, Tiptap extensions, etc.) for a specific custom block:
+Each subdirectory is a self-contained block with its own logic and Vue component:
 
-- **`citation-block/`**: A block for handling citations and bibliographies.
-- **`confusion-matrix/`**: A block for displaying a confusion matrix.
-- **`executable-code-block/`**: A block for code that can be executed.
-- **`inline-ai-generation/`**: A block or functionality for generating content with AI inline.
-- **`math-block/`**: A block for rendering mathematical equations (e.g., using KaTeX).
-- **`nota-config/`**: Components related to configuring a 'nota'.
-- **`subfigure-block/`**: A block for managing subfigures.
-- **`table-block/`**: A block for creating and editing tables.
-- **`theorem-block/`**: A block for theorems, definitions, etc.
-- **`youtube-block/`**: A block for embedding YouTube videos. 
+-   `citation-block`: For creating and managing bibliographic citations.
+-   `confusion-matrix`: For displaying a confusion matrix, a common tool in machine learning.
+-   `executable-code-block`: For code blocks that can be executed, with language selection and output display.
+-   `inline-ai-generation`: For triggering and displaying AI-generated content directly within the text flow.
+-   `math-block`: For writing and rendering mathematical equations, likely using KaTeX or MathJax.
+-   `nota-config`: For configuring metadata and settings for the entire document ("nota").
+-   `subfigure-block`: For arranging and captioning a group of figures.
+-   `table-block`: For creating and editing structured tables.
+-   `theorem-block`: For special-cased blocks like theorems, definitions, and proofs.
+-   `youtube-block`: For embedding and displaying YouTube videos. 

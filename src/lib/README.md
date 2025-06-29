@@ -1,12 +1,8 @@
-# Lib
+# Lib (`src/lib`)
 
-This directory contains helper functions, utilities, and other miscellaneous code that doesn't fit into a more specific category like `composables` or `services`.
-
-## Subdirectories
-
-- **`extensions/`**: Contains extensions or plugins, likely for third-party libraries.
+This directory contains general-purpose helper functions and utilities that are not tied to a specific feature and can be used throughout the application.
 
 ## Files
 
-- **`citation.ts`**: Contains utility functions specifically for handling citations.
-- **`utils.ts`**: A general-purpose utility file containing various helper functions used throughout the application. 
+-   **`citation.ts`**: Contains utility functions for handling citations, such as formatting and parsing.
+-   **`utils.ts`**: A collection of miscellaneous, general-purpose helper functions used across the application. 

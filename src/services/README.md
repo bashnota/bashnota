@@ -1,6 +1,14 @@
-# Services
+# Global Services (`src/services`)
 
-This directory contains services that handle business logic, data fetching, and communication with external APIs.
+This directory contains global, application-wide services that are not specific to any single feature. These services handle cross-cutting concerns like HTTP requests, logging, and core backend integrations.
+
+## Services
+
+-   **`aiService.ts`**: A high-level service for interacting with AI models. Note: Most AI logic is within `src/features/ai`.
+-   **`axios.ts`**: Configures the global Axios instance used for making HTTP requests to the backend API.
+-   **`codeExecutionService.ts`**: A service that manages the execution of code, likely by interfacing with a Jupyter kernel.
+-   **`firebase.ts`**: Initializes and configures the connection to Firebase services.
+-   **`logger.ts`**: A service for application-wide logging, which can be configured for different environments and log levels.
 
 ## Subdirectories
 
@@ -9,14 +17,9 @@ This directory contains services that handle business logic, data fetching, and 
 ## Files
 
 - **`aiConversationService.ts`**: Manages the state and logic for AI conversations.
-- **`aiService.ts`**: A general service for interacting with AI models.
 - **`auth.ts`**: Handles user authentication, registration, and session management.
-- **`axios.ts`**: A configuration file for the Axios HTTP client.
-- **`codeExecutionService.ts`**: A service for executing code, likely communicating with a Jupyter kernel or other execution backend.
 - **`commentService.ts`**: Manages all operations related to comments (creating, fetching, deleting).
-- **`firebase.ts`**: Initializes and configures the Firebase application instance.
 - **`jupyterService.ts`**: Handles communication with the Jupyter server API.
-- **`logger.ts`**: A service for logging application events.
 - **`notaExtensionService.ts`**: A service for managing 'nota' extensions.
 - **`publishNotaUtilities.ts`**: Contains utility functions to help with the process of publishing a 'nota'.
 - **`statisticsService.ts`**: A service for fetching and processing statistics.

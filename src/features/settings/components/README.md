@@ -1,11 +1,16 @@
-# Settings Components
+# Settings Components (`src/features/settings/components`)
 
-This directory contains components used to build the settings or preferences pages of the application.
+This directory contains the Vue components that make up the different sections of the application's settings page.
+
+## Main Settings Components
+
+-   **`GlobalSettings.vue`**: A component that manages global application settings that affect all workspaces.
+-   **`JupyterSettings.vue`**: A component for managing Jupyter server configurations.
 
 ## Subdirectories
 
-- **`ai/`**: Contains components related to configuring AI provider settings.
-- **`workspace/`**: Contains components for workspace-specific settings.
+-   **`ai`**: Contains components for configuring the AI providers and related settings.
+-   **`workspace`**: Contains components for settings that are specific to the current workspace.
 
 ## Files
 

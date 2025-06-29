@@ -1,12 +1,17 @@
-# AI Settings Components
+# AI Settings Components (`src/features/settings/components/ai`)
 
-This directory contains components for configuring AI-related features and providers.
+This directory contains components for configuring the AI features of the application.
+
+## Main Components
+
+-   **`BaseProviderSettings.vue`**: A base component that provides a common structure and functionality for the settings of each individual AI provider.
+-   **`UnifiedAISettings.vue`**: The main component for all AI-related settings, which likely orchestrates the different provider-specific settings components.
 
 ## Subdirectories
 
-- **`components/`**: Contains smaller, reusable UI components used across the different AI settings pages.
-- **`composables/`**: Contains Vue composables for handling logic related to AI provider settings.
-- **`providers/`**: Contains specific settings components for each supported AI provider (e.g., Gemini, Ollama).
+-   **`components`**: Contains smaller, reusable UI components used within the AI settings pages.
+-   **`composables`**: Holds Vue composables for managing the logic of the AI settings.
+-   **`providers`**: Contains the specific settings components for each AI provider (e.g., Gemini, Ollama).
 
 ## Files
 

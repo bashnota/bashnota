@@ -1,13 +1,13 @@
-# Editor Extensions
+# Editor Extensions (`src/features/editor/components/extensions`)
 
-This directory contains custom Tiptap extensions and plugins to enhance the editor's functionality.
+This directory contains custom Tiptap extensions and Prosemirror plugins that add new functionality to the rich text editor.
 
-## Files
+## Extensions & Plugins
 
-- **`Commands.ts`**: Defines custom commands that can be used within the editor.
-- **`DragHandlePlugin.ts`**: Implements a drag handle plugin, allowing users to reorder blocks of content by dragging and dropping.
-- **`index.ts`**: Exports all the extensions and plugins in this directory for easy integration into the editor setup.
-- **`MarkdownExtension.ts`**: An extension to provide Markdown parsing and serialization capabilities.
-- **`PageLinkExtension.ts`**: An extension for creating and managing links to other pages within the application.
-- **`suggestion.ts`**: A utility that provides the basis for suggestion/autocomplete functionality (e.g., for slash commands or user mentions).
-- **`types.ts`**: Contains TypeScript type definitions used by the extensions in this directory. 
+-   **`Commands.ts`**: Defines custom commands that can be chained and executed within the editor's command flow.
+-   **`DragHandlePlugin.ts`**: A Prosemirror plugin that adds a drag handle to each block-level node, allowing users to easily reorder content.
+-   **`index.ts`**: A central file that exports all extensions and plugins for easy registration with the Tiptap editor.
+-   **`MarkdownExtension.ts`**: An extension that adds support for Markdown shortcuts and input rules, allowing users to write in Markdown and have it converted to rich text on the fly.
+-   **`PageLinkExtension.ts`**: A custom extension for creating internal links to other pages or documents within the application.
+-   **`suggestion.ts`**: A utility that provides the core logic for suggestion and autocomplete pop-ups, used for features like slash commands, @-mentions, and citation picking.
+-   **`types.ts`**: Contains shared TypeScript type definitions used by the extensions in this directory. 

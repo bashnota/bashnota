@@ -1,6 +1,13 @@
-# Stores
+# Global Stores (`src/stores`)
 
-This directory contains all the Pinia stores for state management across the application.
+This directory contains global Pinia stores that manage application-wide state not specific to any single business feature.
+
+## Stores
+
+-   **`shortcutsStore.ts`**: Manages the registration and handling of global keyboard shortcuts.
+-   **`sidebarStore.ts`**: Manages the state of the main application sidebars, such as which sidebar is currently open and its dimensions.
+-   **`tabsStore.ts`**: Manages the state of the open tabs, including which tab is active and the list of all open documents.
+-   **`uiStore.ts`**: A store for managing miscellaneous global UI state, such as the visibility of dialogs or global loading indicators.
 
 ## Files
 
@@ -12,8 +19,4 @@ This directory contains all the Pinia stores for state management across the app
 - **`favoriteBlocksStore.ts`**: Manages the user's list of favorite content blocks.
 - **`jupyterStore.ts`**: Stores state related to Jupyter servers and sessions.
 - **`nota.ts`**: The main store for managing 'nota' documents, content, and metadata.
-- **`sidebarStore.ts`**: Manages the state of the application's sidebars (e.g., which one is open).
-- **`shortcutsStore.ts`**: Manages keyboard shortcuts.
-- **`tabsStore.ts`**: Manages the state of open tabs in the application.
-- **`tableStore.ts`**: Manages state for table blocks.
-- **`uiStore.ts`**: Manages general UI state, such as the visibility of modals or dialogs. 
+- **`tableStore.ts`**: Manages state for table blocks. 

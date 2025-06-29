@@ -1,9 +1,9 @@
-# Welcome Components
+# Welcome Components (`src/features/bashhub/components/welcome`)
 
-This directory contains components that are part of a "welcome" or initial greeting section on the home page.
+This directory contains components that are used to create a welcome and onboarding experience for the user, likely on the main dashboard.
 
-## Files
+## Components
 
-- **`ActionCards.vue`**: Displays a set of cards that encourage the user to perform key actions.
-- **`QuickInsights.vue`**: A component for showing quick, insightful statistics or information to the user upon visiting the home page.
-- **`WelcomeGreeting.vue`**: A component that displays a welcome message to the user. 
+-   **`ActionCards.vue`**: A component that displays a series of cards prompting the user to take specific actions, such as creating a new document or exploring a feature.
+-   **`QuickInsights.vue`**: Shows a summary of interesting statistics or data, providing a quick overview of activity.
+-   **`WelcomeGreeting.vue`**: A simple component that displays a personalized welcome message to the user. 

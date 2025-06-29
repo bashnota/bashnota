@@ -1,8 +1,8 @@
-# Utils
+# Utilities (`src/utils`)
 
-This directory contains miscellaneous utility functions that can be used across the application.
+This directory contains miscellaneous, standalone utility functions that can be used anywhere in the application.
 
 ## Files
- 
-- **`dateUtils.ts`**: A set of utility functions for formatting and manipulating dates.
-- **`userTagGenerator.ts`**: A utility for generating user tags. 
+
+-   **`dateUtils.ts`**: A set of helper functions for working with dates, such as formatting them for display.
+-   **`userTagGenerator.ts`**: A utility for generating unique user tags, likely used during user registration. 

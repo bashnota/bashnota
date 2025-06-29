@@ -1,10 +1,10 @@
-# Editor UI Components
+# Editor UI Components (`src/features/editor/components/ui`)
 
-This directory contains UI components that are specifically used for the editor's user interface, such as toolbars, menus, and metadata displays.
+This directory contains UI components that form the chrome and primary interface of the rich text editor.
 
-## Files
+## UI Components
 
-- **`BlockCommandMenu.vue`**: A component that displays a menu of block-level commands, often triggered by a specific action like typing `/`.
-- **`EditorToolbar.vue`**: The main toolbar component for the editor, containing buttons for text formatting and other actions.
-- **`NotaMetadata.vue`**: A component responsible for displaying metadata related to the current 'nota' (e.g., author, creation date, tags).
-- **`TableOfContents.vue`**: A component that automatically generates and displays a table of contents based on the headings in the editor's content. 
+-   **`BlockCommandMenu.vue`**: A pop-up menu that appears when the user types `/`, suggesting different content blocks that can be inserted into the document.
+-   **`EditorToolbar.vue`**: The main toolbar for the editor. It contains formatting buttons (bold, italic), block type selectors, and other tools for manipulating the content.
+-   **`NotaMetadata.vue`**: A component for displaying and editing the metadata associated with the current document, such as its title, tags, and other properties.
+-   **`TableOfContents.vue`**: An auto-generated table of contents based on the headings within the document, providing an outline and quick navigation. 
