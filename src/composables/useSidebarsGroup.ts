@@ -208,3 +208,12 @@ export function useSidebarsGroup(options: SidebarsGroupOptions = {}) {
     cleanupResizeListeners
   }
 }
+
+
+
+
+
+
+
+
+

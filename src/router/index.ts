@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
+import { useAuthStore } from '@/features/auth/stores/auth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -7,79 +7,79 @@ const router = createRouter({
     {
       path: '/',
       name: 'home',
-      component: () => import('../views/HomeView.vue'),
+      component: () => import('@/features/bashhub/views/HomeView.vue'),
     },
     {
       path: '/nota/:id',
       name: 'nota',
-      component: () => import('../views/NotaView.vue'),
+      component: () => import('@/features/nota/views/NotaView.vue'),
       props: true,
     },
     {
       path: '/favorites',
       name: 'favorites',
-      component: () => import('../views/FavoritesView.vue'),
+      component: () => import('@/features/nota/views/FavoritesView.vue'),
     },
     {
       path: '/settings',
       name: 'settings',
-      component: () => import('@/views/SettingsView.vue'),
+      component: () => import('@/features/settings/views/SettingsView.vue'),
     },
     {
       path: '/bashhub',
       name: 'bashhub',
-      component: () => import('@/views/BashHubView.vue'),
+      component: () => import('@/features/bashhub/views/BashHubView.vue'),
     },
     // Auth routes
     {
       path: '/login',
       name: 'login',
-      component: () => import('@/views/auth/LoginView.vue'),
+      component: () => import('@/features/auth/views/LoginView.vue'),
       meta: { requiresGuest: true },
     },
     {
       path: '/register',
       name: 'register',
-      component: () => import('@/views/auth/RegisterView.vue'),
+      component: () => import('@/features/auth/views/RegisterView.vue'),
       meta: { requiresGuest: true },
     },
     {
       path: '/profile',
       name: 'profile',
-      component: () => import('@/views/auth/ProfileView.vue'),
+      component: () => import('@/features/auth/views/ProfileView.vue'),
       meta: { requiresAuth: true },
     },
     {
       path: '/p/:id',
       name: 'public-nota',
-      component: () => import('@/views/PublicNotaView.vue'),
+      component: () => import('@/features/nota/views/PublicNotaView.vue'),
       props: true,
     },
     // User routes with tag
     {
       path: '/@:userTag',
       name: 'user-tag-profile',
-      component: () => import('@/views/UserPublishedView.vue'),
+      component: () => import('@/features/bashhub/views/UserPublishedView.vue'),
       props: true,
     },
     {
       path: '/@:userTag/:notaId',
       name: 'user-tag-nota',
-      component: () => import('@/views/PublicNotaView.vue'),
+      component: () => import('@/features/nota/views/PublicNotaView.vue'),
       props: true,
     },
     // Legacy user route
     {
       path: '/u/:userId',
       name: 'user-published',
-      component: () => import('@/views/UserPublishedView.vue'),
+      component: () => import('@/features/bashhub/views/UserPublishedView.vue'),
       props: true,
     },
     // 404 route should be the last route
     {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
-      component: () => import('../views/NotFound.vue'),
+      component: () => import('@/features/nota/components/NotFound.vue'),
     },
   ],
 })
@@ -114,3 +114,11 @@ router.beforeEach(async (to, from, next) => {
 })
 
 export default router
+
+
+
+
+
+
+
+

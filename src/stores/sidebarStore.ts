@@ -173,3 +173,11 @@ export const useSidebarStore = defineStore('sidebar', () => {
     closeAllSidebars
   }
 })
+
+
+
+
+
+
+
+

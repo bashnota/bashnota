@@ -6,3 +6,11 @@ declare module 'tippy.js' {
     (targets: string | Element | Element[] | null, props?: Partial<Props>): any;
   }
 } 
+
+
+
+
+
+
+
+

@@ -3,8 +3,8 @@ import type {
   ExecutionResult,
   JupyterMessage,
   MessageStatus,
-} from '@/types/codeExecution'
-import type { JupyterServer } from '@/types/jupyter'
+} from '@/features/editor/types/codeExecution'
+import type { JupyterServer } from '@/features/jupyter/types/jupyter'
 import { logger } from '@/services/logger'
 
 export class CodeExecutionService {
@@ -236,3 +236,11 @@ export class CodeExecutionService {
     return results[0]
   }
 }
+
+
+
+
+
+
+
+

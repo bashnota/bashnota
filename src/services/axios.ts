@@ -22,3 +22,12 @@ api.interceptors.request.use(
 )
 
 export const fetchAPI = api
+
+
+
+
+
+
+
+
+

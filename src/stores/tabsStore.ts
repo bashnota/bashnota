@@ -1,8 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { useNotaStore } from './nota'
+import { useNotaStore } from '@/features/nota/stores/nota'
 import { logger } from '@/services/logger'
+import { toast } from '@/lib/utils'
 
 export interface Tab {
   id: string       // Unique ID for the tab (same as nota ID)
@@ -166,3 +167,11 @@ export const useTabsStore = defineStore('tabs', () => {
     setActiveTab
   }
 }) 
+
+
+
+
+
+
+
+
