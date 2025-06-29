@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { RouterView, useRouter, useRoute } from 'vue-router'
-import AppSidebar from './components/layout/AppSidebar.vue'
-import BreadcrumbNav from './components/layout/BreadcrumbNav.vue'
-import AppTabs from './components/layout/AppTabs.vue'
-import ServerSelectionDialogWrapper from './components/editor/jupyter/ServerSelectionDialogWrapper.vue'
+import AppSidebar from '@/features/nota/components/AppSidebar.vue'
+import BreadcrumbNav from '@/features/nota/components/BreadcrumbNav.vue'
+import AppTabs from '@/features/nota/components/AppTabs.vue'
+import ServerSelectionDialogWrapper from '@/features/editor/components/jupyter/ServerSelectionDialogWrapper.vue'
 import { ref, onMounted, watch, onUnmounted, computed } from 'vue'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/ui/button'
 import { cn } from '@/lib/utils'
-import Toaster from '@/components/ui/toast/Toaster.vue'
-import { useAuthStore } from '@/stores/auth'
-import { useNotaStore } from '@/stores/nota'
+import Toaster from '@/ui/toast/Toaster.vue'
+import { useAuthStore } from '@/features/auth/stores/auth'
+import { useNotaStore } from '@/features/nota/stores/nota'
 import { Menu, Home, Globe, FileUp } from 'lucide-vue-next'
 import { logger } from '@/services/logger'
 import { toast } from '@/lib/utils'
@@ -481,3 +481,11 @@ const convertNotebookOutputs = (outputs: any[]): string => {
   scrollbar-width: none;
 }
 </style>
+
+
+
+
+
+
+
+

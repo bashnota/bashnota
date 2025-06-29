@@ -10,9 +10,9 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useCodeExecutionStore } from '@/stores/codeExecutionStore'
+import { useCodeExecutionStore } from '@/features/editor/stores/codeExecutionStore'
 import ServerSelectDialog from './ServerSelectDialog.vue'
-import type { JupyterServer } from '@/types/jupyter'
+import type { JupyterServer } from '@/features/jupyter/types/jupyter'
 
 const codeExecutionStore = useCodeExecutionStore()
 

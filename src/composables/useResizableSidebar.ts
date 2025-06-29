@@ -208,3 +208,12 @@ export function useResizableSidebar(options: ResizableSidebarOptions = {}) {
     cleanupResizeListeners
   }
 }
+
+
+
+
+
+
+
+
+

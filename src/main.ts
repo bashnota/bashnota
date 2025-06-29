@@ -8,8 +8,8 @@ import { analytics } from './services/firebase'
 import { logAnalyticsEvent } from './services/firebase'
 
 // Import core stores to ensure they're registered
-import '@/stores/aiSettingsStore'
-import '@/stores/jupyterStore'
+import '@/features/ai/stores/aiSettingsStore'
+import '@/features/jupyter/stores/jupyterStore'
 
 const app = createApp(App)
 const pinia = createPinia()
@@ -35,3 +35,11 @@ app.mount('#app')
 
 // Make analytics available globally
 app.config.globalProperties.$analytics = analytics
+
+
+
+
+
+
+
+

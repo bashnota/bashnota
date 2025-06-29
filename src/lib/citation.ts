@@ -2,7 +2,7 @@
  * Citation utilities for formatting and generating citations for Nota objects
  */
 
-import type { PublishedNota } from '@/types/nota'
+import type { PublishedNota } from '@/features/nota/types/nota'
 
 /**
  * Formats for citation output

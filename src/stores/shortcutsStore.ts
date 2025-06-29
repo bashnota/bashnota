@@ -95,3 +95,11 @@ export const useShortcutsStore = defineStore('shortcuts', {
     }
   }
 })
+
+
+
+
+
+
+
+

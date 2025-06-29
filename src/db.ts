@@ -1,7 +1,7 @@
 import Dexie, { type Table } from 'dexie'
-import type { Nota } from '@/types/nota'
-import type { FavoriteBlock } from '@/types/nota'
-import type { AIConversation } from '@/stores/aiConversationStore'
+import type { Nota } from '@/features/nota/types/nota'
+import type { FavoriteBlock } from '@/features/nota/types/nota'
+import type { AIConversation } from '@/features/ai/stores/aiConversationStore'
 
 export class NotaDB extends Dexie {
   notas!: Table<Nota>
@@ -32,3 +32,11 @@ export class NotaDB extends Dexie {
 }
 
 export const db = new NotaDB()
+
+
+
+
+
+
+
+

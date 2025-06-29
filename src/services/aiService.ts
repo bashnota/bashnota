@@ -1,16 +1,10 @@
-import axios from 'axios'
-import * as webllm from "@mlc-ai/web-llm";
-import { logger } from '@/services/logger'
-import { aiService as newAIService } from './ai';
+import { aiService as newAIService } from '@/features/ai/services';
 import type {
   GenerationOptions as NewGenerationOptions,
   GenerationResult as NewGenerationResult,
   MultimodalGenerationOptions as NewMultimodalGenerationOptions,
   StreamCallbacks,
-  WebLLMModelInfo as NewWebLLMModelInfo,
-  GeminiModelInfo as NewGeminiModelInfo,
-  GeminiSafetySettings as NewGeminiSafetySettings
-} from './ai';
+} from '@/features/ai/services';
 
 // Add the InitProgressReport interface to match WebLLM's API
 interface InitProgressReport {
@@ -304,3 +298,11 @@ class AIServiceLegacy {
         
 // Export the singleton instance for backward compatibility
 export const aiService = new AIServiceLegacy();
+
+
+
+
+
+
+
+
