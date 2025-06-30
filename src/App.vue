@@ -13,6 +13,7 @@ import { useNotaStore } from '@/features/nota/stores/nota'
 import { Menu, Home, Globe, FileUp } from 'lucide-vue-next'
 import { logger } from '@/services/logger'
 import { toast } from '@/lib/utils'
+import { useNotaImport } from '@/features/nota/composables/useNotaImport'
 
 const isSidebarOpen = ref(false)
 const sidebarWidth = ref(300)
@@ -22,8 +23,8 @@ const notaStore = useNotaStore()
 const route = useRoute()
 const router = useRouter()
 
-// File input ref for ipynb import
-const ipynbFileInput = ref<HTMLInputElement | null>(null)
+// Import composable
+const { importJupyterNotebook } = useNotaImport({ navigateToNota: true })
 
 // Check if we're in BashHub view
 const isInBashHub = computed(() => route.name === 'bashhub')
@@ -108,244 +109,14 @@ const toggleBashHub = () => {
 }
 
 // IPYNB Import functionality
-const handleImportIpynb = () => {
-  ipynbFileInput.value?.click()
+const handleImportIpynb = async () => {
+  await importJupyterNotebook()
 }
 
-const handleIpynbFileSelect = async (event: Event) => {
-  const input = event.target as HTMLInputElement
-  if (!input.files?.length) return
 
-  const file = input.files[0]
-  if (!file.name.endsWith('.ipynb')) {
-    toast('Please select a .ipynb file', 'Invalid File', 'destructive')
-    return
-  }
 
-  try {
-    const fileContent = await readFileAsText(file)
-    const notebook = JSON.parse(fileContent)
-    
-    // Convert notebook to nota format
-    const notaContent = convertNotebookToNota(notebook)
-    
-    // Create a new nota with the converted content
-    const title = extractNotebookTitle(notebook, file.name)
-    const newNota = await notaStore.createItem(title)
-    
-    // Update the nota with the converted content
-    await notaStore.saveNota({
-      id: newNota.id,
-      content: JSON.stringify(notaContent)
-    })
 
-    toast(`Notebook "${title}" imported successfully`, 'Import Successful')
 
-    // Navigate to the newly created nota
-    router.push(`/nota/${newNota.id}`)
-    
-  } catch (error) {
-    logger.error('Failed to import notebook:', error)
-    toast('Failed to import the notebook file', 'Import Failed', 'destructive')
-  } finally {
-    // Reset input
-    input.value = ''
-  }
-}
-
-// Helper function to read file as text
-const readFileAsText = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = (e) => resolve(e.target?.result as string)
-    reader.onerror = () => reject(new Error('Failed to read file'))
-    reader.readAsText(file)
-  })
-}
-
-// Extract title from notebook metadata or filename
-const extractNotebookTitle = (notebook: any, filename: string): string => {
-  // Try to get title from notebook metadata
-  if (notebook.metadata?.title) {
-    return notebook.metadata.title
-  }
-  
-  // Try to get title from first markdown cell
-  if (notebook.cells && Array.isArray(notebook.cells)) {
-    for (const cell of notebook.cells) {
-      if (cell.cell_type === 'markdown' && cell.source && Array.isArray(cell.source)) {
-        const firstLine = cell.source[0]?.trim()
-        if (firstLine && firstLine.startsWith('#')) {
-          return firstLine.replace(/^#+\s*/, '')
-        }
-      }
-    }
-  }
-  
-  // Fallback to filename without extension
-  return filename.replace('.ipynb', '')
-}
-
-// Convert Jupyter notebook to nota format
-const convertNotebookToNota = (notebook: any) => {
-  if (!notebook.cells || !Array.isArray(notebook.cells)) {
-    throw new Error('Invalid notebook format: no cells found')
-  }
-
-  const notaContent = {
-    type: 'doc',
-    content: [] as any[]
-  }
-
-  for (const cell of notebook.cells) {
-    try {
-      const convertedCell = convertNotebookCell(cell)
-      if (convertedCell) {
-        notaContent.content.push(convertedCell)
-      }
-    } catch (error) {
-      logger.warn('Failed to convert notebook cell:', error, cell)
-      // Continue with other cells instead of failing completely
-    }
-  }
-
-  return notaContent
-}
-
-// Convert individual notebook cell to nota format
-const convertNotebookCell = (cell: any) => {
-  switch (cell.cell_type) {
-    case 'markdown':
-      return convertMarkdownCell(cell)
-    case 'code':
-      return convertCodeCell(cell)
-    case 'raw':
-      return convertRawCell(cell)
-    default:
-      logger.warn('Unknown cell type:', cell.cell_type)
-      return null
-  }
-}
-
-// Convert markdown cell to nota format
-const convertMarkdownCell = (cell: any) => {
-  const source = Array.isArray(cell.source) ? cell.source.join('') : cell.source || ''
-  
-  if (!source.trim()) return null
-
-  return {
-    type: 'paragraph',
-    content: [
-      {
-        type: 'text',
-        text: source
-      }
-    ]
-  }
-}
-
-// Convert code cell to executable code block
-const convertCodeCell = (cell: any) => {
-  const source = Array.isArray(cell.source) ? cell.source.join('') : cell.source || ''
-  
-  if (!source.trim()) return null
-
-  // Determine language from notebook metadata or default to python
-  const language = cell.metadata?.language || 'python'
-  
-  // Convert outputs to string representation
-  let outputText = ''
-  if (cell.outputs && Array.isArray(cell.outputs)) {
-    outputText = convertNotebookOutputs(cell.outputs)
-  }
-
-  return {
-    type: 'executableCodeBlock',
-    attrs: {
-      id: crypto.randomUUID(),
-      language: language,
-      executable: true,
-      output: outputText || null,
-      kernelName: null,
-      serverID: null,
-      sessionId: null
-    },
-    content: [
-      {
-        type: 'text',
-        text: source
-      }
-    ]
-  }
-}
-
-// Convert raw cell to plain text
-const convertRawCell = (cell: any) => {
-  const source = Array.isArray(cell.source) ? cell.source.join('') : cell.source || ''
-  
-  if (!source.trim()) return null
-
-  return {
-    type: 'paragraph',
-    content: [
-      {
-        type: 'text',
-        text: source
-      }
-    ]
-  }
-}
-
-// Convert notebook outputs to text representation
-const convertNotebookOutputs = (outputs: any[]): string => {
-  let result = ''
-  
-  for (const output of outputs) {
-    try {
-      switch (output.output_type) {
-        case 'stream':
-          if (output.text) {
-            const text = Array.isArray(output.text) ? output.text.join('') : output.text
-            result += text
-          }
-          break
-          
-        case 'execute_result':
-        case 'display_data':
-          if (output.data) {
-            // Prefer plain text representation
-            if (output.data['text/plain']) {
-              const text = Array.isArray(output.data['text/plain']) 
-                ? output.data['text/plain'].join('')
-                : output.data['text/plain']
-              result += text + '\n'
-            }
-            // Handle HTML output
-            else if (output.data['text/html']) {
-              const html = Array.isArray(output.data['text/html'])
-                ? output.data['text/html'].join('')
-                : output.data['text/html']
-              result += html + '\n'
-            }
-          }
-          break
-          
-        case 'error':
-          if (output.traceback) {
-            const traceback = Array.isArray(output.traceback)
-              ? output.traceback.join('\n')
-              : output.traceback
-            result += `Error: ${output.ename}\n${output.evalue}\n${traceback}\n`
-          }
-          break
-      }
-    } catch (error) {
-      logger.warn('Failed to convert output:', error, output)
-    }
-  }
-  
-  return result.trim()
-}
 </script>
 
 <template>
@@ -434,13 +205,7 @@ const convertNotebookOutputs = (outputs: any[]): string => {
   <ServerSelectionDialogWrapper />
   
   <!-- Hidden file input for ipynb import -->
-  <input 
-    type="file" 
-    accept=".ipynb" 
-    class="hidden" 
-    ref="ipynbFileInput" 
-    @change="handleIpynbFileSelect" 
-  />
+
 </template>
 
 <style>

@@ -5,12 +5,17 @@ import {
   Plus,
   LogIn,
   ExternalLink,
-  Star
+  Star,
+  FileUp,
+  ChevronDown
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/features/auth/stores/auth'
 import { useRouter } from 'vue-router'
 import { Button } from '@/ui/button'
 import { Card, CardContent } from '@/ui/card'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu'
+import { useNotaImport } from '@/features/nota/composables/useNotaImport'
+import { FILE_EXTENSIONS } from '@/constants/app'
 
 // Emits
 const emit = defineEmits<{
@@ -19,6 +24,9 @@ const emit = defineEmits<{
 
 const authStore = useAuthStore()
 const router = useRouter()
+
+// Import composable
+const { importNota, importJupyterNotebook, isImporting } = useNotaImport()
 
 // GitHub stars state
 const githubStars = ref<number | null>(null)
@@ -50,6 +58,15 @@ const fetchGitHubStars = async () => {
   } finally {
     isLoadingStars.value = false
   }
+}
+
+// Import functionality using composable
+const handleImportNota = async () => {
+  await importNota([FILE_EXTENSIONS.nota])
+}
+
+const handleImportIpynb = async () => {
+  await importJupyterNotebook()
 }
 
 const greeting = computed(() => {
@@ -129,10 +146,43 @@ onMounted(() => {
           <span class="font-medium">Sign In</span>
         </Button>
 
+        <!-- Import Dropdown -->
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button 
+              variant="outline"
+              :class="authStore.isAuthenticated ? 'flex-1' : 'flex-[0.6]'"
+              class="h-12 hover:bg-muted/50 transition-colors"
+              :disabled="isImporting"
+            >
+              <FileUp class="h-4 w-4 mr-2" />
+              <span class="font-medium">{{ isImporting ? 'Importing...' : 'Import' }}</span>
+              <ChevronDown class="h-3 w-3 ml-1" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" class="w-48">
+            <DropdownMenuItem @click="handleImportNota" class="cursor-pointer" :disabled="isImporting">
+              <FileUp class="h-4 w-4 mr-2" />
+              <div class="flex-1">
+                <div class="font-medium text-sm">Import Nota</div>
+                <div class="text-xs text-muted-foreground">.nota files</div>
+              </div>
+            </DropdownMenuItem>
+            <DropdownMenuItem @click="handleImportIpynb" class="cursor-pointer" :disabled="isImporting">
+              <FileUp class="h-4 w-4 mr-2" />
+              <div class="flex-1">
+                <div class="font-medium text-sm">Import Notebook</div>
+                <div class="text-xs text-muted-foreground">Jupyter .ipynb files</div>
+              </div>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         <Button 
           @click="openGitHub"
           variant="outline"
-          class="flex-1 h-12 hover:bg-muted/50 transition-colors group"
+          :class="authStore.isAuthenticated ? 'flex-1' : 'flex-[0.4]'"
+          class="h-12 hover:bg-muted/50 transition-colors group"
         >
           <Github class="h-4 w-4 mr-2" />
           <span class="font-medium">Contribute</span>
