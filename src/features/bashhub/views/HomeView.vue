@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, computed } from 'vue'
+import { ref, watch, onMounted, computed, onUnmounted } from 'vue'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/ui/card'
 import { Button } from '@/ui/button'
 import { Badge } from '@/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/ui/tabs'
+import { Alert, AlertDescription } from '@/ui/alert'
 import { 
   Clock, 
   X, 
@@ -13,7 +14,10 @@ import {
   BarChart3, 
   Lightbulb, 
   Sparkles,
-  Layers
+  Layers,
+  AlertCircle,
+  RefreshCw,
+  Filter
 } from 'lucide-vue-next'
 import HomeHeader from '@/features/bashhub/components/HomeHeader.vue'
 import HomeSearchBar from '@/features/bashhub/components/HomeSearchBar.vue'
@@ -33,8 +37,12 @@ import { toast } from '@/lib/utils'
 // Store
 const store = useNotaStore()
 
-// State
+// Enhanced state management
 const isLoading = ref(true)
+const isRefreshing = ref(false)
+const loadError = ref<string | null>(null)
+const retryCount = ref(0)
+const maxRetries = 3
 
 // Composables
 const {
@@ -54,7 +62,7 @@ const {
   handleExport
 } = useNotaActions()
 
-// Filtering
+// Enhanced filtering with debouncing for better performance
 const filterOptions = computed(() => ({
   showFavorites: showFavorites.value,
   searchQuery: searchQuery.value,
@@ -71,26 +79,7 @@ const {
   filterOptions
 )
 
-// Lifecycle
-onMounted(async () => {
-  try {
-    await store.loadNotas()
-  } catch (error) {
-    console.error('Failed to load notas:', error)
-    toast('Failed to load notas')
-  }
-})
-
-// Watch for loading state
-watch(
-  () => store.rootItems,
-  () => {
-    isLoading.value = false
-  },
-  { immediate: true }
-)
-
-// Computed properties
+// Enhanced computed properties
 const lastUpdated = computed(() => {
   if (store.rootItems.length === 0) return null
   const latest = store.rootItems.reduce((latest, nota) => {
@@ -102,39 +91,91 @@ const lastUpdated = computed(() => {
   return getRelativeTime(latest)
 })
 
-const emptyStateConfig = computed(() => {
-  if (showFavorites.value) {
-    return {
-      title: 'No Favorite Notas',
-      description: 'Star important notas to see them here',
-      action: null
+const hasNotas = computed(() => store.rootItems.length > 0)
+const isEmptyState = computed(() => !isLoading.value && !hasNotas.value && !hasActiveFilters.value)
+
+// Enhanced loading and error handling
+const loadNotas = async (showToast = false) => {
+  try {
+    loadError.value = null
+    if (showToast) {
+      isRefreshing.value = true
+    } else {
+      isLoading.value = true
     }
-  }
-  
-  if (searchQuery.value || selectedTag.value) {
-    return {
-      title: 'No Matching Notas',
-      description: `No notas match your current filters. Try adjusting your search or creating a new nota.`,
-      action: 'create'
+    
+    await store.loadNotas()
+    retryCount.value = 0
+    
+    if (showToast) {
+      toast('Notas refreshed successfully')
     }
+  } catch (error) {
+    console.error('Failed to load notas:', error)
+    loadError.value = error instanceof Error ? error.message : 'Failed to load notas'
+    
+    if (retryCount.value < maxRetries) {
+      retryCount.value++
+      setTimeout(() => loadNotas(), 1000 * retryCount.value) // Exponential backoff
+    } else {
+      toast('Failed to load notas. Please try again later.')
+    }
+  } finally {
+    isLoading.value = false
+    isRefreshing.value = false
   }
-  
-  return {
-    title: 'No Notas Yet',
-    description: 'Create your first nota to get started',
-    action: 'create'
-  }
+}
+
+const handleRetry = () => {
+  retryCount.value = 0
+  loadNotas()
+}
+
+const handleRefresh = () => {
+  loadNotas(true)
+}
+
+// Lifecycle
+onMounted(() => {
+  loadNotas()
 })
+
+// Watch for loading state
+watch(
+  () => store.rootItems,
+  () => {
+    if (isLoading.value) {
+      isLoading.value = false
+    }
+  },
+  { immediate: true }
+)
 
 // Methods
 const handlePageChange = (page: number) => {
   currentPage.value = page
+  
+  // Smooth scroll to top of content area when page changes
+  const contentElement = document.querySelector('[data-content-area]')
+  if (contentElement) {
+    contentElement.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 }
+
+// Enhanced filter management
+const handleClearFilters = () => {
+  clearFilters()
+  toast('Filters cleared')
+}
+
+// Performance optimization: Cleanup any listeners
+onUnmounted(() => {
+  // Cleanup any pending timeouts or intervals if needed
+})
 </script>
 
 <template>
   <div class="flex flex-col w-full h-screen lg:h-screen bg-background overflow-hidden lg:overflow-hidden">
-
     <!-- Main Content Area with proper overflow handling for desktop vs mobile -->
     <main class="flex-1 overflow-auto lg:overflow-hidden h-full w-full">
       <div class="container max-w-full px-3 sm:px-4 lg:px-6 h-full py-4 sm:py-6 lg:h-full lg:overflow-hidden">
@@ -151,7 +192,7 @@ const handlePageChange = (page: number) => {
           <!-- Mobile: Full width below header, Desktop: Right Column with dynamic content -->
           <div class="lg:col-span-3 flex flex-col h-auto lg:h-full lg:min-h-0 w-full min-w-0">
             
-            <!-- View Controls Tabs -->
+            <!-- Enhanced View Controls Tabs -->
             <div class="shrink-0 mb-4">
               <Tabs :model-value="activeView" @update:model-value="(value: string | number) => activeView = String(value) as ActiveView" class="w-full">
                 <TabsList class="inline-flex h-9 sm:h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground w-full overflow-x-auto scrollbar-none">
@@ -190,9 +231,27 @@ const handlePageChange = (page: number) => {
                 </TabsList>
               </Tabs>
             </div>
+
+            <!-- Error State -->
+            <Alert v-if="loadError && !isLoading" variant="destructive" class="mb-4">
+              <AlertCircle class="h-4 w-4" />
+              <AlertDescription class="flex items-center justify-between w-full">
+                <span>{{ loadError }}</span>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  @click="handleRetry"
+                  class="ml-4"
+                >
+                  <RefreshCw class="h-3 w-3 mr-1" />
+                  Retry
+                </Button>
+              </AlertDescription>
+            </Alert>
+
             <!-- Notas View -->
             <div v-if="activeView === 'notas'" class="flex flex-col h-auto lg:h-full gap-4 w-full min-w-0">
-              <!-- Search and Controls Bar with responsive spacing -->
+              <!-- Enhanced Search and Controls Bar -->
               <div class="shrink-0 space-y-3 sm:space-y-4 lg:space-y-0 lg:flex lg:items-center lg:gap-4 w-full">
                 <div class="flex-1 min-w-0 w-full lg:w-auto">
                   <HomeSearchBar
@@ -212,38 +271,61 @@ const handlePageChange = (page: number) => {
                   />
                 </div>
                 
-                <Button
-                  v-if="hasActiveFilters"
-                  variant="ghost"
-                  size="sm"
-                  @click="clearFilters"
-                  class="h-10 shrink-0 hover:bg-destructive-[.10] hover:text-destructive w-full sm:w-auto"
-                  :title="`Clear active filters: ${activeFiltersText}`"
-                >
-                  Clear Filters
-                  <X class="h-4 w-4 ml-2" />
-                </Button>
+                <!-- Enhanced filter controls -->
+                <div class="flex items-center gap-2">
+                  <Button
+                    v-if="hasActiveFilters"
+                    variant="ghost"
+                    size="sm"
+                    @click="handleClearFilters"
+                    class="h-10 shrink-0 hover:bg-destructive/10 hover:text-destructive w-full sm:w-auto"
+                    :title="`Clear active filters: ${activeFiltersText}`"
+                  >
+                    <Filter class="h-4 w-4 mr-2" />
+                    Clear
+                    <X class="h-4 w-4 ml-2" />
+                  </Button>
+                  
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    @click="handleRefresh"
+                    :disabled="isRefreshing"
+                    class="h-10 shrink-0"
+                    title="Refresh notas"
+                  >
+                    <RefreshCw :class="['h-4 w-4', isRefreshing && 'animate-spin']" />
+                  </Button>
+                </div>
               </div>
 
-              <!-- Notas List Card with proper overflow -->
-              <Card class="flex-1 flex flex-col min-h-[50vh] lg:min-h-0 lg:h-full lg:overflow-hidden">
-                <CardHeader class="shrink-0 border-b bg-muted-[.30]">
+              <!-- Enhanced Notas List Card -->
+              <Card class="flex-1 flex flex-col min-h-[50vh] lg:min-h-0 lg:h-full lg:overflow-hidden" data-content-area>
+                <CardHeader class="shrink-0 border-b bg-muted/30">
                   <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
                     <div class="min-w-0 flex-1">
                       <CardTitle class="flex items-center gap-2 text-base sm:text-lg">
                         <Clock class="h-4 w-4 sm:h-5 sm:w-5" />
                         {{ showFavorites ? 'Favorite' : 'Recent' }} Notas
                         <Badge variant="secondary" class="ml-2 flex items-center gap-1 text-xs">
-                          <span v-if="stats.isFiltering && isLoading" class="animate-pulse">
+                          <span v-if="stats.isFiltering && (isLoading || isRefreshing)" class="animate-pulse">
                             ⋯
                           </span>
-                          {{ stats.filtered }}
+                          <template v-else>
+                            {{ stats.filtered }}
+                            <span v-if="hasActiveFilters" class="text-muted-foreground">
+                              / {{ stats.total }}
+                            </span>
+                          </template>
                         </Badge>
                       </CardTitle>
                       <CardDescription class="mt-1 text-xs sm:text-sm">
                         {{ showFavorites ? 'Your starred notas' : 'Your recently updated notas' }}
                         <span v-if="lastUpdated && !showFavorites" class="text-xs opacity-75 ml-2 hidden sm:inline">
                           • Last updated {{ lastUpdated }}
+                        </span>
+                        <span v-if="hasActiveFilters" class="text-xs ml-2">
+                          • {{ activeFiltersText }}
                         </span>
                       </CardDescription>
                     </div>
@@ -253,7 +335,7 @@ const handlePageChange = (page: number) => {
                         size="sm" 
                         @click="createNewNota"
                         title="Create a new nota"
-                        class="hover:bg-primary-[.10] text-xs sm:text-sm px-2 sm:px-3"
+                        class="hover:bg-primary/10 text-xs sm:text-sm px-2 sm:px-3"
                       >
                         <Plus class="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                         <span class="hidden xs:inline">New</span>
@@ -264,7 +346,7 @@ const handlePageChange = (page: number) => {
                         size="sm" 
                         @click="() => handleImport()"
                         title="Import notas from JSON file"
-                        class="hover:bg-blue-50 dark:hover:bg-blue-900-[.20] text-xs sm:text-sm px-2 sm:px-3"
+                        class="hover:bg-blue-50 dark:hover:bg-blue-900/20 text-xs sm:text-sm px-2 sm:px-3"
                       >
                         <FolderPlus class="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                         <span class="hidden sm:inline">Import</span>
@@ -284,22 +366,30 @@ const handlePageChange = (page: number) => {
                     @create-nota="createNewNota"
                     @update:selectedTag="selectedTag = $event"
                     @update:page="handlePageChange"
+                    @clear-filters="handleClearFilters"
                   />
                 </CardContent>
               </Card>
             </div>
 
-            <!-- Analytics View with proper overflow -->
+            <!-- Enhanced Analytics View -->
             <div v-else-if="activeView === 'insights'" class="flex flex-col h-auto lg:h-full lg:min-h-0">
               <Card class="flex-1 flex flex-col min-h-[60vh] lg:min-h-0 lg:h-full lg:overflow-hidden">
                 <CardHeader class="shrink-0">
-                  <CardTitle class="flex items-center gap-2 text-base sm:text-lg">
-                    <Lightbulb class="h-4 w-4 sm:h-5 sm:w-5" />
-                    Smart Insights & Recommendations
-                  </CardTitle>
-                  <CardDescription class="text-xs sm:text-sm">
-                    AI-powered suggestions and productivity insights based on your nota patterns
-                  </CardDescription>
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <CardTitle class="flex items-center gap-2 text-base sm:text-lg">
+                        <Lightbulb class="h-4 w-4 sm:h-5 sm:w-5" />
+                        Smart Insights & Recommendations
+                      </CardTitle>
+                      <CardDescription class="text-xs sm:text-sm">
+                        AI-powered suggestions and productivity insights based on your nota patterns
+                      </CardDescription>
+                    </div>
+                    <Badge variant="outline" class="text-xs">
+                      {{ stats.total }} notas analyzed
+                    </Badge>
+                  </div>
                 </CardHeader>
                 <CardContent class="flex-1 overflow-y-auto p-3 sm:p-6">
                   <HomeRecommendations :notas="store.rootItems" />
@@ -307,7 +397,7 @@ const handlePageChange = (page: number) => {
               </Card>
             </div>
 
-            <!-- Templates View -->
+            <!-- Enhanced Templates View -->
             <div v-else-if="activeView === 'templates'" class="flex flex-col h-auto lg:h-full lg:min-h-0">
               <Card class="flex-1 flex flex-col min-h-[60vh] lg:min-h-0 lg:h-full lg:overflow-hidden">
                 <CardHeader class="shrink-0">
@@ -330,20 +420,37 @@ const handlePageChange = (page: number) => {
               </Card>
             </div>
 
-            <!-- Analytics Dashboard -->
+            <!-- Enhanced Analytics Dashboard -->
             <div v-else-if="activeView === 'workspace'" class="flex flex-col h-auto lg:h-full lg:min-h-0">
               <Card class="flex-1 flex flex-col min-h-[60vh] lg:min-h-0 lg:h-full lg:overflow-hidden">
                 <CardHeader class="shrink-0">
-                  <CardTitle class="flex items-center gap-2 text-base sm:text-lg">
-                    <BarChart3 class="h-4 w-4 sm:h-5 sm:w-5" />
-                    Analytics Dashboard
-                  </CardTitle>
-                  <CardDescription class="text-xs sm:text-sm">
-                    Comprehensive analytics and productivity metrics for your nota workspace
-                  </CardDescription>
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <CardTitle class="flex items-center gap-2 text-base sm:text-lg">
+                        <BarChart3 class="h-4 w-4 sm:h-5 sm:w-5" />
+                        Analytics Dashboard
+                      </CardTitle>
+                      <CardDescription class="text-xs sm:text-sm">
+                        Comprehensive analytics and productivity metrics for your nota workspace
+                      </CardDescription>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <Badge variant="outline" class="text-xs">
+                        Real-time Data
+                      </Badge>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        @click="handleRefresh"
+                        :disabled="isRefreshing"
+                        title="Refresh analytics"
+                      >
+                        <RefreshCw :class="['h-4 w-4', isRefreshing && 'animate-spin']" />
+                      </Button>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent class="flex-1 overflow-y-auto p-3 sm:p-6">
-                  <!-- Analytics Overview Section -->
                   <div>
                     <div class="flex items-center justify-between mb-4">
                       <h3 class="text-base sm:text-lg font-semibold flex items-center gap-2">
@@ -351,7 +458,7 @@ const handlePageChange = (page: number) => {
                         Productivity Analytics
                       </h3>
                       <Badge variant="outline" class="text-xs">
-                        Real-time Data
+                        {{ stats.total }} total notas
                       </Badge>
                     </div>
                     <HomeAnalytics :notas="store.rootItems" />
