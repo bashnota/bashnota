@@ -522,11 +522,11 @@ const handlePageChange = (page: number) => {
   }
   
   /* Ensure minimum heights work on mobile */
-  .min-h-[50vh] {
+  .min-h-\[50vh\] {
     min-height: 50vh !important;
   }
   
-  .min-h-[60vh] {
+  .min-h-\[60vh\] {
     min-height: 60vh !important;
   }
 }
@@ -621,7 +621,7 @@ const handlePageChange = (page: number) => {
   }
   
   /* Ensure minimum content visibility */
-  .min-h-[50vh] {
+  .min-h-\[50vh\] {
     min-height: 60vh !important;
   }
 }
@@ -661,7 +661,7 @@ const handlePageChange = (page: number) => {
   }
   
   /* Ensure content is always scrollable */
-  .min-h-[50vh] {
+  .min-h-\[50vh\] {
     min-height: 70vh !important;
   }
   
@@ -703,7 +703,7 @@ const handlePageChange = (page: number) => {
   }
   
   /* Ensure minimum scrollable content */
-  .min-h-[50vh] {
+  .min-h-\[50vh\] {
     min-height: 75vh !important;
   }
   
@@ -738,11 +738,11 @@ const handlePageChange = (page: number) => {
   }
   
   /* Reduce content minimum heights in landscape */
-  .min-h-[50vh] {
+  .min-h-\[50vh\] {
     min-height: 40vh !important;
   }
   
-  .min-h-[60vh] {
+  .min-h-\[60vh\] {
     min-height: 45vh !important;
   }
 }
