@@ -4,6 +4,7 @@ import { useNotaStore } from '@/features/nota/stores/nota'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/ui/card'
 import { Button } from '@/ui/button'
 import { Badge } from '@/ui/badge'
+import { Tabs, TabsList, TabsTrigger } from '@/ui/tabs'
 import { 
   Clock, 
   X, 
@@ -12,6 +13,7 @@ import {
   BarChart3, 
   Lightbulb, 
   Sparkles,
+  Layers
 } from 'lucide-vue-next'
 import HomeHeader from '@/features/bashhub/components/HomeHeader.vue'
 import HomeSearchBar from '@/features/bashhub/components/HomeSearchBar.vue'
@@ -22,7 +24,7 @@ import HomeRecommendations from '@/features/bashhub/components/HomeRecommendatio
 import HomeQuickActions from '@/features/bashhub/components/HomeQuickActions.vue'
 
 // Composables
-import { useHomePreferences } from '@/features/bashhub/composables/useHomePreferences'
+import { useHomePreferences, type ActiveView } from '@/features/bashhub/composables/useHomePreferences'
 import { useNotaFiltering } from '@/features/nota/composables/useNotaFiltering'
 import { useNotaActions } from '@/features/nota/composables/useNotaActions'
 import { getRelativeTime } from '@/utils/dateUtils'
@@ -141,15 +143,53 @@ const handlePageChange = (page: number) => {
           <div class="lg:col-span-2 flex flex-col h-auto lg:h-full lg:min-h-0 w-full min-w-0">
             <div class="flex-1 lg:overflow-y-auto lg:overflow-x-hidden lg:scrollbar-thin lg:scrollbar-thumb-muted lg:scrollbar-track-background w-full">
               <HomeHeader 
-                :active-view="activeView"
                 @create-nota="createNewNota"
-                @update:active-view="activeView = $event"
               />
             </div>
           </div>
 
           <!-- Mobile: Full width below header, Desktop: Right Column with dynamic content -->
           <div class="lg:col-span-3 flex flex-col h-auto lg:h-full lg:min-h-0 w-full min-w-0">
+            
+            <!-- View Controls Tabs -->
+            <div class="shrink-0 mb-4">
+              <Tabs :model-value="activeView" @update:model-value="(value: string | number) => activeView = String(value) as ActiveView" class="w-full">
+                <TabsList class="inline-flex h-9 sm:h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground w-full overflow-x-auto scrollbar-none">
+                  <TabsTrigger 
+                    value="notas" 
+                    class="inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm min-w-[44px] sm:min-w-0 flex-shrink-0"
+                    :title="activeView !== 'notas' ? 'Notas' : undefined"
+                  >
+                    <Clock class="h-4 w-4 flex-shrink-0" />
+                    <span class="ml-1 sm:ml-2 hidden xs:inline">Notas</span>
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="insights" 
+                    class="inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm min-w-[44px] sm:min-w-0 flex-shrink-0"
+                    :title="activeView !== 'insights' ? 'Insights' : undefined"
+                  >
+                    <Lightbulb class="h-4 w-4 flex-shrink-0" />
+                    <span class="ml-1 sm:ml-2 hidden xs:inline">Insights</span>
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="templates" 
+                    class="inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm min-w-[44px] sm:min-w-0 flex-shrink-0"
+                    :title="activeView !== 'templates' ? 'Templates' : undefined"
+                  >
+                    <Sparkles class="h-4 w-4 flex-shrink-0" />
+                    <span class="ml-1 sm:ml-2 hidden xs:inline">Templates</span>
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="workspace" 
+                    class="inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm min-w-[44px] sm:min-w-0 flex-shrink-0"
+                    :title="activeView !== 'workspace' ? 'Analytics' : undefined"
+                  >
+                    <Layers class="h-4 w-4 flex-shrink-0" />
+                    <span class="ml-1 sm:ml-2 hidden xs:inline">Analytics</span>
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
             <!-- Notas View -->
             <div v-if="activeView === 'notas'" class="flex flex-col h-auto lg:h-full gap-4 w-full min-w-0">
               <!-- Search and Controls Bar with responsive spacing -->
