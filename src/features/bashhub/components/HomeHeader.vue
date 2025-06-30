@@ -7,7 +7,8 @@ import {
   ExternalLink,
   Star,
   FileUp,
-  ChevronDown
+  ChevronDown,
+  Twitter
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/features/auth/stores/auth'
 import { useRouter } from 'vue-router'
@@ -32,6 +33,10 @@ const { importNota, importJupyterNotebook, isImporting } = useNotaImport()
 const githubStars = ref<number | null>(null)
 const isLoadingStars = ref(false)
 
+// Twitter followers state
+const twitterFollowers = ref<number | null>(null)
+const isLoadingTwitter = ref(false)
+
 // Methods
 const handleCreateNota = () => {
   emit('create-nota')
@@ -43,6 +48,10 @@ const handleLogin = () => {
 
 const openGitHub = () => {
   window.open('https://github.com/bashnota/bashnota', '_blank')
+}
+
+const openTwitter = () => {
+  window.open('https://twitter.com/bashnota', '_blank')
 }
 
 const fetchGitHubStars = async () => {
@@ -57,6 +66,23 @@ const fetchGitHubStars = async () => {
     console.error('Failed to fetch GitHub stars:', error)
   } finally {
     isLoadingStars.value = false
+  }
+}
+
+const fetchTwitterFollowers = async () => {
+  try {
+    isLoadingTwitter.value = true
+    // Note: Twitter API v2 requires authentication, so we'll use a fallback approach
+    // For now, we'll show the follow button without the count
+    // In production, you'd want to use a backend service to fetch this data
+    
+    // Fallback: Try to get follower count from a public API or service
+    // Since Twitter API requires auth, we'll skip the count for now
+    twitterFollowers.value = null
+  } catch (error) {
+    console.error('Failed to fetch Twitter followers:', error)
+  } finally {
+    isLoadingTwitter.value = false
   }
 }
 
@@ -82,9 +108,18 @@ const formattedStars = computed(() => {
   return githubStars.value.toString()
 })
 
-// Load GitHub stars on mount
+const formattedFollowers = computed(() => {
+  if (twitterFollowers.value === null) return null
+  if (twitterFollowers.value >= 1000) {
+    return `${(twitterFollowers.value / 1000).toFixed(1)}k`
+  }
+  return twitterFollowers.value.toString()
+})
+
+// Load data on mount
 onMounted(() => {
   fetchGitHubStars()
+  fetchTwitterFollowers()
 })
 </script>
 
@@ -181,18 +216,19 @@ onMounted(() => {
         <Button 
           @click="openGitHub"
           variant="outline"
-          :class="authStore.isAuthenticated ? 'flex-1' : 'flex-[0.4]'"
+          :class="authStore.isAuthenticated ? 'flex-[0.5]' : 'flex-[0.3]'"
           class="h-12 hover:bg-muted/50 transition-colors group"
         >
           <Github class="h-4 w-4 mr-2" />
           <span class="font-medium">Contribute</span>
           <ExternalLink class="h-3 w-3 ml-1 opacity-60 group-hover:opacity-100 transition-opacity" />
         </Button>
+
       </div>
     </div>
 
-    <!-- GitHub Stars & Open Source Badge -->
-    <div class="flex justify-center gap-3">
+    <!-- GitHub Stars, Twitter Followers & Open Source Badge -->
+    <div class="flex justify-center gap-3 flex-wrap">
       <!-- GitHub Stars -->
       <div 
         v-if="githubStars !== null || isLoadingStars"
@@ -202,6 +238,17 @@ onMounted(() => {
         <Star class="h-3 w-3 text-yellow-500 fill-yellow-500" />
         <span class="text-xs font-medium text-muted-foreground">
           {{ isLoadingStars ? '...' : formattedStars }} stars
+        </span>
+      </div>
+
+      <!-- Twitter Followers -->
+      <div 
+        class="inline-flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-full border border-border/50 hover:bg-muted/70 transition-colors cursor-pointer"
+        @click="openTwitter"
+      >
+        <Twitter class="h-3 w-3 text-blue-500" />
+        <span class="text-xs font-medium text-muted-foreground">
+          {{ isLoadingTwitter ? '...' : (twitterFollowers !== null ? `${formattedFollowers} followers` : 'Follow @bashnota') }}
         </span>
       </div>
 
