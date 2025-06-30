@@ -81,39 +81,10 @@ export function useNotaActions() {
     }
   }
 
-  const handleImport = async (acceptedExtensions: string[] = [FILE_EXTENSIONS.json]): Promise<boolean> => {
-    return new Promise((resolve) => {
-      const input = document.createElement('input')
-      input.type = 'file'
-      input.accept = acceptedExtensions.join(',')
-      input.onchange = async (event) => {
-        const file = (event.target as HTMLInputElement).files?.[0]
-        if (file) {
-          try {
-            const importedNotas = await store.importNotas(file)
-            if (importedNotas.length > 0) {
-              await store.loadNotas()
-              toast(SUCCESS_MESSAGES.notas.imported)
-              router.push(`/nota/${importedNotas[0].id}`)
-              resolve(true)
-            } else {
-              resolve(false)
-            }
-          } catch (error) {
-            console.error('Import failed in useNotaActions:', error)
-            toast(ERROR_MESSAGES.notas.importFailed)
-            resolve(false)
-          }
-        } else {
-          resolve(false)
-        }
-      }
-      
-      // Handle cancel/escape
-      input.oncancel = () => resolve(false)
-      
-      input.click()
-    })
+  const handleImport = async (acceptedExtensions: string[] = [FILE_EXTENSIONS.nota]): Promise<boolean> => {
+    const { useNotaImport } = await import('./useNotaImport')
+    const { importNota } = useNotaImport()
+    return await importNota(acceptedExtensions)
   }
 
   const handleExport = async (): Promise<boolean> => {
