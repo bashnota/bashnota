@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { 
   Github,
   Plus,
   LogIn,
-  ExternalLink
+  ExternalLink,
+  Star
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/features/auth/stores/auth'
 import { useRouter } from 'vue-router'
@@ -19,6 +20,10 @@ const emit = defineEmits<{
 const authStore = useAuthStore()
 const router = useRouter()
 
+// GitHub stars state
+const githubStars = ref<number | null>(null)
+const isLoadingStars = ref(false)
+
 // Methods
 const handleCreateNota = () => {
   emit('create-nota')
@@ -32,117 +37,187 @@ const openGitHub = () => {
   window.open('https://github.com/bashnota/bashnota', '_blank')
 }
 
+const fetchGitHubStars = async () => {
+  try {
+    isLoadingStars.value = true
+    const response = await fetch('https://api.github.com/repos/bashnota/bashnota')
+    if (response.ok) {
+      const data = await response.json()
+      githubStars.value = data.stargazers_count
+    }
+  } catch (error) {
+    console.error('Failed to fetch GitHub stars:', error)
+  } finally {
+    isLoadingStars.value = false
+  }
+}
+
 const greeting = computed(() => {
   const name = authStore.currentUser?.displayName
   return name ? `Welcome back, ${name}!` : 'Welcome to BashNota'
 })
+
+const formattedStars = computed(() => {
+  if (githubStars.value === null) return null
+  if (githubStars.value >= 1000) {
+    return `${(githubStars.value / 1000).toFixed(1)}k`
+  }
+  return githubStars.value.toString()
+})
+
+// Load GitHub stars on mount
+onMounted(() => {
+  fetchGitHubStars()
+})
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="max-w-lg mx-auto space-y-8 p-6">
     <!-- Header Section -->
-    <div class="text-center space-y-4">
-      <div class="flex items-center justify-center gap-3">
-        <div class="p-2 bg-primary/10 rounded-lg border border-primary/20">
-          <img src="@/assets/logo.svg" alt="BashNota Logo" class="h-6 w-6" />
+    <div class="text-center space-y-6">
+      <!-- Logo and Brand -->
+      <div class="space-y-3">
+        <div class="inline-flex items-center justify-center p-3 bg-gradient-to-br from-primary/10 to-primary/5 rounded-2xl border border-primary/20 shadow-sm">
+          <img src="@/assets/logo.svg" alt="BashNota Logo" class="h-8 w-8" />
         </div>
         <div>
-          <h1 class="text-2xl font-bold text-foreground">BashNota</h1>
-          <p class="text-sm text-muted-foreground">{{ greeting }}</p>
+          <h1 class="text-3xl font-bold text-foreground tracking-tight">BashNota</h1>
+          <p class="text-muted-foreground mt-1">{{ greeting }}</p>
         </div>
       </div>
       
       <!-- Compelling Tagline -->
-      <div class="max-w-md mx-auto">
-        <p class="text-lg font-medium text-foreground mb-2">
+      <div class="space-y-3">
+        <h2 class="text-xl font-semibold text-foreground leading-tight">
           Your second brain, cracked on code and AI
-        </p>
-        <p class="text-sm text-muted-foreground leading-relaxed">
-          Build your own extensions, own your data, break free from platform lock-in. 
+        </h2>
+        <p class="text-muted-foreground leading-relaxed max-w-sm mx-auto">
+          Build extensions, own your data, break free from platform lock-in. 
           Open source tools for independent minds.
         </p>
       </div>
     </div>
 
-    <!-- Call to Action Cards -->
-    <div class="space-y-3">
+    <!-- Call to Action Section -->
+    <div class="space-y-4">
       <!-- Primary CTA -->
-      <Card class="border-2 border-primary/20 hover:border-primary/40 transition-colors">
-        <CardContent class="p-0">
-          <Button 
-            @click="handleCreateNota"
-            class="w-full h-auto p-4 bg-primary hover:bg-primary/90 text-primary-foreground"
-            size="lg"
-          >
-            <div class="flex items-center gap-3 w-full">
-              <Plus class="h-5 w-5" />
-              <div class="text-left flex-1">
-                <div class="font-semibold">Create Your First Nota</div>
-                <div class="text-sm opacity-90">Start building your knowledge base</div>
-              </div>
-            </div>
-          </Button>
-        </CardContent>
-      </Card>
+      <Button 
+        @click="handleCreateNota"
+        class="w-full h-14 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02]"
+        size="lg"
+      >
+        <div class="flex items-center gap-3">
+          <div class="p-1 bg-white/20 rounded-lg">
+            <Plus class="h-5 w-5" />
+          </div>
+          <div class="text-left">
+            <div class="font-semibold text-base">Create Your First Nota</div>
+            <div class="text-sm opacity-90">Start building your knowledge base</div>
+          </div>
+        </div>
+      </Button>
 
-      <!-- Secondary CTAs -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Card v-if="!authStore.isAuthenticated" class="hover:shadow-md transition-shadow">
-          <CardContent class="p-0">
-            <Button 
-              @click="handleLogin"
-              variant="outline"
-              class="w-full h-auto p-3"
-            >
-              <div class="flex items-center gap-2 w-full">
-                <LogIn class="h-4 w-4" />
-                <div class="text-left flex-1">
-                  <div class="font-medium text-sm">Sign In</div>
-                  <div class="text-xs text-muted-foreground">Access your workspace</div>
-                </div>
-              </div>
-            </Button>
-          </CardContent>
-        </Card>
+      <!-- Secondary Actions -->
+      <div class="flex gap-3">
+        <Button 
+          v-if="!authStore.isAuthenticated"
+          @click="handleLogin"
+          variant="outline"
+          class="flex-1 h-12 hover:bg-muted/50 transition-colors"
+        >
+          <LogIn class="h-4 w-4 mr-2" />
+          <span class="font-medium">Sign In</span>
+        </Button>
 
-        <Card class="hover:shadow-md transition-shadow">
-          <CardContent class="p-0">
-            <Button 
-              @click="openGitHub"
-              variant="outline"
-              class="w-full h-auto p-3"
-            >
-              <div class="flex items-center gap-2 w-full">
-                <Github class="h-4 w-4" />
-                <div class="text-left flex-1">
-                  <div class="font-medium text-sm">Contribute</div>
-                  <div class="text-xs text-muted-foreground">Join the open source movement</div>
-                </div>
-                <ExternalLink class="h-3 w-3 opacity-60" />
-              </div>
-            </Button>
-          </CardContent>
-        </Card>
+        <Button 
+          @click="openGitHub"
+          variant="outline"
+          class="flex-1 h-12 hover:bg-muted/50 transition-colors group"
+        >
+          <Github class="h-4 w-4 mr-2" />
+          <span class="font-medium">Contribute</span>
+          <ExternalLink class="h-3 w-3 ml-1 opacity-60 group-hover:opacity-100 transition-opacity" />
+        </Button>
       </div>
     </div>
 
-    <!-- Open Source Message -->
-    <div class="text-center">
-      <p class="text-xs text-muted-foreground italic">
-        Built by developers, for developers. No corporate overlords, no data harvesting.
-      </p>
+    <!-- GitHub Stars & Open Source Badge -->
+    <div class="flex justify-center gap-3">
+      <!-- GitHub Stars -->
+      <div 
+        v-if="githubStars !== null || isLoadingStars"
+        class="inline-flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-full border border-border/50 hover:bg-muted/70 transition-colors cursor-pointer"
+        @click="openGitHub"
+      >
+        <Star class="h-3 w-3 text-yellow-500 fill-yellow-500" />
+        <span class="text-xs font-medium text-muted-foreground">
+          {{ isLoadingStars ? '...' : formattedStars }} stars
+        </span>
+      </div>
+
+      <!-- Open Source Badge -->
+      <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-full border border-border/50">
+        <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+        <span class="text-xs font-medium text-muted-foreground">
+          Open Source & Privacy First
+        </span>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* Minimal, clean styling with subtle interactions */
-.transition-colors {
-  transition: border-color 0.2s ease;
+/* Enhanced UX with smooth interactions */
+.transition-all {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.transition-shadow {
-  transition: box-shadow 0.2s ease;
+.transition-colors {
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.transition-opacity {
+  transition: opacity 0.2s ease;
+}
+
+/* Subtle hover scale effect */
+.hover\:scale-\[1\.02\]:hover {
+  transform: scale(1.02);
+}
+
+/* Custom shadow for primary button */
+.shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.hover\:shadow-xl:hover {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Smooth gradient animation for logo container */
+.bg-gradient-to-br {
+  background-image: linear-gradient(to bottom right, var(--tw-gradient-stops));
+}
+
+/* Improved focus states for accessibility */
+button:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .max-w-lg {
+    max-width: 100%;
+  }
+  
+  .p-6 {
+    padding: 1rem;
+  }
+  
+  .space-y-8 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 1.5rem;
+  }
 }
 </style>
 
