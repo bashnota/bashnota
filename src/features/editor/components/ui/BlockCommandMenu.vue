@@ -7,17 +7,12 @@ import {
   CommandSeparator,
 } from '@/ui/command'
 import { 
-  Trash2Icon, 
-  ScissorsIcon, 
-  CopyIcon, 
-  StarIcon,
-  SparklesIcon,
-  EditIcon,
-  CheckCircleIcon,
-  LinkIcon,
-  WandIcon
+  Trash2 as Trash2Icon, 
+  Scissors as ScissorsIcon, 
+  Copy as CopyIcon, 
+  Star as StarIcon
 } from 'lucide-vue-next'
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, computed, h } from 'vue'
 import type { EditorView } from '@tiptap/pm/view'
 import { serializeForClipboard } from '@/features/editor/components/extensions/DragHandlePlugin'
 import type { Selection } from '@tiptap/pm/state'
@@ -25,9 +20,9 @@ import { useFavoriteBlocksStore } from '@/features/nota/stores/favoriteBlocksSto
 import AddToFavoritesModal from '@/features/editor/components/dialogs/AddToFavoritesModal.vue'
 import { toast } from '@/ui/toast'
 import { logger } from '@/services/logger'
-import { aiService } from '@/features/ai/services'
-import { useAISettingsStore } from '@/features/ai/stores/aiSettingsStore'
-import type { GenerationOptions } from '@/features/ai/services'
+import { useAIActionsStore } from '@/features/ai/stores/aiActionsStore'
+import { useAIActions } from '@/features/ai/components/composables/useAIActions'
+import { getIconComponent, getColorClasses } from '@/features/ai/utils/iconResolver'
 
 const props = defineProps<{
   position: { x: number; y: number } | null
@@ -41,10 +36,31 @@ const emit = defineEmits<{
 }>()
 
 const favoriteBlocksStore = useFavoriteBlocksStore()
-const aiSettings = useAISettingsStore()
+const aiActionsStore = useAIActionsStore()
+const { isProcessing, executeAction } = useAIActions()
 
 const showAddToFavoritesModal = ref(false)
-const isAIProcessing = ref(false)
+
+// Get enabled AI actions with safety checks
+const enabledAIActions = computed(() => {
+  try {
+    // Only return actions if the store is loaded
+    if (!aiActionsStore.isLoaded) {
+      return []
+    }
+    
+    return aiActionsStore.enabledActions.filter(action => 
+      action && 
+      action.id && 
+      action.name && 
+      action.icon && 
+      action.color
+    )
+  } catch (error) {
+    logger.error('Error getting enabled AI actions:', error)
+    return []
+  }
+})
 
 const cut = () => {
   emit('close')
@@ -160,100 +176,17 @@ const replaceSelectedText = (newText: string) => {
   props.editorView.focus()
 }
 
-const performAIAction = async (prompt: string, actionName: string) => {
+const handleAIAction = async (actionId: string) => {
+  const action = aiActionsStore.getActionById(actionId)
+  if (!action) return
+  
   const selectedText = getSelectedText()
-  if (!selectedText) {
-    toast({
-      title: 'No text selected',
-      description: 'Please select some text to perform this action.',
-      variant: 'destructive'
-    })
-    return
-  }
-
-  try {
-    isAIProcessing.value = true
-    
-    const providerId = aiSettings.settings.preferredProviderId
-    const apiKey = aiSettings.getApiKey(providerId)
-    
-    if (!apiKey && providerId !== 'webllm') {
-      toast({
-        title: 'API Key Required',
-        description: `Please configure your ${providerId} API key in settings.`,
-        variant: 'destructive'
-      })
-      return
-    }
-
-    const fullPrompt = `${prompt}\n\nText to process: "${selectedText}"\n\nPlease respond with only the processed text, no additional commentary.`
-    
-    const options: GenerationOptions = {
-      prompt: fullPrompt,
-      maxTokens: aiSettings.settings.maxTokens,
-      temperature: 0.3 // Lower temperature for more consistent results
-    }
-
-    const result = await aiService.generateText(providerId, options, apiKey)
-    
-    if (result?.text) {
-      // Clean up the response by removing quotes and extra whitespace
-      let processedText = result.text.trim()
-      
-      // Remove surrounding quotes if present
-      if ((processedText.startsWith('"') && processedText.endsWith('"')) ||
-          (processedText.startsWith("'") && processedText.endsWith("'"))) {
-        processedText = processedText.slice(1, -1)
-      }
-      
-      replaceSelectedText(processedText)
-      
-      toast({
-        title: `${actionName} Complete`,
-        description: 'Text has been successfully processed.'
-      })
-    } else {
-      throw new Error('No response received from AI service')
-    }
-  } catch (error) {
-    logger.error(`Error in ${actionName}:`, error)
-    toast({
-      title: `${actionName} Failed`,
-      description: error instanceof Error ? error.message : 'An unexpected error occurred.',
-      variant: 'destructive'
-    })
-  } finally {
-    isAIProcessing.value = false
-    emit('close')
-  }
-}
-
-const rewriteText = async () => {
-  await performAIAction(
-    'Please rewrite the following text to improve its clarity, flow, and readability while maintaining the original meaning and intent:',
-    'Text Rewrite'
-  )
-}
-
-const correctGrammar = async () => {
-  await performAIAction(
-    'Please correct any grammar, spelling, and punctuation errors in the following text while preserving the original meaning and style:',
-    'Grammar Correction'
-  )
-}
-
-const improveWriting = async () => {
-  await performAIAction(
-    'Please improve the following text by enhancing its vocabulary, sentence structure, and overall writing quality while maintaining the original meaning:',
-    'Writing Improvement'
-  )
-}
-
-const makeConcise = async () => {
-  await performAIAction(
-    'Please make the following text more concise and to-the-point while preserving all important information and meaning:',
-    'Text Concision'
-  )
+  
+  await executeAction(action, selectedText, (newText) => {
+    replaceSelectedText(newText)
+  })
+  
+  emit('close')
 }
 
 // Handle click outside
@@ -301,49 +234,27 @@ onUnmounted(() => {
           </CommandItem>
         </CommandGroup>
 
-        <CommandSeparator />
+        <CommandSeparator v-if="aiActionsStore.isLoaded && enabledAIActions.length > 0" />
 
         <!-- AI-Powered Actions -->
-        <CommandGroup>
+        <CommandGroup v-if="aiActionsStore.isLoaded && enabledAIActions.length > 0">
           <CommandItem 
-            value="rewrite" 
-            @select="rewriteText"
-            :disabled="isAIProcessing"
-            class="text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+            v-for="action in enabledAIActions"
+            :key="action.id"
+            :value="action.id" 
+            @select="() => handleAIAction(action.id)"
+            :disabled="isProcessing"
+            :class="[getColorClasses(action.color || 'blue').text, getColorClasses(action.color || 'blue').hover]"
           >
-            <EditIcon class="mr-2 h-4 w-4" />
-            <span>{{ isAIProcessing ? 'Processing...' : 'Rewrite with AI' }}</span>
-          </CommandItem>
-          <CommandItem 
-            value="grammar" 
-            @select="correctGrammar"
-            :disabled="isAIProcessing"
-            class="text-green-600 hover:bg-green-50 hover:text-green-700"
-          >
-            <CheckCircleIcon class="mr-2 h-4 w-4" />
-            <span>{{ isAIProcessing ? 'Processing...' : 'Fix Grammar' }}</span>
-          </CommandItem>
-          <CommandItem 
-            value="improve" 
-            @select="improveWriting"
-            :disabled="isAIProcessing"
-            class="text-purple-600 hover:bg-purple-50 hover:text-purple-700"
-          >
-            <SparklesIcon class="mr-2 h-4 w-4" />
-            <span>{{ isAIProcessing ? 'Processing...' : 'Improve Writing' }}</span>
-          </CommandItem>
-          <CommandItem 
-            value="concise" 
-            @select="makeConcise"
-            :disabled="isAIProcessing"
-            class="text-orange-600 hover:bg-orange-50 hover:text-orange-700"
-          >
-            <WandIcon class="mr-2 h-4 w-4" />
-            <span>{{ isAIProcessing ? 'Processing...' : 'Make Concise' }}</span>
+            <component 
+              :is="getIconComponent(action.icon || 'EditIcon')" 
+              class="mr-2 h-4 w-4" 
+            />
+            <span>{{ isProcessing ? 'Processing...' : (action.name || 'AI Action') }}</span>
           </CommandItem>
         </CommandGroup>
 
-        <CommandSeparator />
+        <CommandSeparator v-if="aiActionsStore.isLoaded && enabledAIActions.length > 0" />
 
         <!-- Destructive Actions -->
         <CommandGroup>

@@ -2,6 +2,21 @@
 
 This document outlines a plan for improving the existing AI features and adding new capabilities to the application.
 
+## ✅ Completed Features
+
+### Modular AI Context Menu Actions
+- **Status:** ✅ Completed
+- **Description:** Enhanced the right-click context menu on text blocks with configurable AI-powered actions.
+- **Features Implemented:**
+  - Modular AI action system with customizable prompts, icons, and colors
+  - Default actions: Rewrite, Fix Grammar, Improve Writing, Make Concise, Expand, Translate, Summarize
+  - User-configurable actions through settings panel
+  - Ability to add custom AI actions with custom prompts
+  - Enable/disable individual actions
+  - Reorder actions by priority
+  - Duplicate and edit existing actions
+  - Visual feedback with color-coded actions and processing states
+
 ## 1. Enhance Contextual Awareness
 
 The current AI assistant is limited to the context of a single block. We can make it more powerful by providing it with more context.
