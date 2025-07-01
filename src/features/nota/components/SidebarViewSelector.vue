@@ -13,6 +13,7 @@ interface ViewOption {
 
 const props = defineProps<{
   modelValue: ViewType
+  condensed?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -32,7 +33,7 @@ watch(() => props.modelValue, (newView) => {
 </script>
 
 <template>
-  <div class="flex gap-1">
+  <div v-if="!condensed" class="flex gap-1">
     <Button
       v-for="option in viewOptions"
       :key="option.id"
@@ -46,6 +47,22 @@ watch(() => props.modelValue, (newView) => {
       :title="option.label"
     >
       <component :is="option.icon" class="h-4 w-4" />
+    </Button>
+  </div>
+  
+  <!-- Condensed view when searching - shows only active view -->
+  <div v-else class="flex gap-1">
+    <Button
+      variant="ghost"
+      size="sm"
+      class="h-7 px-2 bg-primary/10 text-primary hover:bg-primary/20"
+      :title="`Filtering by: ${viewOptions.find(v => v.id === modelValue)?.label}`"
+    >
+      <component 
+        :is="viewOptions.find(v => v.id === modelValue)?.icon" 
+        class="h-3.5 w-3.5 mr-1" 
+      />
+      <span class="text-xs">{{ viewOptions.find(v => v.id === modelValue)?.label.split(' ')[0] }}</span>
     </Button>
   </div>
 </template> 

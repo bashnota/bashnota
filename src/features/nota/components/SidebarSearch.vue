@@ -63,17 +63,19 @@ const clearSearch = () => {
       <Input
         :value="modelValue"
         @input="(e: Event) => emit('update:modelValue', (e.target as HTMLInputElement).value)"
-        placeholder="Search notes..."
-        class="pl-7 pr-7 h-7 text-xs w-full bg-background"
+        placeholder="Search notes... (⌘K)"
+        class="pl-7 pr-7 h-7 text-xs w-full bg-background transition-all duration-200"
         ref="searchInput"
       />
       <Button
+        v-if="modelValue"
         variant="ghost"
         size="sm"
-        class="absolute right-1 top-1/2 -translate-y-1/2 h-4 w-4"
+        class="absolute right-1 top-1/2 -translate-y-1/2 h-5 w-5 opacity-60 hover:opacity-100 transition-opacity"
         @click="clearSearch"
+        title="Clear search (Esc)"
       >
-        <X v-if="modelValue" class="h-4 w-4" />
+        <X class="h-3 w-3" />
       </Button>
     </div>
     <Button

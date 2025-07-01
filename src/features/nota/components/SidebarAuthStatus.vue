@@ -13,6 +13,10 @@ import {
 } from 'lucide-vue-next'
 import { Tooltip } from '@/ui/tooltip'
 
+const props = defineProps<{
+  compact?: boolean
+}>()
+
 const authStore = useAuthStore()
 const router = useRouter()
 
@@ -43,7 +47,52 @@ const handleLogout = () => {
 </script>
 
 <template>
-  <div class="border-t px-2 py-2">
+  <!-- Compact mode for header -->
+  <div v-if="compact" class="flex items-center gap-1">
+    <div v-if="isAuthenticated" class="flex items-center gap-1">
+      <!-- User avatar with initials -->
+      <Tooltip :content="`${currentUser?.displayName || currentUser?.email}`">
+        <div 
+          class="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-[10px] font-medium cursor-pointer"
+          v-if="!currentUser?.photoURL"
+          @click="handleProfileClick"
+        >
+          {{ userInitials }}
+        </div>
+        <img 
+          v-else 
+          :src="currentUser.photoURL" 
+          alt="User avatar" 
+          class="w-6 h-6 rounded-full object-cover cursor-pointer"
+          @click="handleProfileClick"
+        />
+      </Tooltip>
+      
+      <Tooltip v-if="userTag" content="Your public profile">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          class="h-6 w-6" 
+          asChild
+        >
+          <RouterLink :to="`/@${userTag}`">
+            <AtSign class="h-3.5 w-3.5" />
+          </RouterLink>
+        </Button>
+      </Tooltip>
+    </div>
+    
+    <div v-else class="flex items-center gap-1">
+      <Button variant="ghost" size="sm" asChild class="h-6 px-1 text-xs">
+        <RouterLink to="/login">
+          <LogIn class="h-3 w-3" />
+        </RouterLink>
+      </Button>
+    </div>
+  </div>
+
+  <!-- Full mode for sidebar bottom -->
+  <div v-else class="border-t px-2 py-2">
     <div v-if="isAuthenticated" class="flex items-center justify-between">
       <div class="flex items-center gap-2 min-w-0">
         <!-- User avatar with initials -->

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed, watch, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useAuthStore } from '@/features/auth/stores/auth'
@@ -16,12 +16,6 @@ import { Button } from '@/ui/button'
 import NotaTree from '@/features/nota/components/NotaTree.vue'
 import { RouterLink } from 'vue-router'
 import { ScrollArea } from '@/ui/scroll-area'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/ui/dropdown-menu'
 import ShortcutsDialog from '@/ui/ShortcutsDialog.vue'
 import { logger } from '@/services/logger'
 
@@ -42,10 +36,19 @@ const expandedItems = ref<Set<string>>(new Set())
 const shortcutsDialog = ref<{ isOpen: boolean }>({ isOpen: false })
 const activeView = ref<'all' | 'favorites' | 'recent'>('all')
 const showSearch = ref(false)
+const debouncedSearchQuery = ref('')
+
+// Responsive state
+const isMobile = ref(false)
 
 // Pagination state
 const currentPage = ref(1)
 const itemsPerPage = ref(15)
+
+// Responsive breakpoint check
+const updateScreenSize = () => {
+  isMobile.value = window.innerWidth < 768
+}
 
 // Load last used view from localStorage
 onMounted(async () => {
@@ -54,15 +57,32 @@ onMounted(async () => {
   if (savedView) {
     activeView.value = savedView as 'all' | 'favorites' | 'recent'
   }
+  
+  // Set up responsive design
+  updateScreenSize()
+  window.addEventListener('resize', updateScreenSize)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', updateScreenSize)
+})
+
+// Debounce search input for better performance
+let searchTimeout: NodeJS.Timeout
+watch(searchQuery, (newQuery) => {
+  clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => {
+    debouncedSearchQuery.value = newQuery
+  }, 300)
 })
 
 // Reset pagination when view or search changes
-watch([activeView, searchQuery], () => {
+watch([activeView, debouncedSearchQuery], () => {
   currentPage.value = 1
 })
 
 const filteredNotas = computed(() => {
-  const query = searchQuery.value.toLowerCase()
+  const query = debouncedSearchQuery.value.toLowerCase()
   let items = notaStore.rootItems
 
   // Filter based on active view
@@ -125,11 +145,42 @@ const createNewNota = async (parentId: string | null = null) => {
   }
 }
 
-// Keyboard shortcuts
+// Enhanced keyboard shortcuts
 onKeyStroke('n', (e: KeyboardEvent) => {
   if (e.metaKey || e.ctrlKey) {
     e.preventDefault()
-    showNewNotaInput.value = false
+    showNewNotaInput.value = true
+  }
+})
+
+// View switching shortcuts
+onKeyStroke('1', (e: KeyboardEvent) => {
+  if (e.metaKey || e.ctrlKey) {
+    e.preventDefault()
+    activeView.value = 'all'
+  }
+})
+
+onKeyStroke('2', (e: KeyboardEvent) => {
+  if (e.metaKey || e.ctrlKey) {
+    e.preventDefault()
+    activeView.value = 'favorites'
+  }
+})
+
+onKeyStroke('3', (e: KeyboardEvent) => {
+  if (e.metaKey || e.ctrlKey) {
+    e.preventDefault()
+    activeView.value = 'recent'
+  }
+})
+
+// Clear search shortcut
+onKeyStroke('Escape', () => {
+  if (showSearch.value && searchQuery.value) {
+    searchQuery.value = ''
+  } else if (showSearch.value) {
+    showSearch.value = false
   }
 })
 
@@ -144,10 +195,10 @@ const handleAuthNavigation = () => {
 </script>
 
 <template>
-  <div class="w-full h-full flex flex-col border-e bg-background text-foreground">
+  <div class="w-full h-full flex flex-col border-e bg-background text-foreground" :class="{ 'mobile-sidebar': isMobile }">
     <!-- Header -->
     <div class="p-2 border-b space-y-2">
-      <!-- Logo and Controls -->
+      <!-- Logo and User Info -->
       <div class="flex items-center justify-between">
         <RouterLink
           to="/"
@@ -158,6 +209,8 @@ const handleAuthNavigation = () => {
         </RouterLink>
 
         <div class="flex items-center gap-1">
+          <!-- User info in header for better visibility -->
+          <SidebarAuthStatus :compact="true" />
           <DarkModeToggle />
           
           <!-- Dedicated Settings Button -->
@@ -181,10 +234,10 @@ const handleAuthNavigation = () => {
             v-model:showSearch="showSearch"
           />
 
-          <!-- View Selector Component -->
+          <!-- View Selector Component - now shows condensed when searching -->
           <SidebarViewSelector
             v-model="activeView"
-            v-if="!showSearch"
+            :condensed="showSearch"
           />
 
           <!-- New Nota Button Component -->
@@ -219,17 +272,35 @@ const handleAuthNavigation = () => {
           @update:new-nota-title="(value) => (newNotaTitle = value)"
         />
 
+        <!-- Loading State -->
+        <div
+          v-if="notaStore.loading"
+          class="flex flex-col items-center justify-center h-24 text-sm text-muted-foreground gap-1.5 my-4"
+        >
+          <div class="animate-spin rounded-full bg-muted/50 p-2">
+            <div class="h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+          </div>
+          <p>Loading notes...</p>
+        </div>
+
         <!-- Empty State -->
         <div
-          v-if="filteredNotas.length === 0"
+          v-else-if="filteredNotas.length === 0"
           class="flex flex-col items-center justify-center h-24 text-sm text-muted-foreground gap-1.5 my-4"
         >
           <div class="rounded-full bg-muted/50 p-2">
-            <Search class="h-4 w-4" />
+            <Search v-if="debouncedSearchQuery" class="h-4 w-4" />
+            <FileText v-else class="h-4 w-4" />
           </div>
-          <p>{{ searchQuery ? 'No items found' : 'Create your first nota' }}</p>
+          <p>{{ debouncedSearchQuery ? 'No items found' : 'Create your first nota' }}</p>
+          <div v-if="debouncedSearchQuery" class="text-xs text-center">
+            <p>Try adjusting your search terms</p>
+            <Button @click="searchQuery = ''" variant="link" size="sm" class="text-xs p-0 h-auto">
+              Clear search
+            </Button>
+          </div>
           <Button 
-            v-if="!searchQuery" 
+            v-else
             @click="showNewNotaInput = true" 
             variant="outline" 
             size="sm" 
@@ -252,12 +323,76 @@ const handleAuthNavigation = () => {
       </div>
     </ScrollArea>
 
-    <!-- Auth Status Component -->
-    <SidebarAuthStatus />
-
     <ShortcutsDialog ref="shortcutsDialog" />
   </div>
 </template>
+
+<style scoped>
+/* Mobile optimizations */
+.mobile-sidebar {
+  @apply text-sm;
+}
+
+.mobile-sidebar .h-7 {
+  @apply h-8;
+}
+
+.mobile-sidebar .text-xs {
+  @apply text-sm;
+}
+
+/* Enhanced transitions */
+.transition-colors {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Loading animation */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Smooth layout transitions */
+.space-y-2 > * + * {
+  transition: margin-top 0.2s ease;
+}
+
+/* Better focus states for accessibility */
+button:focus-visible,
+a:focus-visible {
+  @apply ring-2 ring-primary ring-offset-2 outline-none;
+}
+
+/* Mobile touch targets */
+@media (max-width: 768px) {
+  button, a {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  .gap-1 {
+    @apply gap-1.5;
+  }
+  
+  .gap-1\.5 {
+    @apply gap-2;
+  }
+}
+
+/* Responsive text scaling */
+@media (max-width: 640px) {
+  .text-sm {
+    @apply text-base;
+  }
+  
+  .text-xs {
+    @apply text-sm;
+  }
+}
+</style>
 
 
 
