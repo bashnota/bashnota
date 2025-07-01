@@ -139,7 +139,7 @@ onUnmounted(() => {
         <Input
           v-if="showRenameInput === item.id"
           :value="renameTitle"
-          @input="(e: Event) => (renameTitle = (e.target as HTMLInputElement).value)"
+          @input="renameTitle = ($event.target as HTMLInputElement).value"
           class="h-6 text-sm"
           @keyup.enter="handleRename(item.id)"
           @keyup.esc="showRenameInput = null"
@@ -238,11 +238,11 @@ onUnmounted(() => {
       <div v-if="showNewInput === item.id" class="ml-7 mt-0.5">
         <Input
           :value="newNotaTitle"
-          @input="(e: Event) => emit('update:newNotaTitle', (e.target as HTMLInputElement).value)"
+          @input="$emit('update:newNotaTitle', ($event.target as HTMLInputElement).value)"
           placeholder="New sub-nota title..."
           class="h-6 text-sm"
-          @keyup.enter="emit('create', item.id)"
-          @keyup.esc="emit('show-new-input', null)"
+          @keyup.enter="$emit('create', item.id)"
+          @keyup.esc="$emit('show-new-input', null)"
           autofocus
         />
       </div>

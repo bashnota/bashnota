@@ -21,6 +21,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/ui/dialog'
 import { Button } from '@/ui/button'
 import { Input } from '@/ui/input'
@@ -28,6 +29,8 @@ import { Textarea } from '@/ui/textarea'
 import { Badge } from '@/ui/badge'
 import { ScrollArea } from '@/ui/scroll-area'
 import { logger } from '@/services/logger'
+import type { Nota } from '@/features/nota/types/nota'
+import { markdownToTiptap } from '@/lib/markdownToTiptap'
 
 interface NotaTemplate {
   id: string
@@ -152,31 +155,39 @@ const createNota = async () => {
       props.parentId || null
     )
 
-    // If template has content, update the nota with it
+    // Consolidate updates for content and tags
+    const updates: Partial<Nota> = {}
     if (selectedTemplate.value?.content) {
+      // Convert markdown to Tiptap JSON before saving
+      const tiptapContent = markdownToTiptap(selectedTemplate.value.content)
+      updates.content = JSON.stringify(tiptapContent)
+    }
+    if (selectedTemplate.value?.tags && selectedTemplate.value.tags.length > 0) {
+      updates.tags = selectedTemplate.value.tags
+    }
+
+    // Apply updates in a single call before navigating
+    if (Object.keys(updates).length > 0) {
       await notaStore.saveNota({
         id: nota.id,
-        content: selectedTemplate.value.content
+        ...updates,
       })
     }
 
-    // Add template tags if available
-    if (selectedTemplate.value?.tags.length) {
-      await notaStore.saveNota({
-        id: nota.id,
-        tags: selectedTemplate.value.tags
-      })
-      logger.info('Created nota with template tags:', selectedTemplate.value.tags)
+    if (updates.tags) {
+      logger.info('Created nota with template tags:', updates.tags)
     }
 
     emit('created', nota)
     emit('update:open', false)
     
-    // Navigate to the new nota
-    await router.push(`/nota/${nota.id}`)
-    
-    // Reset form
+    // Reset form before navigating
+    const newNotaId = nota.id
     resetForm()
+
+    // Navigate to the new nota AFTER saving is complete
+    await router.push(`/nota/${newNotaId}`)
+    
   } catch (error) {
     logger.error('Failed to create nota:', error)
   } finally {
@@ -207,6 +218,9 @@ watch(() => props.open, (open) => {
     <DialogContent class="max-w-4xl max-h-[90vh] p-0">
       <DialogHeader class="p-6 pb-0">
         <DialogTitle class="text-xl font-semibold">Create New Nota</DialogTitle>
+        <DialogDescription class="text-muted-foreground">
+          Create a new nota from a template or start with a blank canvas.
+        </DialogDescription>
       </DialogHeader>
 
       <div class="flex h-[70vh]">
@@ -217,7 +231,8 @@ watch(() => props.open, (open) => {
             <div class="relative">
               <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                v-model="searchQuery"
+                :value="searchQuery"
+                @input="searchQuery = ($event.target as HTMLInputElement).value"
                 placeholder="Search templates..."
                 class="pl-9"
               />
@@ -265,7 +280,8 @@ watch(() => props.open, (open) => {
             <div>
               <label class="text-sm font-medium mb-2 block">Title</label>
               <Input
-                v-model="title"
+                :value="title"
+                @input="title = ($event.target as HTMLInputElement).value"
                 placeholder="Enter nota title..."
                 class="w-full"
               />
