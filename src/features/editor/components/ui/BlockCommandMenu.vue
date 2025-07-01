@@ -6,7 +6,17 @@ import {
   CommandList,
   CommandSeparator,
 } from '@/ui/command'
-import { Trash2Icon, ScissorsIcon, CopyIcon, StarIcon } from 'lucide-vue-next'
+import { 
+  Trash2Icon, 
+  ScissorsIcon, 
+  CopyIcon, 
+  StarIcon,
+  SparklesIcon,
+  EditIcon,
+  CheckCircleIcon,
+  LinkIcon,
+  WandIcon
+} from 'lucide-vue-next'
 import { onMounted, onUnmounted, ref } from 'vue'
 import type { EditorView } from '@tiptap/pm/view'
 import { serializeForClipboard } from '@/features/editor/components/extensions/DragHandlePlugin'
@@ -15,6 +25,9 @@ import { useFavoriteBlocksStore } from '@/features/nota/stores/favoriteBlocksSto
 import AddToFavoritesModal from '@/features/editor/components/dialogs/AddToFavoritesModal.vue'
 import { toast } from '@/ui/toast'
 import { logger } from '@/services/logger'
+import { aiService } from '@/features/ai/services'
+import { useAISettingsStore } from '@/features/ai/stores/aiSettingsStore'
+import type { GenerationOptions } from '@/features/ai/services'
 
 const props = defineProps<{
   position: { x: number; y: number } | null
@@ -28,8 +41,10 @@ const emit = defineEmits<{
 }>()
 
 const favoriteBlocksStore = useFavoriteBlocksStore()
+const aiSettings = useAISettingsStore()
 
 const showAddToFavoritesModal = ref(false)
+const isAIProcessing = ref(false)
 
 const cut = () => {
   emit('close')
@@ -123,6 +138,124 @@ const handleAddToFavorites = async (name: string, tags: string[]) => {
   }
 }
 
+// AI-powered functions
+const getSelectedText = (): string => {
+  if (!props.editorView || !props.selection) return ''
+  
+  const { from, to } = props.selection
+  const text = props.editorView.state.doc.textBetween(from, to, ' ')
+  return text.trim()
+}
+
+const replaceSelectedText = (newText: string) => {
+  if (!props.editorView || !props.selection) return
+  
+  const { state, dispatch } = props.editorView
+  const { from, to } = props.selection
+  
+  const tr = state.tr.replaceWith(from, to, state.schema.text(newText))
+  dispatch(tr)
+  
+  // Focus the editor after replacing
+  props.editorView.focus()
+}
+
+const performAIAction = async (prompt: string, actionName: string) => {
+  const selectedText = getSelectedText()
+  if (!selectedText) {
+    toast({
+      title: 'No text selected',
+      description: 'Please select some text to perform this action.',
+      variant: 'destructive'
+    })
+    return
+  }
+
+  try {
+    isAIProcessing.value = true
+    
+    const providerId = aiSettings.settings.preferredProviderId
+    const apiKey = aiSettings.getApiKey(providerId)
+    
+    if (!apiKey && providerId !== 'webllm') {
+      toast({
+        title: 'API Key Required',
+        description: `Please configure your ${providerId} API key in settings.`,
+        variant: 'destructive'
+      })
+      return
+    }
+
+    const fullPrompt = `${prompt}\n\nText to process: "${selectedText}"\n\nPlease respond with only the processed text, no additional commentary.`
+    
+    const options: GenerationOptions = {
+      prompt: fullPrompt,
+      maxTokens: aiSettings.settings.maxTokens,
+      temperature: 0.3 // Lower temperature for more consistent results
+    }
+
+    const result = await aiService.generateText(providerId, options, apiKey)
+    
+    if (result?.text) {
+      // Clean up the response by removing quotes and extra whitespace
+      let processedText = result.text.trim()
+      
+      // Remove surrounding quotes if present
+      if ((processedText.startsWith('"') && processedText.endsWith('"')) ||
+          (processedText.startsWith("'") && processedText.endsWith("'"))) {
+        processedText = processedText.slice(1, -1)
+      }
+      
+      replaceSelectedText(processedText)
+      
+      toast({
+        title: `${actionName} Complete`,
+        description: 'Text has been successfully processed.'
+      })
+    } else {
+      throw new Error('No response received from AI service')
+    }
+  } catch (error) {
+    logger.error(`Error in ${actionName}:`, error)
+    toast({
+      title: `${actionName} Failed`,
+      description: error instanceof Error ? error.message : 'An unexpected error occurred.',
+      variant: 'destructive'
+    })
+  } finally {
+    isAIProcessing.value = false
+    emit('close')
+  }
+}
+
+const rewriteText = async () => {
+  await performAIAction(
+    'Please rewrite the following text to improve its clarity, flow, and readability while maintaining the original meaning and intent:',
+    'Text Rewrite'
+  )
+}
+
+const correctGrammar = async () => {
+  await performAIAction(
+    'Please correct any grammar, spelling, and punctuation errors in the following text while preserving the original meaning and style:',
+    'Grammar Correction'
+  )
+}
+
+const improveWriting = async () => {
+  await performAIAction(
+    'Please improve the following text by enhancing its vocabulary, sentence structure, and overall writing quality while maintaining the original meaning:',
+    'Writing Improvement'
+  )
+}
+
+const makeConcise = async () => {
+  await performAIAction(
+    'Please make the following text more concise and to-the-point while preserving all important information and meaning:',
+    'Text Concision'
+  )
+}
+
 // Handle click outside
 const handleClickOutside = (event: MouseEvent) => {
   const target = event.target as HTMLElement
@@ -152,6 +285,7 @@ onUnmounted(() => {
       }"
     >
       <CommandList>
+        <!-- Standard Actions -->
         <CommandGroup>
           <CommandItem value="cut" @select="cut">
             <ScissorsIcon class="mr-2 h-4 w-4" />
@@ -169,6 +303,49 @@ onUnmounted(() => {
 
         <CommandSeparator />
 
+        <!-- AI-Powered Actions -->
+        <CommandGroup>
+          <CommandItem 
+            value="rewrite" 
+            @select="rewriteText"
+            :disabled="isAIProcessing"
+            class="text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+          >
+            <EditIcon class="mr-2 h-4 w-4" />
+            <span>{{ isAIProcessing ? 'Processing...' : 'Rewrite with AI' }}</span>
+          </CommandItem>
+          <CommandItem 
+            value="grammar" 
+            @select="correctGrammar"
+            :disabled="isAIProcessing"
+            class="text-green-600 hover:bg-green-50 hover:text-green-700"
+          >
+            <CheckCircleIcon class="mr-2 h-4 w-4" />
+            <span>{{ isAIProcessing ? 'Processing...' : 'Fix Grammar' }}</span>
+          </CommandItem>
+          <CommandItem 
+            value="improve" 
+            @select="improveWriting"
+            :disabled="isAIProcessing"
+            class="text-purple-600 hover:bg-purple-50 hover:text-purple-700"
+          >
+            <SparklesIcon class="mr-2 h-4 w-4" />
+            <span>{{ isAIProcessing ? 'Processing...' : 'Improve Writing' }}</span>
+          </CommandItem>
+          <CommandItem 
+            value="concise" 
+            @select="makeConcise"
+            :disabled="isAIProcessing"
+            class="text-orange-600 hover:bg-orange-50 hover:text-orange-700"
+          >
+            <WandIcon class="mr-2 h-4 w-4" />
+            <span>{{ isAIProcessing ? 'Processing...' : 'Make Concise' }}</span>
+          </CommandItem>
+        </CommandGroup>
+
+        <CommandSeparator />
+
+        <!-- Destructive Actions -->
         <CommandGroup>
           <CommandItem
             class="text-red-600 hover:bg-red-100 hover:text-red-600"
@@ -192,6 +369,10 @@ onUnmounted(() => {
 <style scoped>
 .fixed {
   position: fixed;
+}
+
+.command-menu .lucide {
+  flex-shrink: 0;
 }
 </style>
 
