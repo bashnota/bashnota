@@ -25,10 +25,13 @@ import SidebarViewSelector from '@/features/nota/components/SidebarViewSelector.
 import SidebarNewNotaButton from '@/features/nota/components/SidebarNewNotaButton.vue'
 import SidebarPagination from '@/features/nota/components/SidebarPagination.vue'
 import SidebarAuthStatus from '@/features/nota/components/SidebarAuthStatus.vue'
+import NewNotaModal from '@/features/nota/components/NewNotaModal.vue'
+import { useQuickNotaCreation } from '@/features/nota/composables/useQuickNotaCreation'
 
 const router = useRouter()
 const notaStore = useNotaStore()
 const authStore = useAuthStore()
+const { createQuickNota } = useQuickNotaCreation()
 const newNotaTitle = ref('')
 const searchQuery = ref('')
 const showNewNotaInput = ref<boolean>(false)
@@ -37,6 +40,7 @@ const shortcutsDialog = ref<{ isOpen: boolean }>({ isOpen: false })
 const activeView = ref<'all' | 'favorites' | 'recent'>('all')
 const showSearch = ref(false)
 const debouncedSearchQuery = ref('')
+const showNewNotaModal = ref(false)
 
 // Responsive state
 const isMobile = ref(false)
@@ -131,15 +135,17 @@ const createNewNota = async (parentId: string | null = null) => {
   try {
     // For root-level notas, parentId should be null
     const actualParentId = parentId === '' ? null : parentId
-    const nota = await notaStore.createItem(title, actualParentId)
-    newNotaTitle.value = ''
-    showNewNotaInput.value = false
+    
+    const result = await createQuickNota(title, actualParentId)
+    
+    if (result.success) {
+      newNotaTitle.value = ''
+      showNewNotaInput.value = false
 
-    if (actualParentId) {
-      expandedItems.value.add(actualParentId)
+      if (actualParentId) {
+        expandedItems.value.add(actualParentId)
+      }
     }
-
-    await router.push(`/nota/${nota.id}`)
   } catch (error) {
     logger.error('Failed to create nota:', error)
   }
@@ -249,6 +255,7 @@ const handleAuthNavigation = () => {
             @update:show-input="showNewNotaInput = $event"
             @update:title="newNotaTitle = $event"
             @create="createNewNota"
+            @open-modal="showNewNotaModal = true"
             class="ml-auto"
           />
         </div>
@@ -324,6 +331,16 @@ const handleAuthNavigation = () => {
     </ScrollArea>
 
     <ShortcutsDialog ref="shortcutsDialog" />
+    
+    <!-- New Nota Modal -->
+    <NewNotaModal
+      :open="showNewNotaModal"
+      @update:open="showNewNotaModal = $event"
+      @created="(nota) => {
+        showNewNotaInput = false
+        newNotaTitle = ''
+      }"
+    />
   </div>
 </template>
 
