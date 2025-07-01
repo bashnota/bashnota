@@ -159,27 +159,16 @@ const handleAuthNavigation = () => {
 
         <div class="flex items-center gap-1">
           <DarkModeToggle />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm">
-                <Settings2 class="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem @click="shortcutsDialog.isOpen = true">
-                <Search class="h-4 w-4 mr-2" />
-                <span>Shortcuts</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem @click="router.push('/settings')">
-                <Settings class="h-4 w-4 mr-2" />
-                <span>Settings</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem @click="handleAuthNavigation">
-                <FileText class="h-4 w-4 mr-2" />
-                <span>{{ authStore.isAuthenticated ? 'Your Profile' : 'Login' }}</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          
+          <!-- Dedicated Settings Button -->
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            @click="router.push('/settings')"
+            title="Settings"
+          >
+            <Settings class="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
