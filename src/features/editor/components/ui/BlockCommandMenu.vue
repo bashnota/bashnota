@@ -6,8 +6,13 @@ import {
   CommandList,
   CommandSeparator,
 } from '@/ui/command'
-import { Trash2Icon, ScissorsIcon, CopyIcon, StarIcon } from 'lucide-vue-next'
-import { onMounted, onUnmounted, ref } from 'vue'
+import { 
+  Trash2 as Trash2Icon, 
+  Scissors as ScissorsIcon, 
+  Copy as CopyIcon, 
+  Star as StarIcon
+} from 'lucide-vue-next'
+import { onMounted, onUnmounted, ref, computed, h } from 'vue'
 import type { EditorView } from '@tiptap/pm/view'
 import { serializeForClipboard } from '@/features/editor/components/extensions/DragHandlePlugin'
 import type { Selection } from '@tiptap/pm/state'
@@ -15,6 +20,9 @@ import { useFavoriteBlocksStore } from '@/features/nota/stores/favoriteBlocksSto
 import AddToFavoritesModal from '@/features/editor/components/dialogs/AddToFavoritesModal.vue'
 import { toast } from '@/ui/toast'
 import { logger } from '@/services/logger'
+import { useAIActionsStore } from '@/features/ai/stores/aiActionsStore'
+import { useAIActions } from '@/features/ai/components/composables/useAIActions'
+import { getIconComponent, getColorClasses } from '@/features/ai/utils/iconResolver'
 
 const props = defineProps<{
   position: { x: number; y: number } | null
@@ -28,8 +36,31 @@ const emit = defineEmits<{
 }>()
 
 const favoriteBlocksStore = useFavoriteBlocksStore()
+const aiActionsStore = useAIActionsStore()
+const { isProcessing, executeAction } = useAIActions()
 
 const showAddToFavoritesModal = ref(false)
+
+// Get enabled AI actions with safety checks
+const enabledAIActions = computed(() => {
+  try {
+    // Only return actions if the store is loaded
+    if (!aiActionsStore.isLoaded) {
+      return []
+    }
+    
+    return aiActionsStore.enabledActions.filter(action => 
+      action && 
+      action.id && 
+      action.name && 
+      action.icon && 
+      action.color
+    )
+  } catch (error) {
+    logger.error('Error getting enabled AI actions:', error)
+    return []
+  }
+})
 
 const cut = () => {
   emit('close')
@@ -123,6 +154,41 @@ const handleAddToFavorites = async (name: string, tags: string[]) => {
   }
 }
 
+// AI-powered functions
+const getSelectedText = (): string => {
+  if (!props.editorView || !props.selection) return ''
+  
+  const { from, to } = props.selection
+  const text = props.editorView.state.doc.textBetween(from, to, ' ')
+  return text.trim()
+}
+
+const replaceSelectedText = (newText: string) => {
+  if (!props.editorView || !props.selection) return
+  
+  const { state, dispatch } = props.editorView
+  const { from, to } = props.selection
+  
+  const tr = state.tr.replaceWith(from, to, state.schema.text(newText))
+  dispatch(tr)
+  
+  // Focus the editor after replacing
+  props.editorView.focus()
+}
+
+const handleAIAction = async (actionId: string) => {
+  const action = aiActionsStore.getActionById(actionId)
+  if (!action) return
+  
+  const selectedText = getSelectedText()
+  
+  await executeAction(action, selectedText, (newText) => {
+    replaceSelectedText(newText)
+  })
+  
+  emit('close')
+}
+
 // Handle click outside
 const handleClickOutside = (event: MouseEvent) => {
   const target = event.target as HTMLElement
@@ -152,6 +218,7 @@ onUnmounted(() => {
       }"
     >
       <CommandList>
+        <!-- Standard Actions -->
         <CommandGroup>
           <CommandItem value="cut" @select="cut">
             <ScissorsIcon class="mr-2 h-4 w-4" />
@@ -167,8 +234,29 @@ onUnmounted(() => {
           </CommandItem>
         </CommandGroup>
 
-        <CommandSeparator />
+        <CommandSeparator v-if="aiActionsStore.isLoaded && enabledAIActions.length > 0" />
 
+        <!-- AI-Powered Actions -->
+        <CommandGroup v-if="aiActionsStore.isLoaded && enabledAIActions.length > 0">
+          <CommandItem 
+            v-for="action in enabledAIActions"
+            :key="action.id"
+            :value="action.id" 
+            @select="() => handleAIAction(action.id)"
+            :disabled="isProcessing"
+            :class="[getColorClasses(action.color || 'blue').text, getColorClasses(action.color || 'blue').hover]"
+          >
+            <component 
+              :is="getIconComponent(action.icon || 'EditIcon')" 
+              class="mr-2 h-4 w-4" 
+            />
+            <span>{{ isProcessing ? 'Processing...' : (action.name || 'AI Action') }}</span>
+          </CommandItem>
+        </CommandGroup>
+
+        <CommandSeparator v-if="aiActionsStore.isLoaded && enabledAIActions.length > 0" />
+
+        <!-- Destructive Actions -->
         <CommandGroup>
           <CommandItem
             class="text-red-600 hover:bg-red-100 hover:text-red-600"
@@ -192,6 +280,10 @@ onUnmounted(() => {
 <style scoped>
 .fixed {
   position: fixed;
+}
+
+.command-menu .lucide {
+  flex-shrink: 0;
 }
 </style>
 

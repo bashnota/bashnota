@@ -181,6 +181,22 @@
       </CardContent>
     </Card>
 
+    <!-- AI Actions Configuration -->
+    <Card>
+      <CardHeader>
+        <CardTitle class="flex items-center">
+          <WandIcon class="mr-2 h-5 w-5" />
+          AI Actions
+        </CardTitle>
+        <CardDescription>
+          Configure AI-powered actions for the context menu
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <AIActionsSettings />
+      </CardContent>
+    </Card>
+
     <!-- Save Actions -->
     <div class="flex justify-between items-center pt-6 border-t">
       <div class="text-sm text-muted-foreground">
@@ -210,18 +226,20 @@ import { Checkbox } from '@/ui/checkbox'
 import { Badge } from '@/ui/badge'
 import { toast } from '@/ui/toast'
 import { 
-  SparklesIcon, 
-  ServerIcon, 
+  Sparkles as SparklesIcon, 
+  Server as ServerIcon, 
   Globe as GlobeIcon, 
   Settings, 
   Save,
-  CheckCircle as CheckCircleIcon
+  CheckCircle as CheckCircleIcon,
+  Wand as WandIcon
 } from 'lucide-vue-next'
 import { useAISettingsStore } from '@/features/ai/stores/aiSettingsStore'
 import { useAIProviders } from '@/features/ai/components/composables/useAIProviders'
 import GeminiProviderSettings from './providers/GeminiProviderSettings.vue'
 import OllamaProviderSettings from './providers/OllamaProviderSettings.vue'
 import WebLLMProviderSettings from './providers/WebLLMProviderSettings.vue'
+import AIActionsSettings from './AIActionsSettings.vue'
 
 // Stores and composables
 const aiSettings = useAISettingsStore()
