@@ -27,6 +27,7 @@ import SidebarPagination from '@/features/nota/components/SidebarPagination.vue'
 import SidebarAuthStatus from '@/features/nota/components/SidebarAuthStatus.vue'
 import NewNotaModal from '@/features/nota/components/NewNotaModal.vue'
 import { useQuickNotaCreation } from '@/features/nota/composables/useQuickNotaCreation'
+import { generateRandomTitle } from '@/utils/randomTitleGenerator'
 
 const router = useRouter()
 const notaStore = useNotaStore()
@@ -151,6 +152,11 @@ const createNewNota = async (parentId: string | null = null) => {
   }
 }
 
+const handleQuickCreate = async () => {
+  const title = generateRandomTitle()
+  await createQuickNota(title)
+}
+
 // Enhanced keyboard shortcuts
 onKeyStroke('n', (e: KeyboardEvent) => {
   if (e.metaKey || e.ctrlKey) {
@@ -249,12 +255,7 @@ const handleAuthNavigation = () => {
           <!-- New Nota Button Component -->
           <SidebarNewNotaButton
             v-if="!showSearch"
-            :show-input="showNewNotaInput"
-            :title="newNotaTitle"
-            :parent-id="null"
-            @update:show-input="showNewNotaInput = $event"
-            @update:title="newNotaTitle = $event"
-            @create="createNewNota"
+            @quick-create="handleQuickCreate"
             @open-modal="showNewNotaModal = true"
             class="ml-auto"
           />
@@ -308,7 +309,7 @@ const handleAuthNavigation = () => {
           </div>
           <Button 
             v-else
-            @click="showNewNotaInput = true" 
+            @click="handleQuickCreate" 
             variant="outline" 
             size="sm" 
             class="mt-1"
