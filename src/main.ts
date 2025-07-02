@@ -7,6 +7,57 @@ import router from './router'
 import { analytics } from './services/firebase'
 import { logAnalyticsEvent } from './services/firebase'
 
+// Text color initialization utility
+const initializeTextColors = () => {
+  // Convert hex color to HSL values for CSS variables
+  const hexToHsl = (hex: string) => {
+    const r = parseInt(hex.slice(1, 3), 16) / 255
+    const g = parseInt(hex.slice(3, 5), 16) / 255
+    const b = parseInt(hex.slice(5, 7), 16) / 255
+    
+    const max = Math.max(r, g, b)
+    const min = Math.min(r, g, b)
+    const diff = max - min
+    const sum = max + min
+    const l = sum / 2
+    
+    let h, s
+    if (diff === 0) {
+      h = s = 0
+    } else {
+      s = l > 0.5 ? diff / (2 - sum) : diff / sum
+      switch (max) {
+        case r: h = (g - b) / diff + (g < b ? 6 : 0); break
+        case g: h = (b - r) / diff + 2; break
+        case b: h = (r - g) / diff + 4; break
+        default: h = 0
+      }
+      h /= 6
+    }
+    
+    return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`
+  }
+
+  // Load saved text color settings
+  try {
+    const savedSettings = localStorage.getItem('editor-settings')
+    if (savedSettings) {
+      const settings = JSON.parse(savedSettings)
+      const darkModeTextColor = settings.textColor || '#e5e5e5'
+      const lightModeTextColor = settings.lightModeTextColor || '#1f1f1f'
+      
+      // Apply the appropriate color based on current theme
+      const isDarkMode = document.documentElement.classList.contains('dark')
+      const currentColor = isDarkMode ? darkModeTextColor : lightModeTextColor
+      const hslColor = hexToHsl(currentColor)
+      
+      document.documentElement.style.setProperty('--foreground', hslColor)
+    }
+  } catch (error) {
+    console.error('Failed to load text color settings:', error)
+  }
+}
+
 // Import core stores to ensure they're registered
 import '@/features/ai/stores/aiSettingsStore'
 import '@/features/jupyter/stores/jupyterStore'
@@ -32,6 +83,26 @@ router.afterEach((to) => {
 
 // Initialize the app
 app.mount('#app')
+
+// Apply saved text colors after app mounts and theme is initialized
+setTimeout(() => {
+  initializeTextColors()
+}, 100) // Allow time for theme composables to initialize
+
+// Watch for theme changes and reapply text colors
+const observer = new MutationObserver((mutations) => {
+  mutations.forEach((mutation) => {
+    if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+      // Re-apply text colors when theme changes
+      setTimeout(initializeTextColors, 10) // Small delay to ensure theme is fully applied
+    }
+  })
+})
+
+observer.observe(document.documentElement, {
+  attributes: true,
+  attributeFilter: ['class']
+})
 
 // Make analytics available globally
 app.config.globalProperties.$analytics = analytics
