@@ -192,6 +192,7 @@ export const useJupyterStore = defineStore('jupyter', () => {
 
   return {
     jupyterServers,
+    servers: jupyterServers, // Alias for backward compatibility
     kernels,
     addServer,
     removeServer,

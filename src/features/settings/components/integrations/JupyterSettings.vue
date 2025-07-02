@@ -29,30 +29,7 @@ const serverForm = ref<{
 })
 
 const isTestingConnection = ref(false)
-const testResults = ref<Record<string, { success: boolean; message: string }>>({})
 const showServerForm = ref(false)
-
-// Test server connection
-const testConnection = async (server: JupyterServer) => {
-  isTestingConnection.value = true
-  try {
-    const result = await jupyterService.testConnection(server)
-    const serverKey = `${server.ip}:${server.port}`
-    testResults.value[serverKey] = result
-    if (result.success) {
-      // Load available kernels
-      await refreshKernels(server)
-    }
-  } catch (error) {
-    const serverKey = `${server.ip}:${server.port}`
-    testResults.value[serverKey] = {
-      success: false,
-      message: error instanceof Error ? error.message : 'Connection failed',
-    }
-  } finally {
-    isTestingConnection.value = false
-  }
-}
 
 // Refresh kernels for a server
 const refreshKernels = async (server: JupyterServer) => {
@@ -89,10 +66,7 @@ const addServer = async () => {
     variant: 'default'
   })
   
-  await testConnection(server)
-
-  const serverKey = `${server.ip}:${server.port}`
-  const testResult = testResults.value[serverKey]
+  const testResult = await jupyterService.testConnection(server)
   
   if (testResult?.success) {
     jupyterStore.addServer(server)
@@ -162,14 +136,15 @@ const parseJupyterUrl = () => {
 const resetToDefaults = () => {
   if (confirm('Are you sure you want to remove all Jupyter servers?')) {
     // Clear all servers
-    jupyterStore.servers.forEach(server => {
-      jupyterStore.removeServer(server)
-    })
+    if (jupyterStore.servers) {
+      jupyterStore.servers.forEach(server => {
+        jupyterStore.removeServer(server)
+      })
+    }
     
     // Reset form
     serverForm.value = { ip: '', port: '', token: '', url: '' }
     showServerForm.value = false
-    testResults.value = {}
     
     toast({
       title: 'Settings Reset',
@@ -297,7 +272,7 @@ defineExpose({
     </Card>
 
     <!-- Existing Servers -->
-    <Card v-if="jupyterStore.servers.length > 0">
+    <Card v-if="jupyterStore.servers && jupyterStore.servers.length > 0">
       <CardHeader>
         <CardTitle>Configured Servers</CardTitle>
         <CardDescription>Manage your existing Jupyter server connections</CardDescription>
@@ -307,15 +282,12 @@ defineExpose({
           <div
             v-for="server in jupyterStore.servers"
             :key="`${server.ip}:${server.port}`"
-            class="p-4 border rounded-lg"
           >
             <ServerListItem
               :server="server"
-              @test-connection="testConnection"
-              @remove-server="removeServer"
-              @refresh-kernels="refreshKernels"
-              :test-results="testResults"
-              :is-testing="isTestingConnection"
+              :kernels="jupyterStore.kernels[`${server.ip}:${server.port}`] || []"
+              @remove="removeServer"
+              @kernels-updated="refreshKernels"
             />
           </div>
         </div>
