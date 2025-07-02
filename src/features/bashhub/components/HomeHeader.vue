@@ -8,7 +8,8 @@ import {
   Star,
   FileUp,
   ChevronDown,
-  Twitter
+  Twitter,
+  Mail
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/features/auth/stores/auth'
 import { useRouter } from 'vue-router'
@@ -17,6 +18,7 @@ import { Card, CardContent } from '@/ui/card'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu'
 import { useNotaImport } from '@/features/nota/composables/useNotaImport'
 import { FILE_EXTENSIONS } from '@/constants/app'
+import NewsletterModal from './NewsletterModal.vue'
 
 // Emits
 const emit = defineEmits<{
@@ -25,6 +27,9 @@ const emit = defineEmits<{
 
 const authStore = useAuthStore()
 const router = useRouter()
+
+// Newsletter Modal State
+const isNewsletterModalOpen = ref(false)
 
 // Import composable
 const { importNota, importJupyterNotebook, isImporting } = useNotaImport()
@@ -214,6 +219,16 @@ onMounted(() => {
         </DropdownMenu>
 
         <Button 
+          v-if="authStore.isAuthenticated"
+          @click="isNewsletterModalOpen = true"
+          variant="outline"
+          class="flex-[0.8] h-12 hover:bg-muted/50 transition-colors group"
+        >
+          <Mail class="h-4 w-4 mr-2" />
+          <span class="font-medium">Newsletter</span>
+        </Button>
+
+        <Button 
           @click="openGitHub"
           variant="outline"
           :class="authStore.isAuthenticated ? 'flex-[0.5]' : 'flex-[0.3]'"
@@ -261,6 +276,7 @@ onMounted(() => {
       </div>
     </div>
   </div>
+  <NewsletterModal :open="isNewsletterModalOpen" @update:open="isNewsletterModalOpen = $event" />
 </template>
 
 <style scoped>

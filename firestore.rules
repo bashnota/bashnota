@@ -170,6 +170,15 @@ service cloud.firestore {
       );
     }
     
+    // Newsletter Subscriptions collection rules
+    match /newsletterSubscriptions/{userId} {
+      // Allow users to create, read and delete their own subscription
+      allow read, delete: if isUserAuthenticated(userId);
+      allow create: if isUserAuthenticated(userId) && request.resource.data.uid == userId;
+      // For now, disallow updates to prevent changing email or other details.
+      allow update: if false;
+    }
+    
     // Default deny all
     match /{document=**} {
       allow read, write: if false;
