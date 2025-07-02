@@ -68,6 +68,28 @@ export const useShortcutsStore = defineStore('shortcuts', {
       }
     },
     
+    resetShortcut(id: string) {
+      // Find the default shortcut by id
+      const defaultGeneral = defaultGeneralShortcuts.find(s => s.id === id)
+      if (defaultGeneral) {
+        const index = this.generalShortcuts.findIndex(s => s.id === id)
+        if (index !== -1) {
+          this.generalShortcuts[index] = { ...defaultGeneral }
+          this.saveShortcuts()
+          return
+        }
+      }
+      
+      const defaultBlock = defaultBlockShortcuts.find(s => s.id === id)
+      if (defaultBlock) {
+        const index = this.blockShortcuts.findIndex(s => s.id === id)
+        if (index !== -1) {
+          this.blockShortcuts[index] = { ...defaultBlock }
+          this.saveShortcuts()
+        }
+      }
+    },
+
     resetToDefaults() {
       this.generalShortcuts = [...defaultGeneralShortcuts]
       this.blockShortcuts = [...defaultBlockShortcuts]

@@ -9,7 +9,7 @@ import { toast } from '@/ui/toast'
 import { RotateCw, Palette } from 'lucide-vue-next'
 import { useTheme } from '@/composables/theme'
 
-const { setTheme, theme } = useTheme()
+const { setThemeMode, themeMode } = useTheme()
 
 // Settings state
 const currentTheme = ref('system')
@@ -48,7 +48,7 @@ const loadSettings = () => {
       customAccentColor.value = settings.customAccentColor || '#3b82f6'
     } else {
       // Get current theme from the composable
-      currentTheme.value = theme.value || 'system'
+      currentTheme.value = themeMode.value || 'system'
     }
   } catch (error) {
     console.error('Failed to load theme settings:', error)
@@ -68,7 +68,7 @@ const saveSettings = () => {
   localStorage.setItem('theme-settings', JSON.stringify(settings))
   
   // Apply theme change
-  setTheme(currentTheme.value)
+  setThemeMode(currentTheme.value as any)
   
   // Apply accessibility settings
   if (reducedMotion.value) {
