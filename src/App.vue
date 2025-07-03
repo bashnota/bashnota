@@ -9,17 +9,14 @@ import { Button } from '@/ui/button'
 import { cn } from '@/lib/utils'
 import Toaster from '@/ui/toast/Toaster.vue'
 import { useAuthStore } from '@/features/auth/stores/auth'
-import { useNotaStore } from '@/features/nota/stores/nota'
-import { Menu, Home, Globe, FileUp } from 'lucide-vue-next'
+import { Menu, Home, Globe } from 'lucide-vue-next'
 import { logger } from '@/services/logger'
-import { toast } from '@/lib/utils'
 import { useNotaImport } from '@/features/nota/composables/useNotaImport'
 
 const isSidebarOpen = ref(false)
 const sidebarWidth = ref(300)
 const isResizing = ref(false)
 const authStore = useAuthStore()
-const notaStore = useNotaStore()
 const route = useRoute()
 const router = useRouter()
 
@@ -108,15 +105,6 @@ const toggleBashHub = () => {
   }
 }
 
-// IPYNB Import functionality
-const handleImportIpynb = async () => {
-  await importJupyterNotebook()
-}
-
-
-
-
-
 </script>
 
 <template>
@@ -162,16 +150,6 @@ const handleImportIpynb = async () => {
           
           <!-- Actions and BashHub Toggle -->
           <div class="flex items-center gap-2">
-            <!-- Import IPYNB Button -->
-            <Button
-              variant="outline"
-              size="sm"
-              @click="handleImportIpynb"
-              title="Import Jupyter Notebook (.ipynb)"
-            >
-              <FileUp class="h-4 w-4 mr-2" />
-              Import .ipynb
-            </Button>
             
             <!-- BashHub Toggle Button -->
             <Button
@@ -182,7 +160,7 @@ const handleImportIpynb = async () => {
             >
               <Globe v-if="isInBashHub" class="h-4 w-4 mr-2" />
               <Home v-else class="h-4 w-4 mr-2" />
-              {{ isInBashHub ? 'Community Hub' : 'My Notas' }}
+              {{ isInBashHub ? 'Go to My Notas' : 'Go to Hub' }}
             </Button>
           </div>
         </div>
@@ -204,8 +182,6 @@ const handleImportIpynb = async () => {
   <!-- Global components that need to be available anywhere -->
   <ServerSelectionDialogWrapper />
   
-  <!-- Hidden file input for ipynb import -->
-
 </template>
 
 <style>
