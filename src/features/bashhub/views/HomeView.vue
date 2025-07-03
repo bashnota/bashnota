@@ -8,7 +8,6 @@ import { Tabs, TabsList, TabsTrigger } from '@/ui/tabs'
 import { Alert, AlertDescription } from '@/ui/alert'
 import { 
   Clock, 
-  X, 
   Plus, 
   FolderPlus, 
   BarChart3, 
@@ -16,12 +15,9 @@ import {
   Sparkles,
   Layers,
   AlertCircle,
-  RefreshCw,
-  Filter
+  RefreshCw
 } from 'lucide-vue-next'
 import HomeHeader from '@/features/bashhub/components/HomeHeader.vue'
-import HomeSearchBar from '@/features/bashhub/components/HomeSearchBar.vue'
-import HomeTagFilter from '@/features/bashhub/components/HomeTagFilter.vue'
 import HomeNotaList from '@/features/bashhub/components/HomeNotaList.vue'
 import HomeAnalytics from '@/features/bashhub/components/HomeAnalytics.vue'
 import HomeRecommendations from '@/features/bashhub/components/HomeRecommendations.vue'
@@ -29,9 +25,7 @@ import HomeQuickActions from '@/features/bashhub/components/HomeQuickActions.vue
 
 // Composables
 import { useHomePreferences, type ActiveView } from '@/features/bashhub/composables/useHomePreferences'
-import { useNotaFiltering } from '@/features/nota/composables/useNotaFiltering'
 import { useNotaActions } from '@/features/nota/composables/useNotaActions'
-import { getRelativeTime } from '@/utils/dateUtils'
 import { toast } from '@/lib/utils'
 
 // Store
@@ -52,7 +46,6 @@ const {
   searchQuery,
   selectedTag,
   layoutPreferences,
-  currentPage,
   clearFilters
 } = useHomePreferences()
 
@@ -62,37 +55,12 @@ const {
   handleExport
 } = useNotaActions()
 
-// Enhanced filtering with debouncing for better performance
-const filterOptions = computed(() => ({
-  showFavorites: showFavorites.value,
-  searchQuery: searchQuery.value,
-  selectedTag: selectedTag.value
+// Simple stats for other views
+const stats = computed(() => ({
+  total: store.rootItems.length
 }))
 
-const {
-  filteredNotas,
-  stats,
-  hasActiveFilters,
-  activeFiltersText
-} = useNotaFiltering(
-  computed(() => store.rootItems),
-  filterOptions
-)
-
-// Enhanced computed properties
-const lastUpdated = computed(() => {
-  if (store.rootItems.length === 0) return null
-  const latest = store.rootItems.reduce((latest, nota) => {
-    const notaDate = nota.updatedAt instanceof Date ? nota.updatedAt : new Date(nota.updatedAt)
-    const latestDate = latest instanceof Date ? latest : new Date(latest)
-    return notaDate > latestDate ? notaDate : latest
-  }, store.rootItems[0].updatedAt)
-  
-  return getRelativeTime(latest)
-})
-
 const hasNotas = computed(() => store.rootItems.length > 0)
-const isEmptyState = computed(() => !isLoading.value && !hasNotas.value && !hasActiveFilters.value)
 
 // Enhanced loading and error handling
 const loadNotas = async (showToast = false) => {
@@ -152,15 +120,6 @@ watch(
 )
 
 // Methods
-const handlePageChange = (page: number) => {
-  currentPage.value = page
-  
-  // Smooth scroll to top of content area when page changes
-  const contentElement = document.querySelector('[data-content-area]')
-  if (contentElement) {
-    contentElement.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-}
 
 // Enhanced filter management
 const handleClearFilters = () => {
@@ -250,126 +209,21 @@ onUnmounted(() => {
             </Alert>
 
             <!-- Notas View -->
-            <div v-if="activeView === 'notas'" class="flex flex-col h-auto lg:h-full gap-4 w-full min-w-0">
-              <!-- Enhanced Search and Controls Bar -->
-              <div class="shrink-0 space-y-3 sm:space-y-4 lg:space-y-0 lg:flex lg:items-center lg:gap-4 w-full">
-                <div class="flex-1 min-w-0 w-full lg:w-auto">
-                  <HomeSearchBar
-                    v-model:search="searchQuery"
-                    v-model:view-type="viewType"
-                    v-model:show-favorites="showFavorites"
-                    @create-nota="createNewNota"
-                    class="w-full"
-                  />
-                </div>
-                
-                <div class="w-full sm:w-64 lg:w-64 shrink-0">
-                  <HomeTagFilter 
-                    v-model:selected-tag="selectedTag" 
-                    :notas="store.rootItems"
-                    class="h-10 w-full"
-                  />
-                </div>
-                
-                <!-- Enhanced filter controls -->
-                <div class="flex items-center gap-2">
-                  <Button
-                    v-if="hasActiveFilters"
-                    variant="ghost"
-                    size="sm"
-                    @click="handleClearFilters"
-                    class="h-10 shrink-0 hover:bg-destructive/10 hover:text-destructive w-full sm:w-auto"
-                    :title="`Clear active filters: ${activeFiltersText}`"
-                  >
-                    <Filter class="h-4 w-4 mr-2" />
-                    Clear
-                    <X class="h-4 w-4 ml-2" />
-                  </Button>
-                  
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    @click="handleRefresh"
-                    :disabled="isRefreshing"
-                    class="h-10 shrink-0"
-                    title="Refresh notas"
-                  >
-                    <RefreshCw :class="['h-4 w-4', isRefreshing && 'animate-spin']" />
-                  </Button>
-                </div>
-              </div>
-
-              <!-- Enhanced Notas List Card -->
-              <Card class="flex-1 flex flex-col min-h-[50vh] lg:min-h-0 lg:h-full lg:overflow-hidden" data-content-area>
-                <CardHeader class="shrink-0 border-b bg-muted/30">
-                  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
-                    <div class="min-w-0 flex-1">
-                      <CardTitle class="flex items-center gap-2 text-base sm:text-lg">
-                        <Clock class="h-4 w-4 sm:h-5 sm:w-5" />
-                        {{ showFavorites ? 'Favorite' : 'Recent' }} Notas
-                        <Badge variant="secondary" class="ml-2 flex items-center gap-1 text-xs">
-                          <span v-if="stats.isFiltering && (isLoading || isRefreshing)" class="animate-pulse">
-                            ⋯
-                          </span>
-                          <template v-else>
-                            {{ stats.filtered }}
-                            <span v-if="hasActiveFilters" class="text-muted-foreground">
-                              / {{ stats.total }}
-                            </span>
-                          </template>
-                        </Badge>
-                      </CardTitle>
-                      <CardDescription class="mt-1 text-xs sm:text-sm">
-                        {{ showFavorites ? 'Your starred notas' : 'Your recently updated notas' }}
-                        <span v-if="lastUpdated && !showFavorites" class="text-xs opacity-75 ml-2 hidden sm:inline">
-                          • Last updated {{ lastUpdated }}
-                        </span>
-                        <span v-if="hasActiveFilters" class="text-xs ml-2">
-                          • {{ activeFiltersText }}
-                        </span>
-                      </CardDescription>
-                    </div>
-                    <div class="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        @click="createNewNota"
-                        title="Create a new nota"
-                        class="hover:bg-primary/10 text-xs sm:text-sm px-2 sm:px-3"
-                      >
-                        <Plus class="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                        <span class="hidden xs:inline">New</span>
-                        <span class="hidden sm:inline"> Nota</span>
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        @click="() => handleImport()"
-                        title="Import notas from JSON file"
-                        class="hover:bg-blue-50 dark:hover:bg-blue-900/20 text-xs sm:text-sm px-2 sm:px-3"
-                      >
-                        <FolderPlus class="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                        <span class="hidden sm:inline">Import</span>
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent class="flex-1 overflow-y-auto p-3 sm:p-6">
-                  <HomeNotaList
-                    :is-loading="isLoading"
-                    :view-type="viewType"
-                    :show-favorites="showFavorites"
-                    :search-query="searchQuery"
-                    :selected-tag="selectedTag"
-                    :notas="filteredNotas"
-                    :current-page="currentPage"
-                    @create-nota="createNewNota"
-                    @update:selectedTag="selectedTag = $event"
-                    @update:page="handlePageChange"
-                    @clear-filters="handleClearFilters"
-                  />
-                </CardContent>
-              </Card>
+            <div v-if="activeView === 'notas'" class="flex flex-col h-auto lg:h-full w-full min-w-0">
+              <HomeNotaList
+                :is-loading="isLoading"
+                :view-type="viewType"
+                :show-favorites="showFavorites"
+                :search-query="searchQuery"
+                :selected-tag="selectedTag"
+                :notas="store.rootItems"
+                @create-nota="createNewNota"
+                @update:selectedTag="selectedTag = $event"
+                @update:viewType="viewType = $event"
+                @update:searchQuery="searchQuery = $event"
+                @update:showFavorites="showFavorites = $event"
+                @clear-filters="handleClearFilters"
+              />
             </div>
 
             <!-- Enhanced Analytics View -->
