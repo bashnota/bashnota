@@ -20,9 +20,6 @@ const authStore = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 
-// Import composable
-const { importJupyterNotebook } = useNotaImport({ navigateToNota: true })
-
 // Check if we're in BashHub view
 const isInBashHub = computed(() => route.name === 'bashhub')
 
