@@ -2,37 +2,27 @@
 import { ref, onMounted } from 'vue'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/ui/card'
 import { Label } from '@/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/ui/select'
 import { Button } from '@/ui/button'
 import { Switch } from '@/ui/switch'
 import { toast } from '@/ui/toast'
 import { RotateCw, Palette } from 'lucide-vue-next'
 import { useTheme } from '@/composables/theme'
+import { useThemeColor, themeDefinitions, type ThemeColor } from '@/composables/theme'
 
 const { setThemeMode, themeMode } = useTheme()
+const { color: currentThemeColor, setColor: setThemeColor } = useThemeColor()
 
 // Settings state
 const currentTheme = ref('system')
 const highContrast = ref(false)
 const reducedMotion = ref(false)
 const darkModeSchedule = ref(false)
-const customAccentColor = ref('#3b82f6')
 
 // Theme options
 const themeOptions = [
   { value: 'light', label: 'Light', description: 'Light theme' },
   { value: 'dark', label: 'Dark', description: 'Dark theme' },
   { value: 'system', label: 'System', description: 'Follow system preference' }
-]
-
-// Accent color options
-const accentColors = [
-  { value: '#3b82f6', label: 'Blue', color: 'bg-blue-500' },
-  { value: '#10b981', label: 'Green', color: 'bg-green-500' },
-  { value: '#f59e0b', label: 'Yellow', color: 'bg-yellow-500' },
-  { value: '#ef4444', label: 'Red', color: 'bg-red-500' },
-  { value: '#8b5cf6', label: 'Purple', color: 'bg-purple-500' },
-  { value: '#06b6d4', label: 'Cyan', color: 'bg-cyan-500' }
 ]
 
 // Load settings from localStorage
@@ -45,7 +35,6 @@ const loadSettings = () => {
       highContrast.value = settings.highContrast ?? false
       reducedMotion.value = settings.reducedMotion ?? false
       darkModeSchedule.value = settings.darkModeSchedule ?? false
-      customAccentColor.value = settings.customAccentColor || '#3b82f6'
     } else {
       // Get current theme from the composable
       currentTheme.value = themeMode.value || 'system'
@@ -61,8 +50,7 @@ const saveSettings = () => {
     theme: currentTheme.value,
     highContrast: highContrast.value,
     reducedMotion: reducedMotion.value,
-    darkModeSchedule: darkModeSchedule.value,
-    customAccentColor: customAccentColor.value
+    darkModeSchedule: darkModeSchedule.value
   }
   
   localStorage.setItem('theme-settings', JSON.stringify(settings))
@@ -77,9 +65,6 @@ const saveSettings = () => {
     document.documentElement.style.removeProperty('--animation-duration')
   }
   
-  // Apply accent color
-  document.documentElement.style.setProperty('--accent-color', customAccentColor.value)
-  
   // Dispatch event to notify other parts of the app
   if (window.dispatchEvent) {
     window.dispatchEvent(new CustomEvent('theme-settings-changed', { detail: settings }))
@@ -92,10 +77,9 @@ const handleThemeChange = (newTheme: string) => {
   saveSettings()
 }
 
-// Handle accent color change
-const handleAccentColorChange = (color: string) => {
-  customAccentColor.value = color
-  saveSettings()
+// Handle theme color change
+const handleThemeColorChange = (color: ThemeColor) => {
+  setThemeColor(color)
 }
 
 // Reset to defaults
@@ -104,7 +88,7 @@ const resetToDefaults = () => {
   highContrast.value = false
   reducedMotion.value = false
   darkModeSchedule.value = false
-  customAccentColor.value = '#3b82f6'
+  setThemeColor('slate')
   
   saveSettings()
   
@@ -169,31 +153,34 @@ defineExpose({
       </CardContent>
     </Card>
 
-    <!-- Accent Color -->
+    <!-- Theme Color -->
     <Card>
       <CardHeader>
-        <CardTitle>Accent Color</CardTitle>
-        <CardDescription>Choose your preferred accent color</CardDescription>
+        <CardTitle>Theme Color</CardTitle>
+        <CardDescription>Choose your preferred theme color</CardDescription>
       </CardHeader>
       <CardContent class="space-y-6">
         <div class="space-y-4">
-          <div class="grid grid-cols-6 gap-3">
+          <div class="grid grid-cols-7 gap-3">
             <div
-              v-for="color in accentColors"
-              :key="color.value"
+              v-for="themeColor in themeDefinitions"
+              :key="themeColor.value"
               :class="[
                 'relative p-3 border-2 rounded-lg cursor-pointer transition-all hover:shadow-md',
-                customAccentColor === color.value
+                currentThemeColor === themeColor.value
                   ? 'border-primary'
                   : 'border-border hover:border-primary/50'
               ]"
-              @click="handleAccentColorChange(color.value)"
+              @click="handleThemeColorChange(themeColor.value as ThemeColor)"
             >
               <div class="text-center">
-                <div :class="['w-6 h-6 rounded-full mx-auto mb-1', color.color]"></div>
-                <div class="text-xs font-medium">{{ color.label }}</div>
+                <div 
+                  class="w-6 h-6 rounded-full mx-auto mb-1 border border-border/20"
+                  :style="{ backgroundColor: themeColor.color }"
+                ></div>
+                <div class="text-xs font-medium">{{ themeColor.label }}</div>
               </div>
-              <div v-if="customAccentColor === color.value" class="absolute top-1 right-1">
+              <div v-if="currentThemeColor === themeColor.value" class="absolute top-1 right-1">
                 <div class="w-2 h-2 bg-primary rounded-full"></div>
               </div>
             </div>
