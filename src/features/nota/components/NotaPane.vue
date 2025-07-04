@@ -46,6 +46,9 @@
       </div>
     </div>
     
+    <!-- Pane Tabs (when there are multiple tabs) -->
+    <PaneTabs :pane="pane" />
+    
     <!-- Drop Zone (when no nota) -->
     <div 
       v-if="!pane.notaId"
@@ -110,7 +113,7 @@
 import { ref, computed, watch } from 'vue'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
-import { useTabsStore } from '@/stores/tabsStore'
+
 import { useLayoutStore, type Pane } from '@/stores/layoutStore'
 import { useCodeExecutionStore } from '@/features/editor/stores/codeExecutionStore'
 import { toast } from '@/ui/toast'
@@ -118,6 +121,7 @@ import { Button } from '@/ui/button'
 import NotaEditor from '@/features/editor/components/NotaEditor.vue'
 import NotaConfigModal from '@/features/editor/components/blocks/nota-config/NotaConfigModal.vue'
 import PublishNotaModal from '@/features/editor/components/dialogs/PublishNotaModal.vue'
+import PaneTabs from './PaneTabs.vue'
 import { 
   X, 
   FileText, 
@@ -133,7 +137,6 @@ const props = defineProps<{
 // Stores
 const notaStore = useNotaStore()
 const jupyterStore = useJupyterStore()
-const tabsStore = useTabsStore()
 const layoutStore = useLayoutStore()
 const codeExecutionStore = useCodeExecutionStore()
 
@@ -164,17 +167,8 @@ const loadNota = async (notaId: string) => {
       await notaStore.saveItem(loadedNota)
     }
     
-    // Register with tab system if not already there
-    if (!tabsStore.tabs.find(tab => tab.id === notaId)) {
-      tabsStore.openTab({
-        id: notaId,
-        title: loadedNota?.title || 'Untitled',
-        route: {
-          name: 'nota',
-          params: { id: notaId }
-        }
-      })
-    }
+    // Tab registration is now handled by the layout store
+    // when openNotaInPane is called
 
     // Check if this is a root nota and has no Jupyter servers configured
     if (loadedNota && !loadedNota.parentId && jupyterStore.jupyterServers.length === 0) {
@@ -208,16 +202,7 @@ watch(
   { immediate: true }
 )
 
-// Watch for title changes to update tab title
-watch(
-  () => nota.value?.title,
-  (newTitle) => {
-    if (nota.value && newTitle && props.pane.notaId) {
-      tabsStore.updateTab(props.pane.notaId, { title: newTitle })
-    }
-  },
-  { immediate: true }
-)
+// Tab title updates are now handled by PaneTabs component
 
 // Handlers
 const handlePaneClick = () => {

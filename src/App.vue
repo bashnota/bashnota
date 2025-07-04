@@ -4,6 +4,7 @@ import AppSidebar from '@/features/nota/components/AppSidebar.vue'
 import BreadcrumbNav from '@/features/nota/components/BreadcrumbNav.vue'
 import AppTabs from '@/features/nota/components/AppTabs.vue'
 
+
 import ServerSelectionDialogWrapper from '@/features/editor/components/jupyter/ServerSelectionDialogWrapper.vue'
 import { ref, onMounted, watch, onUnmounted, computed } from 'vue'
 import { Button } from '@/ui/button'
@@ -165,7 +166,7 @@ const toggleBashHub = () => {
         </div>
       </div>
 
-      <!-- Tabs Navigation (only show when not in BashHub) -->
+      <!-- Global Split Creation Zone (only when dragging) -->
       <AppTabs v-if="!isInBashHub" />
 
       <!-- Content Area: Use RouterView for all routes -->

@@ -6,6 +6,7 @@ export interface Pane {
   id: string
   notaId: string | null
   isActive: boolean
+  tabHistory: string[] // Array of nota IDs that have been opened in this pane
 }
 
 export interface SplitLayout {
@@ -25,7 +26,8 @@ export const useLayoutStore = defineStore('layout', () => {
       panes.value = [{
         id: 'pane-0',
         notaId: null,
-        isActive: true
+        isActive: true,
+        tabHistory: []
       }]
       activePane.value = 'pane-0'
     }
@@ -38,7 +40,12 @@ export const useLayoutStore = defineStore('layout', () => {
       const savedActivePane = localStorage.getItem('layout-active-pane')
       
       if (savedPanes) {
-        panes.value = JSON.parse(savedPanes)
+        const loadedPanes = JSON.parse(savedPanes)
+        // Ensure all panes have tabHistory property (backwards compatibility)
+        panes.value = loadedPanes.map((pane: any) => ({
+          ...pane,
+          tabHistory: pane.tabHistory || (pane.notaId ? [pane.notaId] : [])
+        }))
       }
       
       if (savedActivePane) {
@@ -115,6 +122,16 @@ export const useLayoutStore = defineStore('layout', () => {
     }
     
     if (targetPane) {
+      // Ensure tabHistory exists (backwards compatibility)
+      if (!targetPane.tabHistory) {
+        targetPane.tabHistory = targetPane.notaId ? [targetPane.notaId] : []
+      }
+      
+      // Add to tab history if not already there
+      if (!targetPane.tabHistory.includes(notaId)) {
+        targetPane.tabHistory.push(notaId)
+      }
+      
       targetPane.notaId = notaId
       setActivePane(targetPane.id)
       logger.debug('Opened nota in pane', { notaId, paneId: targetPane.id })
@@ -133,7 +150,8 @@ export const useLayoutStore = defineStore('layout', () => {
     const newPane: Pane = {
       id: newPaneId,
       notaId: notaId || null,
-      isActive: false
+      isActive: false,
+      tabHistory: []
     }
     
     // Insert the new pane after the source pane
@@ -180,8 +198,28 @@ export const useLayoutStore = defineStore('layout', () => {
     
     if (!fromPane || !toPane) return
     
-    // Clear the source pane
-    fromPane.notaId = null
+    // Ensure tabHistory exists (backwards compatibility)
+    if (!fromPane.tabHistory) fromPane.tabHistory = fromPane.notaId ? [fromPane.notaId] : []
+    if (!toPane.tabHistory) toPane.tabHistory = toPane.notaId ? [toPane.notaId] : []
+    
+    // Remove from source pane tab history
+    fromPane.tabHistory = fromPane.tabHistory.filter(id => id !== notaId)
+    
+    // Clear the source pane if it was showing this nota
+    if (fromPane.notaId === notaId) {
+      if (fromPane.tabHistory.length > 0) {
+        // Switch to the last tab in history
+        fromPane.notaId = fromPane.tabHistory[fromPane.tabHistory.length - 1]
+      } else {
+        // No more tabs, clear the pane
+        fromPane.notaId = null
+      }
+    }
+    
+    // Add to target pane tab history if not already there
+    if (!toPane.tabHistory.includes(notaId)) {
+      toPane.tabHistory.push(notaId)
+    }
     
     // Set the nota in the target pane
     toPane.notaId = notaId
@@ -205,7 +243,8 @@ export const useLayoutStore = defineStore('layout', () => {
       panes.value = [{
         id: 'pane-0',
         notaId: null,
-        isActive: true
+        isActive: true,
+        tabHistory: []
       }]
       activePane.value = 'pane-0'
     } else {
@@ -216,6 +255,53 @@ export const useLayoutStore = defineStore('layout', () => {
         setActivePane(panes.value[0].id)
       }
     }
+  }
+  
+  const closeTabInPane = (paneId: string, notaId: string) => {
+    const pane = getPane(paneId)
+    if (!pane) return
+    
+    // Ensure tabHistory exists (backwards compatibility)
+    if (!pane.tabHistory) {
+      pane.tabHistory = pane.notaId ? [pane.notaId] : []
+    }
+    
+    // Remove from tab history
+    pane.tabHistory = pane.tabHistory.filter(id => id !== notaId)
+    
+    // If this was the active nota in the pane, switch to the last tab or clear
+    if (pane.notaId === notaId) {
+      if (pane.tabHistory.length > 0) {
+        // Switch to the last tab in history
+        pane.notaId = pane.tabHistory[pane.tabHistory.length - 1]
+      } else {
+        // No more tabs, clear the pane
+        pane.notaId = null
+      }
+    }
+    
+    logger.debug('Closed tab in pane', { paneId, notaId })
+  }
+  
+  const switchToTabInPane = (paneId: string, notaId: string) => {
+    const pane = getPane(paneId)
+    if (!pane) return
+    
+    // Ensure tabHistory exists (backwards compatibility)
+    if (!pane.tabHistory) {
+      pane.tabHistory = pane.notaId ? [pane.notaId] : []
+    }
+    
+    // Make sure this nota is in the tab history
+    if (!pane.tabHistory.includes(notaId)) {
+      pane.tabHistory.push(notaId)
+    }
+    
+    // Set as active nota
+    pane.notaId = notaId
+    setActivePane(paneId)
+    
+    logger.debug('Switched to tab in pane', { paneId, notaId })
   }
   
   return {
@@ -232,6 +318,8 @@ export const useLayoutStore = defineStore('layout', () => {
     moveNotaBetweenPanes,
     setDraggedTab,
     clearEmptyPanes,
+    closeTabInPane,
+    switchToTabInPane,
     initializeLayout
   }
 }) 
