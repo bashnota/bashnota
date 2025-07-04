@@ -1,129 +1,182 @@
 <template>
-  <div 
-    class="h-full w-full overflow-hidden"
-    :style="gridStyles"
-  >
-    <NotaPane
-      v-for="pane in layoutStore.panes"
-      :key="pane.id"
-      :pane="pane"
-      :style="getPaneStyles(pane)"
-    />
+  <div class="split-view-container w-full h-full" ref="gridRef" :style="gridStyle">
+    <!-- 1 Pane Layout -->
+    <template v-if="layoutStore.panes.length === 1">
+      <NotaPane :pane="layoutStore.panes[0]" />
+    </template>
+
+    <!-- 2 Panes Layout (Horizontal Split) -->
+    <template v-if="layoutStore.panes.length === 2">
+      <NotaPane :pane="layoutStore.panes[0]" style="grid-column: 1; grid-row: 1" />
+      <div class="gutter-col" data-track="1" style="grid-column: 2; grid-row: 1"></div>
+      <NotaPane :pane="layoutStore.panes[1]" style="grid-column: 3; grid-row: 1" />
+    </template>
+
+    <!-- 3 Panes Layout (1 Left, 2 Right) -->
+    <template v-if="layoutStore.panes.length === 3">
+      <NotaPane :pane="layoutStore.panes[0]" style="grid-column: 1; grid-row: 1 / span 3" />
+      <div class="gutter-col" data-track="1" style="grid-column: 2; grid-row: 1 / span 3"></div>
+      <NotaPane :pane="layoutStore.panes[1]" style="grid-column: 3; grid-row: 1" />
+      <div class="gutter-row" data-track="1" style="grid-column: 3; grid-row: 2"></div>
+      <NotaPane :pane="layoutStore.panes[2]" style="grid-column: 3; grid-row: 3" />
+    </template>
+    
+    <!-- 4+ Panes Layout (Grid) -->
+    <template v-if="layoutStore.panes.length >= 4">
+      <!-- Panes -->
+      <template v-for="(pane, index) in layoutStore.panes" :key="pane.id">
+        <NotaPane :pane="pane" :style="getPaneStyle(index)" />
+      </template>
+      
+      <!-- Gutters -->
+      <template v-for="i in Math.ceil(Math.sqrt(layoutStore.panes.length)) - 1" :key="`col-gutter-${i}`">
+        <div class="gutter-col" :data-track="i * 2 - 1" :style="{ 'grid-column': i * 2, 'grid-row': '1 / -1' }"></div>
+      </template>
+      <template v-for="i in Math.ceil(layoutStore.panes.length / Math.ceil(Math.sqrt(layoutStore.panes.length))) - 1" :key="`row-gutter-${i}`">
+        <div class="gutter-row" :data-track="i * 2 - 1" :style="{ 'grid-row': i * 2, 'grid-column': '1 / -1' }"></div>
+      </template>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue'
 import { useLayoutStore } from '@/stores/layoutStore'
 import NotaPane from './NotaPane.vue'
+import Split from 'split-grid'
+import { logger } from '@/services/logger'
+
+// Manually define types if they are not exported correctly
+type SplitInstance = ReturnType<typeof Split>
+interface Gutter {
+    track: number;
+    element: HTMLElement;
+}
 
 const layoutStore = useLayoutStore()
+const gridRef = ref<HTMLElement | null>(null)
+let splitInstance: SplitInstance | null = null
 
-// Calculate grid layout based on panes
-const gridStyles = computed(() => {
-  const paneCount = layoutStore.panes.length
+const GutterSize = '7px'
+
+// Computed property to define the grid layout based on pane count
+const gridStyle = computed(() => {
+  const count = layoutStore.panes.length
+  if (count <= 1) return { display: 'grid', 'grid-template-columns': '1fr', 'grid-template-rows': '1fr' }
   
-  if (paneCount <= 1) {
+  // For 2 panes, it's a simple horizontal split
+  if (count === 2) {
     return {
       display: 'grid',
-      gridTemplateColumns: '1fr',
-      gridTemplateRows: '1fr',
-      gap: '1px'
+      'grid-template-columns': `1fr ${GutterSize} 1fr`,
+      'grid-template-rows': '1fr',
     }
   }
   
-  // For 2 panes, create a horizontal split
-  if (paneCount === 2) {
+  // For 3 panes, special layout: 1 on left, 2 stacked on right
+  if (count === 3) {
     return {
       display: 'grid',
-      gridTemplateColumns: '1fr 1fr',
-      gridTemplateRows: '1fr',
-      gap: '1px'
+      'grid-template-columns': `1fr ${GutterSize} 1fr`,
+      'grid-template-rows': `1fr ${GutterSize} 1fr`,
     }
   }
   
-  // For 3 panes, create a layout with one on left, two stacked on right
-  if (paneCount === 3) {
-    return {
-      display: 'grid',
-      gridTemplateColumns: '1fr 1fr',
-      gridTemplateRows: '1fr 1fr',
-      gap: '1px'
-    }
-  }
-  
-  // For 4 panes, create a 2x2 grid
-  if (paneCount === 4) {
-    return {
-      display: 'grid',
-      gridTemplateColumns: '1fr 1fr',
-      gridTemplateRows: '1fr 1fr',
-      gap: '1px'
-    }
-  }
-  
-  // For more than 4 panes, create a flexible grid
-  const columns = Math.ceil(Math.sqrt(paneCount))
-  const rows = Math.ceil(paneCount / columns)
+  // For 4 or more panes, create a square-ish grid
+  const cols = Math.ceil(Math.sqrt(count))
+  const rows = Math.ceil(count / cols)
+  const colDef = Array(cols).fill('1fr').join(` ${GutterSize} `)
+  const rowDef = Array(rows).fill('1fr').join(` ${GutterSize} `)
   
   return {
     display: 'grid',
-    gridTemplateColumns: `repeat(${columns}, 1fr)`,
-    gridTemplateRows: `repeat(${rows}, 1fr)`,
-    gap: '1px'
+    'grid-template-columns': colDef,
+    'grid-template-rows': rowDef,
   }
 })
 
-// Get styles for individual panes
-const getPaneStyles = (pane: any) => {
-  const paneIndex = layoutStore.panes.findIndex(p => p.id === pane.id)
-  const paneCount = layoutStore.panes.length
+// Function to calculate grid position for a pane (for 4+ panes layout)
+const getPaneStyle = (index: number) => {
+  const count = layoutStore.panes.length
+  if (count < 4) return {}
   
-  // Special positioning for 3-pane layout
-  if (paneCount === 3) {
-    if (paneIndex === 0) {
-      return {
-        gridColumn: '1',
-        gridRow: '1 / -1'
-      }
-    } else if (paneIndex === 1) {
-      return {
-        gridColumn: '2',
-        gridRow: '1'
-      }
-    } else {
-      return {
-        gridColumn: '2',
-        gridRow: '2'
-      }
-    }
+  const cols = Math.ceil(Math.sqrt(count))
+  const rowIndex = Math.floor(index / cols)
+  const colIndex = index % cols
+  
+  return {
+    'grid-row': rowIndex * 2 + 1,
+    'grid-column': colIndex * 2 + 1,
   }
-  
-  // Default positioning for other layouts
-  return {}
 }
+
+// Re-initialize split grid when layout changes
+const initSplit = () => {
+  if (splitInstance) {
+    splitInstance.destroy()
+    splitInstance = null
+  }
+
+  if (!gridRef.value || layoutStore.panes.length <= 1) return
+
+  const columnGutters: Gutter[] = []
+  const rowGutters: Gutter[] = []
+
+  // Query all gutter elements from the DOM
+  const colGutterElements = gridRef.value.querySelectorAll<HTMLElement>('.gutter-col')
+  const rowGutterElements = gridRef.value.querySelectorAll<HTMLElement>('.gutter-row')
+
+  colGutterElements.forEach(el => {
+    const track = parseInt(el.dataset.track || '0', 10)
+    if (track > 0) columnGutters.push({ track, element: el })
+  })
+
+  rowGutterElements.forEach(el => {
+    const track = parseInt(el.dataset.track || '0', 10)
+    if (track > 0) rowGutters.push({ track, element: el })
+  })
+
+  if (columnGutters.length > 0 || rowGutters.length > 0) {
+    logger.debug('Initializing split-grid', { columnGutters, rowGutters })
+    splitInstance = Split({
+      columnGutters,
+      rowGutters,
+      minSize: 150, // Minimum pane size in pixels
+    })
+  }
+}
+
+// Lifecycle hooks
+onMounted(() => {
+  nextTick(initSplit)
+})
+
+onUnmounted(() => {
+  if (splitInstance) {
+    splitInstance.destroy()
+  }
+})
+
+// Watch for changes in pane count to re-initialize the grid
+watch(() => layoutStore.panes.length, () => {
+  // Wait for DOM to update
+  nextTick(initSplit)
+})
 </script>
 
-<style scoped>
-/* Add resize handles between panes */
-.grid-pane {
-  position: relative;
-}
-
-.grid-pane:not(:last-child)::after {
-  content: '';
-  position: absolute;
-  right: -1px;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: var(--border);
+<style>
+.gutter-col {
   cursor: col-resize;
-  z-index: 10;
+  background-color: transparent;
+  transition: background-color 0.2s ease;
 }
-
-/* Add hover effect for resize handles */
-.grid-pane:not(:last-child)::after:hover {
-  background: var(--primary);
+.gutter-row {
+  cursor: row-resize;
+  background-color: transparent;
+  transition: background-color 0.2s ease;
+}
+.gutter-col:hover, .gutter-row:hover, .dragger {
+  background-color: hsl(var(--primary));
+  opacity: 0.8;
 }
 </style> 
