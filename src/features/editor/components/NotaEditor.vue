@@ -412,7 +412,7 @@ const handleKeyboardShortcuts = (event: KeyboardEvent) => {
 onMounted(() => {
   // Add keyboard shortcut event listener
   document.addEventListener('keydown', handleKeyboardShortcuts)
-
+  
   // Add event listener for activating AI Assistant
   window.addEventListener('activate-ai-assistant', ((event: CustomEvent) => {
     if (event.detail) {

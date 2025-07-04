@@ -4,50 +4,13 @@
     :class="{ 'border-primary border-2': isActive }"
     @click="handlePaneClick"
   >
-    <!-- Pane Header (when there's a nota) -->
-    <div 
-      v-if="pane.notaId" 
-      class="flex items-center justify-between px-3 py-2 border-b bg-muted/10"
-    >
-      <div class="flex items-center gap-2 flex-1 min-w-0">
-        <span class="text-sm font-medium truncate">
-          {{ nota?.title || 'Untitled' }}
-        </span>
-        <span v-if="nota?.tags?.length" class="text-xs text-muted-foreground">
-          {{ nota.tags.length }} tags
-        </span>
-      </div>
-      
-      <div class="flex items-center gap-1">
-        <Button
-          variant="ghost"
-          size="sm"
-          @click.stop="splitHorizontal"
-          title="Split Right"
-        >
-          <SplitSquareHorizontal class="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          @click.stop="splitVertical"
-          title="Split Down"
-        >
-          <SplitSquareVertical class="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          @click.stop="closePane"
-          title="Close Pane"
-        >
-          <X class="h-4 w-4" />
-        </Button>
-      </div>
-    </div>
-    
     <!-- Pane Tabs (when there are multiple tabs) -->
-    <PaneTabs :pane="pane" />
+    <PaneTabs 
+      :pane="pane"
+      @split-horizontal="splitHorizontal"
+      @split-vertical="splitVertical"
+      @close-pane="closePane"
+    />
     
     <!-- Drop Zone (when no nota) -->
     <div 
@@ -248,15 +211,11 @@ const handleDrop = (event: DragEvent) => {
 }
 
 const splitHorizontal = () => {
-  if (props.pane.notaId) {
-    layoutStore.splitPane(props.pane.id, 'horizontal')
-  }
+  layoutStore.splitPane(props.pane.id, 'horizontal')
 }
 
 const splitVertical = () => {
-  if (props.pane.notaId) {
-    layoutStore.splitPane(props.pane.id, 'vertical')
-  }
+  layoutStore.splitPane(props.pane.id, 'vertical')
 }
 
 const closePane = () => {
