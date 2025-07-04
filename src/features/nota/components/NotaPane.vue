@@ -84,6 +84,7 @@
           @open-config="toggleConfigModal"
           @export-nota="exportNota"
           class="h-full w-full"
+          ref="notaEditorRef"
         />
       </template>
       
@@ -119,6 +120,7 @@ import { useCodeExecutionStore } from '@/features/editor/stores/codeExecutionSto
 import { toast } from '@/ui/toast'
 import { Button } from '@/ui/button'
 import NotaEditor from '@/features/editor/components/NotaEditor.vue'
+import { useEditorStore } from '@/features/editor/stores/editorStore'
 import NotaConfigModal from '@/features/editor/components/blocks/nota-config/NotaConfigModal.vue'
 import PublishNotaModal from '@/features/editor/components/dialogs/PublishNotaModal.vue'
 import PaneTabs from './PaneTabs.vue'
@@ -139,6 +141,7 @@ const notaStore = useNotaStore()
 const jupyterStore = useJupyterStore()
 const layoutStore = useLayoutStore()
 const codeExecutionStore = useCodeExecutionStore()
+const editorStore = useEditorStore()
 
 // State
 const isExecutingAll = ref(false)
@@ -146,6 +149,7 @@ const isReady = ref(false)
 const showConfigModal = ref(false)
 const showShareDialog = ref(false)
 const isDragOver = ref(false)
+const notaEditorRef = ref<InstanceType<typeof NotaEditor> | null>(null)
 
 // Computed properties
 const nota = computed(() => {
@@ -153,6 +157,18 @@ const nota = computed(() => {
 })
 
 const isActive = computed(() => props.pane.isActive)
+
+// Watch for active state changes to update the editor store
+watch(isActive, (active) => {
+  if (active) {
+    editorStore.setActiveEditor(notaEditorRef.value?.editor || null)
+  } else {
+    // When pane is inactive, check if it was the active one
+    if (editorStore.activeEditor === notaEditorRef.value?.editor) {
+      editorStore.setActiveEditor(null)
+    }
+  }
+})
 
 const loadNota = async (notaId: string) => {
   try {
@@ -322,4 +338,12 @@ const handleTagsUpdate = async (tags: string[]) => {
     // The editor component handles saving the nota with updated tags
   }
 }
+
+defineExpose({
+  executeAllCells,
+  toggleFavorite,
+  toggleConfigModal,
+  toggleShareDialog,
+  exportNota
+})
 </script> 

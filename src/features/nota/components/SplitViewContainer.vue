@@ -2,30 +2,30 @@
   <div class="split-view-container w-full h-full" ref="gridRef" :style="gridStyle">
     <!-- 1 Pane Layout -->
     <template v-if="layoutStore.panes.length === 1">
-      <NotaPane :pane="layoutStore.panes[0]" />
+      <NotaPane :pane="layoutStore.panes[0]" :ref="setPaneRef" />
     </template>
 
     <!-- 2 Panes Layout (Horizontal Split) -->
     <template v-if="layoutStore.panes.length === 2">
-      <NotaPane :pane="layoutStore.panes[0]" style="grid-column: 1; grid-row: 1" />
+      <NotaPane :pane="layoutStore.panes[0]" style="grid-column: 1; grid-row: 1" :ref="setPaneRef" />
       <div class="gutter-col" data-track="1" style="grid-column: 2; grid-row: 1"></div>
-      <NotaPane :pane="layoutStore.panes[1]" style="grid-column: 3; grid-row: 1" />
+      <NotaPane :pane="layoutStore.panes[1]" style="grid-column: 3; grid-row: 1" :ref="setPaneRef" />
     </template>
 
     <!-- 3 Panes Layout (1 Left, 2 Right) -->
     <template v-if="layoutStore.panes.length === 3">
-      <NotaPane :pane="layoutStore.panes[0]" style="grid-column: 1; grid-row: 1 / span 3" />
+      <NotaPane :pane="layoutStore.panes[0]" style="grid-column: 1; grid-row: 1 / span 3" :ref="setPaneRef" />
       <div class="gutter-col" data-track="1" style="grid-column: 2; grid-row: 1 / span 3"></div>
-      <NotaPane :pane="layoutStore.panes[1]" style="grid-column: 3; grid-row: 1" />
+      <NotaPane :pane="layoutStore.panes[1]" style="grid-column: 3; grid-row: 1" :ref="setPaneRef" />
       <div class="gutter-row" data-track="1" style="grid-column: 3; grid-row: 2"></div>
-      <NotaPane :pane="layoutStore.panes[2]" style="grid-column: 3; grid-row: 3" />
+      <NotaPane :pane="layoutStore.panes[2]" style="grid-column: 3; grid-row: 3" :ref="setPaneRef" />
     </template>
     
     <!-- 4+ Panes Layout (Grid) -->
     <template v-if="layoutStore.panes.length >= 4">
       <!-- Panes -->
       <template v-for="(pane, index) in layoutStore.panes" :key="pane.id">
-        <NotaPane :pane="pane" :style="getPaneStyle(index)" />
+        <NotaPane :pane="pane" :ref="setPaneRef" />
       </template>
       
       <!-- Gutters -->
@@ -40,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch, nextTick, onBeforeUpdate } from 'vue'
 import { useLayoutStore } from '@/stores/layoutStore'
 import NotaPane from './NotaPane.vue'
 import Split from 'split-grid'
@@ -55,6 +55,7 @@ interface Gutter {
 
 const layoutStore = useLayoutStore()
 const gridRef = ref<HTMLElement | null>(null)
+const paneRefs = ref<any[]>([])
 let splitInstance: SplitInstance | null = null
 
 const GutterSize = '7px'
@@ -161,6 +162,20 @@ onUnmounted(() => {
 watch(() => layoutStore.panes.length, () => {
   // Wait for DOM to update
   nextTick(initSplit)
+})
+
+onBeforeUpdate(() => {
+  paneRefs.value = []
+})
+
+const setPaneRef = (el: any) => {
+  if (el) {
+    paneRefs.value.push(el)
+  }
+}
+
+defineExpose({
+  paneRefs
 })
 </script>
 
