@@ -96,7 +96,7 @@ export const useTabsStore = defineStore('tabs', () => {
   }
 
   // Close a tab
-  const closeTab = (id: string) => {
+  const closeTab = async (id: string) => {
     logger.debug('Closing tab', id)
     const tabIndex = tabs.value.findIndex(tab => tab.id === id)
     
@@ -134,6 +134,24 @@ export const useTabsStore = defineStore('tabs', () => {
     
     // Remove the tab
     tabs.value.splice(tabIndex, 1)
+    
+    // Also try to remove the nota from layout panes if using layout store
+    try {
+      const { useLayoutStore } = await import('./layoutStore')
+      const layoutStore = useLayoutStore()
+      const pane = layoutStore.getPaneByNotaId(id)
+      if (pane) {
+        if (layoutStore.panes.length === 1) {
+          // Clear the pane instead of closing it if it's the only one
+          pane.notaId = null
+        } else {
+          layoutStore.closePane(pane.id)
+        }
+      }
+    } catch (error) {
+      // Layout store might not be available in some contexts, ignore
+      logger.debug('Could not access layout store:', error)
+    }
   }
 
   // Update a tab's properties
