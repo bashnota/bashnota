@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { RouterView, useRouter, useRoute } from 'vue-router'
 import AppSidebar from '@/features/nota/components/AppSidebar.vue'
-import BreadcrumbNav from '@/features/nota/components/BreadcrumbNav.vue'
 import AppTabs from '@/features/nota/components/AppTabs.vue'
 
 
@@ -11,8 +10,9 @@ import { Button } from '@/ui/button'
 import { cn } from '@/lib/utils'
 import Toaster from '@/ui/toast/Toaster.vue'
 import { useAuthStore } from '@/features/auth/stores/auth'
+import { useEditorStore } from '@/features/editor/stores/editorStore'
 
-import { Menu, Home, Globe } from 'lucide-vue-next'
+import { Menu, Home, Globe, PanelTopClose } from 'lucide-vue-next'
 import { logger } from '@/services/logger'
 import { useNotaImport } from '@/features/nota/composables/useNotaImport'
 
@@ -20,11 +20,13 @@ const isSidebarOpen = ref(false)
 const sidebarWidth = ref(300)
 const isResizing = ref(false)
 const authStore = useAuthStore()
+const editorStore = useEditorStore()
 const route = useRoute()
 const router = useRouter()
 
 // Check if we're in BashHub view
 const isInBashHub = computed(() => route.name === 'bashhub')
+const isNotaView = computed(() => route.name === 'nota')
 
 onMounted(async () => {
   // Initialize auth state
@@ -145,7 +147,15 @@ const toggleBashHub = () => {
             >
               <Menu class="h-5 w-5" />
             </Button>
-            <BreadcrumbNav />
+            <Button
+              v-if="isNotaView"
+              variant="ghost"
+              size="icon"
+              @click="editorStore.toggleToolbar"
+              title="Toggle toolbar"
+            >
+              <PanelTopClose class="h-5 w-5" />
+            </Button>
           </div>
           
           <!-- Actions and BashHub Toggle -->

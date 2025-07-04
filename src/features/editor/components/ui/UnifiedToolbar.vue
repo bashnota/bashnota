@@ -18,28 +18,14 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-vue-next'
-import { computed, ref, onMounted } from 'vue'
+import { computed } from 'vue'
 import type { Editor } from '@tiptap/vue-3'
 
 type SidebarId = 'toc' | 'references' | 'jupyter' | 'ai' | 'metadata' | 'favorites';
 
 const editorStore = useEditorStore()
 const editor = computed(() => editorStore.activeEditor as Editor | null)
-
-// --- Collapsible Toolbar State ---
-const isCollapsed = ref(false)
-
-const toggleCollapse = () => {
-  isCollapsed.value = !isCollapsed.value
-  localStorage.setItem('toolbar-collapsed', JSON.stringify(isCollapsed.value))
-}
-
-onMounted(() => {
-  const savedState = localStorage.getItem('toolbar-collapsed')
-  if (savedState) {
-    isCollapsed.value = JSON.parse(savedState)
-  }
-})
+const isToolbarCollapsed = computed(() => editorStore.isToolbarCollapsed)
 
 // TODO: These will be wired up later
 const props = defineProps<{
@@ -61,18 +47,9 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div v-if="editor" class="border-b bg-background sticky top-0 z-10 transition-all duration-300">
+  <div class="border-b bg-background sticky top-0 z-10 transition-all duration-300">
     <!-- Collapsed View -->
-    <div v-if="isCollapsed" class="flex items-center justify-end px-4 py-1">
-      <Button
-        variant="ghost"
-        size="icon"
-        class="h-6 w-6"
-        @click="toggleCollapse"
-        title="Expand toolbar"
-      >
-        <ChevronDown class="h-4 w-4" />
-      </Button>
+    <div v-if="isToolbarCollapsed" class="flex items-center justify-end">
     </div>
 
     <!-- Expanded View -->
@@ -142,7 +119,7 @@ const emit = defineEmits<{
             variant="ghost"
             size="icon"
             class="h-6 w-6"
-            @click="toggleCollapse"
+            @click="editorStore.toggleToolbar"
             title="Collapse toolbar"
           >
             <ChevronUp class="h-4 w-4" />
@@ -150,8 +127,5 @@ const emit = defineEmits<{
         </div>
       </div>
     </template>
-  </div>
-  <div v-else class="h-10 border-b bg-background sticky top-0 z-10 flex items-center justify-center">
-    <p class="text-muted-foreground">Select a pane to activate the toolbar</p>
   </div>
 </template> 
