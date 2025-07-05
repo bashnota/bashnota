@@ -16,6 +16,7 @@ import { Menu, Home, Globe, PanelTopClose } from 'lucide-vue-next'
 import { logger } from '@/services/logger'
 import { useNotaImport } from '@/features/nota/composables/useNotaImport'
 import SidebarPanel from '@/components/SidebarPanel.vue'
+import PinnedSidebars from '@/components/PinnedSidebars.vue'
 import { useSidebarManager } from '@/composables/useSidebarManager'
 
 const isSidebarOpen = ref(false)
@@ -162,6 +163,9 @@ const toggleBashHub = () => {
             >
               <PanelTopClose class="h-5 w-5" />
             </Button>
+            
+            <!-- Pinned Sidebars -->
+            <PinnedSidebars />
             
             <!-- Sidebar Panel -->
             <SidebarPanel />

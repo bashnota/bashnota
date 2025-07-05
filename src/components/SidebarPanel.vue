@@ -16,11 +16,14 @@ import {
   Tag,
   Star,
   Menu,
+  Pin,
+  PinOff,
 } from 'lucide-vue-next'
 import { useSidebarManager } from '@/composables/useSidebarManager'
 
 const {
   sidebarsByCategory,
+  pinnedSidebars,
   activeSidebar,
   hasActiveSidebar,
   isNotaView,
@@ -28,6 +31,7 @@ const {
   closeAllSidebars,
   toggleCategory,
   toggleSidebarPanel,
+  toggleSidebarPin,
   isSidebarPanelOpen,
 } = useSidebarManager()
 
@@ -93,6 +97,9 @@ const categoryColors = {
           <Badge v-if="hasActiveSidebar" variant="secondary" class="text-xs">
             {{ activeSidebar?.title }}
           </Badge>
+          <Badge v-if="pinnedSidebars.length > 0" variant="outline" class="text-xs">
+            {{ pinnedSidebars.length }} pinned
+          </Badge>
         </div>
         <div class="flex items-center gap-1">
           <Tooltip content="Close all sidebars">
@@ -114,6 +121,56 @@ const categoryColors = {
           >
             <X class="h-3 w-3" />
           </Button>
+        </div>
+      </div>
+
+      <!-- Pinned Sidebars Section -->
+      <div v-if="pinnedSidebars.length > 0" class="border-b">
+        <div class="p-3 bg-muted/30">
+          <div class="flex items-center gap-2 mb-2">
+            <Pin class="h-4 w-4 text-primary" />
+            <h4 class="font-medium text-sm">Pinned Sidebars</h4>
+          </div>
+          <div class="space-y-1">
+            <Button
+              v-for="sidebar in pinnedSidebars"
+              :key="sidebar.id"
+              variant="ghost"
+              class="w-full justify-start h-auto p-2 hover:bg-muted/50"
+              :class="{ 'bg-muted': sidebar.isOpen }"
+              @click="toggleSidebar(sidebar.id)"
+            >
+              <component
+                :is="getIcon(sidebar.icon)"
+                class="h-4 w-4 mr-3 text-muted-foreground"
+              />
+              <div class="flex-1 text-left">
+                <div class="font-medium text-sm">{{ sidebar.title }}</div>
+                <div class="text-xs text-muted-foreground">
+                  {{ sidebar.description }}
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <Tooltip content="Unpin sidebar">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    class="h-6 w-6"
+                    @click.stop="toggleSidebarPin(sidebar.id)"
+                  >
+                    <PinOff class="h-3 w-3" />
+                  </Button>
+                </Tooltip>
+                <Badge
+                  v-if="sidebar.isOpen"
+                  variant="default"
+                  class="text-xs"
+                >
+                  Active
+                </Badge>
+              </div>
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -178,6 +235,17 @@ const categoryColors = {
                     </div>
                   </div>
                   <div class="flex items-center gap-2">
+                    <Tooltip :content="sidebar.isPinned ? 'Unpin sidebar' : 'Pin to top bar'">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        class="h-6 w-6"
+                        @click.stop="toggleSidebarPin(sidebar.id)"
+                      >
+                        <Pin v-if="!sidebar.isPinned" class="h-3 w-3" />
+                        <PinOff v-else class="h-3 w-3 text-primary" />
+                      </Button>
+                    </Tooltip>
                     <Badge
                       v-if="sidebar.isOpen"
                       variant="default"

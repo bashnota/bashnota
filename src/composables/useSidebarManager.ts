@@ -113,13 +113,13 @@ const categoryConfigs: Record<SidebarCategory, Omit<SidebarCategoryConfig, 'isCo
 }
 
 // Global state
-const sidebarStates = reactive<Record<SidebarId, { isOpen: boolean; isAvailable: boolean }>>({
-  toc: { isOpen: false, isAvailable: true },
-  references: { isOpen: false, isAvailable: true },
-  jupyter: { isOpen: false, isAvailable: true },
-  ai: { isOpen: false, isAvailable: true },
-  metadata: { isOpen: false, isAvailable: true },
-  favorites: { isOpen: false, isAvailable: true },
+const sidebarStates = reactive<Record<SidebarId, { isOpen: boolean; isAvailable: boolean; isPinned: boolean }>>({
+  toc: { isOpen: false, isAvailable: true, isPinned: false },
+  references: { isOpen: false, isAvailable: true, isPinned: false },
+  jupyter: { isOpen: false, isAvailable: true, isPinned: false },
+  ai: { isOpen: false, isAvailable: true, isPinned: false },
+  metadata: { isOpen: false, isAvailable: true, isPinned: false },
+  favorites: { isOpen: false, isAvailable: true, isPinned: false },
 })
 
 const categoryStates = reactive<Record<SidebarCategory, { isCollapsed: boolean }>>({
@@ -147,15 +147,24 @@ export function useSidebarManager() {
         ...config,
         isOpen: sidebarStates[config.id].isOpen,
         isAvailable: sidebarStates[config.id].isAvailable,
+        isPinned: sidebarStates[config.id].isPinned,
       }))
       .sort((a, b) => a.order - b.order)
+  })
+
+  const pinnedSidebars = computed(() => {
+    return availableSidebars.value.filter(sidebar => sidebar.isPinned)
+  })
+
+  const unpinnedSidebars = computed(() => {
+    return availableSidebars.value.filter(sidebar => !sidebar.isPinned)
   })
 
   const sidebarsByCategory = computed(() => {
     const categories = Object.values(categoryConfigs).map(config => ({
       ...config,
       isCollapsed: categoryStates[config.id].isCollapsed,
-      sidebars: availableSidebars.value.filter(sidebar => sidebar.category === config.id),
+      sidebars: unpinnedSidebars.value.filter(sidebar => sidebar.category === config.id),
     })).sort((a, b) => a.order - b.order)
 
     return categories.filter(category => category.sidebars.length > 0)
@@ -216,6 +225,21 @@ export function useSidebarManager() {
     if (!available) {
       sidebarStates[id].isOpen = false
     }
+    saveSidebarStates()
+  }
+
+  const toggleSidebarPin = (id: SidebarId) => {
+    sidebarStates[id].isPinned = !sidebarStates[id].isPinned
+    saveSidebarStates()
+  }
+
+  const pinSidebar = (id: SidebarId) => {
+    sidebarStates[id].isPinned = true
+    saveSidebarStates()
+  }
+
+  const unpinSidebar = (id: SidebarId) => {
+    sidebarStates[id].isPinned = false
     saveSidebarStates()
   }
 
@@ -294,30 +318,35 @@ export function useSidebarManager() {
     { immediate: true }
   )
 
-  return {
-    // State
-    sidebarStates,
-    categoryStates,
-    isSidebarPanelOpen,
-    
-    // Computed
-    availableSidebars,
-    sidebarsByCategory,
-    activeSidebar,
-    hasActiveSidebar,
-    isNotaView,
-    
-    // Actions
-    toggleSidebar,
-    closeSidebar,
-    closeAllSidebars,
-    toggleCategory,
-    toggleSidebarPanel,
-    setSidebarAvailability,
-    initialize,
-    
-    // Configs
-    sidebarConfigs,
-    categoryConfigs,
-  }
+      return {
+      // State
+      sidebarStates,
+      categoryStates,
+      isSidebarPanelOpen,
+      
+      // Computed
+      availableSidebars,
+      pinnedSidebars,
+      unpinnedSidebars,
+      sidebarsByCategory,
+      activeSidebar,
+      hasActiveSidebar,
+      isNotaView,
+      
+      // Actions
+      toggleSidebar,
+      closeSidebar,
+      closeAllSidebars,
+      toggleCategory,
+      toggleSidebarPanel,
+      toggleSidebarPin,
+      pinSidebar,
+      unpinSidebar,
+      setSidebarAvailability,
+      initialize,
+      
+      // Configs
+      sidebarConfigs,
+      categoryConfigs,
+    }
 } 
