@@ -87,7 +87,7 @@ const categoryColors = {
     <!-- Sidebar Panel Dropdown -->
     <div
       v-if="isSidebarPanelOpen"
-      class="absolute top-full left-0 mt-2 w-80 bg-popover border rounded-lg shadow-lg z-50 max-h-96 overflow-hidden"
+      class="absolute top-full left-0 mt-2 w-80 bg-popover border rounded-lg shadow-lg z-[9999] max-h-[32rem] overflow-hidden"
     >
       <!-- Header -->
       <div class="flex items-center justify-between p-3 border-b">
@@ -124,144 +124,147 @@ const categoryColors = {
         </div>
       </div>
 
-      <!-- Pinned Sidebars Section -->
-      <div v-if="pinnedSidebars.length > 0" class="border-b">
-        <div class="p-3 bg-muted/30">
-          <div class="flex items-center gap-2 mb-2">
-            <Pin class="h-4 w-4 text-primary" />
-            <h4 class="font-medium text-sm">Pinned Sidebars</h4>
-          </div>
-          <div class="space-y-1">
-            <Button
-              v-for="sidebar in pinnedSidebars"
-              :key="sidebar.id"
-              variant="ghost"
-              class="w-full justify-start h-auto p-2 hover:bg-muted/50"
-              :class="{ 'bg-muted': sidebar.isOpen }"
-              @click="toggleSidebar(sidebar.id)"
-            >
-              <component
-                :is="getIcon(sidebar.icon)"
-                class="h-4 w-4 mr-3 text-muted-foreground"
-              />
-              <div class="flex-1 text-left">
-                <div class="font-medium text-sm">{{ sidebar.title }}</div>
-                <div class="text-xs text-muted-foreground">
-                  {{ sidebar.description }}
-                </div>
-              </div>
-              <div class="flex items-center gap-2">
-                <Tooltip content="Unpin sidebar">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    class="h-6 w-6"
-                    @click.stop="toggleSidebarPin(sidebar.id)"
-                  >
-                    <PinOff class="h-3 w-3" />
-                  </Button>
-                </Tooltip>
-                <Badge
-                  v-if="sidebar.isOpen"
-                  variant="default"
-                  class="text-xs"
-                >
-                  Active
-                </Badge>
-              </div>
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Sidebar Categories -->
-      <div class="max-h-80 overflow-y-auto">
-        <div
-          v-for="category in sidebarsByCategory"
-          :key="category.id"
-          class="border-b last:border-b-0"
-        >
-          <Collapsible :open="!category.isCollapsed">
-            <CollapsibleTrigger asChild>
+      <!-- Scrollable Content Area -->
+      <div class="flex-1 overflow-y-auto max-h-[24rem]">
+        <!-- Pinned Sidebars Section -->
+        <div v-if="pinnedSidebars.length > 0" class="border-b">
+          <div class="p-3 bg-muted/30">
+            <div class="flex items-center gap-2 mb-2">
+              <Pin class="h-4 w-4 text-primary" />
+              <h4 class="font-medium text-sm">Pinned Sidebars</h4>
+            </div>
+            <div class="space-y-1">
               <Button
+                v-for="sidebar in pinnedSidebars"
+                :key="sidebar.id"
                 variant="ghost"
-                class="w-full justify-start p-3 h-auto hover:bg-muted/50"
-                @click="toggleCategory(category.id)"
+                class="w-full justify-start h-auto p-2 hover:bg-muted/50"
+                :class="{ 'bg-muted': sidebar.isOpen }"
+                @click="toggleSidebar(sidebar.id)"
               >
                 <component
-                  :is="categoryIcons[category.id]"
-                  class="h-4 w-4 mr-2 text-muted-foreground"
+                  :is="getIcon(sidebar.icon)"
+                  class="h-4 w-4 mr-3 text-muted-foreground"
                 />
                 <div class="flex-1 text-left">
-                  <div class="font-medium text-sm">{{ category.title }}</div>
+                  <div class="font-medium text-sm">{{ sidebar.title }}</div>
                   <div class="text-xs text-muted-foreground">
-                    {{ category.description }}
+                    {{ sidebar.description }}
                   </div>
                 </div>
                 <div class="flex items-center gap-2">
+                  <Tooltip content="Unpin sidebar">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      class="h-6 w-6"
+                      @click.stop="toggleSidebarPin(sidebar.id)"
+                    >
+                      <PinOff class="h-3 w-3" />
+                    </Button>
+                  </Tooltip>
                   <Badge
-                    :class="categoryColors[category.id]"
-                    variant="secondary"
+                    v-if="sidebar.isOpen"
+                    variant="default"
                     class="text-xs"
                   >
-                    {{ category.sidebars.length }}
+                    Active
                   </Badge>
-                  <ChevronDown
-                    class="h-4 w-4 transition-transform"
-                    :class="{ 'rotate-180': category.isCollapsed }"
-                  />
                 </div>
               </Button>
-            </CollapsibleTrigger>
-            
-            <CollapsibleContent class="pb-2">
-              <div class="space-y-1 px-3">
+            </div>
+          </div>
+        </div>
+
+        <!-- Sidebar Categories -->
+        <div>
+          <div
+            v-for="category in sidebarsByCategory"
+            :key="category.id"
+            class="border-b last:border-b-0"
+          >
+            <Collapsible :open="!category.isCollapsed">
+              <CollapsibleTrigger asChild>
                 <Button
-                  v-for="sidebar in category.sidebars"
-                  :key="sidebar.id"
                   variant="ghost"
-                  class="w-full justify-start h-auto p-2 hover:bg-muted/50"
-                  :class="{ 'bg-muted': sidebar.isOpen }"
-                  @click="toggleSidebar(sidebar.id)"
+                  class="w-full justify-start p-3 h-auto hover:bg-muted/50"
+                  @click="toggleCategory(category.id)"
                 >
                   <component
-                    :is="getIcon(sidebar.icon)"
-                    class="h-4 w-4 mr-3 text-muted-foreground"
+                    :is="categoryIcons[category.id]"
+                    class="h-4 w-4 mr-2 text-muted-foreground"
                   />
                   <div class="flex-1 text-left">
-                    <div class="font-medium text-sm">{{ sidebar.title }}</div>
+                    <div class="font-medium text-sm">{{ category.title }}</div>
                     <div class="text-xs text-muted-foreground">
-                      {{ sidebar.description }}
+                      {{ category.description }}
                     </div>
                   </div>
                   <div class="flex items-center gap-2">
-                    <Tooltip :content="sidebar.isPinned ? 'Unpin sidebar' : 'Pin to top bar'">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        class="h-6 w-6"
-                        @click.stop="toggleSidebarPin(sidebar.id)"
-                      >
-                        <Pin v-if="!sidebar.isPinned" class="h-3 w-3" />
-                        <PinOff v-else class="h-3 w-3 text-primary" />
-                      </Button>
-                    </Tooltip>
                     <Badge
-                      v-if="sidebar.isOpen"
-                      variant="default"
+                      :class="categoryColors[category.id]"
+                      variant="secondary"
                       class="text-xs"
                     >
-                      Active
+                      {{ category.sidebars.length }}
                     </Badge>
-                    <ChevronRight
-                      class="h-3 w-3 text-muted-foreground"
-                      :class="{ 'rotate-90': sidebar.isOpen }"
+                    <ChevronDown
+                      class="h-4 w-4 transition-transform"
+                      :class="{ 'rotate-180': category.isCollapsed }"
                     />
                   </div>
                 </Button>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
+              </CollapsibleTrigger>
+              
+              <CollapsibleContent class="pb-2">
+                <div class="space-y-1 px-3">
+                  <Button
+                    v-for="sidebar in category.sidebars"
+                    :key="sidebar.id"
+                    variant="ghost"
+                    class="w-full justify-start h-auto p-2 hover:bg-muted/50"
+                    :class="{ 'bg-muted': sidebar.isOpen }"
+                    @click="toggleSidebar(sidebar.id)"
+                  >
+                    <component
+                      :is="getIcon(sidebar.icon)"
+                      class="h-4 w-4 mr-3 text-muted-foreground"
+                    />
+                    <div class="flex-1 text-left">
+                      <div class="font-medium text-sm">{{ sidebar.title }}</div>
+                      <div class="text-xs text-muted-foreground">
+                        {{ sidebar.description }}
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <Tooltip :content="sidebar.isPinned ? 'Unpin sidebar' : 'Pin to top bar'">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          class="h-6 w-6"
+                          @click.stop="toggleSidebarPin(sidebar.id)"
+                        >
+                          <Pin v-if="!sidebar.isPinned" class="h-3 w-3" />
+                          <PinOff v-else class="h-3 w-3 text-primary" />
+                        </Button>
+                      </Tooltip>
+                      <Badge
+                        v-if="sidebar.isOpen"
+                        variant="default"
+                        class="text-xs"
+                      >
+                        Active
+                      </Badge>
+                      <ChevronRight
+                        class="h-3 w-3 text-muted-foreground"
+                        :class="{ 'rotate-90': sidebar.isOpen }"
+                      />
+                    </div>
+                  </Button>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
         </div>
       </div>
 
