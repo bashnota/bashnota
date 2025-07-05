@@ -35,13 +35,9 @@ import {
   PlayCircle,
   Loader2,
   
-  // Sidebar toggles (moved to App.vue)
-  Link2,
-  
   // UI controls
   ChevronUp,
   ChevronDown,
-  Menu,
 } from 'lucide-vue-next'
 import { computed, ref, onMounted } from 'vue'
 import type { Editor } from '@tiptap/vue-3'
@@ -269,10 +265,17 @@ const toolbarGroups = computed<ToolbarGroup[]>(() => {
   ]
 })
 
-// Sidebar actions moved to App.vue via SidebarPanel
-
 // Document actions
 const documentActions = computed(() => [
+  {
+    id: 'run-all',
+    icon: props.isExecutingAll ? Loader2 : PlayCircle,
+    label: 'Run All',
+    tooltip: 'Run all cells',
+    action: () => emit('run-all'),
+    isDisabled: !props.canRunAll || props.isExecutingAll,
+    variant: 'outline' as const,
+  },
   {
     id: 'save',
     icon: Save,
@@ -286,15 +289,6 @@ const documentActions = computed(() => [
     label: 'History',
     tooltip: 'Version history',
     action: () => emit('open-history'),
-  },
-  {
-    id: 'run-all',
-    icon: props.isExecutingAll ? Loader2 : PlayCircle,
-    label: 'Run All',
-    tooltip: 'Run all cells',
-    action: () => emit('run-all'),
-    isDisabled: !props.canRunAll || props.isExecutingAll,
-    variant: 'outline' as const,
   },
   {
     id: 'favorite',
@@ -338,7 +332,7 @@ const getIconClasses = (action: ToolbarAction) => {
 </script>
 
 <template>
-  <div class="border-b bg-background sticky top-0 z-10 transition-all duration-300">
+  <div class="border-b bg-background sticky top-0 z-50 transition-all duration-300">
     <!-- Collapsed View -->
     <div v-if="isToolbarCollapsed" class="flex items-center justify-between px-4 py-2">
       <div class="flex items-center gap-2">
@@ -371,12 +365,60 @@ const getIconClasses = (action: ToolbarAction) => {
     </div>
 
     <!-- Expanded View -->
-    <template v-else>
-      <!-- Main Editor Toolbar -->
-      <div class="flex flex-wrap items-center gap-1 px-4 py-2">
-        <!-- History Actions -->
+    <div v-else class="flex flex-wrap items-center gap-1 px-4 py-2">
+      <Button
+        variant="ghost"
+        size="icon"
+        class="h-6 w-6"
+        @click="editorStore.toggleToolbar"
+        title="Collapse toolbar"
+      >
+        <ChevronUp class="h-4 w-4" />
+      </Button>
+      
+      <Separator orientation="vertical" class="mx-2 h-6" />
+
+      <!-- History Actions -->
+      <div class="flex items-center gap-0.5">
+        <Tooltip v-for="action in toolbarGroups.find(g => g.id === 'history')?.actions || []" :key="action.id" :content="action.tooltip">
+          <Button
+            variant="ghost"
+            size="sm"
+            :class="getButtonClasses(action)"
+            @click="action.action"
+            :disabled="action.isDisabled"
+          >
+            <component :is="action.icon" class="h-4 w-4" />
+        </Button>
+        </Tooltip>
+      </div>
+
+      <Separator orientation="vertical" class="mx-2 h-6" />
+
+      <!-- Text Style Selector -->
+      <div class="flex items-center">
+        <Select :value="currentHeadingLevel" @update:value="setHeadingLevel">
+          <SelectTrigger class="h-8 w-32 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem
+              v-for="option in headingOptions"
+              :key="option.value"
+              :value="option.value"
+            >
+              {{ option.label }}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <Separator orientation="vertical" class="mx-2 h-6" />
+
+      <!-- Formatting, Lists, and Insert Groups -->
+      <template v-for="group in toolbarGroups.filter(g => ['formatting', 'lists', 'insert'].includes(g.id))" :key="group.id">
         <div class="flex items-center gap-0.5">
-          <Tooltip v-for="action in toolbarGroups.find(g => g.id === 'history')?.actions || []" :key="action.id" :content="action.tooltip">
+          <Tooltip v-for="action in group.actions" :key="action.id" :content="action.tooltip">
             <Button
               variant="ghost"
               size="sm"
@@ -385,105 +427,52 @@ const getIconClasses = (action: ToolbarAction) => {
               :disabled="action.isDisabled"
             >
               <component :is="action.icon" class="h-4 w-4" />
-            </Button>
+        </Button>
           </Tooltip>
         </div>
-
         <Separator orientation="vertical" class="mx-2 h-6" />
+      </template>
 
-        <!-- Text Style Selector -->
-        <div class="flex items-center">
-          <Select :value="currentHeadingLevel" @update:value="setHeadingLevel">
-            <SelectTrigger class="h-8 w-32 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem
-                v-for="option in headingOptions"
-                :key="option.value"
-                :value="option.value"
-              >
-                {{ option.label }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <Separator orientation="vertical" class="mx-2 h-6" />
-
-        <!-- Formatting, Lists, and Insert Groups -->
-        <template v-for="group in toolbarGroups.filter(g => ['formatting', 'lists', 'insert'].includes(g.id))" :key="group.id">
-          <div class="flex items-center gap-0.5">
-            <Tooltip v-for="action in group.actions" :key="action.id" :content="action.tooltip">
-              <Button
-                variant="ghost"
-                size="sm"
-                :class="getButtonClasses(action)"
-                @click="action.action"
-                :disabled="action.isDisabled"
-              >
-                <component :is="action.icon" class="h-4 w-4" />
-              </Button>
-            </Tooltip>
-          </div>
-          <Separator orientation="vertical" class="mx-2 h-6" />
-        </template>
-
-        <!-- Math Toggle -->
-        <div class="flex items-center">
-          <Tooltip :content="isRenderingMath ? 'Show LaTeX source code' : 'Show rendered math'">
-            <Button
-              variant="ghost"
-              size="sm"
-              @click="toggleMathRendering"
-              :class="{ 'bg-muted': !isRenderingMath }"
-              class="h-8 px-3 text-xs"
-            >
-              <Eye v-if="isRenderingMath" class="h-4 w-4" />
-              <EyeOff v-else class="h-4 w-4" />
-              <span class="ml-1.5 hidden sm:inline">
-                {{ isRenderingMath ? 'Math' : 'Source' }}
-              </span>
-            </Button>
-          </Tooltip>
-        </div>
-
-        <!-- Spacer -->
-        <div class="flex-1"></div>
-
-        <!-- Collapse Button -->
-        <Tooltip content="Collapse toolbar">
+      <!-- Math Toggle -->
+      <div class="flex items-center">
+        <Tooltip :content="isRenderingMath ? 'Show LaTeX source code' : 'Show rendered math'">
           <Button
             variant="ghost"
-            size="icon"
-            class="h-6 w-6"
-            @click="editorStore.toggleToolbar"
+            size="sm"
+            @click="toggleMathRendering"
+            :class="{ 'bg-muted': !isRenderingMath }"
+            class="h-8 px-3 text-xs"
           >
-            <ChevronUp class="h-4 w-4" />
+            <Eye v-if="isRenderingMath" class="h-4 w-4" />
+            <EyeOff v-else class="h-4 w-4" />
+            <span class="ml-1.5 hidden sm:inline">
+              {{ isRenderingMath ? 'Math' : 'Source' }}
+            </span>
+        </Button>
+        </Tooltip>
+      </div>
+      
+      <div class="flex-grow" />
+
+      <!-- Document Actions -->
+      <div class="flex items-center gap-1">
+        <Tooltip v-for="action in documentActions" :key="action.id" :content="action.tooltip">
+          <Button
+            :variant="action.variant || 'ghost'"
+            size="icon"
+            @click="action.action"
+            :disabled="action.isDisabled"
+            :class="getButtonClasses(action)"
+          >
+            <component :is="action.icon" :class="getIconClasses(action)" />
           </Button>
         </Tooltip>
       </div>
 
-      <!-- Secondary Toolbar -->
-      <div class="flex items-center justify-end px-4 py-2 text-sm text-muted-foreground border-t">
-        <!-- Document Actions & Status -->
-        <div class="flex items-center gap-2">
-          <Tooltip v-for="action in documentActions" :key="action.id" :content="action.tooltip">
-            <Button
-              :variant="action.variant || 'ghost'"
-              size="icon"
-              class="h-8 w-8 p-0"
-              @click="action.action"
-              :disabled="action.isDisabled"
-            >
-              <component :is="action.icon" :class="getIconClasses(action)" />
-            </Button>
-          </Tooltip>
-          
-          <Separator orientation="vertical" class="mx-2 h-4" />
-          <span class="text-xs">{{ props.wordCount || 0 }} words</span>
-        </div>
-      </div>
-    </template>
+      <Separator orientation="vertical" class="mx-2 h-6" />
+
+      <!-- Word Count -->
+      <span class="text-xs text-muted-foreground/80">{{ props.wordCount || 0 }} words</span>
+    </div>
   </div>
 </template> 

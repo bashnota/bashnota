@@ -48,7 +48,7 @@
             <component :is="config.icon" v-if="config.icon" class="h-3.5 w-3.5 text-primary" />
             <h3 class="text-sm font-medium">{{ config.title }}</h3>
           </div>
-          <Button variant="ghost" size="icon" class="h-5 w-5 -mr-1" @click="toggleSidebar(id)">
+          <Button variant="ghost" size="icon" class="h-5 w-5 -mr-1" @click="toggleSidebar(id as SidebarId)">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3">
               <path d="M18 6 6 18"></path>
               <path d="m6 6 12 12"></path>
@@ -94,7 +94,7 @@ import AIAssistantSidebar from '@/features/ai/components/AIAssistantSidebar.vue'
 import MetadataSidebar from '@/features/nota/components/MetadataSidebar.vue'
 import FavoriteBlocksSidebar from '@/features/nota/components/FavoriteBlocksSidebar.vue'
 import { BookIcon, ServerIcon, BrainIcon, Tag, Star } from 'lucide-vue-next'
-import { useSidebarManager } from '@/composables/useSidebarManager'
+import { useSidebarManager, type SidebarId } from '@/composables/useSidebarManager'
 
 const layoutStore = useLayoutStore()
 const editorStore = useEditorStore()
