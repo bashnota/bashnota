@@ -35,11 +35,7 @@ import {
   PlayCircle,
   Loader2,
   
-  // Sidebar toggles
-  BookIcon,
-  ServerIcon,
-  BrainIcon,
-  Tag,
+  // Sidebar toggles (moved to App.vue)
   Link2,
   
   // UI controls
@@ -273,15 +269,7 @@ const toolbarGroups = computed<ToolbarGroup[]>(() => {
   ]
 })
 
-// Sidebar actions
-const sidebarActions = [
-  { id: 'references', icon: BookIcon, label: 'References', tooltip: 'References' },
-  { id: 'jupyter', icon: ServerIcon, label: 'Jupyter', tooltip: 'Jupyter Servers' },
-  { id: 'ai', icon: BrainIcon, label: 'AI', tooltip: 'AI Assistant' },
-  { id: 'metadata', icon: Tag, label: 'Metadata', tooltip: 'Metadata' },
-  { id: 'favorites', icon: Star, label: 'Favorites', tooltip: 'Favorite Blocks' },
-  { id: 'toc', icon: Menu, label: 'TOC', tooltip: 'Table of Contents' },
-]
+// Sidebar actions moved to App.vue via SidebarPanel
 
 // Document actions
 const documentActions = computed(() => [
@@ -477,21 +465,7 @@ const getIconClasses = (action: ToolbarAction) => {
       </div>
 
       <!-- Secondary Toolbar -->
-      <div class="flex items-center justify-between px-4 py-2 text-sm text-muted-foreground border-t">
-        <!-- Sidebar Toggles -->
-        <div class="flex items-center gap-2">
-          <Tooltip v-for="sidebar in sidebarActions" :key="sidebar.id" :content="sidebar.tooltip">
-            <Button
-              variant="ghost"
-              size="sm"
-              class="h-8 w-8 p-0"
-              @click="$emit('toggle-sidebar', sidebar.id as SidebarId)"
-            >
-              <component :is="sidebar.icon" class="h-4 w-4" />
-            </Button>
-          </Tooltip>
-        </div>
-
+      <div class="flex items-center justify-end px-4 py-2 text-sm text-muted-foreground border-t">
         <!-- Document Actions & Status -->
         <div class="flex items-center gap-2">
           <Tooltip v-for="action in documentActions" :key="action.id" :content="action.tooltip">

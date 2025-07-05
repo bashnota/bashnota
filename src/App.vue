@@ -15,6 +15,8 @@ import { useEditorStore } from '@/features/editor/stores/editorStore'
 import { Menu, Home, Globe, PanelTopClose } from 'lucide-vue-next'
 import { logger } from '@/services/logger'
 import { useNotaImport } from '@/features/nota/composables/useNotaImport'
+import SidebarPanel from '@/components/SidebarPanel.vue'
+import { useSidebarManager } from '@/composables/useSidebarManager'
 
 const isSidebarOpen = ref(false)
 const sidebarWidth = ref(300)
@@ -23,6 +25,7 @@ const authStore = useAuthStore()
 const editorStore = useEditorStore()
 const route = useRoute()
 const router = useRouter()
+const sidebarManager = useSidebarManager()
 
 // Check if we're in BashHub view
 const isInBashHub = computed(() => route.name === 'bashhub')
@@ -31,6 +34,9 @@ const isNotaView = computed(() => route.name === 'nota')
 onMounted(async () => {
   // Initialize auth state
   await authStore.init()
+  
+  // Initialize sidebar manager
+  sidebarManager.initialize()
   
   const savedState = localStorage.getItem('sidebar-state')
   if (savedState) {
@@ -156,6 +162,9 @@ const toggleBashHub = () => {
             >
               <PanelTopClose class="h-5 w-5" />
             </Button>
+            
+            <!-- Sidebar Panel -->
+            <SidebarPanel />
           </div>
           
           <!-- Actions and BashHub Toggle -->

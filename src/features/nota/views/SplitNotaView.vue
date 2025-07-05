@@ -94,12 +94,14 @@ import AIAssistantSidebar from '@/features/ai/components/AIAssistantSidebar.vue'
 import MetadataSidebar from '@/features/nota/components/MetadataSidebar.vue'
 import FavoriteBlocksSidebar from '@/features/nota/components/FavoriteBlocksSidebar.vue'
 import { BookIcon, ServerIcon, BrainIcon, Tag, Star } from 'lucide-vue-next'
+import { useSidebarManager } from '@/composables/useSidebarManager'
 
 const layoutStore = useLayoutStore()
 const editorStore = useEditorStore()
 const notaStore = useNotaStore()
 const route = useRoute()
 const splitViewContainerRef = ref<any>(null)
+const sidebarManager = useSidebarManager()
 
 const activeNota = computed(() => {
   const activePane = layoutStore.activePaneObj
@@ -136,35 +138,29 @@ const activePaneComponent = computed(() => {
   return paneComponent
 })
 
-// --- Sidebar Management ---
-type SidebarPosition = 'left' | 'right';
-type SidebarId = 'toc' | 'references' | 'jupyter' | 'ai' | 'metadata' | 'favorites';
+// Use the global sidebar manager
+const { availableSidebars, toggleSidebar } = sidebarManager
 
-interface SidebarConfig {
-  isOpen: boolean;
-  position: SidebarPosition;
-  title: string;
-  icon?: any;
-}
-
-type SidebarsConfig = Record<SidebarId, SidebarConfig>;
-
-const sidebars = reactive<SidebarsConfig>({
-  toc: { isOpen: false, position: 'left', title: 'Table of Contents', icon: null },
-  references: { isOpen: false, position: 'right', title: 'References', icon: BookIcon },
-  jupyter: { isOpen: false, position: 'right', title: 'Jupyter Servers', icon: ServerIcon },
-  ai: { isOpen: false, position: 'right', title: 'AI Assistant', icon: BrainIcon },
-  metadata: { isOpen: false, position: 'right', title: 'Metadata', icon: Tag },
-  favorites: { isOpen: false, position: 'right', title: 'Favorite Blocks', icon: Star }
-});
-
-const toggleSidebar = (id: SidebarId): void => {
-  const currentState = sidebars[id].isOpen;
-  (Object.keys(sidebars) as SidebarId[]).forEach(key => {
-    sidebars[key].isOpen = false;
-  });
-  sidebars[id].isOpen = !currentState;
-};
+// Create a computed property for backward compatibility
+const sidebars = computed(() => {
+  const sidebarMap: Record<string, any> = {}
+  
+  availableSidebars.value.forEach(sidebar => {
+    sidebarMap[sidebar.id] = {
+      isOpen: sidebar.isOpen,
+      position: sidebar.position,
+      title: sidebar.title,
+      icon: sidebar.id === 'toc' ? null : 
+            sidebar.id === 'references' ? BookIcon :
+            sidebar.id === 'jupyter' ? ServerIcon :
+            sidebar.id === 'ai' ? BrainIcon :
+            sidebar.id === 'metadata' ? Tag :
+            sidebar.id === 'favorites' ? Star : null
+    }
+  })
+  
+  return sidebarMap
+})
 
 // Initialize layout store when this view is mounted
 onMounted(() => {
