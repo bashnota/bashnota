@@ -287,22 +287,36 @@ const exportNota = async () => {
 }
 
 const toggleFavorite = () => {
-  if (nota.value && props.pane.notaId) {
-    notaStore.toggleFavorite(props.pane.notaId)
-  }
+  if (!props.pane.notaId) return
+  notaStore.toggleFavorite(props.pane.notaId)
 }
 
-const handleTagsUpdate = async (tags: string[]) => {
+const handleTagsUpdate = (tags: string[]) => {
   if (nota.value) {
-    // The editor component handles saving the nota with updated tags
+    nota.value.tags = tags
   }
 }
 
+const saveVersion = async () => {
+  await notaEditorRef.value?.saveVersion()
+}
+
+const openHistory = () => {
+  if (notaEditorRef.value) {
+    notaEditorRef.value.showVersionHistory = true
+  }
+}
+
+// Expose methods for parent components
 defineExpose({
+  pane: props.pane,
+  notaEditorRef,
   executeAllCells,
   toggleFavorite,
   toggleConfigModal,
   toggleShareDialog,
-  exportNota
+  exportNota,
+  saveVersion,
+  openHistory,
 })
 </script> 

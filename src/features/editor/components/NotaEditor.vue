@@ -625,6 +625,8 @@ defineExpose({
   editor,
   insertSubNotaLink,
   createAndLinkSubNota,
+  saveVersion,
+  showVersionHistory,
 })
 
 </script>
