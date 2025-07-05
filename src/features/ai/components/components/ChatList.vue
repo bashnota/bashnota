@@ -169,7 +169,7 @@ const handleRefresh = async () => {
                 variant="ghost"
                 size="sm"
                 class="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                @click="(e) => handleDeleteConversation(item, e)"
+                @click="(e: Event) => handleDeleteConversation(item, e)"
               >
                 <Trash2 class="h-3 w-3 text-muted-foreground hover:text-destructive" />
               </Button>

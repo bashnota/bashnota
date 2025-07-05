@@ -1,72 +1,81 @@
 <template>
+  <!-- Global split creation zone - only shows when dragging -->
   <div
-    class="flex items-center space-x-1 overflow-x-auto bg-muted/20 border-b px-1 py-1 no-scrollbar"
-    v-if="tabsStore.tabs.length > 0"
+    v-if="layoutStore.draggedTab"
+    class="flex items-center justify-center gap-4 bg-muted/20 border-b px-4 py-2"
   >
+    <p class="text-sm text-muted-foreground">Create new split:</p>
+    
     <div
-      v-for="tab in tabsStore.tabs"
-      :key="tab.id"
-      :class="[
-        'flex items-center py-1 px-3 text-sm rounded-md cursor-pointer transition-colors whitespace-nowrap',
-        tabsStore.activeTabId === tab.id 
-          ? 'bg-background text-foreground font-medium shadow-sm' 
-          : 'hover:bg-background/80 text-muted-foreground'
-      ]"
-      @click="tabsStore.setActiveTab(tab.id)"
+      class="h-8 w-24 border-2 border-dashed border-primary/50 rounded-md flex items-center justify-center text-xs text-primary/70 hover:border-primary hover:bg-primary/10 transition-colors cursor-pointer"
+      @dragover.prevent="handleSplitDragOver"
+      @dragleave="handleSplitDragLeave"
+      @drop.prevent="handleSplitDrop('horizontal')"
+      :class="{ 'bg-primary/10 border-primary': splitDropZone === 'horizontal' }"
+      title="Drop to split horizontally"
     >
-      <span class="truncate max-w-[150px]">{{ tab.title }}</span>
-      <span 
-        v-if="tab.isDirty" 
-        class="ml-1 text-primary-foreground text-xs"
-      >*</span>
-      <button
-        class="ml-2 w-5 h-5 rounded-sm flex items-center justify-center hover:bg-muted transition-colors"
-        @click.stop="tabsStore.closeTab(tab.id)"
-        aria-label="Close tab"
-      >
-        <X class="h-3 w-3" />
-      </button>
+      Split Right →
+    </div>
+    
+    <div
+      class="h-8 w-24 border-2 border-dashed border-primary/50 rounded-md flex items-center justify-center text-xs text-primary/70 hover:border-primary hover:bg-primary/10 transition-colors cursor-pointer"
+      @dragover.prevent="handleSplitDragOver"
+      @dragleave="handleSplitDragLeave"
+      @drop.prevent="handleSplitDrop('vertical')"
+      :class="{ 'bg-primary/10 border-primary': splitDropZone === 'vertical' }"
+      title="Drop to split vertically"
+    >
+      Split Down ↓
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { X } from 'lucide-vue-next'
-import { useTabsStore } from '@/stores/tabsStore'
-import { onBeforeUnmount, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useLayoutStore } from '@/stores/layoutStore'
+import { ref } from 'vue'
 import { logger } from '@/services/logger'
 
-const tabsStore = useTabsStore()
-const route = useRoute()
+const layoutStore = useLayoutStore()
 
-// Sync route changes with tabs
-watch(
-  () => route,
-  (newRoute) => {
-    // We only want to track nota routes in tabs
-    if (newRoute.name === 'nota') {
-      const notaId = newRoute.params.id as string
-      
-      logger.debug('Route changed to nota', notaId)
-      
-      // Open or switch to tab without closing others
-      tabsStore.openTab({
-        id: notaId,
-        route: {
-          name: 'nota',
-          params: { id: notaId }
-        }
-      })
+// Drag and drop state
+const splitDropZone = ref<'horizontal' | 'vertical' | null>(null)
+
+
+
+// Split drop zone handlers
+const handleSplitDragOver = (event: DragEvent) => {
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  const centerX = rect.left + rect.width / 2
+  
+  splitDropZone.value = event.clientX < centerX ? 'horizontal' : 'vertical'
+}
+
+const handleSplitDragLeave = () => {
+  splitDropZone.value = null
+}
+
+const handleSplitDrop = (direction: 'horizontal' | 'vertical') => {
+  const sourceTabId = layoutStore.draggedTab
+  if (!sourceTabId) return
+  
+  // Find or create a pane for the split
+  const activePaneId = layoutStore.activePane
+  if (activePaneId) {
+    const newPaneId = layoutStore.splitPane(activePaneId, direction, sourceTabId)
+    if (newPaneId) {
+      logger.debug('Created split pane', { direction, sourceTabId, newPaneId })
     }
-  },
-  { immediate: true, deep: true }
-)
+  } else {
+    // No active pane, just open in the first pane
+    layoutStore.openNotaInPane(sourceTabId)
+  }
+  
+  // Clear drag state
+  layoutStore.setDraggedTab(null)
+  splitDropZone.value = null
+}
 
-// Clean up when component is unmounted
-onBeforeUnmount(() => {
-  logger.debug('AppTabs component unmounting')
-})
+
 </script>
 
 <style scoped>

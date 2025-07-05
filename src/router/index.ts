@@ -12,7 +12,7 @@ const router = createRouter({
     {
       path: '/nota/:id',
       name: 'nota',
-      component: () => import('@/features/nota/views/NotaView.vue'),
+      component: () => import('@/features/nota/views/SplitNotaView.vue'),
       props: true,
     },
     {
