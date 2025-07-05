@@ -31,8 +31,11 @@
         @open-config="activePaneComponent?.toggleConfigModal"
         @share="activePaneComponent?.toggleShareDialog"
         @export-nota="activePaneComponent?.exportNota"
+        @save-version="activePaneComponent?.saveVersion"
+        @open-history="activePaneComponent?.openHistory"
         :is-favorite="activeNota?.favorite || false"
         :can-run-all="!!(activeNota && activeNota.config?.savedSessions && activeNota.config?.savedSessions.length > 0)"
+        :word-count="wordCount"
       />
       <SplitViewContainer class="flex-1" ref="splitViewContainerRef" />
     </div>
@@ -104,6 +107,19 @@ const activeNota = computed(() => {
     return notaStore.getItem(activePane.notaId)
   }
   return null
+})
+
+// Calculate word count from nota content
+const wordCount = computed(() => {
+  if (!activeNota.value?.content) return 0
+  
+  // Remove HTML tags and count words
+  const textContent = activeNota.value.content
+    .replace(/<[^>]*>/g, '') // Remove HTML tags
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim()
+  
+  return textContent ? textContent.split(' ').length : 0
 })
 
 const activePaneComponent = computed(() => {

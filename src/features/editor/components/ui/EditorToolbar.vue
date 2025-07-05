@@ -17,12 +17,27 @@ import {
   MinusSquare,
   Eye,
   EyeOff,
+  Underline,
+  Strikethrough,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Link,
+  Image,
+  Type,
 } from 'lucide-vue-next'
 import { Button } from '@/ui/button'
 import { Separator } from '@/ui/separator'
 import { ToggleGroup, ToggleGroupItem } from '@/ui/toggle-group'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/ui/select'
 import type { FunctionalComponent } from 'vue'
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import {
   toggleRenderMathState
 } from '@/features/editor/components/extensions/MarkdownExtension'
@@ -65,24 +80,50 @@ onMounted(() => {
   }
 })
 
+// Current heading level for the select dropdown
+const currentHeadingLevel = computed(() => {
+  if (!props.editor) return 'normal'
+  
+  if (props.editor.isActive('heading', { level: 1 })) return 'h1'
+  if (props.editor.isActive('heading', { level: 2 })) return 'h2'
+  if (props.editor.isActive('heading', { level: 3 })) return 'h3'
+  return 'normal'
+})
+
+// Handle heading level change
+const setHeadingLevel = (level: string) => {
+  if (!props.editor) return
+  
+  if (level === 'normal') {
+    props.editor.chain().focus().setParagraph().run()
+  } else {
+    const headingLevel = parseInt(level.replace('h', '')) as 1 | 2 | 3
+    props.editor.chain().focus().toggleHeading({ level: headingLevel }).run()
+  }
+}
+
 // Toolbar groups for better organization
-const headingLevels: { icon: FunctionalComponent; level: 1 | 2 | 3 }[] = [
-  { icon: Heading1, level: 1 },
-  { icon: Heading2, level: 2 },
-  { icon: Heading3, level: 3 },
+const headingOptions = [
+  { value: 'normal', label: 'Normal text' },
+  { value: 'h1', label: 'Heading 1' },
+  { value: 'h2', label: 'Heading 2' },
+  { value: 'h3', label: 'Heading 3' },
 ]
 </script>
 
 <template>
-  <div v-if="editor" class="border-b">
-    <div class="flex flex-wrap items-center gap-1 p-1">
+  <div v-if="editor" class="border-b bg-background">
+    <!-- Main toolbar -->
+    <div class="flex flex-wrap items-center gap-1 px-3 py-2">
       <!-- History Group -->
-      <div class="flex items-center">
+      <div class="flex items-center gap-0.5">
         <Button
           variant="ghost"
           size="sm"
           @click="editor.chain().focus().undo().run()"
           :disabled="!editor.can().undo()"
+          class="h-8 w-8 p-0"
+          title="Undo"
         >
           <Undo class="h-4 w-4" />
         </Button>
@@ -91,107 +132,142 @@ const headingLevels: { icon: FunctionalComponent; level: 1 | 2 | 3 }[] = [
           size="sm"
           @click="editor.chain().focus().redo().run()"
           :disabled="!editor.can().redo()"
+          class="h-8 w-8 p-0"
+          title="Redo"
         >
           <Redo class="h-4 w-4" />
         </Button>
       </div>
 
-      <Separator orientation="vertical" class="mx-1 h-6" />
+      <Separator orientation="vertical" class="mx-2 h-6" />
 
-      <!-- Headings Group -->
-      <ToggleGroup size="sm" type="single">
-        <ToggleGroupItem
-          v-for="{ icon: Icon, level } in headingLevels"
-          :key="level"
-          :value="'h' + level"
-          :pressed="editor.isActive('heading', { level })"
-          @click="editor.chain().focus().toggleHeading({ level }).run()"
-        >
-          <component :is="Icon" class="h-4 w-4" />
-        </ToggleGroupItem>
-      </ToggleGroup>
+      <!-- Text Style Selector -->
+      <div class="flex items-center">
+        <Select :value="currentHeadingLevel" @update:value="setHeadingLevel">
+          <SelectTrigger class="h-8 w-32 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem
+              v-for="option in headingOptions"
+              :key="option.value"
+              :value="option.value"
+            >
+              {{ option.label }}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
-      <Separator orientation="vertical" class="mx-1 h-6" />
+      <Separator orientation="vertical" class="mx-2 h-6" />
 
       <!-- Text Formatting Group -->
-      <ToggleGroup size="sm" type="multiple">
-        <ToggleGroupItem
-          value="bold"
-          :pressed="editor.isActive('bold')"
+      <div class="flex items-center gap-0.5">
+        <Button
+          variant="ghost"
+          size="sm"
           @click="editor.chain().focus().toggleBold().run()"
+          :class="{ 'bg-muted': editor.isActive('bold') }"
+          class="h-8 w-8 p-0"
+          title="Bold"
         >
           <Bold class="h-4 w-4" />
-        </ToggleGroupItem>
-        <ToggleGroupItem
-          value="italic"
-          :pressed="editor.isActive('italic')"
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           @click="editor.chain().focus().toggleItalic().run()"
+          :class="{ 'bg-muted': editor.isActive('italic') }"
+          class="h-8 w-8 p-0"
+          title="Italic"
         >
           <Italic class="h-4 w-4" />
-        </ToggleGroupItem>
-        <ToggleGroupItem
-          value="code"
-          :pressed="editor.isActive('code')"
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           @click="editor.chain().focus().toggleCode().run()"
+          :class="{ 'bg-muted': editor.isActive('code') }"
+          class="h-8 w-8 p-0"
+          title="Inline code"
         >
           <Code class="h-4 w-4" />
-        </ToggleGroupItem>
-      </ToggleGroup>
+        </Button>
+      </div>
 
-      <Separator orientation="vertical" class="mx-1 h-6" />
+      <Separator orientation="vertical" class="mx-2 h-6" />
 
       <!-- Lists Group -->
-      <ToggleGroup size="sm" type="multiple">
-        <ToggleGroupItem
-          value="bulletList"
-          :pressed="editor.isActive('bulletList')"
+      <div class="flex items-center gap-0.5">
+        <Button
+          variant="ghost"
+          size="sm"
           @click="editor.chain().focus().toggleBulletList().run()"
+          :class="{ 'bg-muted': editor.isActive('bulletList') }"
+          class="h-8 w-8 p-0"
+          title="Bullet list"
         >
           <List class="h-4 w-4" />
-        </ToggleGroupItem>
-        <ToggleGroupItem
-          value="orderedList"
-          :pressed="editor.isActive('orderedList')"
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           @click="editor.chain().focus().toggleOrderedList().run()"
+          :class="{ 'bg-muted': editor.isActive('orderedList') }"
+          class="h-8 w-8 p-0"
+          title="Numbered list"
         >
           <ListOrdered class="h-4 w-4" />
-        </ToggleGroupItem>
-      </ToggleGroup>
+        </Button>
+      </div>
 
-      <Separator orientation="vertical" class="mx-1 h-6" />
-
-      <!-- Block Elements Group -->
-      <ToggleGroup size="sm" type="multiple">
-        <ToggleGroupItem
-          value="codeBlock"
-          :pressed="editor.isActive('codeBlock')"
-          @click="editor.chain().focus().toggleCodeBlock().run()"
-        >
-          <FileCode class="h-4 w-4" />
-        </ToggleGroupItem>
-        <ToggleGroupItem
-          value="blockquote"
-          :pressed="editor.isActive('blockquote')"
-          @click="editor.chain().focus().toggleBlockquote().run()"
-        >
-          <Quote class="h-4 w-4" />
-        </ToggleGroupItem>
-      </ToggleGroup>
-
-      <Separator orientation="vertical" class="mx-1 h-6" />
+      <Separator orientation="vertical" class="mx-2 h-6" />
 
       <!-- Insert Group -->
       <div class="flex items-center gap-0.5">
-        <Button variant="ghost" size="sm" @click="editor.chain().focus().insertTable().run()">
+        <Button
+          variant="ghost"
+          size="sm"
+          @click="editor.chain().focus().insertTable().run()"
+          class="h-8 w-8 p-0"
+          title="Insert table"
+        >
           <Table class="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="sm" @click="editor.chain().focus().setHorizontalRule().run()">
+        <Button
+          variant="ghost"
+          size="sm"
+          @click="editor.chain().focus().toggleCodeBlock().run()"
+          :class="{ 'bg-muted': editor.isActive('codeBlock') }"
+          class="h-8 w-8 p-0"
+          title="Code block"
+        >
+          <FileCode class="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          @click="editor.chain().focus().toggleBlockquote().run()"
+          :class="{ 'bg-muted': editor.isActive('blockquote') }"
+          class="h-8 w-8 p-0"
+          title="Quote"
+        >
+          <Quote class="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          @click="editor.chain().focus().setHorizontalRule().run()"
+          class="h-8 w-8 p-0"
+          title="Horizontal rule"
+        >
           <MinusSquare class="h-4 w-4" />
         </Button>
       </div>
 
-      <Separator orientation="vertical" class="mx-1 h-6" />
-      
+      <!-- Spacer to push math toggle to the right -->
+      <div class="flex-1"></div>
+
       <!-- Math Rendering Toggle -->
       <div class="flex items-center">
         <Button
@@ -200,13 +276,15 @@ const headingLevels: { icon: FunctionalComponent; level: 1 | 2 | 3 }[] = [
           @click="toggleMathRendering"
           :title="isRenderingMath ? 'Show LaTeX source code' : 'Show rendered math'"
           :class="{ 'bg-muted': !isRenderingMath }"
+          class="h-8 px-3 text-xs"
         >
           <Eye v-if="isRenderingMath" class="h-4 w-4" />
           <EyeOff v-else class="h-4 w-4" />
-          <span class="ml-1 hidden sm:inline">{{ isRenderingMath ? 'Hide Math Source' : 'Show Math Rendered' }}</span>
+          <span class="ml-1.5 hidden sm:inline">
+            {{ isRenderingMath ? 'Math' : 'Source' }}
+          </span>
         </Button>
       </div>
-      
     </div>
   </div>
 </template>

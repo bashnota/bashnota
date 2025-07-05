@@ -1,96 +1,50 @@
 <script setup lang="ts">
-import EditorToolbar from '@/features/editor/components/ui/EditorToolbar.vue'
-import { Separator } from '@/ui/separator'
-import { Tooltip } from '@/ui/tooltip'
-import { Button } from '@/ui/button'
-import { Star, Share2, Download, Save, Clock, Book } from 'lucide-vue-next'
+import UnifiedToolbar from '@/features/editor/components/ui/UnifiedToolbar.vue'
 import type { Editor } from '@tiptap/vue-3'
 
+// Props - simplified to match UnifiedToolbar
 const props = defineProps<{
   editor: Editor | null
   canRunAll?: boolean
   isExecutingAll?: boolean
   isFavorite?: boolean
+  wordCount?: number
 }>()
 
+// Emit events - pass through to UnifiedToolbar
 const emit = defineEmits<{
   'run-all': []
   'toggle-favorite': []
-  share: []
+  'share': []
   'open-config': []
   'export-nota': []
   'save-version': []
   'open-history': []
+  'toggle-sidebar': [id: string]
 }>()
+
+// Type definition for sidebar IDs
+type SidebarId = 'toc' | 'references' | 'jupyter' | 'ai' | 'metadata' | 'favorites'
+
+// Handle sidebar toggle with proper typing
+const handleSidebarToggle = (id: SidebarId) => {
+  emit('toggle-sidebar', id)
+}
 </script>
 
 <template>
-  <div class="flex items-center gap-2">
-    <!-- Editor Formatting Tools -->
-    <EditorToolbar
-      v-if="editor"
-      :editor="editor"
-      class="flex items-center gap-1"
-      :can-run-all="canRunAll"
-      :is-executing-all="isExecutingAll"
-      @run-all="$emit('run-all')"
-      :is-favorite="isFavorite"
-      @toggle-favorite="$emit('toggle-favorite')"
-      @share="$emit('share')"
-      @open-config="$emit('open-config')"
-      @export-nota="$emit('export-nota')"
-    />
-
-    <Separator orientation="vertical" class="h-6" />
-
-    <!-- Document Actions -->
-    <div class="flex items-center gap-1">
-      <!-- Save Version -->
-      <Tooltip content="Save version">
-        <Button variant="ghost" size="sm" @click="$emit('save-version')">
-          <Save class="h-4 w-4" />
-        </Button>
-      </Tooltip>
-
-      <!-- Version History -->
-      <Tooltip content="Version history">
-        <Button variant="ghost" size="sm" @click="$emit('open-history')">
-          <Clock class="h-4 w-4" />
-        </Button>
-      </Tooltip>
-
-      <!-- Favorite -->
-      <Tooltip :content="isFavorite ? 'Remove from favorites' : 'Add to favorites'">
-        <Button variant="ghost" size="sm" @click="$emit('toggle-favorite')">
-          <Star class="h-4 w-4" :class="{ 'text-yellow-400': isFavorite }" />
-        </Button>
-      </Tooltip>
-    </div>
-
-    <Separator orientation="vertical" class="h-6" />
-
-    <!-- Sharing & Export -->
-    <div class="flex items-center gap-1">
-      <!-- Share -->
-      <Tooltip content="Share document">
-        <Button variant="ghost" size="sm" @click="$emit('share')">
-          <Share2 class="h-4 w-4" />
-        </Button>
-      </Tooltip>
-
-      <!-- Export -->
-      <Tooltip content="Export document">
-        <Button variant="ghost" size="sm" @click="$emit('export-nota')">
-          <Download class="h-4 w-4" />
-        </Button>
-      </Tooltip>
-
-      <!-- References -->
-      <Tooltip content="Manage references">
-        <Button variant="ghost" size="sm" @click="$emit('open-config')">
-          <Book class="h-4 w-4" />
-        </Button>
-      </Tooltip>
-    </div>
-  </div>
+  <UnifiedToolbar
+    :can-run-all="canRunAll"
+    :is-executing-all="isExecutingAll"
+    :is-favorite="isFavorite"
+    :word-count="wordCount"
+    @run-all="$emit('run-all')"
+    @toggle-favorite="$emit('toggle-favorite')"
+    @share="$emit('share')"
+    @open-config="$emit('open-config')"
+    @export-nota="$emit('export-nota')"
+    @save-version="$emit('save-version')"
+    @open-history="$emit('open-history')"
+    @toggle-sidebar="handleSidebarToggle"
+  />
 </template> 
