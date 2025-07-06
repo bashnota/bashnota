@@ -46,6 +46,9 @@ import {
 import {
   ConfusionMatrixExtension
 } from '@/features/editor/components/blocks/confusion-matrix'
+import {
+  PipelineExtension
+} from '@/features/editor/components/blocks/pipeline/PipelineExtension'
 
 // Import command-related extensions
 import SlashCommands from './Commands'
@@ -132,6 +135,7 @@ export function getEditorExtensions() {
     BibliographyExtension,
     TheoremExtension,
     ConfusionMatrixExtension,
+    PipelineExtension,
   ]
 }
 
@@ -196,6 +200,7 @@ export function getViewerExtensions() {
     }),
     TheoremExtension,
     ConfusionMatrixExtension,
+    PipelineExtension,
   ]
 }
 

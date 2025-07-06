@@ -282,6 +282,33 @@ function safeExecuteCommand(callback: Function) {
 }
 
 /**
+ * Safely inserts content with range validation
+ */
+function safeInsertContent(editor: Editor, range: Range, content: any, contentType: string = 'content') {
+  try {
+    // Validate range before proceeding
+    const { from, to } = range;
+    const docSize = editor.state.doc.content.size;
+    
+    if (from < 0 || to > docSize || from > to) {
+      console.warn(`Invalid range for ${contentType} insertion:`, range, 'Document size:', docSize);
+      return false;
+    }
+    
+    return editor
+      .chain()
+      .focus()
+      .setTextSelection(from)
+      .deleteRange(range)
+      .insertContent(content)
+      .run();
+  } catch (error) {
+    console.error(`Error inserting ${contentType}:`, error);
+    return false;
+  }
+}
+
+/**
  * Creates basic text format commands
  */
 function createBasicCommands(): CommandItem[] {
@@ -476,6 +503,46 @@ function createAdvancedCommands(): CommandItem[] {
       },
     },
     {
+      title: 'Execution Pipeline',
+      category: 'Advanced',
+      icon: ChartPieIcon,
+      keywords: ['pipeline', 'execution', 'workflow', 'code', 'flow'],
+      description: 'Create a visual execution pipeline for code blocks',
+      command: ({ editor, range }: CommandArgs) => {
+        try {
+          // Validate range before proceeding
+          const { from, to } = range;
+          const docSize = editor.state.doc.content.size;
+          
+          if (from < 0 || to > docSize || from > to) {
+            console.warn('Invalid range for pipeline insertion:', range, 'Document size:', docSize);
+            return;
+          }
+          
+          // Use a safer approach by setting selection first
+          editor
+            .chain()
+            .focus()
+            .setTextSelection(from)
+            .deleteRange(range)
+            .insertPipeline()
+            .run();
+        } catch (error) {
+          console.error('Error inserting pipeline:', error);
+          // Fallback: try to insert at current cursor position
+          try {
+            editor
+              .chain()
+              .focus()
+              .insertPipeline()
+              .run();
+          } catch (fallbackError) {
+            console.error('Fallback pipeline insertion also failed:', fallbackError);
+          }
+        }
+      },
+    },
+    {
       title: 'AI Assistant',
       category: 'AI',
       icon: SparklesIcon,
@@ -545,18 +612,13 @@ function createAdvancedCommands(): CommandItem[] {
       icon: FileText,
       keywords: ['references', 'bibliography', 'citations', 'works cited'],
       command: ({ editor, range }: CommandArgs) => {
-        editor
-          .chain()
-          .focus()
-          .deleteRange(range)
-          .insertContent({
-            type: 'bibliography',
-            attrs: {
-              style: 'apa',
-              title: 'References'
-            }
-          } as any)
-          .run();
+        safeInsertContent(editor, range, {
+          type: 'bibliography',
+          attrs: {
+            style: 'apa',
+            title: 'References'
+          }
+        } as any, 'bibliography');
       },
     },
     {
@@ -566,22 +628,17 @@ function createAdvancedCommands(): CommandItem[] {
       keywords: ['confusion', 'matrix', 'classification', 'ml', 'machine learning', 'accuracy', 'precision', 'recall'],
       description: 'Insert a confusion matrix visualization with CSV upload or Jupyter integration',
       command: ({ editor, range }: CommandArgs) => {
-        editor
-          .chain()
-          .focus()
-          .deleteRange(range)
-          .insertContent({
-            type: 'confusionMatrix',
-            attrs: {
-              title: 'Confusion Matrix',
-              matrixData: null,
-              labels: null,
-              source: 'upload',
-              filePath: null,
-              stats: null
-            }
-          } as any)
-          .run();
+        safeInsertContent(editor, range, {
+          type: 'confusionMatrix',
+          attrs: {
+            title: 'Confusion Matrix',
+            matrixData: null,
+            labels: null,
+            source: 'upload',
+            filePath: null,
+            stats: null
+          }
+        } as any, 'confusion matrix');
       },
     },
     // Sub Nota command defined separately for clarity
