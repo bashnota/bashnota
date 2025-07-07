@@ -68,7 +68,7 @@
               :result="nodeData.output"
               :serverID="nodeData.serverID"
               :kernel-name="nodeData.kernelName"
-              :session-id="nodeData.sessionId"
+              :session-id="nodeData.sessionId || null"
               :nota-id="notaId"
               :is-read-only="false"
               :is-executing="isExecuting"
@@ -84,8 +84,13 @@
         </div>
       </div>
       <div class="code-editor-footer">
-        <button @click="$emit('save')" class="save-btn">Save Changes</button>
-        <button @click="$emit('delete')" class="delete-btn">Delete Block</button>
+        <div>
+          <button @click="$emit('reset-all-outputs')" class="reset-outputs-btn">Reset All Outputs</button>
+        </div>
+        <div>
+          <button @click="$emit('save')" class="save-btn">Save Changes</button>
+          <button @click="$emit('delete')" class="delete-btn">Delete Block</button>
+        </div>
       </div>
     </div>
   </div>
@@ -103,7 +108,7 @@ defineProps<{
   availableKernels: any[]
 }>()
 
-defineEmits(['close', 'save', 'delete', 'run-node', 'update:node-data'])
+defineEmits(['close', 'save', 'delete', 'run-node', 'update:node-data', 'reset-all-outputs'])
 </script>
 
 <style scoped>
@@ -287,12 +292,17 @@ defineEmits(['close', 'save', 'delete', 'run-node', 'update:node-data'])
 
 .code-editor-footer {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 12px;
   padding: 16px 20px;
   border-top: 1px solid hsl(var(--border));
   background: hsl(var(--muted));
   flex-shrink: 0;
+}
+
+.code-editor-footer > div {
+  display: flex;
+  gap: 12px;
 }
 
 .save-btn {
@@ -325,6 +335,23 @@ defineEmits(['close', 'save', 'delete', 'run-node', 'update:node-data'])
 
 .delete-btn:hover {
   opacity: 0.9;
+}
+
+.reset-outputs-btn {
+  background: hsl(var(--secondary));
+  color: hsl(var(--secondary-foreground));
+  border: 1px solid hsl(var(--border));
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.reset-outputs-btn:hover {
+  background: hsl(var(--secondary) / 0.8);
+  border-color: hsl(var(--border) / 0.8);
 }
 
 </style> 

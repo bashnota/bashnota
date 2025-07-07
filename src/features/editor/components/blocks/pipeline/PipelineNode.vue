@@ -14,18 +14,25 @@
       :has-valid-pipeline="hasValidPipeline"
       :node-count="flowState.nodes.length"
       :is-fullscreen="isFullscreen"
+      :execution-progress="executionProgress"
+      :executed-nodes="executedNodes"
+      :total-executable-nodes="totalExecutableNodes"
+      :current-executing-node="currentExecutingNodeTitle"
       @title-blur="handleTitleUpdate"
       @toggle-edit="toggleEditMode"
       @add-node="handleAddNode"
       @show-templates="showTemplateSelector = true"
       @auto-layout="handleAutoLayout"
+      @reset-outputs="handleResetAllOutputs"
       @show-settings="showKernelSettings = true"
       @execute="handleExecutePipeline"
+      @cancel-execution="handleCancelExecution"
       @toggle-fullscreen="handleToggleFullscreen"
     />
     
     <div 
       class="pipeline-content" 
+      :class="{ 'pipeline-executing': isExecuting }"
       @keydown="handleKeydown" 
       tabindex="0"
       ref="contentRef"
@@ -187,6 +194,7 @@
       @save="handleSaveCodeBlock"
       @delete="handleDeleteCodeBlock"
       @run-node="handleRunNode"
+      @reset-all-outputs="handleResetAllOutputs"
     />
     
     <PipelineSettingsModal
@@ -197,23 +205,6 @@
       @close="showKernelSettings = false"
       @apply="handleApplyKernelSettings"
     />
-    
-    <!-- Execution Overlay -->
-    <div v-if="isExecuting" class="execution-overlay">
-      <div class="execution-progress">
-        <div class="progress-header">
-          <LoaderIcon class="w-5 h-5 animate-spin" />
-          <span>Executing Pipeline...</span>
-        </div>
-        <div class="progress-details">
-          <div class="progress-bar">
-            <div class="progress-fill" :style="{ width: `${executionProgress}%` }"></div>
-        </div>
-          <span class="progress-text">{{ executedNodes }}/{{ totalExecutableNodes }} blocks completed</span>
-        </div>
-        <button @click="handleCancelExecution" class="cancel-btn">Cancel</button>
-      </div>
-      </div>
     </div>
   </NodeViewWrapper>
 </template>
@@ -239,6 +230,7 @@ import {
 } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { useCodeExecutionStore } from '@/features/editor/stores/codeExecutionStore'
+import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
 import { useJupyterServers } from '@/features/jupyter/composables/useJupyterServers'
 
 // Import composables
@@ -282,6 +274,7 @@ const props = defineProps<PipelineNodeProps>()
 // External dependencies
 const router = useRouter()
 const codeExecutionStore = useCodeExecutionStore()
+const jupyterStore = useJupyterStore()
 const { servers } = useJupyterServers()
 const notaId = computed(() => router.currentRoute.value.params.id as string)
 
@@ -295,6 +288,16 @@ const isEditMode = ref(props.node.attrs.isEditMode ?? true)
 const isExecuting = ref(false)
 const executedNodes = ref(0)
 const hasMadeConnection = ref(props.node.attrs.hasMadeConnection || false)
+
+// Execution state tracking
+const currentExecutingNode = ref<string | null>(null)
+const executionStartTime = ref<number | null>(null)
+const executionSummary = reactive({
+  total: 0,
+  executed: 0,
+  skipped: 0,
+  errors: 0
+})
 
 // Modal states
 const showCodeEditor = ref(false)
@@ -311,11 +314,19 @@ const pipelineSettings = reactive({
   autoSave: props.node.attrs.autoSave ?? false,
 })
 
-const availableKernels = ref<any[]>([
-  { name: 'python3', display_name: 'Python 3' },
-  { name: 'ir', display_name: 'R' },
-  { name: 'javascript', display_name: 'JavaScript' },
-])
+const availableKernels = computed(() => {
+  // Get all kernels from all available servers
+  const allKernels: any[] = []
+  for (const server of jupyterStore.jupyterServers) {
+    const serverKey = `${server.ip}:${server.port}`
+    const serverKernels = jupyterStore.kernels[serverKey] || []
+    allKernels.push(...serverKernels.map(k => ({
+      ...k,
+      serverInfo: `${server.name} (${server.ip}:${server.port})`
+    })))
+  }
+  return allKernels
+})
 
 // Initialize composables
 const initialViewport = props.node.attrs.viewport
@@ -400,12 +411,18 @@ const {
 
 // Computed properties
 const totalExecutableNodes = computed(() => 
-  flowState.nodes.filter(n => n.data?.code).length
+  flowState.nodes.filter(n => n.data?.code && n.data.code.trim().length > 0).length
 )
 
 const executionProgress = computed(() => 
   totalExecutableNodes.value > 0 ? (executedNodes.value / totalExecutableNodes.value) * 100 : 0
 )
+
+const currentExecutingNodeTitle = computed(() => {
+  if (!currentExecutingNode.value) return null
+  const node = flowState.nodes.find(n => n.id === currentExecutingNode.value)
+  return node?.data?.title || currentExecutingNode.value
+})
 
 const defaultEdgeOptions = computed(() => ({
   type: 'smoothstep',
@@ -529,69 +546,447 @@ const handleDeleteCodeBlock = () => {
   showCodeEditor.value = false
 }
 
-const handleRunNode = () => {
-  if (selectedNode.value) {
-    executeCodeBlock(selectedNode.value)
+const handleResetAllOutputs = () => {
+  console.log('Resetting outputs for all pipeline nodes')
+  
+  // Reset output and status for all nodes
+  flowState.nodes.forEach(node => {
+    Object.assign(node.data, {
+      output: null,
+      status: null,
+      executionTime: null
+    })
+  })
+  
+  // Reset execution state
+  executedNodes.value = 0
+  currentExecutingNode.value = null
+  executionStartTime.value = null
+  
+  // Reset execution summary
+  executionSummary.total = 0
+  executionSummary.executed = 0
+  executionSummary.skipped = 0
+  executionSummary.errors = 0
+  
+  // Save changes
+  saveToAttributes()
+  
+  console.log(`Reset outputs for ${flowState.nodes.length} nodes`)
+}
+
+const handleRunNode = async () => {
+  if (!selectedNode.value) return
+  
+  // Ensure server availability
+  const serversAvailable = await ensureServerAvailability()
+  if (!serversAvailable) {
+    console.error('Cannot execute node: No Jupyter servers available')
+    return
+  }
+  
+  const node = selectedNode.value
+  console.log(`Executing single node ${node.id}: ${node.data.title || 'Untitled'}`)
+  
+  // Ensure reactive updates
+  Object.assign(node.data, { status: 'running' })
+  updateNodeState(node.id, { isExecuting: true })
+  
+  try {
+    const startTime = Date.now()
+    await executeCodeBlock(node)
+    // Ensure reactive updates
+    Object.assign(node.data, {
+      status: 'completed',
+      executionTime: Date.now() - startTime
+    })
+    console.log(`Node ${node.id} completed successfully in ${node.data.executionTime}ms`)
+  } catch (error) {
+    // Ensure reactive updates
+    Object.assign(node.data, { status: 'error' })
+    console.error(`Error executing node ${node.id}:`, error)
+  } finally {
+    updateNodeState(node.id, { isExecuting: false })
+    saveToAttributes()
   }
 }
 
 const handleApplyKernelSettings = () => {
   if (pipelineSettings.kernelMode === 'shared') {
     flowState.nodes.forEach(node => {
-      node.data.useSharedKernel = true
-      node.data.kernelName = pipelineSettings.sharedKernelName
+      // Ensure reactive updates
+      Object.assign(node.data, {
+        useSharedKernel: true,
+        kernelName: pipelineSettings.sharedKernelName
+      })
     })
   }
   saveToAttributes()
   showKernelSettings.value = false
 }
 
+const ensureServerAvailability = async (): Promise<boolean> => {
+  // Check if we have any configured servers
+  if (!jupyterStore.jupyterServers || jupyterStore.jupyterServers.length === 0) {
+    console.error('No Jupyter servers configured for pipeline execution')
+    return false
+  }
+
+  // For shared mode, try to ensure shared session
+  if (pipelineSettings.kernelMode === 'shared') {
+    try {
+      if (!codeExecutionStore.sharedSessionMode) {
+        await codeExecutionStore.toggleSharedSessionMode(notaId.value)
+      }
+      await codeExecutionStore.ensureSharedSession()
+      return true
+    } catch (error) {
+      console.error('Failed to setup shared session:', error)
+      return false
+    }
+  }
+
+  // For other modes, check if we have at least one working server
+  const serverResult = await jupyterStore.getFirstAvailableServer()
+  if (!serverResult) {
+    console.error('No available Jupyter servers with kernels found')
+    return false
+  }
+
+  return true
+}
+
 const handleExecutePipeline = async () => {
   if (!hasValidPipeline.value || isExecuting.value) return
   
+  // Ensure server availability before starting
+  const serversAvailable = await ensureServerAvailability()
+  if (!serversAvailable) {
+    console.error('Cannot execute pipeline: No Jupyter servers available')
+    // TODO: Show user-friendly error message or server setup dialog
+    return
+  }
+  
+  // Initialize execution state
   isExecuting.value = true
   executedNodes.value = 0
+  currentExecutingNode.value = null
+  executionStartTime.value = Date.now()
+  
+  // Reset summary
+  executionSummary.total = 0
+  executionSummary.executed = 0
+  executionSummary.skipped = 0
+  executionSummary.errors = 0
   
   try {
-    const order = getExecutionOrder()
-    for (const nodeId of order) {
-      if (!isExecuting.value) break
-      
-      const node = flowState.nodes.find(n => n.id === nodeId)
-      if (node?.data?.code) {
-        node.data.status = 'running'
-        updateNodeState(nodeId, { isExecuting: true })
-        
-        try {
-          const startTime = Date.now()
-          await executeCodeBlock(node)
-          node.data.status = 'completed'
-          node.data.executionTime = Date.now() - startTime
-          executedNodes.value++
-        } catch (error) {
-          node.data.status = 'error'
-          console.error(`Error executing node ${nodeId}:`, error)
-          if (pipelineSettings.stopOnError) break
-        } finally {
-          updateNodeState(nodeId, { isExecuting: false })
-        }
-      }
+    // Categorize nodes
+    const allNodes = flowState.nodes
+    const nodesWithCode = allNodes.filter(n => n.data?.code && n.data.code.trim().length > 0)
+    const emptyNodes = allNodes.filter(n => !n.data?.code || n.data.code.trim().length === 0)
+    
+    // Update summary
+    executionSummary.total = allNodes.length
+    
+    // Debug logging
+    console.log('=== PIPELINE EXECUTION ANALYSIS ===')
+    console.log(`Total nodes in pipeline: ${allNodes.length}`)
+    console.log(`Nodes with code: ${nodesWithCode.length}`)
+    console.log(`Empty nodes: ${emptyNodes.length}`)
+    
+    console.log('\nNodes with code:')
+    nodesWithCode.forEach(n => {
+      console.log(`  - ${n.id}: "${n.data?.title || 'Untitled'}" (${n.data?.code?.length || 0} chars)`)
+    })
+    
+    console.log('\nEmpty nodes:')
+    emptyNodes.forEach(n => {
+      console.log(`  - ${n.id}: "${n.data?.title || 'Untitled'}" (empty)`)
+    })
+    
+    // Execute based on the chosen execution order
+    if (pipelineSettings.executionOrder === 'parallel') {
+      await executeParallelWithDependencies(nodesWithCode, emptyNodes)
+    } else {
+      await executeSequential(nodesWithCode, emptyNodes)
     }
+    
+    const executionTime = Date.now() - (executionStartTime.value || 0)
+    console.log('\n=== PIPELINE EXECUTION SUMMARY ===')
+    console.log(`Execution mode: ${pipelineSettings.executionOrder}`)
+    console.log(`Total nodes in pipeline: ${flowState.nodes.length}`)
+    console.log(`Nodes executed: ${executionSummary.executed}`)
+    console.log(`Nodes skipped: ${executionSummary.skipped}`)
+    console.log(`Errors: ${executionSummary.errors}`)
+    console.log(`Total execution time: ${executionTime}ms`)
+    console.log(`Success rate: ${executionSummary.executed}/${nodesWithCode.length} executable nodes`)
+    
+  } catch (error) {
+    console.error('❌ Pipeline execution failed:', error)
   } finally {
     isExecuting.value = false
+    currentExecutingNode.value = null
+    saveToAttributes()
   }
+}
+
+// Sequential execution (original behavior for sequential and topological modes)
+const executeSequential = async (nodesWithCode: any[], emptyNodes: any[]) => {
+  const order = getExecutionOrder()
+  console.log(`\nExecution order (${pipelineSettings.executionOrder}): ${order.length} nodes`)
+  console.log('Order:', order)
+  
+  let processedNodes = 0
+  
+  for (const nodeId of order) {
+    if (!isExecuting.value) break
+    
+    const node = flowState.nodes.find(n => n.id === nodeId)
+    if (!node) {
+      console.warn(`❌ Node ${nodeId} not found in flowState.nodes`)
+      continue
+    }
+    
+    processedNodes++
+    const hasCode = node.data?.code && node.data.code.trim().length > 0
+    
+    console.log(`\n[${processedNodes}/${order.length}] Processing node ${nodeId}:`)
+    console.log(`  Title: "${node.data?.title || 'Untitled'}"`)
+    console.log(`  Has code: ${hasCode}`)
+    console.log(`  Code length: ${node.data?.code?.length || 0} chars`)
+    
+    if (hasCode) {
+      currentExecutingNode.value = nodeId
+      console.log(`  ✅ EXECUTING: ${node.data.title || nodeId}`)
+      // Ensure reactive updates
+      Object.assign(node.data, { status: 'running' })
+      updateNodeState(nodeId, { isExecuting: true })
+      
+      try {
+        const startTime = Date.now()
+        await executeCodeBlock(node)
+        // Ensure reactive updates
+        Object.assign(node.data, {
+          status: 'completed',
+          executionTime: Date.now() - startTime
+        })
+        executedNodes.value++
+        executionSummary.executed++
+        console.log(`  ✅ COMPLETED: ${node.data.title || nodeId} in ${node.data.executionTime}ms`)
+      } catch (error) {
+        // Ensure reactive updates
+        Object.assign(node.data, { status: 'error' })
+        executionSummary.errors++
+        console.error(`  ❌ ERROR: ${node.data.title || nodeId}:`, error)
+        if (pipelineSettings.stopOnError) {
+          console.log('  🛑 Pipeline execution stopped due to error (stopOnError is enabled)')
+          break
+        }
+      } finally {
+        updateNodeState(nodeId, { isExecuting: false })
+      }
+    } else {
+      executionSummary.skipped++
+      console.log(`  ⏭️  SKIPPED: ${node.data.title || nodeId} (no code)`)
+      // Set status to indicate it was processed but skipped (ensure reactive updates)
+      Object.assign(node.data, { status: 'idle' })
+    }
+  }
+}
+
+// Parallel execution with dependency management
+const executeParallelWithDependencies = async (nodesWithCode: any[], emptyNodes: any[]) => {
+  console.log('\n🚀 Starting parallel execution with dependency management...')
+  
+  // Build dependency graph
+  const dependencies = new Map<string, Set<string>>() // node -> dependencies
+  const dependents = new Map<string, Set<string>>()   // node -> nodes that depend on it
+  const nodeStatus = new Map<string, 'waiting' | 'ready' | 'running' | 'completed' | 'error' | 'skipped'>()
+  
+  // Initialize dependency maps
+  flowState.nodes.forEach(node => {
+    dependencies.set(node.id, new Set())
+    dependents.set(node.id, new Set())
+    
+    // Determine initial status
+    const hasCode = node.data?.code && node.data.code.trim().length > 0
+    nodeStatus.set(node.id, hasCode ? 'waiting' : 'skipped')
+  })
+  
+  // Build dependency relationships from edges
+  flowState.edges.forEach(edge => {
+    dependencies.get(edge.target)?.add(edge.source)
+    dependents.get(edge.source)?.add(edge.target)
+  })
+  
+  console.log('Dependency analysis:')
+  dependencies.forEach((deps, nodeId) => {
+    const node = flowState.nodes.find(n => n.id === nodeId)
+    if (deps.size > 0) {
+      console.log(`  ${node?.data?.title || nodeId} depends on: [${Array.from(deps).map(id => {
+        const depNode = flowState.nodes.find(n => n.id === id)
+        return depNode?.data?.title || id
+      }).join(', ')}]`)
+    }
+  })
+  
+  // Track running promises
+  const runningTasks = new Map<string, Promise<void>>()
+  
+  // Function to check if a node's dependencies are satisfied
+  const areDependenciesSatisfied = (nodeId: string): boolean => {
+    const deps = dependencies.get(nodeId) || new Set()
+    for (const depId of deps) {
+      const depStatus = nodeStatus.get(depId)
+      if (depStatus !== 'completed' && depStatus !== 'skipped') {
+        return false
+      }
+    }
+    return true
+  }
+  
+  // Function to find nodes ready to execute
+  const findReadyNodes = (): string[] => {
+    const ready: string[] = []
+    nodeStatus.forEach((status, nodeId) => {
+      if (status === 'waiting' && areDependenciesSatisfied(nodeId)) {
+        ready.push(nodeId)
+      }
+    })
+    return ready
+  }
+  
+  // Function to execute a single node
+  const executeNode = async (nodeId: string): Promise<void> => {
+    const node = flowState.nodes.find(n => n.id === nodeId)
+    if (!node) return
+    
+    const hasCode = node.data?.code && node.data.code.trim().length > 0
+    
+    if (!hasCode) {
+      console.log(`⏭️  SKIPPING: ${node.data?.title || nodeId} (no code)`)
+      nodeStatus.set(nodeId, 'skipped')
+      Object.assign(node.data, { status: 'idle' })
+      executionSummary.skipped++
+      return
+    }
+    
+    console.log(`🔄 EXECUTING: ${node.data?.title || nodeId}`)
+    nodeStatus.set(nodeId, 'running')
+    Object.assign(node.data, { status: 'running' })
+    updateNodeState(nodeId, { isExecuting: true })
+    
+    try {
+      const startTime = Date.now()
+      await executeCodeBlock(node)
+      
+      // Success
+      nodeStatus.set(nodeId, 'completed')
+      Object.assign(node.data, {
+        status: 'completed',
+        executionTime: Date.now() - startTime
+      })
+      executedNodes.value++
+      executionSummary.executed++
+      console.log(`✅ COMPLETED: ${node.data?.title || nodeId} in ${node.data.executionTime}ms`)
+      
+    } catch (error) {
+      // Error
+      nodeStatus.set(nodeId, 'error')
+      Object.assign(node.data, { status: 'error' })
+      executionSummary.errors++
+      console.error(`❌ ERROR: ${node.data?.title || nodeId}:`, error)
+      
+      // If stopOnError is enabled, mark all dependent nodes as skipped
+      if (pipelineSettings.stopOnError) {
+        const affectedNodes = new Set<string>()
+        const markDependentsAsSkipped = (nodeId: string) => {
+          const deps = dependents.get(nodeId) || new Set()
+          deps.forEach(depId => {
+            if (!affectedNodes.has(depId) && nodeStatus.get(depId) === 'waiting') {
+              affectedNodes.add(depId)
+              nodeStatus.set(depId, 'skipped')
+              const depNode = flowState.nodes.find(n => n.id === depId)
+              if (depNode) {
+                Object.assign(depNode.data, { status: 'idle' })
+              }
+              executionSummary.skipped++
+              markDependentsAsSkipped(depId)
+            }
+          })
+        }
+        markDependentsAsSkipped(nodeId)
+        
+        if (affectedNodes.size > 0) {
+          console.log(`🛑 Marked ${affectedNodes.size} dependent nodes as skipped due to error`)
+        }
+      }
+      
+    } finally {
+      updateNodeState(nodeId, { isExecuting: false })
+      runningTasks.delete(nodeId)
+    }
+  }
+  
+  // Main execution loop
+  while (isExecuting.value) {
+    const readyNodes = findReadyNodes()
+    
+    if (readyNodes.length === 0) {
+      // No nodes ready - check if we're done or waiting for running tasks
+      if (runningTasks.size === 0) {
+        // No running tasks and no ready nodes - we're done
+        break
+      } else {
+        // Wait for at least one running task to complete
+        await Promise.race(runningTasks.values())
+        continue
+      }
+    }
+    
+    // Start execution for all ready nodes
+    readyNodes.forEach(nodeId => {
+      nodeStatus.set(nodeId, 'ready')
+      const task = executeNode(nodeId)
+      runningTasks.set(nodeId, task)
+    })
+    
+    // If we have too many concurrent tasks, wait for some to complete
+    const maxConcurrency = 5 // Adjust based on system capabilities
+    if (runningTasks.size >= maxConcurrency) {
+      await Promise.race(runningTasks.values())
+    }
+  }
+  
+  // Wait for all remaining tasks to complete
+  if (runningTasks.size > 0) {
+    console.log(`⏳ Waiting for ${runningTasks.size} remaining tasks to complete...`)
+    await Promise.all(runningTasks.values())
+  }
+  
+  console.log('🏁 Parallel execution completed')
 }
 
 const handleCancelExecution = () => {
   isExecuting.value = false
   executedNodes.value = 0
+  currentExecutingNode.value = null
+  
+  // Reset summary
+  executionSummary.total = 0
+  executionSummary.executed = 0
+  executionSummary.skipped = 0
+  executionSummary.errors = 0
   
   flowState.nodes.forEach(node => {
     if (node.data.status === 'running') {
-      node.data.status = 'idle'
+      // Ensure reactive updates
+      Object.assign(node.data, { status: 'idle' })
       updateNodeState(node.id, { isExecuting: false })
     }
   })
+  
+  console.log('🛑 Pipeline execution cancelled by user')
 }
 
 // Navigation handlers
@@ -657,48 +1052,233 @@ const buildTopologicalOrder = (): string[] => {
   const visited = new Set<string>()
   const order: string[] = []
   
+  console.log('\n🔄 Building topological execution order...')
+  console.log(`Available nodes: ${flowState.nodes.length}`)
+  console.log(`Available edges: ${flowState.edges.length}`)
+  
   const visit = (nodeId: string) => {
     if (visited.has(nodeId)) return
     visited.add(nodeId)
     
-    flowState.edges
-      .filter(e => e.target === nodeId)
-      .forEach(edge => visit(edge.source))
+    // Find all edges that target this node (dependencies)
+    const dependencies = flowState.edges.filter(e => e.target === nodeId)
+    dependencies.forEach(edge => visit(edge.source))
     
     order.push(nodeId)
   }
 
-  flowState.nodes
-    .filter(node => !flowState.edges.some(edge => edge.target === node.id))
-    .forEach(node => visit(node.id))
-
+  // Start with nodes that have no incoming edges (root nodes)
+  const rootNodes = flowState.nodes.filter(node => 
+    !flowState.edges.some(edge => edge.target === node.id)
+  )
+  
+  console.log(`Root nodes (no dependencies): ${rootNodes.length}`)
+  rootNodes.forEach(node => visit(node.id))
+  
+  // Handle disconnected nodes (nodes not part of the main graph)
+  flowState.nodes.forEach(node => {
+    if (!visited.has(node.id)) {
+      console.log(`Adding disconnected node: ${node.id}`)
+      visit(node.id)
+    }
+  })
+  
+  console.log(`Final execution order: [${order.join(' → ')}]`)
   return order
 }
 
 const executeCodeBlock = async (node: Node) => {
-  const tempCellId = `pipeline-${node.id}-${Date.now()}`
+  const nodeId = node.id
+  const code = node.data.code
   
+  if (!code?.trim()) {
+    throw new Error('No code to execute')
+  }
+
+  // Determine execution strategy based on pipeline settings
+  let sessionId: string
+  let serverConfig: any
+  let kernelName: string
+
+  if (pipelineSettings.kernelMode === 'shared') {
+    // Use shared session mode
+    if (!codeExecutionStore.sharedSessionMode) {
+      // Enable shared session mode
+      await codeExecutionStore.toggleSharedSessionMode(notaId.value)
+    }
+    
+    // Ensure shared session exists
+    sessionId = await codeExecutionStore.ensureSharedSession()
+    const session = codeExecutionStore.kernelSessions.get(sessionId)
+    
+    if (!session) {
+      throw new Error('Failed to create shared session')
+    }
+    
+    serverConfig = session.serverConfig
+    kernelName = session.kernelName || pipelineSettings.sharedKernelName
+    
+    console.log(`Shared mode setup for node ${nodeId}:`, {
+      sessionId,
+      kernelName,
+      sessionKernelName: session.kernelName,
+      pipelineSharedKernelName: pipelineSettings.sharedKernelName,
+      serverConfig: serverConfig ? `${serverConfig.ip}:${serverConfig.port}` : 'undefined'
+    })
+    
+    // Validate kernel name
+    if (!kernelName || kernelName.trim() === '') {
+      throw new Error(`Invalid kernel name "${kernelName}" for shared mode execution`)
+    }
+  } else if (pipelineSettings.kernelMode === 'isolated') {
+    // Create individual session for this node
+    sessionId = `pipeline-${nodeId}-${Date.now()}`
+    
+    // Check if node has specific kernel configuration
+    if (node.data.kernelName && node.data.serverID) {
+      // Use node's specific kernel configuration
+      kernelName = node.data.kernelName
+      // Find the server config
+      const nodeServer = jupyterStore.jupyterServers.find(s => 
+        `${s.ip}:${s.port}` === node.data.serverID
+      )
+      if (nodeServer) {
+        serverConfig = nodeServer
+      } else {
+        // Fall back to first available server
+        const serverResult = await jupyterStore.getFirstAvailableServer()
+        if (!serverResult) {
+          throw new Error('No available Jupyter servers with kernels found')
+        }
+        serverConfig = serverResult.server
+        kernelName = serverResult.kernel.name
+      }
+          } else {
+        // Find a suitable server and kernel
+        console.log('Finding available server and kernel for isolated mode...')
+        const serverResult = await jupyterStore.getFirstAvailableServer()
+        console.log('Server result:', serverResult)
+        
+        if (!serverResult) {
+          throw new Error('No available Jupyter servers with kernels found')
+        }
+        
+        if (!serverResult.kernel || !serverResult.kernel.name) {
+          throw new Error('Available server does not have a valid kernel')
+        }
+        
+        serverConfig = serverResult.server
+        kernelName = serverResult.kernel.name
+        
+        console.log('Selected kernel for isolated mode:', {
+          serverConfig: `${serverConfig.ip}:${serverConfig.port}`,
+          kernelName,
+          kernelSpec: serverResult.kernel
+        })
+      }
+    
+    console.log(`Isolated mode setup for node ${nodeId}:`, {
+      sessionId,
+      kernelName,
+      serverConfig: `${serverConfig.ip}:${serverConfig.port}`
+    })
+    
+    // Validate kernel name
+    if (!kernelName || kernelName.trim() === '') {
+      throw new Error(`Invalid kernel name "${kernelName}" for isolated mode execution`)
+    }
+    
+    // Create session in the store (kernel will be created automatically during execution)
+    codeExecutionStore.kernelSessions.set(sessionId, {
+      id: sessionId,
+      kernelId: '', // Will be set when kernel is created
+      serverConfig,
+      kernelName,
+      cells: [],
+      name: `Pipeline Node ${node.data.title || nodeId}`
+    })
+  } else {
+    // Mixed mode - use node's specific configuration or shared session
+    if (node.data.sessionId && codeExecutionStore.kernelSessions.has(node.data.sessionId)) {
+      sessionId = node.data.sessionId
+      const session = codeExecutionStore.kernelSessions.get(sessionId)!
+      serverConfig = session.serverConfig
+      kernelName = session.kernelName
+    } else {
+      // Fall back to shared session
+      sessionId = await codeExecutionStore.ensureSharedSession()
+      const session = codeExecutionStore.kernelSessions.get(sessionId)!
+      serverConfig = session.serverConfig
+      kernelName = session.kernelName
+    }
+    
+    console.log(`Mixed mode setup for node ${nodeId}:`, {
+      sessionId,
+      kernelName,
+      hasNodeSession: node.data.sessionId && codeExecutionStore.kernelSessions.has(node.data.sessionId),
+      serverConfig: serverConfig ? `${serverConfig.ip}:${serverConfig.port}` : 'undefined'
+    })
+    
+    // Validate kernel name
+    if (!kernelName || kernelName.trim() === '') {
+      throw new Error(`Invalid kernel name "${kernelName}" for mixed mode execution`)
+    }
+  }
+
+  // Create a cell for execution
+  const cellId = `pipeline-${nodeId}-${Date.now()}`
+  
+  console.log(`Adding cell for execution:`, {
+    cellId,
+    sessionId,
+    kernelName,
+    hasServerConfig: !!serverConfig,
+    codeLength: code.length
+  })
+  
+  // Validate before adding cell
+  if (!kernelName || kernelName.trim() === '') {
+    throw new Error(`Cannot create cell: Invalid kernel name "${kernelName}"`)
+  }
+  
+  // Add cell to the execution store
   codeExecutionStore.addCell({
-    id: tempCellId,
-    code: node.data.code,
+    id: cellId,
+    code: code,
     output: '',
-    kernelName: node.data.kernelName || '',
-    sessionId: node.data.sessionId || '',
+    sessionId: sessionId,
+    kernelName: kernelName,
+    serverConfig: serverConfig,
+    // Add a flag to indicate this is a pipeline cell that should not use shared session mode
+    isPipelineCell: true
   })
   
   try {
-    await codeExecutionStore.executeCell(tempCellId)
-    const cell = codeExecutionStore.getCellById(tempCellId)
+    // Execute the cell (this will handle kernel creation automatically)
+    await codeExecutionStore.executeCell(cellId)
+    
+    // Get the result
+    const cell = codeExecutionStore.getCellById(cellId)
     
     if (cell?.hasError) {
-      throw new Error(typeof cell.error === 'string' ? cell.error : 'Execution failed')
+      const errorMessage = typeof cell.error === 'string' ? cell.error : 'Execution failed'
+      throw new Error(errorMessage)
     }
     
-    node.data.output = cell?.output || null
+    // Update node data with results (ensure reactivity)
+    Object.assign(node.data, {
+      output: cell?.output || null,
+      sessionId: sessionId,
+      kernelName: kernelName,
+      serverConfig: serverConfig
+    })
+    
     return cell?.output
   } finally {
-    // Clean up temporary cell
-    codeExecutionStore.removeCellFromSession(tempCellId, '')
+    // Clean up temporary cell if in isolated mode
+    if (pipelineSettings.kernelMode === 'isolated') {
+      codeExecutionStore.removeCellFromSession(cellId, sessionId)
+    }
   }
 }
 
@@ -835,17 +1415,39 @@ watch(() => flowState.edges.length, (newLength, oldLength) => {
   }
 })
 
+// Only open code editor modal when explicitly clicking on a node (not during execution)
 watch(() => selectedNode.value, (node) => {
-  if (node) {
+  if (node && !isExecuting.value) {
     showCodeEditor.value = true
   }
 })
 
 // Lifecycle
-onMounted(() => {
+onMounted(async () => {
+  // Ensure Jupyter servers are loaded
+  jupyterStore.loadServers()
+  
   // Focus the container for keyboard events
   nextTick(() => {
     contentRef.value?.focus()
+  })
+  
+  // Initialize shared session if in shared mode
+  if (pipelineSettings.kernelMode === 'shared') {
+    try {
+      if (!codeExecutionStore.sharedSessionMode) {
+        await codeExecutionStore.toggleSharedSessionMode(notaId.value)
+      }
+    } catch (error) {
+      console.warn('Failed to initialize shared session mode:', error)
+    }
+  }
+  
+  console.log('Pipeline initialized:', {
+    nodeCount: flowState.nodes.length,
+    kernelMode: pipelineSettings.kernelMode,
+    availableServers: jupyterStore.jupyterServers.length,
+    availableKernels: availableKernels.value.length
   })
 })
 
@@ -906,6 +1508,36 @@ const updatePipelineSettings = (newSettings: any) => {
   background: hsl(var(--background));
   min-height: 400px;
   outline: none;
+  transition: all 0.3s ease;
+}
+
+.pipeline-content.pipeline-executing {
+  background: linear-gradient(135deg, 
+    hsl(var(--background)) 0%, 
+    hsl(var(--primary) / 0.02) 100%
+  );
+}
+
+.pipeline-content.pipeline-executing::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, 
+    hsl(var(--primary)) 0%, 
+    hsl(var(--primary) / 0.5) 50%, 
+    hsl(var(--primary)) 100%
+  );
+  background-size: 200% 100%;
+  animation: progress-shimmer 2s linear infinite;
+  z-index: 5;
+}
+
+@keyframes progress-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
 .pipeline-content .vue-flow {
@@ -1073,77 +1705,4 @@ const updatePipelineSettings = (newSettings: any) => {
 .floating-add-btn:hover {
   box-shadow: 0 6px 16px hsl(var(--primary) / 0.4);
 }
-
-/* Execution overlay */
-.execution-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: hsl(var(--background) / 0.9);
-  backdrop-filter: blur(2px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-}
-
-.execution-progress {
-  background: hsl(var(--card));
-  border: 1px solid hsl(var(--border));
-  border-radius: 8px;
-  padding: 24px;
-  text-align: center;
-  min-width: 300px;
-  box-shadow: 0 8px 16px hsl(var(--foreground) / 0.1);
-}
-
-.progress-header {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin-bottom: 16px;
-  font-weight: 600;
-  color: hsl(var(--foreground));
-}
-
-.progress-details {
-  margin-bottom: 16px;
-}
-
-.progress-bar {
-  width: 100%;
-  height: 8px;
-  background: hsl(var(--muted));
-  border-radius: 4px;
-  overflow: hidden;
-  margin-bottom: 8px;
-}
-
-.progress-fill {
-  height: 100%;
-  background: hsl(var(--primary));
-  transition: width 0.3s ease;
-}
-
-.progress-text {
-  font-size: 12px;
-  color: hsl(var(--muted-foreground));
-}
-
-.cancel-btn {
-  background: hsl(var(--secondary));
-  color: hsl(var(--secondary-foreground));
-  border: 1px solid hsl(var(--border));
-  padding: 8px 16px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.cancel-btn:hover {
-  background: hsl(var(--muted));
-}
-</style> 
+</style>

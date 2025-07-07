@@ -80,6 +80,32 @@
             <span>Click to add code</span>
           </div>
         </div>
+        
+        <!-- Output Section -->
+        <div v-if="hasOutput || data.status === 'running'" class="output-section">
+          <div class="output-header">
+            <span class="output-label">Output</span>
+            <div v-if="data.status === 'running'" class="output-loading">
+              <LoaderIcon class="w-3 h-3 animate-spin" />
+              <span>Executing...</span>
+            </div>
+          </div>
+          <div class="output-content" :class="outputClasses">
+            <div v-if="data.status === 'running'" class="output-placeholder">
+              <div class="loading-dots">
+                <span></span><span></span><span></span>
+              </div>
+            </div>
+            <pre v-else-if="formattedOutput" class="output-text">{{ formattedOutput }}</pre>
+            <div v-else-if="data.status === 'error'" class="output-error">
+              <span>Execution failed</span>
+            </div>
+            <div v-else class="output-empty">
+              <span>No output</span>
+            </div>
+          </div>
+        </div>
+        
         <div class="code-node-footer">
           <div class="code-node-language">
             <span class="language-badge">{{ data.language || 'python' }}</span>
@@ -222,6 +248,31 @@ const codePreview = computed(() => {
 const executionTime = computed(() => {
   return props.data.executionTime ? `${props.data.executionTime}ms` : 'N/A'
 })
+
+const hasOutput = computed(() => {
+  return props.data.output && String(props.data.output).trim().length > 0
+})
+
+const formattedOutput = computed(() => {
+  if (!props.data.output) return ''
+  
+  let output = String(props.data.output)
+  
+  // Limit output length for display
+  const maxLength = 500
+  if (output.length > maxLength) {
+    output = output.substring(0, maxLength) + '...\n[Output truncated]'
+  }
+  
+  return output
+})
+
+const outputClasses = computed(() => ({
+  'output-success': props.data.status === 'completed' && hasOutput.value,
+  'output-error': props.data.status === 'error',
+  'output-running': props.data.status === 'running',
+  'output-empty': !hasOutput.value && props.data.status !== 'running'
+}))
 
 // Handle click methods
 const handleInputClick = () => {
@@ -621,13 +672,124 @@ const handleOutputKeydown = (event: KeyboardEvent) => {
   font-weight: 500;
 }
 
+/* Output Section */
+.output-section {
+  margin-top: 12px;
+  border-top: 1px solid hsl(var(--border));
+  padding-top: 12px;
+}
+
+.output-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.output-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.output-loading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: hsl(var(--primary));
+  font-weight: 500;
+}
+
+.output-content {
+  background: hsl(var(--muted) / 0.3);
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  padding: 8px;
+  min-height: 32px;
+  max-height: 120px;
+  overflow-y: auto;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Consolas', monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  transition: all 0.2s ease;
+}
+
+.output-content.output-success {
+  border-color: hsl(var(--success) / 0.5);
+  background: linear-gradient(135deg, hsl(var(--success) / 0.05), hsl(var(--muted) / 0.3));
+}
+
+.output-content.output-error {
+  border-color: hsl(var(--destructive) / 0.5);
+  background: linear-gradient(135deg, hsl(var(--destructive) / 0.05), hsl(var(--muted) / 0.3));
+}
+
+.output-content.output-running {
+  border-color: hsl(var(--primary) / 0.5);
+  background: linear-gradient(135deg, hsl(var(--primary) / 0.05), hsl(var(--muted) / 0.3));
+}
+
+.output-text {
+  margin: 0;
+  padding: 0;
+  color: hsl(var(--foreground));
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.output-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+}
+
+.loading-dots {
+  display: flex;
+  gap: 4px;
+}
+
+.loading-dots span {
+  width: 4px;
+  height: 4px;
+  background: hsl(var(--primary));
+  border-radius: 50%;
+  animation: loading-bounce 1.4s infinite ease-in-out;
+}
+
+.loading-dots span:nth-child(1) { animation-delay: -0.32s; }
+.loading-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes loading-bounce {
+  0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
+  40% { transform: scale(1.2); opacity: 1; }
+}
+
+.output-error,
+.output-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
+  font-size: 11px;
+}
+
+.output-error {
+  color: hsl(var(--destructive));
+}
+
 /* Enhanced Handles */
 .pipeline-handle {
   width: 32px;
   height: 32px;
   border: 3px solid hsl(var(--primary));
   background: hsl(var(--background));
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: all 0.2s ease;
   z-index: 150;
   display: flex;
   align-items: center;
@@ -641,15 +803,6 @@ const handleOutputKeydown = (event: KeyboardEvent) => {
   position: relative;
 }
 
-.pipeline-handle:hover {
-  transform: scale(1.3);
-  box-shadow: 
-    0 8px 25px hsl(var(--primary) / 0.3),
-    0 0 0 4px hsl(var(--primary) / 0.2),
-    0 0 0 6px hsl(var(--background));
-  border-width: 4px;
-}
-
 .handle-core {
   width: 100%;
   height: 100%;
@@ -658,31 +811,15 @@ const handleOutputKeydown = (event: KeyboardEvent) => {
   justify-content: center;
   border-radius: 50%;
   background: radial-gradient(circle, hsl(var(--primary) / 0.1), transparent 70%);
-  transition: all 0.3s;
-}
-
-.pipeline-handle:hover .handle-core {
-  background: radial-gradient(circle, hsl(var(--primary) / 0.2), transparent 70%);
+  transition: all 0.2s ease;
 }
 
 .pipeline-handle-input {
   border-color: hsl(var(--success));
 }
 
-.pipeline-handle-input:hover {
-  box-shadow: 
-    0 8px 25px hsl(var(--success) / 0.3),
-    0 0 0 4px hsl(var(--success) / 0.2),
-    0 0 0 6px hsl(var(--background));
-  border-color: hsl(var(--success));
-}
-
 .pipeline-handle-input .handle-core {
   background: radial-gradient(circle, hsl(var(--success) / 0.1), transparent 70%);
-}
-
-.pipeline-handle-input:hover .handle-core {
-  background: radial-gradient(circle, hsl(var(--success) / 0.2), transparent 70%);
 }
 
 /* Connection States */
@@ -743,40 +880,34 @@ const handleOutputKeydown = (event: KeyboardEvent) => {
   font-size: 11px;
   white-space: nowrap;
   opacity: 0;
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: opacity 0.2s ease;
   pointer-events: none;
   z-index: 200;
   border: 1px solid hsl(var(--border));
   box-shadow: 0 8px 16px hsl(var(--foreground) / 0.15);
-  transform-origin: center;
   font-weight: 500;
 }
 
 .external-handle-input .handle-tooltip {
   top: -50px;
   left: 50%;
-  transform: translateX(-50%) translateY(8px) scale(0.9);
+  transform: translateX(-50%);
 }
 
 .external-handle-output .handle-tooltip {
   bottom: -50px;
   left: 50%;
-  transform: translateX(-50%) translateY(-8px) scale(0.9);
+  transform: translateX(-50%);
 }
 
-.pipeline-handle:hover .handle-tooltip {
+.external-handle-input:hover .handle-tooltip,
+.external-handle-output:hover .handle-tooltip {
   opacity: 1;
-  transform: translateX(-50%) translateY(0) scale(1);
 }
 
 .drag-cta {
   color: hsl(var(--primary));
   font-weight: 600;
-}
-
-/* Enhanced visibility and interactions */
-.external-handle:hover {
-  transform: translateX(-50%) scale(1.05);
 }
 
 /* Hide handles in readonly mode */
@@ -786,7 +917,7 @@ const handleOutputKeydown = (event: KeyboardEvent) => {
 
 /* Handle icon improvements */
 .handle-icon {
-  transition: all 0.2s;
+  transition: none;
   color: hsl(var(--primary));
   display: flex;
   align-items: center;
@@ -795,10 +926,6 @@ const handleOutputKeydown = (event: KeyboardEvent) => {
 
 .pipeline-handle-input .handle-icon {
   color: hsl(var(--success));
-}
-
-.pipeline-handle:hover .handle-icon {
-  transform: scale(1.1);
 }
 
 /* Active handle state */

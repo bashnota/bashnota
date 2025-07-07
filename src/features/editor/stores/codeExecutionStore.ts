@@ -478,19 +478,21 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
   }
 
   // Cell Management
-  function addCell(cell: Omit<CodeCell, 'isExecuting' | 'hasError' | 'error'> & { isPublished?: boolean }) {
+  function addCell(cell: Omit<CodeCell, 'isExecuting' | 'hasError' | 'error'> & { isPublished?: boolean; isPipelineCell?: boolean }) {
     cells.value.set(cell.id, {
       ...cell,
       isExecuting: false,
       hasError: false,
       error: null,
       // Save isPublished flag in the cell data so components can use it to handle display differently
-      isPublished: cell.isPublished || false
+      isPublished: cell.isPublished || false,
+      // Save isPipelineCell flag to prevent shared session mode interference
+      isPipelineCell: cell.isPipelineCell || false
     })
 
     // If in shared session mode and cell doesn't have a session, add it to the shared session
-    // Don't add published cells to the shared session as they're only for display
-    if (sharedSessionMode.value && !cell.sessionId && !cell.isPublished) {
+    // Don't add published cells or pipeline cells to the shared session as they have their own session management
+    if (sharedSessionMode.value && !cell.sessionId && !cell.isPublished && !cell.isPipelineCell) {
       applySharedSessionToCell(cell.id)
     }
   }
@@ -555,11 +557,13 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
       hasServerConfig: !!cell.serverConfig,
       hasSessionId: !!cell.sessionId,
       sessionId: cell.sessionId,
-      kernelName: cell.kernelName
+      kernelName: cell.kernelName,
+      isPipelineCell: cell.isPipelineCell,
+      sharedSessionMode: sharedSessionMode.value
     })
 
-    // Handle shared session mode at execution time
-    if (sharedSessionMode.value) {
+    // Handle shared session mode at execution time (but not for pipeline cells in isolated mode)
+    if (sharedSessionMode.value && !cell.isPipelineCell) {
       // If no shared session exists yet, create one
       if (!sharedSessionId.value) {
         logger.log(`Creating new shared session for execution`);

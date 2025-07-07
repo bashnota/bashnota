@@ -9,6 +9,19 @@
         class="pipeline-title-input"
         placeholder="Pipeline Title"
       />
+      <!-- Execution Progress Indicator -->
+      <div v-if="isExecuting" class="execution-progress-inline">
+        <div class="progress-bar-mini">
+          <div 
+            class="progress-fill-mini" 
+            :style="{ width: `${executionProgress}%` }"
+          ></div>
+        </div>
+        <span class="progress-text-mini">
+          {{ executedNodes }}/{{ totalExecutableNodes }} executed
+          <span v-if="currentExecutingNode" class="current-node"> · {{ currentExecutingNode }}</span>
+        </span>
+      </div>
     </div>
     <div class="pipeline-controls">
       <div class="control-group">
@@ -49,6 +62,14 @@
           <LayoutIcon />
         </button>
         <button
+          @click="$emit('reset-outputs')"
+          :disabled="isExecuting || nodeCount === 0"
+          class="pipeline-btn pipeline-btn-reset"
+          title="Reset All Outputs"
+        >
+          <RefreshIcon />
+        </button>
+        <button
           @click="$emit('toggle-fullscreen')"
           class="pipeline-btn"
           :title="isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'"
@@ -66,6 +87,16 @@
       </div>
       
       <div class="control-group">
+        <!-- Cancel button when executing -->
+        <button
+          v-if="isExecuting"
+          @click="$emit('cancel-execution')"
+          class="pipeline-btn pipeline-btn-cancel"
+          title="Cancel Execution"
+        >
+          <StopIcon />
+        </button>
+        
         <button
           @click="$emit('execute')"
           :disabled="isExecuting || !hasValidPipeline"
@@ -92,6 +123,8 @@ import {
   LayoutGrid as LayoutIcon,
   Maximize as MaximizeIcon,
   Minimize as MinimizeIcon,
+  Square as StopIcon,
+  RefreshCw as RefreshIcon,
 } from 'lucide-vue-next'
 
 defineProps<{
@@ -101,6 +134,10 @@ defineProps<{
   hasValidPipeline: boolean
   nodeCount: number
   isFullscreen: boolean
+  executionProgress: number
+  executedNodes: number
+  totalExecutableNodes: number
+  currentExecutingNode?: string | null
 }>()
 
 defineEmits<{
@@ -110,9 +147,11 @@ defineEmits<{
   (e: 'add-node'): void
   (e: 'show-templates'): void
   (e: 'auto-layout'): void
+  (e: 'reset-outputs'): void
   (e: 'show-settings'): void
   (e: 'execute'): void
   (e: 'toggle-fullscreen'): void
+  (e: 'cancel-execution'): void
 }>()
 </script>
 
@@ -194,5 +233,55 @@ defineEmits<{
 
 .pipeline-btn-execute:hover:not(:disabled) {
   opacity: 0.9;
+}
+
+.execution-progress-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progress-bar-mini {
+  width: 100px;
+  height: 8px;
+  background: hsl(var(--border));
+  border-radius: 4px;
+}
+
+.progress-fill-mini {
+  height: 100%;
+  background: hsl(var(--primary));
+  border-radius: 4px;
+}
+
+.progress-text-mini {
+  font-size: 12px;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+.current-node {
+  color: hsl(var(--primary));
+  font-weight: 700;
+}
+
+.pipeline-btn-cancel {
+  background: hsl(var(--destructive));
+  border-color: hsl(var(--destructive));
+  color: hsl(var(--destructive-foreground));
+}
+
+.pipeline-btn-cancel:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.pipeline-btn-reset {
+  background: hsl(var(--secondary));
+  border-color: hsl(var(--secondary));
+  color: hsl(var(--secondary-foreground));
+}
+
+.pipeline-btn-reset:hover:not(:disabled) {
+  background: hsl(var(--secondary) / 0.8);
 }
 </style> 
