@@ -19,6 +19,21 @@ export interface PipelineFlowState {
   viewport: { x: number; y: number; zoom: number } | null
 }
 
+export interface NodeConnection {
+  nodeId: string
+  handleId: string
+  edgeId: string
+}
+
+export interface NodeConnectionInfo {
+  inputs: NodeConnection[]  // Connections coming into this node
+  outputs: NodeConnection[] // Connections going out from this node
+  hasMultipleOutputs: boolean
+  hasMultipleInputs: boolean  // Changed from hasInput to hasMultipleInputs
+  dependsOn: string[]       // Node IDs this node depends on
+  dependents: string[]      // Node IDs that depend on this node
+}
+
 export interface FlowHandlers {
   onConnect: (connection: Connection) => void
   onNodeClick: (event: { node: Node }) => void
@@ -62,6 +77,9 @@ export function usePipelineFlow(initialState: PipelineFlowState) {
     isConnectingSource: boolean
     isPotentialTarget: boolean
   }>())
+
+  // Connection tracking for node management
+  const nodeConnections = reactive(new Map<string, NodeConnectionInfo>())
 
   // Computed properties
   const hasValidPipeline = computed(() => 
@@ -193,7 +211,44 @@ export function usePipelineFlow(initialState: PipelineFlowState) {
     }
     
     state.edges.push(newEdge)
-    clearConnectionState()
+    
+    // Update connection tracking after adding edge
+    updateConnectionTracking()
+    
+    // Keep connection mode active for multiple connections
+    // but update potential targets (remove the one we just connected to)
+    const sourceNodeId = connectingFrom.value
+    const sourceHandle = connectingFromHandle.value
+    
+    // Update potential targets list - remove the one we just connected to
+    const updatedTargets = state.nodes
+      .map(n => n.id)
+      .filter(nodeId => {
+        if (nodeId === sourceNodeId) return false
+        return isValidConnection({
+          source: sourceNodeId,
+          sourceHandle: sourceHandle,
+          target: nodeId,
+          targetHandle: `${nodeId}-input`
+        })
+      })
+    
+    // Clear previous potential target states
+    potentialTargets.value.forEach(nodeId => {
+      updateNodeState(nodeId, { isPotentialTarget: false })
+    })
+    
+    // Set new potential targets
+    potentialTargets.value = updatedTargets
+    updatedTargets.forEach(nodeId => {
+      updateNodeState(nodeId, { isPotentialTarget: true })
+    })
+    
+    // If no more potential targets, clear connection state
+    if (updatedTargets.length === 0) {
+      clearConnectionState()
+    }
+    
     return true
   }
 
@@ -214,6 +269,20 @@ export function usePipelineFlow(initialState: PipelineFlowState) {
     }
   }
 
+  // Check if a node can accept an input
+  const canNodeAcceptInput = (nodeId: string): boolean => {
+    // Nodes can accept multiple inputs (many-to-one is now allowed)
+    return state.isEditMode
+  }
+
+  // Check if a specific connection already exists to the same input handle
+  const hasExistingConnectionToHandle = (connection: Connection): boolean => {
+    return state.edges.some(edge =>
+      edge.target === connection.target &&
+      edge.targetHandle === connection.targetHandle
+    )
+  }
+
   const isValidConnection = (connection: Connection): boolean => {
     if (!connection.source || !connection.target) return false
     if (connection.source === connection.target) return false
@@ -221,13 +290,19 @@ export function usePipelineFlow(initialState: PipelineFlowState) {
     const sourceIsOutput = connection.sourceHandle?.endsWith('-output')
     if (!sourceIsOutput) return false
     
-    // Check for existing connections to target
-    const hasExistingInput = state.edges.some(edge => 
-      edge.target === connection.target && edge.targetHandle === connection.targetHandle
-    )
-    if (hasExistingInput) return false
+    // Check if target can accept an input (now always true in edit mode)
+    if (!canNodeAcceptInput(connection.target)) return false
     
-    // Check for cycles
+    // Check if this exact connection already exists
+    const duplicateConnection = state.edges.some(edge =>
+      edge.source === connection.source &&
+      edge.target === connection.target &&
+      edge.sourceHandle === connection.sourceHandle &&
+      edge.targetHandle === connection.targetHandle
+    )
+    if (duplicateConnection) return false
+    
+    // Check for cycles using the new tracking system
     return !wouldCreateCycle(connection.source, connection.target)
   }
 
@@ -278,6 +353,9 @@ export function usePipelineFlow(initialState: PipelineFlowState) {
       }
 
       state.edges.push(newEdge)
+      
+      // Update connection tracking after adding edge
+      updateConnectionTracking()
     },
 
     onNodeClick: (event: { node: Node }) => {
@@ -294,6 +372,8 @@ export function usePipelineFlow(initialState: PipelineFlowState) {
       const edgeIndex = state.edges.findIndex(e => e.id === event.edge.id)
       if (edgeIndex !== -1) {
         state.edges.splice(edgeIndex, 1)
+        // Update connection tracking after removing edge
+        updateConnectionTracking()
       }
     },
 
@@ -418,6 +498,9 @@ export function usePipelineFlow(initialState: PipelineFlowState) {
     }
 
     nodeStates.delete(nodeId)
+    
+    // Update connection tracking after removing node
+    updateConnectionTracking()
   }
 
   const findOptimalPosition = (newNode: Node) => {
@@ -466,8 +549,11 @@ export function usePipelineFlow(initialState: PipelineFlowState) {
     const sourceNode = state.nodes.find(n => n.id === state.selectedNodeId)
     if (!sourceNode) return
 
-    const hasDownstreamConnections = state.edges.some(edge => edge.source === sourceNode.id)
-    if (hasDownstreamConnections) return
+    // Check if source can accept more outputs using connection tracking
+    if (!canNodeAcceptMoreOutputs(sourceNode.id)) return
+    
+    // Check if target can accept input using connection tracking
+    if (!canNodeAcceptInput(newNode.id)) return
 
     const newEdge: Edge = {
       id: nanoid(),
@@ -482,6 +568,9 @@ export function usePipelineFlow(initialState: PipelineFlowState) {
     }
 
     state.edges.push(newEdge)
+    
+    // Update connection tracking after auto-connecting
+    updateConnectionTracking()
   }
 
   // Layout utilities
@@ -599,9 +688,146 @@ export function usePipelineFlow(initialState: PipelineFlowState) {
     flowInstance.value.fitView({ padding: 0.1, duration: 500 })
   }
 
+  // Initialize connection info for a node
+  const initializeNodeConnections = (nodeId: string) => {
+    if (!nodeConnections.has(nodeId)) {
+      nodeConnections.set(nodeId, {
+        inputs: [],
+        outputs: [],
+        hasMultipleOutputs: false,
+        hasMultipleInputs: false,
+        dependsOn: [],
+        dependents: []
+      })
+    }
+  }
+
+  // Update connection tracking when edges change
+  const updateConnectionTracking = () => {
+    // Clear existing connections
+    nodeConnections.clear()
+    
+    // Initialize all nodes
+    state.nodes.forEach(node => initializeNodeConnections(node.id))
+    
+    // Process all edges to build connection info
+    state.edges.forEach(edge => {
+      const sourceId = edge.source
+      const targetId = edge.target
+      
+      // Ensure both nodes have connection info
+      initializeNodeConnections(sourceId)
+      initializeNodeConnections(targetId)
+      
+      const sourceInfo = nodeConnections.get(sourceId)!
+      const targetInfo = nodeConnections.get(targetId)!
+      
+      // Add output connection for source
+      sourceInfo.outputs.push({
+        nodeId: targetId,
+        handleId: edge.targetHandle || `${targetId}-input`,
+        edgeId: edge.id
+      })
+      
+      // Add input connection for target
+      targetInfo.inputs.push({
+        nodeId: sourceId,
+        handleId: edge.sourceHandle || `${sourceId}-output`,
+        edgeId: edge.id
+      })
+      
+      // Update dependency tracking
+      if (!sourceInfo.dependents.includes(targetId)) {
+        sourceInfo.dependents.push(targetId)
+      }
+      if (!targetInfo.dependsOn.includes(sourceId)) {
+        targetInfo.dependsOn.push(sourceId)
+      }
+    })
+    
+    // Update connection flags
+    nodeConnections.forEach((info, nodeId) => {
+      info.hasMultipleOutputs = info.outputs.length > 1
+      info.hasMultipleInputs = info.inputs.length > 1
+    })
+  }
+
+  // Get connection info for a specific node
+  const getNodeConnectionInfo = (nodeId: string): NodeConnectionInfo => {
+    initializeNodeConnections(nodeId)
+    return nodeConnections.get(nodeId)!
+  }
+
+  // Get all nodes that a specific node outputs to
+  const getNodeOutputTargets = (nodeId: string): string[] => {
+    const info = getNodeConnectionInfo(nodeId)
+    return info.outputs.map(conn => conn.nodeId)
+  }
+
+  // Get all nodes that input into a specific node
+  const getNodeInputSources = (nodeId: string): string[] => {
+    const info = getNodeConnectionInfo(nodeId)
+    return info.inputs.map(conn => conn.nodeId)
+  }
+
+  // Check if a node can have additional outputs
+  const canNodeAcceptMoreOutputs = (nodeId: string): boolean => {
+    // In our system, nodes can have unlimited outputs (one-to-many)
+    return state.isEditMode
+  }
+
+  // Get all descendant nodes (nodes that depend on this node)
+  const getNodeDescendants = (nodeId: string): string[] => {
+    const descendants = new Set<string>()
+    const visited = new Set<string>()
+    
+    const traverse = (currentId: string) => {
+      if (visited.has(currentId)) return
+      visited.add(currentId)
+      
+      const info = getNodeConnectionInfo(currentId)
+      info.dependents.forEach(dependentId => {
+        descendants.add(dependentId)
+        traverse(dependentId)
+      })
+    }
+    
+    traverse(nodeId)
+    return Array.from(descendants)
+  }
+
+  // Get all ancestor nodes (nodes this node depends on)
+  const getNodeAncestors = (nodeId: string): string[] => {
+    const ancestors = new Set<string>()
+    const visited = new Set<string>()
+    
+    const traverse = (currentId: string) => {
+      if (visited.has(currentId)) return
+      visited.add(currentId)
+      
+      const info = getNodeConnectionInfo(currentId)
+      info.dependsOn.forEach(ancestorId => {
+        ancestors.add(ancestorId)
+        traverse(ancestorId)
+      })
+    }
+    
+    traverse(nodeId)
+    return Array.from(ancestors)
+  }
+
+  // Initialize connection tracking
+  updateConnectionTracking()
+
+  // Watch for changes to nodes and edges to update connection tracking
+  watch([() => state.nodes, () => state.edges], () => {
+    updateConnectionTracking()
+  }, { deep: true })
+
   // Cleanup
   onUnmounted(() => {
     nodeStates.clear()
+    nodeConnections.clear()
     flowInstance.value = null
     vueFlowComposable = null
   })
@@ -610,6 +836,7 @@ export function usePipelineFlow(initialState: PipelineFlowState) {
     // State
     state,
     nodeStates,
+    nodeConnections,
     flowInstance,
     
     // Computed
@@ -647,6 +874,16 @@ export function usePipelineFlow(initialState: PipelineFlowState) {
     
     // Utilities
     isValidConnection,
-    initializeVueFlow
+    initializeVueFlow,
+    
+    // Connection tracking
+    updateConnectionTracking,
+    getNodeConnectionInfo,
+    getNodeOutputTargets,
+    getNodeInputSources,
+    canNodeAcceptMoreOutputs,
+    canNodeAcceptInput,
+    getNodeDescendants,
+    getNodeAncestors
   }
 } 

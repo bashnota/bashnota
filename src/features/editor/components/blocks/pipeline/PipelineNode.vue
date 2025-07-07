@@ -141,25 +141,25 @@
           <NavigationIcon class="w-4 h-4" />
         </button>
         <div class="quick-nav-hint">Press N for navigation</div>
-      </div>
-      
+            </div>
+
       <!-- Viewport Hints -->
       <div v-if="showViewportHint" class="viewport-hint">
         <span v-if="isViewportTracking">Viewport tracking enabled</span>
         <span v-else>Viewport tracking disabled</span>
-      </div>
+                </div>
       
       <!-- Instructional Overlay -->
       <div v-if="isEditMode && flowState.nodes.length > 1 && !hasMadeConnection && !isConnecting" class="instructional-overlay">
         <MousePointerClickIcon class="w-4 h-4" />
-        <span>Click an output handle, then click an input handle to connect blocks.</span>
+        <span>Click an output handle to start connecting. Supports both one-to-many and many-to-one connections.</span>
       </div>
       
       <!-- Connection Active Overlay -->
       <div v-if="isConnecting" class="instructional-overlay connecting-overlay">
         <MousePointerClickIcon class="w-4 h-4" />
-        <span>Click on a highlighted input handle to complete the connection.</span>
-        <button @click="clearConnectionState" class="cancel-connection-btn">Cancel</button>
+        <span>Click any input to connect. Multiple connections to/from nodes are allowed.</span>
+        <button @click="clearConnectionState" class="cancel-connection-btn">Finish</button>
       </div>
       
       <!-- Floating Add Button -->
@@ -208,12 +208,12 @@
         <div class="progress-details">
           <div class="progress-bar">
             <div class="progress-fill" :style="{ width: `${executionProgress}%` }"></div>
-          </div>
+        </div>
           <span class="progress-text">{{ executedNodes }}/{{ totalExecutableNodes }} blocks completed</span>
         </div>
         <button @click="handleCancelExecution" class="cancel-btn">Cancel</button>
       </div>
-    </div>
+      </div>
     </div>
   </NodeViewWrapper>
 </template>
@@ -223,7 +223,7 @@ import { ref, computed, reactive, onMounted, onUnmounted, nextTick, watch } from
 import { 
   VueFlow, 
   ConnectionMode, 
-  MarkerType,
+  MarkerType, 
   type Node,
   type Edge
 } from '@vue-flow/core'
@@ -325,6 +325,7 @@ const {
   state: flowState,
   handlers: flowHandlers,
   nodeStates,
+  nodeConnections,
   flowInstance,
   hasValidPipeline,
   selectedNode,
@@ -339,7 +340,14 @@ const {
   applySmartLayout,
   focusOnNode,
   focusOnAllNodes,
-  isValidConnection
+  isValidConnection,
+  getNodeConnectionInfo,
+  getNodeOutputTargets,
+  getNodeInputSources,
+  canNodeAcceptMoreOutputs,
+  canNodeAcceptInput,
+  getNodeDescendants,
+  getNodeAncestors
 } = usePipelineFlow({
   nodes: props.node.attrs.nodes || [],
   edges: props.node.attrs.edges || [],
@@ -418,6 +426,21 @@ const historyInfo = computed(() => ({
 }))
 
 const visibleNodesCount = computed(() => getVisibleNodesCount())
+
+// Connection tracking helpers
+const logConnectionInfo = (nodeId: string) => {
+  const info = getNodeConnectionInfo(nodeId)
+  console.log(`Node ${nodeId} connection info:`, {
+    inputs: info.inputs.length,
+    outputs: info.outputs.length,
+    hasMultipleOutputs: info.hasMultipleOutputs,
+    hasMultipleInputs: info.hasMultipleInputs,
+    outputTargets: getNodeOutputTargets(nodeId),
+    inputSources: getNodeInputSources(nodeId),
+    descendants: getNodeDescendants(nodeId),
+    ancestors: getNodeAncestors(nodeId)
+  })
+}
 
 // Event handlers
 const handleTitleUpdate = () => {
@@ -787,10 +810,28 @@ watch([() => flowState.nodes, () => flowState.edges], () => {
   updateNodeVisibility(flowState.nodes, contentRef.value || undefined)
 }, { deep: true })
 
-watch(() => flowState.edges.length, (newLength) => {
+watch(() => flowState.edges.length, (newLength, oldLength) => {
   if (newLength > 0 && !hasMadeConnection.value) {
     hasMadeConnection.value = true
     saveToAttributes()
+  }
+  
+  // Log connection tracking info when edges change
+  if (newLength > oldLength) {
+    console.log('New connection made! Current connection tracking:')
+    flowState.nodes.forEach(node => {
+      const info = getNodeConnectionInfo(node.id)
+      if (info.outputs.length > 0 || info.inputs.length > 0) {
+        console.log(`Node ${node.data?.title || node.id}:`, {
+          inputs: info.inputs.length,
+          outputs: info.outputs.length,
+          hasMultipleOutputs: info.hasMultipleOutputs,
+          hasMultipleInputs: info.hasMultipleInputs,
+          outputTargets: getNodeOutputTargets(node.id),
+          inputSources: getNodeInputSources(node.id)
+        })
+      }
+    })
   }
 })
 
@@ -1030,7 +1071,6 @@ const updatePipelineSettings = (newSettings: any) => {
 }
 
 .floating-add-btn:hover {
-  transform: scale(1.1);
   box-shadow: 0 6px 16px hsl(var(--primary) / 0.4);
 }
 
