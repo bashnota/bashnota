@@ -34,6 +34,7 @@
       class="pipeline-content" 
       :class="{ 'pipeline-executing': isExecuting }"
       @keydown="handleKeydown" 
+      @contextmenu="(e) => handleContextMenu(e, 'pane')"
       tabindex="0"
       ref="contentRef"
     >
@@ -109,17 +110,19 @@
         
         <!-- Custom node template -->
         <template #node-codeblock="{ data, id }">
-          <PipelineCodeNode
-            :id="id"
-            :data="data"
-            :is-edit-mode="isEditMode"
-            :node-state="nodeStates.get(id)"
-            :is-potential-target="potentialTargets.includes(id)"
-            :is-focused="focusedNodeId === id"
-            @duplicate="handleDuplicateNode"
-            @delete="handleDeleteNode"
-            @handle-click="handleHandleClick"
-          />
+          <div @contextmenu="(e) => handleContextMenu(e, 'node', id)">
+            <PipelineCodeNode
+              :id="id"
+              :data="data"
+              :is-edit-mode="isEditMode"
+              :node-state="nodeStates.get(id)"
+              :is-potential-target="potentialTargets.includes(id)"
+              :is-focused="focusedNodeId === id"
+              @duplicate="handleDuplicateNode"
+              @delete="handleDeleteNode"
+              @handle-click="handleHandleClick"
+            />
+          </div>
         </template>
       </VueFlow>
       
@@ -205,6 +208,21 @@
       @close="showKernelSettings = false"
       @apply="handleApplyKernelSettings"
     />
+    
+    <!-- Context Menu -->
+    <PipelineContextMenu
+      :visible="contextMenu.visible"
+      :position="contextMenu.position"
+      :actions="contextMenuActions"
+      @close="closeContextMenu"
+    />
+    
+    <!-- Toast Notifications -->
+    <PipelineToast
+      :toasts="toasts"
+      :nodes="toastNodes"
+      @dismiss="dismissToast"
+    />
     </div>
   </NodeViewWrapper>
 </template>
@@ -218,6 +236,15 @@ import {
   type Node,
   type Edge
 } from '@vue-flow/core'
+import { 
+  type PipelineNodeData, 
+  type PipelineNode, 
+  type PipelineEdge, 
+  type PipelineSettings, 
+  type PipelineExecutionSummary,
+  type PipelineNodeState,
+  type PipelineError
+} from '@/features/editor/types/pipeline'
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import { Background } from '@vue-flow/background'
 import { MiniMap } from '@vue-flow/minimap'
@@ -227,6 +254,14 @@ import {
   Loader as LoaderIcon,
   MousePointerClick as MousePointerClickIcon,
   Navigation as NavigationIcon,
+  Edit as EditIcon,
+  Play as PlayIcon,
+  Copy as CopyIcon,
+  Trash2 as DeleteIcon,
+  Eye as ViewIcon,
+  Layout as LayoutIcon,
+  Settings as SettingsIcon,
+  Square as StopIcon
 } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { useCodeExecutionStore } from '@/features/editor/stores/codeExecutionStore'
@@ -247,13 +282,17 @@ import PipelineCodeEditorModal from './components/PipelineCodeEditorModal.vue'
 import PipelineSettingsModal from './components/PipelineSettingsModal.vue'
 import PipelineNavigationPanel from './components/PipelineNavigationPanel.vue'
 import PipelineCodeNode from './components/PipelineCodeNode.vue'
+import PipelineContextMenu from './components/PipelineContextMenu.vue'
+import PipelineToast, { type PipelineToast as ToastType } from './components/PipelineToast.vue'
+import type { NodeViewProps } from '@tiptap/vue-3'
+import type { PipelineContextMenuAction } from '../../../types/pipeline'
 
-interface PipelineNodeProps {
+const props = defineProps<NodeViewProps & {
   node: {
     attrs: {
       id: string
-      nodes: any[]
-      edges: any[]
+      nodes: PipelineNode[]
+      edges: PipelineEdge[]
       viewport: { x: number; y: number; zoom: number }
       title: string
       kernelMode?: 'shared' | 'isolated' | 'mixed'
@@ -265,11 +304,7 @@ interface PipelineNodeProps {
       isEditMode?: boolean
     }
   }
-  updateAttributes: (attrs: any) => void
-  selected: boolean
-}
-
-const props = defineProps<PipelineNodeProps>()
+}>()
 
 // External dependencies
 const router = useRouter()
@@ -292,12 +327,96 @@ const hasMadeConnection = ref(props.node.attrs.hasMadeConnection || false)
 // Execution state tracking
 const currentExecutingNode = ref<string | null>(null)
 const executionStartTime = ref<number | null>(null)
-const executionSummary = reactive({
+const executionSummary = reactive<PipelineExecutionSummary>({
   total: 0,
   executed: 0,
   skipped: 0,
   errors: 0
 })
+
+// Error tracking
+const pipelineErrors = ref<PipelineError[]>([])
+
+// Toast notifications
+const toasts = ref<ToastType[]>([])
+
+// Debounced save function
+const saveTimeoutId = ref<number | null>(null)
+const debouncedSave = (delay = 300) => {
+  if (saveTimeoutId.value) {
+    clearTimeout(saveTimeoutId.value)
+  }
+  saveTimeoutId.value = window.setTimeout(() => {
+    saveToAttributes()
+    saveTimeoutId.value = null
+  }, delay)
+}
+
+// Error handling utilities
+const addPipelineError = (error: Omit<PipelineError, 'timestamp'>) => {
+  const pipelineError: PipelineError = {
+    ...error,
+    timestamp: Date.now()
+  }
+  pipelineErrors.value.unshift(pipelineError)
+  
+  // Keep only last 50 errors to prevent memory issues
+  if (pipelineErrors.value.length > 50) {
+    pipelineErrors.value = pipelineErrors.value.slice(0, 50)
+  }
+  
+  // Show toast for execution errors
+  if (error.type === 'execution') {
+    showToast({
+      type: 'error',
+      title: 'Execution Error',
+      message: error.message,
+      nodeId: error.nodeId,
+      dismissible: true,
+      duration: 8000
+    })
+  }
+  
+  console.error('Pipeline Error:', pipelineError)
+}
+
+const clearPipelineErrors = (nodeId?: string) => {
+  if (nodeId) {
+    pipelineErrors.value = pipelineErrors.value.filter(error => error.nodeId !== nodeId)
+  } else {
+    pipelineErrors.value = []
+  }
+}
+
+// Toast utilities
+const showToast = (toast: Omit<ToastType, 'id' | 'timestamp'>) => {
+  const newToast: ToastType = {
+    ...toast,
+    id: `toast-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    timestamp: Date.now()
+  }
+  
+  toasts.value.unshift(newToast)
+  
+  // Auto-dismiss if duration is set
+  if (newToast.duration && newToast.duration > 0) {
+    setTimeout(() => {
+      dismissToast(newToast.id)
+    }, newToast.duration)
+  }
+  
+  // Keep only last 10 toasts
+  if (toasts.value.length > 10) {
+    toasts.value = toasts.value.slice(0, 10)
+  }
+}
+
+const dismissToast = (id: string) => {
+  const index = toasts.value.findIndex(toast => toast.id === id)
+  if (index > -1) {
+    toasts.value.splice(index, 1)
+  }
+}
 
 // Modal states
 const showCodeEditor = ref(false)
@@ -305,8 +424,169 @@ const showKernelSettings = ref(false)
 const showTemplateSelector = ref(false)
 const showNavigationPanel = ref(false)
 
+// Context menu state
+const contextMenu = reactive({
+  visible: false,
+  position: { x: 0, y: 0 },
+  target: null as { type: 'node' | 'pane'; nodeId?: string } | null
+})
+
+// Context menu actions
+const getNodeContextActions = (nodeId: string): PipelineContextMenuAction[] => {
+  const node = flowState.nodes.find(n => n.id === nodeId)
+  if (!node) return []
+  
+  const hasCode = node.data?.code && node.data.code.trim().length > 0
+  const isRunning = node.data?.status === 'running'
+  
+  return [
+    {
+      id: 'edit-code',
+      label: 'Edit Code',
+      icon: EditIcon,
+      shortcut: 'Enter',
+      action: () => {
+        flowState.selectedNodeId = nodeId
+        showCodeEditor.value = true
+      }
+    },
+    {
+      id: 'run-node',
+      label: isRunning ? 'Stop Execution' : 'Run Node',
+      icon: isRunning ? StopIcon : PlayIcon,
+      shortcut: 'Ctrl+Enter',
+      disabled: !hasCode && !isRunning,
+      action: () => {
+        if (isRunning) {
+          // TODO: Implement node-specific cancellation
+          console.log('Node-specific cancellation not yet implemented')
+        } else {
+          flowState.selectedNodeId = nodeId
+          handleRunNode()
+        }
+      }
+    },
+    {
+      id: 'view-output',
+      label: 'View Output',
+      icon: ViewIcon,
+      disabled: !node.data?.output,
+      action: () => {
+        // TODO: Implement output viewer
+        console.log('Output viewer not yet implemented')
+      }
+    },
+    {
+      id: 'separator-1',
+      label: '',
+      separator: true,
+      action: () => {}
+    },
+    {
+      id: 'duplicate',
+      label: 'Duplicate',
+      icon: CopyIcon,
+      shortcut: 'Ctrl+D',
+      action: () => handleDuplicateNode(nodeId)
+    },
+    {
+      id: 'delete',
+      label: 'Delete',
+      icon: DeleteIcon,
+      shortcut: 'Delete',
+      action: () => handleDeleteNode(nodeId)
+    }
+  ]
+}
+
+const getPaneContextActions = (): PipelineContextMenuAction[] => {
+  return [
+    {
+      id: 'add-node',
+      label: 'Add Node',
+      icon: PlusIcon,
+      shortcut: 'Ctrl+N',
+      disabled: !isEditMode.value,
+      action: () => handleAddNode()
+    },
+    {
+      id: 'show-templates',
+      label: 'Insert Template',
+      icon: LayoutIcon,
+      disabled: !isEditMode.value,
+      action: () => {
+        showTemplateSelector.value = true
+      }
+    },
+    {
+      id: 'separator-1',
+      label: '',
+      separator: true,
+      action: () => {}
+    },
+    {
+      id: 'auto-layout',
+      label: 'Auto Layout',
+      icon: LayoutIcon,
+      shortcut: 'Ctrl+L',
+      disabled: !isEditMode.value || flowState.nodes.length < 2,
+      action: () => handleAutoLayout()
+    },
+    {
+      id: 'fit-view',
+      label: 'Fit to View',
+      shortcut: 'Ctrl+F',
+      action: () => handleFocusAll()
+    },
+    {
+      id: 'separator-2',
+      label: '',
+      separator: true,
+      action: () => {}
+    },
+    {
+      id: 'execute-pipeline',
+      label: isExecuting.value ? 'Cancel Execution' : 'Execute Pipeline',
+      icon: isExecuting.value ? StopIcon : PlayIcon,
+      shortcut: 'Ctrl+Enter',
+      disabled: !hasValidPipeline.value && !isExecuting.value,
+      action: () => {
+        if (isExecuting.value) {
+          handleCancelExecution()
+        } else {
+          handleExecutePipeline()
+        }
+      }
+    },
+    {
+      id: 'reset-outputs',
+      label: 'Reset All Outputs',
+      disabled: flowState.nodes.length === 0,
+      action: () => handleResetAllOutputs()
+    },
+    {
+      id: 'pipeline-settings',
+      label: 'Pipeline Settings',
+      icon: SettingsIcon,
+      action: () => {
+        showKernelSettings.value = true
+      }
+    }
+  ]
+}
+
+const contextMenuActions = computed((): PipelineContextMenuAction[] => {
+  if (!contextMenu.target) return []
+  
+  if (contextMenu.target.type === 'node' && contextMenu.target.nodeId) {
+    return getNodeContextActions(contextMenu.target.nodeId)
+  } else {
+    return getPaneContextActions()
+  }
+})
+
 // Pipeline settings
-const pipelineSettings = reactive({
+const pipelineSettings = reactive<PipelineSettings>({
   kernelMode: props.node.attrs.kernelMode || 'mixed',
   sharedKernelName: props.node.attrs.sharedKernelName || '',
   executionOrder: props.node.attrs.executionOrder || 'topological',
@@ -328,8 +608,33 @@ const availableKernels = computed(() => {
   return allKernels
 })
 
+// Computed property for toast nodes (transform Vue Flow nodes to expected format)
+const toastNodes = computed(() => {
+  return flowState.nodes.map(node => ({
+    id: node.id,
+    data: { title: node.data?.title }
+  }))
+})
+
 // Initialize composables
 const initialViewport = props.node.attrs.viewport
+
+// Convert PipelineNode[] to Vue Flow Node[] format
+const convertToVueFlowNodes = (pipelineNodes: PipelineNode[]): Node[] => {
+  return pipelineNodes.map(node => ({
+    id: node.id,
+    type: node.type || 'codeblock',
+    position: node.position,
+    data: node.data || {
+      id: node.id,
+      title: 'Code Block',
+      code: '',
+      status: 'idle'
+    },
+    selected: node.selected,
+    dragging: node.dragging
+  }))
+}
 
 // Flow composable
 const {
@@ -360,7 +665,7 @@ const {
   getNodeDescendants,
   getNodeAncestors
 } = usePipelineFlow({
-  nodes: props.node.attrs.nodes || [],
+  nodes: convertToVueFlowNodes(props.node.attrs.nodes || []),
   edges: props.node.attrs.edges || [],
   isEditMode: isEditMode.value,
   isExecuting: false,
@@ -468,6 +773,21 @@ const toggleEditMode = () => {
   isEditMode.value = !isEditMode.value
   flowState.isEditMode = isEditMode.value
   saveToAttributes()
+}
+
+// Context menu handlers
+const handleContextMenu = (event: MouseEvent, type: 'node' | 'pane', nodeId?: string) => {
+  event.preventDefault()
+  event.stopPropagation()
+  
+  contextMenu.visible = true
+  contextMenu.position = { x: event.clientX, y: event.clientY }
+  contextMenu.target = { type, nodeId }
+}
+
+const closeContextMenu = () => {
+  contextMenu.visible = false
+  contextMenu.target = null
 }
 
 const handleToggleFullscreen = () => {
@@ -600,12 +920,29 @@ const handleRunNode = async () => {
       status: 'completed',
       executionTime: Date.now() - startTime
     })
-    console.log(`Node ${node.id} completed successfully in ${node.data.executionTime}ms`)
-  } catch (error) {
-    // Ensure reactive updates
-    Object.assign(node.data, { status: 'error' })
-    console.error(`Error executing node ${node.id}:`, error)
-  } finally {
+            console.log(`Node ${node.id} completed successfully in ${node.data.executionTime}ms`)
+        
+        // Show success toast
+        showToast({
+          type: 'success',
+          title: 'Node Executed',
+          message: `Completed in ${node.data.executionTime}ms`,
+          nodeId: node.id,
+          dismissible: true,
+          duration: 3000
+        })
+      } catch (error) {
+      // Ensure reactive updates
+      Object.assign(node.data, { status: 'error' })
+      
+      // Track the error
+      addPipelineError({
+        nodeId: node.id,
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        type: 'execution'
+      })
+    } finally {
     updateNodeState(node.id, { isExecuting: false })
     saveToAttributes()
   }
@@ -721,6 +1058,33 @@ const handleExecutePipeline = async () => {
     console.log(`Total execution time: ${executionTime}ms`)
     console.log(`Success rate: ${executionSummary.executed}/${nodesWithCode.length} executable nodes`)
     
+    // Show completion toast
+    if (executionSummary.errors === 0) {
+      showToast({
+        type: 'success',
+        title: 'Pipeline Completed',
+        message: `All ${executionSummary.executed} nodes executed successfully in ${executionTime}ms`,
+        dismissible: true,
+        duration: 5000
+      })
+    } else if (executionSummary.executed > 0) {
+      showToast({
+        type: 'warning',
+        title: 'Pipeline Completed with Errors',
+        message: `${executionSummary.executed} successful, ${executionSummary.errors} failed`,
+        dismissible: true,
+        duration: 6000
+      })
+    } else {
+      showToast({
+        type: 'error',
+        title: 'Pipeline Failed',
+        message: `All nodes failed to execute`,
+        dismissible: true,
+        duration: 8000
+      })
+    }
+    
   } catch (error) {
     console.error('❌ Pipeline execution failed:', error)
   } finally {
@@ -777,6 +1141,15 @@ const executeSequential = async (nodesWithCode: any[], emptyNodes: any[]) => {
         // Ensure reactive updates
         Object.assign(node.data, { status: 'error' })
         executionSummary.errors++
+        
+        // Track the error
+        addPipelineError({
+          nodeId: nodeId,
+          message: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          type: 'execution'
+        })
+        
         console.error(`  ❌ ERROR: ${node.data.title || nodeId}:`, error)
         if (pipelineSettings.stopOnError) {
           console.log('  🛑 Pipeline execution stopped due to error (stopOnError is enabled)')
@@ -810,7 +1183,13 @@ const executeParallelWithDependencies = async (nodesWithCode: any[], emptyNodes:
     
     // Determine initial status
     const hasCode = node.data?.code && node.data.code.trim().length > 0
-    nodeStatus.set(node.id, hasCode ? 'waiting' : 'skipped')
+    const initialStatus = hasCode ? 'waiting' : 'skipped'
+    nodeStatus.set(node.id, initialStatus)
+    
+    // Update node data with initial queued status for visual feedback
+    if (hasCode) {
+      Object.assign(node.data, { status: 'queued' })
+    }
   })
   
   // Build dependency relationships from edges
@@ -895,6 +1274,15 @@ const executeParallelWithDependencies = async (nodesWithCode: any[], emptyNodes:
       nodeStatus.set(nodeId, 'error')
       Object.assign(node.data, { status: 'error' })
       executionSummary.errors++
+      
+      // Track the error
+      addPipelineError({
+        nodeId: nodeId,
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        type: 'execution'
+      })
+      
       console.error(`❌ ERROR: ${node.data?.title || nodeId}:`, error)
       
       // If stopOnError is enabled, mark all dependent nodes as skipped
@@ -1037,7 +1425,8 @@ const handleToggleTracking = () => {
 const handleViewportChange = (viewport: any) => {
   onViewportChange(viewport)
   updateNodeVisibility(flowState.nodes, contentRef.value || undefined)
-  saveToAttributes()
+  // Use debounced save for viewport changes to improve performance
+  debouncedSave(100)
 }
 
 // Utilities
@@ -1116,7 +1505,7 @@ const executeCodeBlock = async (node: Node) => {
     }
     
     serverConfig = session.serverConfig
-    kernelName = session.kernelName || pipelineSettings.sharedKernelName
+    kernelName = session.kernelName || pipelineSettings.sharedKernelName || ''
     
     console.log(`Shared mode setup for node ${nodeId}:`, {
       sessionId,
@@ -1285,9 +1674,10 @@ const executeCodeBlock = async (node: Node) => {
 const getNodeColor = (node: Node) => {
   const state = nodeStates.get(node.id)
   if (state?.isSelected) return 'hsl(var(--primary))'
-  if (state?.isExecuting) return 'hsl(var(--warning))'
+  if (state?.isExecuting || node.data?.status === 'running') return 'hsl(var(--warning))'
   if (node.data?.status === 'error') return 'hsl(var(--destructive))'
   if (node.data?.status === 'completed') return 'hsl(var(--success))'
+  if (node.data?.status === 'queued') return 'hsl(var(--primary) / 0.6)'
   return 'hsl(var(--muted))'
 }
 
@@ -1318,6 +1708,12 @@ const handleKeydown = (event: KeyboardEvent) => {
       case 'Enter':
         event.preventDefault()
         if (!isExecuting.value && hasValidPipeline.value) handleExecutePipeline()
+        break
+      case 'd':
+        event.preventDefault()
+        if (selectedNode.value) {
+          handleDuplicateNode(selectedNode.value.id)
+        }
         break
       case 'f':
         event.preventDefault()
@@ -1454,6 +1850,11 @@ onMounted(async () => {
 onUnmounted(() => {
   // Clean up any remaining state
   clearAllSelections()
+  
+  // Clear any pending save timeouts
+  if (saveTimeoutId.value) {
+    clearTimeout(saveTimeoutId.value)
+  }
 })
 
 // Update pipeline settings
