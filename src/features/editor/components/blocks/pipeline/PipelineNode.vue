@@ -129,7 +129,7 @@
       <!-- Navigation Panel -->
       <PipelineNavigationPanel
         v-if="showNavigationPanel"
-        :nodes="flowState.nodes"
+        :nodes="navigationNodes"
         :viewport-info="viewportInfo"
         :history-info="historyInfo"
         :visible-nodes-count="visibleNodesCount"
@@ -613,6 +613,14 @@ const toastNodes = computed(() => {
   return flowState.nodes.map(node => ({
     id: node.id,
     data: { title: node.data?.title }
+  }))
+})
+
+// Computed property for navigation panel nodes (ensure data property is present)
+const navigationNodes = computed(() => {
+  return flowState.nodes.map(node => ({
+    ...node,
+    data: node.data || { title: 'Untitled' }
   }))
 })
 

@@ -90,7 +90,7 @@ export interface NodeConnectionInfo {
 export interface PipelineContextMenuAction {
   id: string
   label: string
-  icon?: string
+  icon?: any // Allow Vue component icons (like Lucide icons)
   shortcut?: string
   separator?: boolean
   disabled?: boolean
