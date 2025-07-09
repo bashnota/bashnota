@@ -6,6 +6,8 @@ import App from './App.vue'
 import router from './router'
 import { analytics } from './services/firebase'
 import { logAnalyticsEvent } from './services/firebase'
+import '@vue-flow/core/dist/style.css'
+import '@vue-flow/core/dist/theme-default.css'
 
 // Text color initialization utility
 const initializeTextColors = () => {

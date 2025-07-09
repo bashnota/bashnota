@@ -11,6 +11,7 @@ export interface CodeCell {
   hasError: boolean
   error: Error | null
   isPublished?: boolean // Flag to indicate this is a cell in a published nota
+  isPipelineCell?: boolean // Flag to indicate this is a pipeline cell that should not use shared session mode
 }
 
 export interface KernelSession {
