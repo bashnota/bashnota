@@ -7,7 +7,12 @@ export interface DefaultModelConfig {
   modelId: string
   autoLoadOnRequest: boolean
   preferSmallModels: boolean
-  fallbackStrategy: 'smallest' | 'fastest' | 'none'
+  fallbackStrategy: 'smallest' | 'fastest' | 'balanced' | 'none'
+  // 🔥 NEW: Enhanced user preference tracking
+  userSelectedModel?: string // Last model manually selected by user
+  lastSetAt?: string // When the default was last set
+  autoLoadStrategy: 'user-selected' | 'smallest' | 'fastest' | 'balanced' | 'none'
+  quickSetupCompleted?: boolean // Whether user has completed quick setup
 }
 
 export interface ModelSelectionCriteria {
@@ -15,6 +20,16 @@ export interface ModelSelectionCriteria {
   preferInstructTuned: boolean
   maxDownloadSize: number // in GB
   excludeExperimental: boolean
+}
+
+// 🔥 NEW: Quick setup preset configurations
+export interface QuickSetupPreset {
+  id: 'fastest' | 'balanced' | 'quality'
+  name: string
+  description: string
+  icon: string
+  criteria: ModelSelectionCriteria
+  autoLoadStrategy: DefaultModelConfig['autoLoadStrategy']
 }
 
 /**
@@ -30,6 +45,182 @@ export class WebLLMDefaultModelService {
       WebLLMDefaultModelService.instance = new WebLLMDefaultModelService()
     }
     return WebLLMDefaultModelService.instance
+  }
+
+  /**
+   * Get quick setup presets for easy model selection
+   */
+  getQuickSetupPresets(): QuickSetupPreset[] {
+    return [
+      {
+        id: 'fastest',
+        name: 'Fastest Response',
+        description: 'Small, efficient models for quick AI assistance',
+        icon: 'Zap',
+        criteria: {
+          preferredSize: 'small',
+          preferInstructTuned: true,
+          maxDownloadSize: 2,
+          excludeExperimental: true
+        },
+        autoLoadStrategy: 'fastest'
+      },
+      {
+        id: 'balanced',
+        name: 'Balanced Performance',
+        description: 'Good balance of speed and quality',
+        icon: 'Scale',
+        criteria: {
+          preferredSize: 'medium',
+          preferInstructTuned: true,
+          maxDownloadSize: 4,
+          excludeExperimental: true
+        },
+        autoLoadStrategy: 'balanced'
+      },
+      {
+        id: 'quality',
+        name: 'Best Quality',
+        description: 'Larger models for highest response quality',
+        icon: 'Crown',
+        criteria: {
+          preferredSize: 'large',
+          preferInstructTuned: true,
+          maxDownloadSize: 8,
+          excludeExperimental: true
+        },
+        autoLoadStrategy: 'balanced'
+      }
+    ]
+  }
+
+  /**
+   * Set up WebLLM with a quick preset configuration
+   */
+  async setupWithPreset(
+    preset: QuickSetupPreset, 
+    availableModels: WebLLMModelInfo[]
+  ): Promise<{ success: boolean; modelId?: string; error?: string }> {
+    try {
+      logger.info(`Setting up WebLLM with preset: ${preset.name}`)
+      
+      const selectedModel = this.selectBestDefaultModel(availableModels, preset.criteria)
+      
+      if (!selectedModel) {
+        return {
+          success: false,
+          error: `No suitable models found for ${preset.name} preset`
+        }
+      }
+
+      // Save the configuration
+      this.saveDefaultModelConfig({
+        enabled: true,
+        modelId: selectedModel.id,
+        autoLoadOnRequest: true,
+        autoLoadStrategy: preset.autoLoadStrategy,
+        userSelectedModel: selectedModel.id,
+        lastSetAt: new Date().toISOString(),
+        quickSetupCompleted: true
+      })
+
+      logger.info(`WebLLM configured with ${preset.name}: ${selectedModel.id}`)
+      
+      return {
+        success: true,
+        modelId: selectedModel.id
+      }
+    } catch (error) {
+      logger.error('Error setting up WebLLM preset:', error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }
+    }
+  }
+
+  /**
+   * Set a specific model as the user's default choice
+   */
+  setUserDefaultModel(modelId: string): void {
+    const currentConfig = this.getDefaultModelConfig()
+    
+    this.saveDefaultModelConfig({
+      ...currentConfig,
+      modelId,
+      userSelectedModel: modelId,
+      autoLoadStrategy: 'user-selected',
+      lastSetAt: new Date().toISOString(),
+      enabled: true,
+      autoLoadOnRequest: true
+    })
+
+    logger.info(`User set default WebLLM model: ${modelId}`)
+    
+    toast({
+      title: 'Default Model Set',
+      description: `${modelId} is now your default WebLLM model for auto-loading`,
+      variant: 'default'
+    })
+  }
+
+  /**
+   * Get the user's selected default model with preference hierarchy
+   */
+  getUserDefaultModel(): string | null {
+    const config = this.getDefaultModelConfig()
+    
+    // Priority: User-selected > Configured modelId > null
+    return config.userSelectedModel || config.modelId || null
+  }
+
+  /**
+   * Check if user has completed quick setup
+   */
+  hasCompletedQuickSetup(): boolean {
+    const config = this.getDefaultModelConfig()
+    return config.quickSetupCompleted || false
+  }
+
+  /**
+   * Get model selection recommendation based on current strategy
+   */
+  getRecommendationForStrategy(
+    models: WebLLMModelInfo[], 
+    strategy: DefaultModelConfig['autoLoadStrategy']
+  ): WebLLMModelInfo | null {
+    switch (strategy) {
+      case 'user-selected':
+        const userModel = this.getUserDefaultModel()
+        return userModel ? models.find(m => m.id === userModel) || null : null
+        
+      case 'fastest':
+        return this.selectBestDefaultModel(models, {
+          preferredSize: 'small',
+          maxDownloadSize: 2,
+          preferInstructTuned: true,
+          excludeExperimental: true
+        })
+        
+      case 'balanced':
+        return this.selectBestDefaultModel(models, {
+          preferredSize: 'medium',
+          maxDownloadSize: 4,
+          preferInstructTuned: true,
+          excludeExperimental: true
+        })
+        
+      case 'smallest':
+        return this.selectBestDefaultModel(models, {
+          preferredSize: 'small',
+          maxDownloadSize: 1,
+          preferInstructTuned: true,
+          excludeExperimental: true
+        })
+        
+      default:
+        return null
+    }
   }
 
   /**
@@ -221,7 +412,9 @@ export class WebLLMDefaultModelService {
       modelId: '',
       autoLoadOnRequest: true,
       preferSmallModels: true,
-      fallbackStrategy: 'smallest'
+      fallbackStrategy: 'smallest',
+      autoLoadStrategy: 'smallest',
+      quickSetupCompleted: false
     }
   }
 

@@ -113,12 +113,25 @@
           </div>
         </div>
 
+        <!-- 🔥 NEW: Default Model Management -->
+        <div v-if="isCompatible">
+          <WebLLMDefaultModelManager
+            :available-models="webLLMModels"
+            :downloaded-models="downloadedModels"
+            :current-model="currentModel"
+            :is-loading="isLoadingWebLLMModels"
+            @refresh-models="handleRefresh"
+            @model-selected="handleModelSelected"
+            @preview-model="handlePreviewModel"
+          />
+        </div>
+
         <!-- Model Selection -->
         <div v-if="isCompatible" class="space-y-4">
           <!-- Model Selection Header -->
           <div class="flex items-center justify-between">
             <div>
-              <h3 class="text-lg font-medium">Select a Model</h3>
+              <h3 class="text-lg font-medium">All Available Models</h3>
               <p class="text-sm text-muted-foreground">
                 {{ webLLMModels.length }} models available • {{ downloadedModels.length }} downloaded
               </p>
@@ -205,6 +218,11 @@
                     <Badge :variant="getModelSizeBadgeVariant((model as any).size || '')">
                       {{ getModelCategory((model as any).size || '').toUpperCase() }}
                     </Badge>
+                    <!-- 🔥 NEW: Default Model Indicator -->
+                    <Badge v-if="isDefaultModel((model as any).id || (model as any).model_id)" variant="default" class="text-xs bg-blue-100 text-blue-800 border-blue-300">
+                      <Crown class="h-3 w-3 mr-1" />
+                      Default
+                    </Badge>
                     <Badge v-if="downloadedModels.includes((model as any).id || (model as any).model_id)" variant="default" class="text-xs">
                       <CheckCircleIcon class="h-3 w-3 mr-1" />
                       Downloaded
@@ -216,6 +234,18 @@
                 <div class="flex items-center justify-between">
                   <span class="text-xs text-muted-foreground">{{ (model as any).downloadSize || 'Unknown Size' }}</span>
                   <div class="flex items-center gap-2">
+                    <!-- 🔥 NEW: Set as Default Button -->
+                    <Button
+                      v-if="!isDefaultModel((model as any).id || (model as any).model_id)"
+                      @click.stop="handleModelSelected((model as any).id || (model as any).model_id)"
+                      variant="outline"
+                      size="sm"
+                      class="text-xs"
+                    >
+                      <Crown class="mr-1 h-3 w-3" />
+                      Set Default
+                    </Button>
+                    
                     <Button
                       @click.stop="loadModel((model as any).id || (model as any).model_id)"
                       :disabled="isModelLoading || currentModel === ((model as any).id || (model as any).model_id)"
@@ -399,12 +429,13 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { Globe as GlobeIcon, RefreshCw as RefreshCwIcon, HardDrive as HardDriveIcon, CheckCircle as CheckCircleIcon, Download as DownloadIcon, XCircle as XCircleIcon, AlertTriangle as AlertTriangleIcon, Gauge as GaugeIcon, X as XIcon, Info as InfoIcon } from 'lucide-vue-next'
+import { Globe as GlobeIcon, RefreshCw as RefreshCwIcon, HardDrive as HardDriveIcon, CheckCircle as CheckCircleIcon, Download as DownloadIcon, XCircle as XCircleIcon, AlertTriangle as AlertTriangleIcon, Gauge as GaugeIcon, X as XIcon, Info as InfoIcon, Crown } from 'lucide-vue-next'
 import { toast } from '@/ui/toast'
 import { Button } from '@/ui/button'
 import { Badge } from '@/ui/badge'
 import BaseProviderSettings from '@/features/settings/components/ai/BaseProviderSettings.vue'
 import ConnectionStatus from '@/features/settings/components/ai/components/ConnectionStatus.vue'
+import WebLLMDefaultModelManager from './components/WebLLMDefaultModelManager.vue'
 import { useProviderSettings, type ModelInfo } from '@/features/settings/components/ai/composables/useProviderSettings'
 import { useAIProviders } from '@/features/ai/components/composables/useAIProviders'
 import type { ConnectionState } from '@/features/settings/components/ai/components/ConnectionStatus.vue'
@@ -580,6 +611,18 @@ const getModelCategory = (size: string): 'small' | 'medium' | 'large' => {
 const getModelName = (modelId: string): string => {
   const model = webLLMModels.value.find((m: any) => (m.id || m.model_id) === modelId)
   return (model as any)?.name || (model as any)?.model_id || modelId
+}
+
+// 🔥 NEW: Check if a model is set as default
+const isDefaultModel = (modelId: string): boolean => {
+  // Import and check WebLLM default model service
+  try {
+    const { webLLMDefaultModelService } = require('@/features/ai/services/webLLMDefaultModelService')
+    const defaultModelId = webLLMDefaultModelService.getUserDefaultModel()
+    return defaultModelId === modelId
+  } catch {
+    return false
+  }
 }
 
 const getModelSizeBadgeVariant = (size: string): 'default' | 'secondary' | 'outline' => {
@@ -795,6 +838,27 @@ const handleTest = async (): Promise<boolean> => {
 const handleRefresh = async () => {
   await loadModels()
   await checkDownloadedModels()
+}
+
+// 🔥 NEW: Event handlers for WebLLMDefaultModelManager
+const handleModelSelected = (modelId: string) => {
+  selectedModelId.value = modelId
+  
+  toast({
+    title: 'Model Selected',
+    description: `${getModelName(modelId)} set as default model`,
+    variant: 'default'
+  })
+}
+
+const handlePreviewModel = (model: WebLLMModelInfo) => {
+  selectedModelId.value = model.id
+  
+  toast({
+    title: 'Model Preview',
+    description: `Previewing ${model.name || model.id}`,
+    variant: 'default'
+  })
 }
 
 // Watch for changes in the current model

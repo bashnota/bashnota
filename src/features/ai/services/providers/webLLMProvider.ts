@@ -58,33 +58,54 @@ export class WebLLMProvider implements AIProvider {
     if (!this.engine && webLLMDefaultModelService.shouldAutoLoad(this.currentModel)) {
       let autoLoadModelId = webLLMDefaultModelService.getAutoLoadModelId();
       
-      // 🔥 NEW: If no model is configured, auto-select a sensible default
+      // 🔥 ENHANCED: Smart model selection based on user preferences and auto-load strategy
       if (!autoLoadModelId) {
-        logger.info('No WebLLM model configured, attempting to auto-select a default model...');
+        logger.info('No WebLLM model configured, attempting intelligent model selection...');
         try {
           const availableModels = await this.getAvailableModels();
-          const recommendedModel = webLLMDefaultModelService.selectBestDefaultModel(availableModels, {
-            preferredSize: 'small',
-            maxDownloadSize: 4, // Prefer smaller models for auto-loading
-            preferInstructTuned: true
-          });
+          const config = webLLMDefaultModelService.getDefaultModelConfig();
+          
+          // Use configured strategy or default to smallest for auto-loading
+          const strategy = config.autoLoadStrategy || 'smallest';
+          const recommendedModel = webLLMDefaultModelService.getRecommendationForStrategy(availableModels, strategy);
           
           if (recommendedModel) {
             autoLoadModelId = recommendedModel.id;
-            logger.info(`Auto-selected WebLLM model: ${autoLoadModelId}`);
+            logger.info(`Auto-selected WebLLM model using ${strategy} strategy: ${autoLoadModelId}`);
             
-            // Save this as the default for future use
+            // Save this as the default for future use, preserving user preferences
             webLLMDefaultModelService.saveDefaultModelConfig({
               modelId: autoLoadModelId,
               enabled: true,
-              autoLoadOnRequest: true
+              autoLoadOnRequest: true,
+              autoLoadStrategy: strategy
             });
           } else {
-            throw new Error('No suitable WebLLM models found for auto-loading');
+            // Fallback to any small model if strategy fails
+            const fallbackModel = webLLMDefaultModelService.selectBestDefaultModel(availableModels, {
+              preferredSize: 'small',
+              maxDownloadSize: 2,
+              preferInstructTuned: true,
+              excludeExperimental: true
+            });
+            
+            if (fallbackModel) {
+              autoLoadModelId = fallbackModel.id;
+              logger.info(`Fallback WebLLM model selected: ${autoLoadModelId}`);
+              
+              webLLMDefaultModelService.saveDefaultModelConfig({
+                modelId: autoLoadModelId,
+                enabled: true,
+                autoLoadOnRequest: true,
+                autoLoadStrategy: 'smallest'
+              });
+            } else {
+              throw new Error('No suitable WebLLM models found for auto-loading');
+            }
           }
         } catch (error) {
           logger.error('Failed to auto-select WebLLM model:', error);
-          throw new Error('WebLLM auto-loading failed: No model configured and unable to auto-select a suitable model. Please manually select a model in Settings > AI Assistant > AI Providers.');
+          throw new Error('WebLLM auto-loading failed: No suitable models found. Please manually select a model in Settings > AI Assistant > AI Providers or check your browser compatibility.');
         }
       }
       
@@ -145,35 +166,53 @@ export class WebLLMProvider implements AIProvider {
     if (!this.engine && webLLMDefaultModelService.shouldAutoLoad(this.currentModel)) {
       let autoLoadModelId = webLLMDefaultModelService.getAutoLoadModelId();
       
-      // 🔥 NEW: If no model is configured, auto-select a sensible default
-      if (!autoLoadModelId) {
-        logger.info('No WebLLM model configured for streaming, attempting to auto-select a default model...');
-        try {
-          const availableModels = await this.getAvailableModels();
-          const recommendedModel = webLLMDefaultModelService.selectBestDefaultModel(availableModels, {
-            preferredSize: 'small',
-            maxDownloadSize: 4,
-            preferInstructTuned: true
-          });
-          
-          if (recommendedModel) {
-            autoLoadModelId = recommendedModel.id;
-            logger.info(`Auto-selected WebLLM model for streaming: ${autoLoadModelId}`);
+              // 🔥 ENHANCED: Smart model selection for streaming (reuse main logic)
+        if (!autoLoadModelId) {
+          logger.info('No WebLLM model configured for streaming, attempting intelligent model selection...');
+          try {
+            const availableModels = await this.getAvailableModels();
+            const config = webLLMDefaultModelService.getDefaultModelConfig();
             
-            // Save this as the default for future use
-            webLLMDefaultModelService.saveDefaultModelConfig({
-              modelId: autoLoadModelId,
-              enabled: true,
-              autoLoadOnRequest: true
-            });
-          } else {
-            throw new Error('No suitable WebLLM models found for auto-loading');
+            const strategy = config.autoLoadStrategy || 'smallest';
+            const recommendedModel = webLLMDefaultModelService.getRecommendationForStrategy(availableModels, strategy);
+            
+            if (recommendedModel) {
+              autoLoadModelId = recommendedModel.id;
+              logger.info(`Auto-selected WebLLM model for streaming using ${strategy} strategy: ${autoLoadModelId}`);
+              
+              webLLMDefaultModelService.saveDefaultModelConfig({
+                modelId: autoLoadModelId,
+                enabled: true,
+                autoLoadOnRequest: true,
+                autoLoadStrategy: strategy
+              });
+            } else {
+              const fallbackModel = webLLMDefaultModelService.selectBestDefaultModel(availableModels, {
+                preferredSize: 'small',
+                maxDownloadSize: 2,
+                preferInstructTuned: true,
+                excludeExperimental: true
+              });
+              
+              if (fallbackModel) {
+                autoLoadModelId = fallbackModel.id;
+                logger.info(`Fallback WebLLM model selected for streaming: ${autoLoadModelId}`);
+                
+                webLLMDefaultModelService.saveDefaultModelConfig({
+                  modelId: autoLoadModelId,
+                  enabled: true,
+                  autoLoadOnRequest: true,
+                  autoLoadStrategy: 'smallest'
+                });
+              } else {
+                throw new Error('No suitable WebLLM models found for auto-loading');
+              }
+            }
+          } catch (error) {
+            logger.error('Failed to auto-select WebLLM model for streaming:', error);
+            throw new Error('WebLLM auto-loading failed: No suitable models found. Please manually select a model in Settings > AI Assistant > AI Providers or check your browser compatibility.');
           }
-        } catch (error) {
-          logger.error('Failed to auto-select WebLLM model for streaming:', error);
-          throw new Error('WebLLM auto-loading failed: No model configured and unable to auto-select a suitable model. Please manually select a model in Settings > AI Assistant > AI Providers.');
         }
-      }
       
       if (autoLoadModelId) {
         logger.info(`Auto-loading WebLLM model for streaming: ${autoLoadModelId}`);

@@ -106,18 +106,43 @@ export const useAISettingsStore = defineStore('aiSettings', () => {
     settings.value.webllmDefaultModel = modelId
     saveSettings()
     logger.info(`WebLLM default model set to: ${modelId}`)
+    
+    // 🔥 NEW: Also update the WebLLM default model service
+    import('@/features/ai/services/webLLMDefaultModelService').then(({ webLLMDefaultModelService }) => {
+      webLLMDefaultModelService.setUserDefaultModel(modelId)
+    }).catch(error => {
+      logger.error('Failed to update WebLLM default model service:', error)
+    })
   }
 
   const setWebLLMAutoLoad = (enabled: boolean) => {
     settings.value.webllmAutoLoad = enabled
     saveSettings()
     logger.info(`WebLLM auto-load ${enabled ? 'enabled' : 'disabled'}`)
+    
+    // 🔥 NEW: Sync with WebLLM default model service
+    import('@/features/ai/services/webLLMDefaultModelService').then(({ webLLMDefaultModelService }) => {
+      webLLMDefaultModelService.saveDefaultModelConfig({
+        autoLoadOnRequest: enabled
+      })
+    }).catch(error => {
+      logger.error('Failed to update WebLLM auto-load setting:', error)
+    })
   }
 
   const setWebLLMAutoLoadStrategy = (strategy: 'default' | 'smallest' | 'fastest' | 'balanced' | 'none') => {
     settings.value.webllmAutoLoadStrategy = strategy
     saveSettings()
     logger.info(`WebLLM auto-load strategy set to: ${strategy}`)
+    
+    // 🔥 NEW: Sync with WebLLM default model service
+    import('@/features/ai/services/webLLMDefaultModelService').then(({ webLLMDefaultModelService }) => {
+      webLLMDefaultModelService.saveDefaultModelConfig({
+        autoLoadStrategy: strategy === 'default' ? 'balanced' : strategy as any
+      })
+    }).catch(error => {
+      logger.error('Failed to update WebLLM auto-load strategy:', error)
+    })
   }
 
   const getWebLLMSettings = () => ({
@@ -126,6 +151,31 @@ export const useAISettingsStore = defineStore('aiSettings', () => {
     autoLoad: settings.value.webllmAutoLoad,
     autoLoadStrategy: settings.value.webllmAutoLoadStrategy
   })
+
+  // 🔥 NEW: Sync settings with WebLLM default model service
+  const syncWebLLMSettings = async () => {
+    try {
+      const { webLLMDefaultModelService } = await import('@/features/ai/services/webLLMDefaultModelService')
+      const config = webLLMDefaultModelService.getDefaultModelConfig()
+      
+      // Sync from WebLLM service to store
+      if (config.userSelectedModel && config.userSelectedModel !== settings.value.webllmDefaultModel) {
+        settings.value.webllmDefaultModel = config.userSelectedModel
+      }
+      
+      if (config.autoLoadOnRequest !== settings.value.webllmAutoLoad) {
+        settings.value.webllmAutoLoad = config.autoLoadOnRequest
+      }
+      
+      if (config.autoLoadStrategy && config.autoLoadStrategy !== settings.value.webllmAutoLoadStrategy) {
+        settings.value.webllmAutoLoadStrategy = config.autoLoadStrategy as any
+      }
+      
+      saveSettings()
+    } catch (error) {
+      logger.error('Failed to sync WebLLM settings:', error)
+    }
+  }
 
   // Load settings on store initialization
   loadSettings()
@@ -157,7 +207,8 @@ export const useAISettingsStore = defineStore('aiSettings', () => {
     setWebLLMDefaultModel,
     setWebLLMAutoLoad,
     setWebLLMAutoLoadStrategy,
-    getWebLLMSettings
+    getWebLLMSettings,
+    syncWebLLMSettings
   }
 })
 
