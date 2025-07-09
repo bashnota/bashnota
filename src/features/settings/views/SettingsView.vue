@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { Search, ChevronRight, ChevronDown, FileText, Palette, SparklesIcon, Plug, Keyboard, Settings } from 'lucide-vue-next'
 import { Input } from '@/ui/input'
 import SettingsPanel from '@/features/settings/components/SettingsPanel.vue'
+
+const route = useRoute()
 
 // Search functionality
 const searchQuery = ref('')
@@ -32,12 +35,13 @@ const settingsCategories = ref([
   },
   {
     id: 'ai',
-    title: 'AI & Machine Learning',
+    title: 'AI Assistant',
     icon: SparklesIcon,
-    expanded: false,
+    expanded: true,
     subcategories: [
       { id: 'ai-providers', title: 'AI Providers', component: 'AIProvidersSettings' },
       { id: 'ai-actions', title: 'AI Actions', component: 'AIActionsSettings' },
+      { id: 'ai-code-actions', title: 'AI Code Actions', component: 'AICodeActionsSettings' },
       { id: 'ai-generation', title: 'Generation Settings', component: 'AIGenerationSettings' }
     ]
   },
@@ -76,7 +80,7 @@ const settingsCategories = ref([
 ])
 
 // Currently selected setting
-const selectedSetting = ref('text-editing')
+const selectedSetting = ref('ai-providers')
 
 // Filtered categories based on search
 const filteredCategories = computed(() => {
@@ -105,7 +109,40 @@ const toggleCategory = (categoryId: string) => {
 // Select a setting
 const selectSetting = (settingId: string) => {
   selectedSetting.value = settingId
+  
+  // Find and expand the parent category
+  for (const category of settingsCategories.value) {
+    const hasSubcategory = category.subcategories.some(sub => sub.id === settingId)
+    if (hasSubcategory) {
+      category.expanded = true
+      break
+    }
+  }
 }
+
+// Handle query parameters for direct navigation
+const handleQueryNavigation = () => {
+  const section = route.query.section as string
+  if (section) {
+    // Check if the section exists
+    const exists = settingsCategories.value.some(category => 
+      category.subcategories.some(sub => sub.id === section)
+    )
+    if (exists) {
+      selectSetting(section)
+    }
+  }
+}
+
+// Initialize
+onMounted(() => {
+  handleQueryNavigation()
+})
+
+// Watch for route changes
+watch(() => route.query.section, () => {
+  handleQueryNavigation()
+})
 
 // Get the current setting title
 const currentSettingTitle = computed(() => {

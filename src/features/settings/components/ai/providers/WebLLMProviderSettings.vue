@@ -11,32 +11,28 @@
   >
     <template #content>
       <div class="space-y-6">
-        <!-- Browser Compatibility -->
+        <!-- Browser Compatibility Status -->
         <div class="space-y-3">
-          <Label class="text-sm font-medium">Browser Compatibility</Label>
+          <h3 class="text-sm font-medium">Browser Compatibility</h3>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div class="flex items-center space-x-2 p-3 border rounded-md">
-              <component :is="webGLSupported ? CheckCircleIcon : XCircleIcon" 
-                         :class="webGLSupported ? 'text-green-500' : 'text-red-500'" 
-                         class="h-4 w-4" />
+              <CheckCircleIcon v-if="webGLSupported" class="h-4 w-4 text-green-500" />
+              <XCircleIcon v-else class="h-4 w-4 text-red-500" />
               <span class="text-sm">WebGL Support</span>
             </div>
             <div class="flex items-center space-x-2 p-3 border rounded-md">
-              <component :is="wasmSupported ? CheckCircleIcon : XCircleIcon" 
-                         :class="wasmSupported ? 'text-green-500' : 'text-red-500'" 
-                         class="h-4 w-4" />
+              <CheckCircleIcon v-if="wasmSupported" class="h-4 w-4 text-green-500" />
+              <XCircleIcon v-else class="h-4 w-4 text-red-500" />
               <span class="text-sm">WebAssembly Support</span>
             </div>
             <div class="flex items-center space-x-2 p-3 border rounded-md">
-              <component :is="isWebLLMSupported ? CheckCircleIcon : AlertTriangleIcon" 
-                         :class="isWebLLMSupported ? 'text-green-500' : 'text-yellow-500'" 
-                         class="h-4 w-4" />
+              <CheckCircleIcon v-if="isWebLLMSupported" class="h-4 w-4 text-green-500" />
+              <AlertTriangleIcon v-else class="h-4 w-4 text-yellow-500" />
               <span class="text-sm">WebGPU Support</span>
             </div>
             <div class="flex items-center space-x-2 p-3 border rounded-md">
-              <component :is="memoryEstimate ? CheckCircleIcon : AlertTriangleIcon" 
-                         :class="memoryEstimate && memoryEstimate >= 4 ? 'text-green-500' : 'text-yellow-500'" 
-                         class="h-4 w-4" />
+              <CheckCircleIcon v-if="memoryEstimate && memoryEstimate >= 4" class="h-4 w-4 text-green-500" />
+              <AlertTriangleIcon v-else class="h-4 w-4 text-yellow-500" />
               <span class="text-sm">RAM: {{ memoryEstimate ? `${memoryEstimate}GB` : 'Unknown' }}</span>
             </div>
           </div>
@@ -52,22 +48,6 @@
           </div>
         </div>
 
-        <!-- Current Model Status -->
-        <div class="p-4 bg-muted/50 rounded-lg">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center">
-              <GaugeIcon class="h-5 w-5 mr-2 text-primary" />
-              <h3 class="font-medium">Current Status</h3>
-            </div>
-            <Badge :variant="currentModel ? 'default' : 'outline'">
-              {{ currentModel ? 'Model Loaded' : 'No Model' }}
-            </Badge>
-          </div>
-          <p class="mt-2 text-sm text-muted-foreground">
-            {{ modelStatus }}
-          </p>
-        </div>
-
         <!-- Connection Status -->
         <ConnectionStatus
           :state="connectionState"
@@ -77,89 +57,37 @@
           @retry="handleTest"
         />
 
-        <!-- Downloaded Models Summary -->
-        <div v-if="downloadedModels.length > 0" class="p-4 bg-muted/50 rounded-lg">
+        <!-- Current Model Status -->
+        <div class="p-4 bg-muted/50 rounded-lg">
           <div class="flex items-center justify-between">
             <div class="flex items-center">
-              <HardDriveIcon class="h-5 w-5 mr-2 text-primary" />
-              <h3 class="font-medium">Downloaded Models</h3>
+              <GaugeIcon class="h-5 w-5 mr-2 text-primary" />
+              <h3 class="font-medium">Current Status</h3>
             </div>
-            <Badge variant="outline">{{ cacheSize }} used</Badge>
-          </div>
-          <div class="mt-3 flex flex-wrap gap-2">
-            <Badge 
-              v-for="modelId in downloadedModels" 
-              :key="modelId" 
-              :variant="currentModel === modelId ? 'default' : 'outline'"
-              class="flex items-center gap-1"
-            >
-              <CheckCircleIcon class="h-3 w-3" />
-              {{ getModelName(modelId) }}
-            </Badge>
-          </div>
-          <p class="mt-2 text-xs text-muted-foreground">
-            These models are already downloaded and cached in your browser.
-          </p>
-        </div>
-
-        <!-- Model Selection -->
-        <div :class="{ 'opacity-50 pointer-events-none': !isCompatible }">
-          <div class="space-y-2">
-            <Label for="model-select">Select a Model</Label>
-            <SearchableSelect
-              v-model="selectedModelId"
-              :options="modelOptions"
-              placeholder="Select a model"
-              max-height="400px"
-              search-placeholder="Search models..."
-              :disabled="isModelLoading"
-            />
-          </div>
-
-          <!-- Model Information -->
-          <div v-if="selectedModel" class="mt-4 p-3 bg-purple-50 rounded-md">
-            <div class="flex items-start justify-between">
-              <div>
-                <h4 class="font-medium text-purple-900">{{ selectedModel.name }}</h4>
-                <p class="text-sm text-purple-700 mt-1">{{ selectedModel.description || 'AI model for text generation' }}</p>
-              </div>
-              <div class="text-right text-xs text-purple-600 space-y-1">
-                <div>
-                  <Badge variant="outline" class="border-purple-300 text-purple-700">{{ selectedModel.size }}</Badge>
-                </div>
-                <div class="text-xs">{{ selectedModel.downloadSize }}</div>
-              </div>
-            </div>
-            
-            <!-- Download/Load Status -->
-            <div class="mt-3 flex items-center justify-between">
-              <div class="text-sm">
-                <span v-if="isModelDownloaded" class="text-green-600">✓ Downloaded</span>
-                <span v-else class="text-gray-600">Not downloaded</span>
-                <span v-if="currentModel === selectedModelId" class="text-blue-600 ml-2">• Currently loaded</span>
-              </div>
+            <div class="flex items-center gap-2">
+              <Badge :variant="currentModel ? 'default' : 'outline'">
+                {{ currentModel ? 'Model Loaded' : 'No Model' }}
+              </Badge>
               <Button
-                variant="default"
+                v-if="currentModel"
+                @click="unloadCurrentModel"
+                variant="outline"
                 size="sm"
-                @click="loadModel"
-                :disabled="isModelLoading || currentModel === selectedModelId"
-                class="text-xs"
+                class="text-red-600 hover:text-red-700"
               >
-                <template v-if="!isModelLoading">
-                  <DownloadIcon v-if="!isModelDownloaded" class="mr-2 h-4 w-4" />
-                  <CheckCircleIcon v-else class="mr-2 h-4 w-4" />
-                  {{ getLoadButtonText() }}
-                </template>
-                <RefreshCwIcon v-else class="mr-2 h-4 w-4 animate-spin" />
-                <span v-if="isModelLoading">Loading...</span>
+                <XIcon class="h-4 w-4 mr-1" />
+                Unload
               </Button>
             </div>
           </div>
+          <p class="mt-2 text-sm text-muted-foreground">
+            {{ modelStatus }}
+          </p>
 
           <!-- Loading Progress -->
           <div v-if="isModelLoading" class="mt-4 space-y-2">
             <div class="flex items-center justify-between">
-              <Label>Loading Progress</Label>
+              <span class="text-sm font-medium">Loading Progress</span>
               <span class="text-sm">{{ Math.round(loadingProgress) }}%</span>
             </div>
             <div class="w-full bg-blue-200 rounded-full h-2">
@@ -173,7 +101,7 @@
             </p>
           </div>
 
-          <!-- Error Message -->
+          <!-- Loading Error -->
           <div v-if="loadingError" class="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
             <div class="flex items-start">
               <XCircleIcon class="h-4 w-4 text-red-600 mt-0.5 mr-2" />
@@ -185,10 +113,180 @@
           </div>
         </div>
 
+        <!-- Model Selection -->
+        <div v-if="isCompatible" class="space-y-4">
+          <!-- Model Selection Header -->
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-lg font-medium">Select a Model</h3>
+              <p class="text-sm text-muted-foreground">
+                {{ webLLMModels.length }} models available • {{ downloadedModels.length }} downloaded
+              </p>
+            </div>
+            <Button
+              @click="handleRefresh"
+              :disabled="isLoadingWebLLMModels"
+              variant="outline"
+              size="sm"
+            >
+              <RefreshCwIcon :class="['h-4 w-4 mr-2', isLoadingWebLLMModels && 'animate-spin']" />
+              Refresh
+            </Button>
+          </div>
+
+          <!-- Model Categories -->
+          <div class="flex space-x-1 p-1 bg-muted rounded-lg">
+            <button
+              v-for="category in modelCategories"
+              :key="category.id"
+                             @click="() => selectedCategory = category.id as 'all' | 'small' | 'medium' | 'large'"
+              :class="[
+                'flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors',
+                selectedCategory === category.id
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              ]"
+            >
+              {{ category.name }}
+              <span class="ml-1 text-xs opacity-60">({{ category.count }})</span>
+            </button>
+          </div>
+
+          <!-- Downloaded Models Quick Access -->
+          <div v-if="downloadedModels.length > 0" class="p-4 bg-green-50 border border-green-200 rounded-lg">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center">
+                <HardDriveIcon class="h-5 w-5 mr-2 text-green-600" />
+                <h4 class="font-medium text-green-800">Downloaded Models</h4>
+              </div>
+              <Badge variant="outline" class="border-green-300 text-green-700">{{ cacheSize }} used</Badge>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="modelId in downloadedModels"
+                :key="modelId"
+                @click="selectModel(modelId)"
+                :class="[
+                  'px-3 py-1 text-sm rounded-md border transition-colors',
+                  selectedModelId === modelId
+                    ? 'bg-green-600 text-white border-green-600'
+                    : currentModel === modelId
+                    ? 'bg-green-100 text-green-800 border-green-300'
+                    : 'bg-white text-green-700 border-green-300 hover:bg-green-50'
+                ]"
+              >
+                {{ getModelName(modelId) }}
+                <span v-if="currentModel === modelId" class="ml-1 text-xs">• Active</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Model Grid -->
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div
+              v-for="model in filteredModels"
+              :key="(model as any).id || (model as any).model_id || 'unknown'"
+              :class="[
+                'p-4 border-2 rounded-lg cursor-pointer transition-all hover:shadow-md',
+                selectedModelId === ((model as any).id || (model as any).model_id)
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border hover:border-primary/50'
+              ]"
+              @click="selectModel((model as any).id || (model as any).model_id)"
+            >
+              <div class="space-y-3">
+                <!-- Model Header -->
+                <div class="flex items-start justify-between">
+                  <div class="flex-1">
+                    <h4 class="font-medium">{{ (model as any).name || (model as any).model_id || 'Unknown Model' }}</h4>
+                    <p class="text-sm text-muted-foreground mt-1">{{ (model as any).size || 'Unknown Size' }}</p>
+                  </div>
+                  <div class="flex flex-col items-end gap-1">
+                    <Badge :variant="getModelSizeBadgeVariant((model as any).size || '')">
+                      {{ getModelCategory((model as any).size || '').toUpperCase() }}
+                    </Badge>
+                    <Badge v-if="downloadedModels.includes((model as any).id || (model as any).model_id)" variant="default" class="text-xs">
+                      <CheckCircleIcon class="h-3 w-3 mr-1" />
+                      Downloaded
+                    </Badge>
+                  </div>
+                </div>
+
+                <!-- Model Status -->
+                <div class="flex items-center justify-between">
+                  <span class="text-xs text-muted-foreground">{{ (model as any).downloadSize || 'Unknown Size' }}</span>
+                  <div class="flex items-center gap-2">
+                    <Button
+                      @click.stop="loadModel((model as any).id || (model as any).model_id)"
+                      :disabled="isModelLoading || currentModel === ((model as any).id || (model as any).model_id)"
+                      variant="default"
+                      size="sm"
+                      class="text-xs"
+                    >
+                      <template v-if="!isModelLoading || selectedModelId !== ((model as any).id || (model as any).model_id)">
+                        <DownloadIcon v-if="!downloadedModels.includes((model as any).id || (model as any).model_id)" class="mr-1 h-3 w-3" />
+                        <CheckCircleIcon v-else class="mr-1 h-3 w-3" />
+                        {{
+                          currentModel === ((model as any).id || (model as any).model_id) ? 'Active' :
+                          downloadedModels.includes((model as any).id || (model as any).model_id) ? 'Load' : 'Download'
+                        }}
+                      </template>
+                      <div v-else class="flex items-center">
+                        <RefreshCwIcon class="mr-1 h-3 w-3 animate-spin" />
+                        Loading...
+                      </div>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Selected Model Details -->
+          <div v-if="selectedModel" class="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+            <div class="flex items-start justify-between">
+              <div>
+                <h4 class="font-medium text-purple-900">{{ (selectedModel as any).name || (selectedModel as any).model_id || 'Unknown Model' }}</h4>
+                <p class="text-sm text-purple-700 mt-1">{{ (selectedModel as any).description || 'AI model for text generation' }}</p>
+              </div>
+              <div class="text-right text-xs text-purple-600 space-y-1">
+                <div>
+                  <Badge variant="outline" class="border-purple-300 text-purple-700">{{ (selectedModel as any).size }}</Badge>
+                </div>
+                <div class="text-xs">{{ (selectedModel as any).downloadSize }}</div>
+              </div>
+            </div>
+            
+            <!-- Download/Load Status -->
+            <div class="mt-3 flex items-center justify-between">
+              <div class="text-sm">
+                <span v-if="isModelDownloaded" class="text-green-600">✓ Downloaded</span>
+                <span v-else class="text-gray-600">Not downloaded</span>
+                <span v-if="currentModel === selectedModelId" class="text-blue-600 ml-2">• Currently loaded</span>
+              </div>
+              <Button
+                variant="default"
+                size="sm"
+                @click="loadModel()"
+                :disabled="isModelLoading || currentModel === selectedModelId"
+                class="text-xs"
+              >
+                <template v-if="!isModelLoading">
+                  <DownloadIcon v-if="!isModelDownloaded" class="mr-2 h-4 w-4" />
+                  <CheckCircleIcon v-else class="mr-2 h-4 w-4" />
+                  {{ getLoadButtonText() }}
+                </template>
+                <RefreshCwIcon v-else class="mr-2 h-4 w-4 animate-spin" />
+                <span v-if="isModelLoading">Loading...</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+
         <!-- Advanced Settings -->
         <div v-if="isCompatible && isConnected" class="space-y-4">
           <div class="flex items-center justify-between">
-            <Label class="text-sm font-medium">Advanced Settings</Label>
+            <h3 class="text-sm font-medium">Advanced Settings</h3>
             <Button
               variant="ghost"
               size="sm"
@@ -202,55 +300,34 @@
             <!-- Model Parameters -->
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <Label class="text-xs">Temperature ({{ temperature[0].toFixed(1) }})</Label>
-                <Slider
-                  v-model="temperature"
-                  :min="0"
-                  :max="2"
-                  :step="0.1"
-                  class="mt-2"
-                />
-                <p class="text-xs text-gray-500 mt-1">
-                  Controls randomness in responses
-                </p>
+                <h4 class="text-xs font-medium">Temperature ({{ temperature[0].toFixed(1) }})</h4>
+                <div class="mt-2 space-y-1">
+                  <input
+                    type="range"
+                    :value="temperature[0]"
+                    @input="(e: Event) => temperature[0] = parseFloat((e.target as HTMLInputElement).value)"
+                    min="0"
+                    max="2"
+                    step="0.1"
+                    class="w-full"
+                  />
+                  <p class="text-xs text-gray-500">Controls randomness in responses</p>
+                </div>
               </div>
               <div>
-                <Label class="text-xs">Top P ({{ topP[0].toFixed(2) }})</Label>
-                <Slider
-                  v-model="topP"
-                  :min="0"
-                  :max="1"
-                  :step="0.05"
-                  class="mt-2"
-                />
-                <p class="text-xs text-gray-500 mt-1">
-                  Nucleus sampling parameter
-                </p>
-              </div>
-            </div>
-
-            <!-- Performance Settings -->
-            <div class="space-y-3">
-              <div class="flex items-center justify-between">
-                <div>
-                  <Label class="text-sm">Enable WebGPU Acceleration</Label>
-                  <p class="text-xs text-gray-500">Use GPU for faster inference (if supported)</p>
+                <h4 class="text-xs font-medium">Top P ({{ topP[0].toFixed(2) }})</h4>
+                <div class="mt-2 space-y-1">
+                  <input
+                    type="range"
+                    :value="topP[0]"
+                    @input="(e: Event) => topP[0] = parseFloat((e.target as HTMLInputElement).value)"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    class="w-full"
+                  />
+                  <p class="text-xs text-gray-500">Nucleus sampling parameter</p>
                 </div>
-                <Switch v-model="useWebGPU" :disabled="!isWebLLMSupported" />
-              </div>
-              
-              <div class="space-y-2">
-                <Label class="text-xs">Max Tokens ({{ maxTokens[0] }})</Label>
-                <Slider
-                  v-model="maxTokens"
-                  :min="100"
-                  :max="2048"
-                  :step="50"
-                  class="mt-2"
-                />
-                <p class="text-xs text-gray-500">
-                  Maximum response length
-                </p>
               </div>
             </div>
           </div>
@@ -259,7 +336,7 @@
         <!-- Cache Management -->
         <div v-if="isCompatible && downloadedModels.length > 0" class="space-y-4">
           <div class="flex items-center justify-between">
-            <Label class="text-sm font-medium">Cache Management</Label>
+            <h3 class="text-sm font-medium">Cache Management</h3>
             <div class="flex gap-2">
               <Button
                 variant="outline"
@@ -321,35 +398,38 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { Globe as GlobeIcon, CheckCircle as CheckCircleIcon, XCircle as XCircleIcon, AlertTriangle as AlertTriangleIcon, Info as InfoIcon, Gauge as GaugeIcon, HardDrive as HardDriveIcon, Download as DownloadIcon, RefreshCw as RefreshCwIcon } from 'lucide-vue-next'
-import { Label } from '@/ui/label'
+import { ref, computed, onMounted, watch } from 'vue'
+import { Globe as GlobeIcon, RefreshCw as RefreshCwIcon, HardDrive as HardDriveIcon, CheckCircle as CheckCircleIcon, Download as DownloadIcon, XCircle as XCircleIcon, AlertTriangle as AlertTriangleIcon, Gauge as GaugeIcon, X as XIcon, Info as InfoIcon } from 'lucide-vue-next'
+import { toast } from '@/ui/toast'
 import { Button } from '@/ui/button'
 import { Badge } from '@/ui/badge'
-import { Slider } from '@/ui/slider'
-import { Switch } from '@/ui/switch'
-import { toast } from '@/ui/toast'
 import BaseProviderSettings from '@/features/settings/components/ai/BaseProviderSettings.vue'
 import ConnectionStatus from '@/features/settings/components/ai/components/ConnectionStatus.vue'
-import SearchableSelect from '@/ui/searchable-select.vue'
 import { useProviderSettings, type ModelInfo } from '@/features/settings/components/ai/composables/useProviderSettings'
 import { useAIProviders } from '@/features/ai/components/composables/useAIProviders'
 import type { ConnectionState } from '@/features/settings/components/ai/components/ConnectionStatus.vue'
 import { logger } from '@/services/logger'
 import type { WebLLMModelInfo } from '@/features/ai/services'
 
+// Simple inline components for better maintainability
+
 // Use the AI providers composable for WebLLM functionality
 const {
   webLLMModels,
   isLoadingWebLLMModels,
-  webLLMModelLoadingState,
   isWebLLMSupported,
   checkWebLLMSupport,
   fetchWebLLMModels,
   loadWebLLMModel
 } = useAIProviders()
 
-// Browser compatibility checks
+// Manual loading state since webLLMModelLoadingState doesn't exist
+const isModelLoading = ref(false)
+const loadingProgress = ref(0)
+const loadingError = ref<string | null>(null)
+const currentModel = ref<string | null>(null)
+
+// Browser compatibility state
 const webGLSupported = ref(false)
 const wasmSupported = ref(false)
 const memoryEstimate = ref<number | null>(null)
@@ -357,9 +437,10 @@ const memoryEstimate = ref<number | null>(null)
 // WebLLM-specific state
 const downloadedModels = ref<string[]>([])
 const cacheSize = ref('0 MB')
-const showAdvanced = ref(false)
 const lastTested = ref<Date | null>(null)
 const isCheckingCache = ref(false)
+const selectedCategory = ref<'all' | 'small' | 'medium' | 'large'>('all')
+const showAdvanced = ref(false)
 
 // WebLLM settings
 const temperature = ref([0.7])
@@ -367,11 +448,7 @@ const topP = ref([0.9])
 const useWebGPU = ref(true)
 const maxTokens = ref([512])
 
-// Loading state from composable
-const isModelLoading = computed(() => webLLMModelLoadingState.value.isLoading)
-const loadingProgress = computed(() => (webLLMModelLoadingState.value.progress || 0) * 100)
-const loadingError = computed(() => webLLMModelLoadingState.value.error)
-const currentModel = computed(() => webLLMModelLoadingState.value.currentModel)
+// Loading state - removed since webLLMModelLoadingState doesn't exist
 
 // Configure the provider settings
 const providerSettings = useProviderSettings({
@@ -391,9 +468,9 @@ const providerSettings = useProviderSettings({
   modelsFetchFn: async (): Promise<ModelInfo[]> => {
     try {
       const models = await fetchWebLLMModels()
-      return models.map((model: WebLLMModelInfo) => ({
-        id: model.id,
-        name: model.name,
+      return models.map((model: any) => ({
+        id: model.id || model.model_id || `model-${Math.random()}`,
+        name: model.name || model.model_id || 'Unknown Model',
         description: model.description || `${model.size} model for text generation`,
         size: model.downloadSize,
         category: getModelCategory(model.size)
@@ -419,7 +496,7 @@ const {
 
 // Computed properties
 const selectedModel = computed(() => {
-  return webLLMModels.value.find((model: WebLLMModelInfo) => model.id === selectedModelId.value)
+  return webLLMModels.value.find((model: any) => (model.id || model.model_id) === selectedModelId.value)
 })
 
 const isCompatible = computed(() => 
@@ -453,7 +530,8 @@ const isModelDownloaded = computed(() => {
 
 const modelStatus = computed(() => {
   if (currentModel.value) {
-    return `Model loaded: ${getModelName(currentModel.value)}`
+    const model = webLLMModels.value.find((m: any) => (m.id || m.model_id) === currentModel.value)
+    return `Model loaded: ${(model as any)?.name || (model as any)?.model_id || currentModel.value}`
   }
   return 'No model loaded'
 })
@@ -465,28 +543,30 @@ const loadingStatusText = computed(() => {
   return 'First-time downloads may take several minutes depending on your internet connection. The model will be cached for future use.'
 })
 
-const modelOptions = computed(() => {
-  const small = webLLMModels.value.filter((model: WebLLMModelInfo) => getModelCategory(model.size) === 'small')
-  const medium = webLLMModels.value.filter((model: WebLLMModelInfo) => getModelCategory(model.size) === 'medium')
-  const large = webLLMModels.value.filter((model: WebLLMModelInfo) => getModelCategory(model.size) === 'large')
-
-  return [
-    ...small.map((model: WebLLMModelInfo) => ({
-      value: model.id,
-      label: downloadedModels.value.includes(model.id) ? `${model.name} (Downloaded)` : model.name,
-      description: `Small Model (${model.size}) - Faster inference`
-    })),
-    ...medium.map((model: WebLLMModelInfo) => ({
-      value: model.id,
-      label: downloadedModels.value.includes(model.id) ? `${model.name} (Downloaded)` : model.name,
-      description: `Medium Model (${model.size}) - Balanced performance`
-    })),
-    ...large.map((model: WebLLMModelInfo) => ({
-      value: model.id,
-      label: downloadedModels.value.includes(model.id) ? `${model.name} (Downloaded)` : model.name,
-      description: `Large Model (${model.size}) - Better quality`
-    }))
+const modelCategories = computed(() => {
+  const categories = [
+    { id: 'all', name: 'All Models', count: webLLMModels.value.length },
+    { id: 'small', name: 'Small', count: 0 },
+    { id: 'medium', name: 'Medium', count: 0 },
+    { id: 'large', name: 'Large', count: 0 }
   ]
+
+  webLLMModels.value.forEach((model: WebLLMModelInfo) => {
+    const category = getModelCategory(model.size)
+    const categoryItem = categories.find(c => c.id === category)
+    if (categoryItem) categoryItem.count++
+  })
+
+  return categories
+})
+
+const filteredModels = computed(() => {
+  if (selectedCategory.value === 'all') {
+    return webLLMModels.value
+  }
+  return webLLMModels.value.filter((model: WebLLMModelInfo) => 
+    getModelCategory(model.size) === selectedCategory.value
+  )
 })
 
 // Methods
@@ -498,8 +578,18 @@ const getModelCategory = (size: string): 'small' | 'medium' | 'large' => {
 }
 
 const getModelName = (modelId: string): string => {
-  const model = webLLMModels.value.find((m: WebLLMModelInfo) => m.id === modelId)
-  return model?.name || modelId
+  const model = webLLMModels.value.find((m: any) => (m.id || m.model_id) === modelId)
+  return (model as any)?.name || (model as any)?.model_id || modelId
+}
+
+const getModelSizeBadgeVariant = (size: string): 'default' | 'secondary' | 'outline' => {
+  const category = getModelCategory(size)
+  switch (category) {
+    case 'small': return 'secondary'
+    case 'medium': return 'default'
+    case 'large': return 'outline'
+    default: return 'default'
+  }
 }
 
 const getLoadButtonText = (): string => {
@@ -573,22 +663,28 @@ const checkDownloadedModels = async () => {
   }
 }
 
-const loadModel = async () => {
-  if (!selectedModelId.value || isModelLoading.value) return
+const selectModel = (modelId: string) => {
+  selectedModelId.value = modelId
+}
+
+const loadModel = async (modelId?: string) => {
+  const targetModelId = modelId || selectedModelId.value
+  if (!targetModelId || isModelLoading.value) return
   
   try {
-    const success = await loadWebLLMModel(selectedModelId.value)
+    const success = await loadWebLLMModel(targetModelId)
     
     if (success) {
       // Add to downloaded models
-      if (!downloadedModels.value.includes(selectedModelId.value)) {
-        downloadedModels.value.push(selectedModelId.value)
+      if (!downloadedModels.value.includes(targetModelId)) {
+        downloadedModels.value.push(targetModelId)
         localStorage.setItem('webllm-models-history', JSON.stringify(downloadedModels.value))
       }
       
+      const model = webLLMModels.value.find((m: any) => (m.id || m.model_id) === targetModelId)
       toast({
         title: 'Model Loaded',
-        description: `${selectedModel.value?.name || selectedModelId.value} has been loaded successfully`,
+        description: `${(model as any)?.name || (model as any)?.model_id || targetModelId} has been loaded successfully`,
         variant: 'default'
       })
       
@@ -600,18 +696,57 @@ const loadModel = async () => {
     logger.error('Error loading model:', error)
     toast({
       title: 'Error',
-      description: 'Failed to load model. See details in the WebLLM settings panel.',
+      description: 'Failed to load model. Please try again.',
       variant: 'destructive'
     })
   }
 }
 
+const unloadCurrentModel = async () => {
+  if (!currentModel.value) return
+  
+  try {
+    // Note: WebLLM doesn't currently support unloading models
+    // This is a placeholder for future functionality
+    toast({
+      title: 'Model Management',
+      description: 'WebLLM models remain loaded in memory. Refresh the page to clear all models.',
+      variant: 'default'
+    })
+  } catch (error) {
+    logger.error('Error with model management:', error)
+    toast({
+      title: 'Error',
+      description: 'Failed to manage model state.',
+      variant: 'destructive'
+    })
+  }
+}
+
+const removeDownloadedModel = async (modelId: string) => {
+  if (currentModel.value === modelId) {
+    await unloadCurrentModel()
+  }
+  
+  downloadedModels.value = downloadedModels.value.filter(id => id !== modelId)
+  localStorage.setItem('webllm-models-history', JSON.stringify(downloadedModels.value))
+  
+  const model = webLLMModels.value.find((m: any) => (m.id || m.model_id) === modelId)
+  toast({
+    title: 'Model Removed',
+    description: `${(model as any)?.name || (model as any)?.model_id || modelId} has been removed from cache.`,
+    variant: 'default'
+  })
+  
+  await refreshCacheInfo()
+}
+
 const refreshCacheInfo = async () => {
   // Calculate cache size based on downloaded models
   const totalSize = downloadedModels.value.reduce((total, modelId) => {
-    const model = webLLMModels.value.find((m: WebLLMModelInfo) => m.id === modelId)
+    const model = webLLMModels.value.find((m: any) => (m.id || m.model_id) === modelId)
     if (model) {
-      const sizeMatch = model.downloadSize.match(/(\d+(?:\.\d+)?)\s*(GB|MB)/)
+      const sizeMatch = (model as any).downloadSize.match(/(\d+(?:\.\d+)?)\s*(GB|MB)/)
       if (sizeMatch) {
         const value = parseFloat(sizeMatch[1])
         const unit = sizeMatch[2]
@@ -628,6 +763,11 @@ const refreshCacheInfo = async () => {
 
 const clearAllCache = async () => {
   if (confirm('Are you sure you want to clear all cached models? This will require re-downloading models when you use them again.')) {
+    // Unload current model if any
+    if (currentModel.value) {
+      await unloadCurrentModel()
+    }
+    
     downloadedModels.value = []
     cacheSize.value = '0 MB'
     localStorage.removeItem('webllm-models-history')
@@ -675,33 +815,10 @@ onMounted(async () => {
   
   // Set default model selection to a small model
   if (webLLMModels.value.length > 0 && !selectedModelId.value) {
-    const smallModel = webLLMModels.value.find((m: WebLLMModelInfo) => getModelCategory(m.size) === 'small')
-    selectedModelId.value = smallModel?.id || webLLMModels.value[0].id
+    const smallModel = webLLMModels.value.find((m: any) => getModelCategory(m.size) === 'small')
+    selectedModelId.value = (smallModel as any)?.id || (smallModel as any)?.model_id || (webLLMModels.value[0] as any)?.id || (webLLMModels.value[0] as any)?.model_id
   }
 })
-
-const searchModels = (query: string, models: ModelInfo[]) => {
-  if (!query) return models
-  return models.filter(model => model.name.toLowerCase().includes(query.toLowerCase()))
-}
-
-const getModelLabel = (model: ModelInfo) => model.name
-const getModelValue = (model: ModelInfo) => model.id
-
-const isModelDisabled = (model: ModelInfo) => {
-  // Example of disabling a model - can be customized
-  return false
-}
-const getModelDescription = (model: ModelInfo) => model.description
-const getModelKeywords = (model: ModelInfo) => [model.name, model.size]
-
-// Add a computed property to get the currently selected model object
-const selectedModelObject = computed(() => {
-  return webLLMModels.value.find((m: WebLLMModelInfo) => m.id === selectedModelId.value)
-})
-
-// Add a computed property for available models, which are just webLLM models
-const availableModels = computed(() => webLLMModels.value)
 </script> 
 
 

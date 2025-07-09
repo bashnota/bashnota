@@ -17,6 +17,9 @@ export interface AISettings {
   ollamaServerUrl?: string // Ollama server URL
   ollamaModel?: string // The selected Ollama model
   webllmModel?: string // The selected WebLLM model
+  webllmDefaultModel?: string // The default WebLLM model to auto-load
+  webllmAutoLoad?: boolean // Whether to auto-load WebLLM model on request
+  webllmAutoLoadStrategy?: 'default' | 'smallest' | 'fastest' | 'balanced' | 'none' // Auto-load strategy
   autoSelectProvider?: boolean // Whether to auto-select the best available provider
   requestTimeout?: number // Request timeout in seconds
 }
@@ -33,7 +36,10 @@ export const useAISettingsStore = defineStore('aiSettings', () => {
     sidebarWidth: 350, // Default sidebar width
     ollamaServerUrl: 'http://localhost:11434', // Default Ollama server URL
     ollamaModel: 'llama2', // Default Ollama model
-    webllmModel: '', // No default WebLLM model
+    webllmModel: '', // Current WebLLM model
+    webllmDefaultModel: '', // Default WebLLM model to auto-load
+    webllmAutoLoad: true, // Auto-load default model on request
+    webllmAutoLoadStrategy: 'smallest', // Default to smallest model for better UX
     autoSelectProvider: true // Default to auto-selecting the best available provider
   })
 
@@ -96,6 +102,31 @@ export const useAISettingsStore = defineStore('aiSettings', () => {
     localStorage.setItem('ai-settings', JSON.stringify(settings.value))
   }
 
+  const setWebLLMDefaultModel = (modelId: string) => {
+    settings.value.webllmDefaultModel = modelId
+    saveSettings()
+    logger.info(`WebLLM default model set to: ${modelId}`)
+  }
+
+  const setWebLLMAutoLoad = (enabled: boolean) => {
+    settings.value.webllmAutoLoad = enabled
+    saveSettings()
+    logger.info(`WebLLM auto-load ${enabled ? 'enabled' : 'disabled'}`)
+  }
+
+  const setWebLLMAutoLoadStrategy = (strategy: 'default' | 'smallest' | 'fastest' | 'balanced' | 'none') => {
+    settings.value.webllmAutoLoadStrategy = strategy
+    saveSettings()
+    logger.info(`WebLLM auto-load strategy set to: ${strategy}`)
+  }
+
+  const getWebLLMSettings = () => ({
+    currentModel: settings.value.webllmModel,
+    defaultModel: settings.value.webllmDefaultModel,
+    autoLoad: settings.value.webllmAutoLoad,
+    autoLoadStrategy: settings.value.webllmAutoLoadStrategy
+  })
+
   // Load settings on store initialization
   loadSettings()
 
@@ -122,7 +153,11 @@ export const useAISettingsStore = defineStore('aiSettings', () => {
     getApiKey,
     setApiKey,
     setPreferredProvider,
-    updateSettings
+    updateSettings,
+    setWebLLMDefaultModel,
+    setWebLLMAutoLoad,
+    setWebLLMAutoLoadStrategy,
+    getWebLLMSettings
   }
 })
 

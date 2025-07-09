@@ -1,11 +1,13 @@
 import * as webllm from '@mlc-ai/web-llm';
 import { logger } from '@/services/logger';
+import { webLLMDefaultModelService } from '../webLLMDefaultModelService';
 import type {
   AIProvider,
   GenerationOptions,
   GenerationResult,
   StreamCallbacks,
   WebLLMModelInfo,
+  WebLLMProgressCallback,
 } from '@/features/ai/services/types';
 
 export class WebLLMProvider implements AIProvider {
@@ -50,7 +52,59 @@ export class WebLLMProvider implements AIProvider {
   }
   
   async generateText(options: GenerationOptions): Promise<GenerationResult> {
+    logger.info(`WebLLM generateText called. Engine: ${!!this.engine}, Model: ${this.currentModel}, Loading: ${this.isModelLoading}`);
+    
+    // Check if auto-loading is needed
+    if (!this.engine && webLLMDefaultModelService.shouldAutoLoad(this.currentModel)) {
+      let autoLoadModelId = webLLMDefaultModelService.getAutoLoadModelId();
+      
+      // 🔥 NEW: If no model is configured, auto-select a sensible default
+      if (!autoLoadModelId) {
+        logger.info('No WebLLM model configured, attempting to auto-select a default model...');
+        try {
+          const availableModels = await this.getAvailableModels();
+          const recommendedModel = webLLMDefaultModelService.selectBestDefaultModel(availableModels, {
+            preferredSize: 'small',
+            maxDownloadSize: 4, // Prefer smaller models for auto-loading
+            preferInstructTuned: true
+          });
+          
+          if (recommendedModel) {
+            autoLoadModelId = recommendedModel.id;
+            logger.info(`Auto-selected WebLLM model: ${autoLoadModelId}`);
+            
+            // Save this as the default for future use
+            webLLMDefaultModelService.saveDefaultModelConfig({
+              modelId: autoLoadModelId,
+              enabled: true,
+              autoLoadOnRequest: true
+            });
+          } else {
+            throw new Error('No suitable WebLLM models found for auto-loading');
+          }
+        } catch (error) {
+          logger.error('Failed to auto-select WebLLM model:', error);
+          throw new Error('WebLLM auto-loading failed: No model configured and unable to auto-select a suitable model. Please manually select a model in Settings > AI Assistant > AI Providers.');
+        }
+      }
+      
+      if (autoLoadModelId) {
+        logger.info(`Auto-loading WebLLM model: ${autoLoadModelId}`);
+        try {
+          await this.initializeModel(autoLoadModelId);
+        } catch (error) {
+          logger.error('Auto-loading failed:', error);
+          throw new Error(`Failed to auto-load WebLLM model ${autoLoadModelId}. Please manually select and load a model in Settings > AI Assistant > AI Providers.`);
+        }
+      }
+    }
+    
     if (!this.engine) {
+      logger.error('WebLLM engine not initialized', {
+        currentModel: this.currentModel,
+        isModelLoading: this.isModelLoading,
+        modelLoadingError: this.modelLoadingError
+      });
       throw new Error('WebLLM engine not initialized. Please select and load a model first.');
     }
 
@@ -85,8 +139,59 @@ export class WebLLMProvider implements AIProvider {
     options: GenerationOptions,
     callbacks: StreamCallbacks
   ): Promise<void> {
+    logger.info(`WebLLM generateTextStream called. Engine: ${!!this.engine}, Model: ${this.currentModel}, Loading: ${this.isModelLoading}`);
+    
+    // Check if auto-loading is needed
+    if (!this.engine && webLLMDefaultModelService.shouldAutoLoad(this.currentModel)) {
+      let autoLoadModelId = webLLMDefaultModelService.getAutoLoadModelId();
+      
+      // 🔥 NEW: If no model is configured, auto-select a sensible default
+      if (!autoLoadModelId) {
+        logger.info('No WebLLM model configured for streaming, attempting to auto-select a default model...');
+        try {
+          const availableModels = await this.getAvailableModels();
+          const recommendedModel = webLLMDefaultModelService.selectBestDefaultModel(availableModels, {
+            preferredSize: 'small',
+            maxDownloadSize: 4,
+            preferInstructTuned: true
+          });
+          
+          if (recommendedModel) {
+            autoLoadModelId = recommendedModel.id;
+            logger.info(`Auto-selected WebLLM model for streaming: ${autoLoadModelId}`);
+            
+            // Save this as the default for future use
+            webLLMDefaultModelService.saveDefaultModelConfig({
+              modelId: autoLoadModelId,
+              enabled: true,
+              autoLoadOnRequest: true
+            });
+          } else {
+            throw new Error('No suitable WebLLM models found for auto-loading');
+          }
+        } catch (error) {
+          logger.error('Failed to auto-select WebLLM model for streaming:', error);
+          throw new Error('WebLLM auto-loading failed: No model configured and unable to auto-select a suitable model. Please manually select a model in Settings > AI Assistant > AI Providers.');
+        }
+      }
+      
+      if (autoLoadModelId) {
+        logger.info(`Auto-loading WebLLM model for streaming: ${autoLoadModelId}`);
+        try {
+          await this.initializeModel(autoLoadModelId);
+        } catch (error) {
+          logger.error('Auto-loading failed for streaming:', error);
+          throw new Error(`Failed to auto-load WebLLM model ${autoLoadModelId}. Please manually select and load a model in Settings > AI Assistant > AI Providers.`);
+        }
+      }
+    }
+    
     if (!this.engine) {
-      logger.error('WebLLM engine not initialized when generating text stream');
+      logger.error('WebLLM engine not initialized when generating text stream', {
+        currentModel: this.currentModel,
+        isModelLoading: this.isModelLoading,
+        modelLoadingError: this.modelLoadingError
+      });
       throw new Error('WebLLM engine not initialized. Please select and load a model first.');
     }
 
@@ -157,7 +262,9 @@ export class WebLLMProvider implements AIProvider {
     return false;
   }
   
-  async initializeModel(modelId: string): Promise<void> {
+  async initializeModel(modelId: string, progressCallback?: WebLLMProgressCallback): Promise<void> {
+    logger.info(`WebLLM initializeModel called with modelId: ${modelId}. Current state: engine=${!!this.engine}, model=${this.currentModel}, loading=${this.isModelLoading}`);
+    
     if (this.isModelLoaded() && this.currentModel === modelId) {
       logger.info(`WebLLM model ${modelId} is already loaded`);
       return;
@@ -179,6 +286,10 @@ export class WebLLMProvider implements AIProvider {
           initProgressCallback: (report: webllm.InitProgressReport) => {
             this.modelLoadingProgress = report.progress;
             logger.info(`WebLLM loading progress: ${Math.round(report.progress * 100)}% - ${report.text}`);
+            // Pass the progress report to the callback if it exists
+            if (progressCallback) {
+              progressCallback(report);
+            }
           },
         }
       );
@@ -188,7 +299,7 @@ export class WebLLMProvider implements AIProvider {
       this.currentModel = modelId;
       this.modelLoadingError = null;
       
-      logger.info(`WebLLM model ${modelId} loaded successfully`);
+      logger.info(`WebLLM model ${modelId} loaded successfully. Final state: engine=${!!this.engine}, model=${this.currentModel}`);
     } catch (error) {
       // Handle initialization error
       this.isModelLoading = false;
@@ -235,7 +346,7 @@ export class WebLLMProvider implements AIProvider {
           description: `${name} (${size}, ${quantization})${isInstruct ? ' - Instruction-tuned' : ''}`,
           // Estimate download size based on model size
           downloadSize: this.estimateDownloadSize(size)
-        };
+        } as WebLLMModelInfo;
       });
     } catch (error) {
       logger.error('Error getting available WebLLM models:', error);
@@ -247,14 +358,14 @@ export class WebLLMProvider implements AIProvider {
           size: '7B',
           description: 'Llama 2 7B Chat (7B, 4-bit) - Instruction-tuned',
           downloadSize: '~4GB'
-        },
+        } as WebLLMModelInfo,
         {
           id: 'Llama-2-13b-chat-hf-q4f32_1',
           name: 'Llama 2 13B Chat',
           size: '13B',
           description: 'Llama 2 13B Chat (13B, 4-bit) - Instruction-tuned',
           downloadSize: '~7GB'
-        }
+        } as WebLLMModelInfo
       ];
     }
   }
@@ -277,12 +388,15 @@ export class WebLLMProvider implements AIProvider {
     error: string | null;
     currentModel: string | null;
   } {
-    return {
+    const state = {
       isLoading: this.isModelLoading,
       progress: this.modelLoadingProgress,
       error: this.modelLoadingError,
       currentModel: this.currentModel || null
     };
+    
+    logger.debug('WebLLM getModelLoadingState:', state);
+    return state;
   }
   
   // Check if a model is loaded

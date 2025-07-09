@@ -1,29 +1,162 @@
-# Executable Code Block (`src/features/editor/components/blocks/executable-code-block`)
+# Executable Code Block Components
 
-This directory contains the components and logic for a code block that can be executed, with its output displayed directly in the document.
+This directory contains the components and composables for the AI-enhanced executable code block system. The implementation follows modular design principles with a unified AI assistant interface.
 
-## Tiptap Extension
+## Core Components
 
--   **`ExecutableCodeBlockExtension.ts`**: The Tiptap Node extension that defines the schema for the executable code block within the editor.
+### `CodeBlockWithExecution.vue`
+The main executable code block component that orchestrates code execution, AI assistance, and user interactions.
 
-## Main Components
+**Key Features:**
+- Code editing with syntax highlighting
+- Multiple execution environments (Jupyter, local, shared sessions)
+- Integrated AI assistance
+- Output rendering with interactive elements
+- Template system for code snippets
 
--   **`ExecutableCodeBlock.vue`**: The main Vue component that renders the code block within the editor. It likely orchestrates the other components.
--   **`CodeBlockWithExecution.vue`**: A more specific component that bundles the code editor (`CodeMirror`) with the execution logic and output rendering.
--   **`FullScreenCodeBlock.vue`**: A component to display and edit the code block in a fullscreen overlay for a better editing experience.
+### `AICodeAssistant.vue`
+Unified AI interface that consolidates all AI-powered features into a single, cohesive component.
 
-## UI Components
+**Key Features:**
+- Tabbed interface (Quick Actions, Custom Actions, Error Assistance)
+- Integration with AI actions store
+- Context-aware assistance
+- Auto-triggered error analysis
+- One-click code application
 
--   **`CodeMirror.vue`**: A wrapper around the CodeMirror 6 editor, providing syntax highlighting, line numbers, and other code editing features.
--   **`ErrorDisplay.vue`**: A component specifically for rendering errors that occur during code execution.
--   **`ExecutionStatus.vue`**: A UI element that shows the current status of the code execution (e.g., running, completed, error).
--   **`InteractiveOutputRenderer.vue`**: Renders interactive outputs from code execution, such as plots or widgets.
--   **`OutputRenderer.vue`**: Renders standard, non-interactive outputs from code execution (e.g., text, images).
--   **`TemplateSelector.vue`**: A component that allows users to select from a list of predefined code templates.
--   **`VariableInspector.vue`**: A tool for inspecting the variables that exist in the execution environment after the code has run.
+## Supporting Components
 
-## Types & Composables
+### `OutputRenderer.vue`
+Handles rendering of code execution outputs with support for:
+- HTML, text, and JSON output
+- Interactive plots and visualizations
+- Error display with syntax highlighting
+- Copy and download functionality
 
--   **`OutputRenderer.d.ts`**: TypeScript declaration file for the output renderer.
--   `composables`: Contains Vue composables for managing the state and logic of the code block, such as handling the execution flow and managing the CodeMirror instance.
--   `types`: Contains TypeScript types and interfaces related to code execution and output formats. 
+### `CodeMirror.vue`
+Code editor component with:
+- Syntax highlighting for multiple languages
+- Auto-completion and formatting
+- Template insertion
+- Keyboard shortcuts
+
+### `TemplateSelector.vue`
+Template management system for:
+- Language-specific code templates
+- Custom template creation
+- Quick code insertion
+
+### `AICodePreferences.vue`
+Simplified settings interface that links to the main AI configuration panel.
+
+## Composables
+
+### `useAICodeAssistant.ts`
+**Unified AI composable** that replaces previous redundant AI composables. Provides:
+- Integration with AI actions store
+- Caching for performance
+- Error handling and retries
+- Result formatting utilities
+
+### `useCodeExecution.ts`
+Manages code execution lifecycle:
+- Execution state management
+- Output streaming
+- Error handling
+
+### `useCodeBlockToolbar.ts`
+Toolbar state and interactions:
+- Server/kernel selection
+- Execution controls
+- Visibility toggles
+
+### `useOutputStreaming.ts`
+Real-time output streaming for long-running executions.
+
+### `useCodeFormatting.ts`
+Code formatting utilities for different languages.
+
+### `useCodeTemplates.ts`
+Template management and insertion logic.
+
+## Architecture Improvements
+
+### ✅ Eliminated Redundancies
+- **Removed:** `AICodeActions.vue`, `CustomAIActions.vue`, `ErrorAssistance.vue`
+- **Replaced with:** Single `AICodeAssistant.vue` component
+- **Removed:** `useCodeAnalysis.ts`, `useErrorTrigger.ts` 
+- **Replaced with:** Unified `useAICodeAssistant.ts` composable
+
+### ✅ Centralized AI Management
+- All AI functionality routes through the `aiActionsStore`
+- Consistent API for custom and built-in actions
+- Unified configuration and settings
+
+### ✅ Modular Design
+- Clear separation of concerns
+- Reusable composables
+- Consistent interfaces between components
+
+### ✅ Performance Optimizations
+- Result caching to avoid re-analysis
+- Lazy loading of AI components
+- Efficient state management
+
+## Usage Examples
+
+### Basic Code Block
+```vue
+<CodeBlockWithExecution
+  :code="pythonCode"
+  language="python"
+  :id="blockId"
+  :session-id="sessionId"
+  :nota-id="notaId"
+  @update:code="handleCodeUpdate"
+/>
+```
+
+### AI Assistant Integration
+The AI assistant is automatically integrated and can be toggled via the toolbar. It provides:
+
+1. **Quick Actions** - Common AI operations (explain, optimize, fix)
+2. **Custom Actions** - User-defined AI workflows
+3. **Error Assistance** - Automatic error analysis and fixes
+
+### Custom AI Actions
+Custom actions are managed through the settings panel and executed via the unified AI interface:
+
+```typescript
+// Example custom action execution
+const result = await aiCodeAssistant.executeAction(
+  'custom-action-id',
+  code,
+  language,
+  error
+)
+```
+
+## Integration with AI Actions Store
+
+The components integrate seamlessly with the centralized AI actions store:
+
+- **Provider Management:** AI provider selection and configuration
+- **Action Execution:** Unified execution pipeline for all AI actions
+- **Settings:** Centralized configuration for all AI features
+- **Caching:** Intelligent caching to improve performance
+
+## Best Practices
+
+1. **Single Responsibility:** Each component has a clear, focused purpose
+2. **Composable Logic:** Reusable logic extracted into composables
+3. **Type Safety:** Full TypeScript support throughout
+4. **Error Handling:** Graceful degradation and user feedback
+5. **Performance:** Efficient state management and lazy loading
+6. **Accessibility:** Proper ARIA labels and keyboard navigation
+
+## Future Enhancements
+
+- **Plugin System:** Extensible architecture for custom AI providers
+- **Collaborative AI:** Real-time collaborative AI assistance
+- **Advanced Caching:** More sophisticated caching strategies
+- **AI Model Selection:** Per-action AI model configuration 

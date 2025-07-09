@@ -1,11 +1,13 @@
 import { ref, computed } from 'vue'
 import { useAISettingsStore } from '@/features/ai/stores/aiSettingsStore'
 import { aiService } from '@/features/ai/services'
-import type { 
-  GeminiModelInfo, 
-  WebLLMModelInfo, 
+import { webLLMDefaultModelService } from '@/features/ai/services/webLLMDefaultModelService'
+import type {
+  GeminiModelInfo,
+  WebLLMModelInfo,
   ProviderConfig,
-  GenerationOptions
+  GenerationOptions,
+  WebLLMInitProgressReport,
 } from '@/features/ai/services'
 import { logger } from '@/services/logger'
 import { toast } from '@/ui/toast'
@@ -27,7 +29,6 @@ export function useAIProviders() {
   const isLoadingWebLLMModels = ref(false)
   
   // WebLLM specific state
-  const webLLMModelLoadingState = computed(() => aiService.getWebLLMModelLoadingState())
   const isWebLLMSupported = ref(false)
   const webLLMProgress = ref(0)
   const webLLMError = ref<string | null>(null)
@@ -120,13 +121,30 @@ export function useAIProviders() {
    */
   const loadWebLLMModel = async (modelName: string) => {
     try {
+      logger.info(`[useAIProviders] Starting to load WebLLM model: ${modelName}`)
       isLoadingWebLLMModels.value = true
       webLLMError.value = null
-      
-      await aiService.initializeWebLLMModel(modelName)
-      
-      // Update WebLLM model state
+
+      // Update state before loading to show loading indicator
       updateWebLLMState()
+
+      const progressCallback = (report: WebLLMInitProgressReport) => {
+        logger.debug(`[useAIProviders] Progress callback`, report)
+        webLLMProgress.value = report.progress
+      }
+
+      await aiService.initializeWebLLMModel(modelName, progressCallback)
+
+      // Update WebLLM model state after loading
+      updateWebLLMState()
+
+      // Verify the model is actually loaded
+      const state = aiService.getWebLLMModelLoadingState()
+      if (!state.currentModel || state.currentModel !== modelName) {
+        throw new Error(`Model loading verification failed. Expected: ${modelName}, Got: ${state.currentModel}`)
+      }
+      
+      logger.info(`[useAIProviders] WebLLM model ${modelName} loaded and verified successfully`);
       
       toast({
         title: 'Model Loaded',
@@ -153,6 +171,8 @@ export function useAIProviders() {
       return false
     } finally {
       isLoadingWebLLMModels.value = false
+      // Final state update
+      updateWebLLMState()
     }
   }
   
@@ -228,12 +248,19 @@ export function useAIProviders() {
   const updateWebLLMState = () => {
     try {
       const state = aiService.getWebLLMModelLoadingState()
+      logger.debug('[useAIProviders] Updating WebLLM state:', state)
+      
       isLoadingWebLLMModels.value = state.isLoading
       webLLMProgress.value = state.progress
       webLLMError.value = state.error
       currentWebLLMModel.value = state.currentModel
+      
+      logger.debug('[useAIProviders] WebLLM state updated. Current model:', currentWebLLMModel.value)
     } catch (error) {
       logger.error('Error getting WebLLM state:', error)
+      // Set error state if we can't get the state
+      webLLMError.value = 'Failed to get WebLLM state'
+      isLoadingWebLLMModels.value = false
     }
   }
   
@@ -437,6 +464,133 @@ export function useAIProviders() {
     logger.error('Error during initial WebLLM check:', error)
   })
   
+  /**
+   * Verify that WebLLM is ready for text generation
+   */
+  const verifyWebLLMReady = async (): Promise<boolean> => {
+    try {
+      updateWebLLMState()
+      
+      if (!isWebLLMSupported.value) {
+        logger.warn('[useAIProviders] WebLLM not supported in this browser')
+        return false
+      }
+      
+      const state = aiService.getWebLLMModelLoadingState()
+      if (!state.currentModel) {
+        logger.warn('[useAIProviders] No WebLLM model is currently loaded')
+        return false
+      }
+      
+      if (state.isLoading) {
+        logger.warn('[useAIProviders] WebLLM model is still loading')
+        return false
+      }
+      
+      if (state.error) {
+        logger.error('[useAIProviders] WebLLM has an error state:', state.error)
+        return false
+      }
+      
+      logger.info(`[useAIProviders] WebLLM is ready with model: ${state.currentModel}`)
+      return true
+    } catch (error) {
+      logger.error('[useAIProviders] Error verifying WebLLM readiness:', error)
+      return false
+    }
+  }
+
+  /**
+   * Set the default WebLLM model that will auto-load on requests
+   */
+  const setDefaultWebLLMModel = (modelId: string) => {
+    aiSettings.setWebLLMDefaultModel(modelId)
+    webLLMDefaultModelService.saveDefaultModelConfig({ modelId, enabled: true })
+    
+    toast({
+      title: 'Default Model Set',
+      description: `${modelId} will auto-load when WebLLM is requested`
+    })
+  }
+
+  /**
+   * Get recommended default models based on current available models
+   */
+  const getRecommendedDefaultModels = () => {
+    return webLLMDefaultModelService.getRecommendedModels(webLLMModels.value)
+  }
+
+  /**
+   * Auto-select and set a smart default model
+   */
+  const autoSelectDefaultModel = async () => {
+    if (webLLMModels.value.length === 0) {
+      await fetchWebLLMModels()
+    }
+
+    const bestModel = webLLMDefaultModelService.selectBestDefaultModel(webLLMModels.value)
+    
+    if (bestModel) {
+      setDefaultWebLLMModel(bestModel.id)
+      logger.info(`Auto-selected default WebLLM model: ${bestModel.id}`)
+      return bestModel
+    }
+    
+    return null
+  }
+
+  /**
+   * Check if auto-loading should happen and trigger it if needed
+   */
+  const ensureWebLLMModelLoaded = async (): Promise<boolean> => {
+    const state = aiService.getWebLLMModelLoadingState()
+    
+    // If model is already loaded, we're good
+    if (state.currentModel && !state.error) {
+      return true
+    }
+
+    // Check if we should auto-load
+    const settings = aiSettings.getWebLLMSettings()
+    if (!settings.autoLoad) {
+      return false
+    }
+
+    // Get the model to load (either default or selected strategy)
+    let modelToLoad = settings.defaultModel
+
+    if (!modelToLoad && settings.autoLoadStrategy) {
+      const recommendations = getRecommendedDefaultModels()
+      
+      switch (settings.autoLoadStrategy) {
+        case 'smallest':
+          modelToLoad = recommendations.smallest?.id
+          break
+        case 'fastest':
+          modelToLoad = recommendations.fastest?.id
+          break
+        case 'balanced':
+          modelToLoad = recommendations.balanced?.id
+          break
+        default:
+          modelToLoad = recommendations.smallest?.id
+      }
+    }
+
+    if (modelToLoad) {
+      logger.info(`Ensuring WebLLM model is loaded: ${modelToLoad}`)
+      try {
+        await loadWebLLMModel(modelToLoad)
+        return true
+      } catch (error) {
+        logger.error(`Failed to ensure WebLLM model ${modelToLoad} is loaded:`, error)
+        return false
+      }
+    }
+
+    return false
+  }
+
   return {
     // Properties
     providers,
@@ -445,7 +599,6 @@ export function useAIProviders() {
     webLLMModels,
     isLoadingGeminiModels,
     isLoadingWebLLMModels,
-    webLLMModelLoadingState,
     isWebLLMSupported,
     webLLMProgress,
     webLLMError,
@@ -465,7 +618,14 @@ export function useAIProviders() {
     updateWebLLMState,
     checkAllProviders,
     selectBestAvailableProvider,
-    selectProvider
+    selectProvider,
+    verifyWebLLMReady,
+    
+    // Default model management
+    setDefaultWebLLMModel,
+    getRecommendedDefaultModels,
+    autoSelectDefaultModel,
+    ensureWebLLMModelLoaded
   }
 } 
 

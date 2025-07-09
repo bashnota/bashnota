@@ -28,6 +28,8 @@ import {
   RotateCw,
   Trash2,
   Link2,
+  Brain,
+  Sparkles,
 } from 'lucide-vue-next'
 import { Button } from '@/ui/button'
 import CodeMirror from '@/features/editor/components/blocks/executable-code-block/CodeMirror.vue'
@@ -41,6 +43,9 @@ import ExecutionStatus from '@/features/editor/components/blocks/executable-code
 import ErrorDisplay from '@/features/editor/components/blocks/executable-code-block/ErrorDisplay.vue'
 import { useOutputStreaming } from '@/features/editor/components/blocks/executable-code-block/composables/useOutputStreaming'
 import TemplateSelector from '@/features/editor/components/blocks/executable-code-block/TemplateSelector.vue'
+import AICodeAssistant from '@/features/editor/components/blocks/executable-code-block/AICodeAssistant.vue'
+import { useAICodeAssistant } from '@/features/editor/components/blocks/executable-code-block/composables/useAICodeAssistant'
+import { useAIActionsStore } from '@/features/editor/stores/aiActionsStore'
 
 // Types
 interface Props {
@@ -113,6 +118,16 @@ const isCodeCopied = ref(false)
 // Add new state for enhanced features
 const isTemplateDialogOpen = ref(false)
 const executionId = ref<string | null>(null)
+
+// Initialize AI Code Assistant
+const aiCodeAssistant = useAICodeAssistant(props.id, {
+  autoAnalyzeErrors: true,
+  enableQuickActions: true,
+  enableCustomActions: true
+})
+
+// Keep AI Actions Store for feature flags
+const aiActionsStore = useAIActionsStore()
 
 // Initialize output streaming
 const {
@@ -703,9 +718,19 @@ const executeCodeBlock = async () => {
     
     executionSuccess.value = !cell.value?.hasError
     
+    // 🔥 NEW: Auto-trigger AI error analysis if enabled and execution failed
+    if (cell.value?.hasError && aiActionsStore.state.errorTriggerConfig.autoTrigger) {
+      await triggerAutoErrorAnalysis()
+    }
+    
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Execution failed'
     logger.error('Code execution failed:', error)
+    
+    // 🔥 NEW: Auto-trigger AI error analysis for caught exceptions
+    if (aiActionsStore.state.errorTriggerConfig.autoTrigger) {
+      await triggerAutoErrorAnalysis(error instanceof Error ? error.message : 'Execution failed')
+    }
   } finally {
     executionInProgress.value = false
     stopStreaming()
@@ -729,6 +754,65 @@ const handleTemplateSelected = (templateCode: string) => {
 
 const showTemplateDialog = () => {
   isTemplateDialogOpen.value = true
+}
+
+// AI Features methods
+const toggleAIFeatures = () => {
+  aiCodeAssistant.toggleVisibility()
+}
+
+const handleAICodeUpdate = (newCode: string) => {
+  updateCode(newCode)
+}
+
+const handleCustomActionExecuted = (actionId: string, result: string) => {
+  logger.debug(`Custom action ${actionId} executed with result length: ${result.length}`)
+  
+  // 🔥 NEW: Enhanced result handling for better feedback
+  if (actionId === 'fix-error' && result) {
+    // Show AI suggestion in a more prominent way
+    logger.info('AI Error Fix Suggestion:', result)
+  }
+}
+
+// 🔥 NEW: Auto error analysis trigger
+const triggerAutoErrorAnalysis = async (customError?: string) => {
+  try {
+    const error = customError || cell.value?.output || errorMessage.value
+    if (!error || !props.code.trim()) return
+    
+    logger.info('🤖 Triggering automatic AI error analysis...')
+    
+    // Enhanced execution context for better AI analysis
+    const executionContext = {
+      code: props.code,
+      language: props.language,
+      error: error,
+      // 🔥 NEW: Rich execution context
+      executionTime: executionTime.value,
+      sessionId: selectedSession.value,
+      kernelName: selectedKernel.value,
+      hasOutput: !!cell.value?.output,
+      cellOutput: cell.value?.output
+    }
+    
+    // Auto-run fix-error action if enabled  
+    if (aiActionsStore.state.errorTriggerConfig.showQuickFix) {
+      await aiCodeAssistant.analyzeError(props.code, props.language, error, executionContext)
+    }
+    
+    // Show AI assistant if not already visible
+    if (!aiCodeAssistant.isVisible.value) {
+      aiCodeAssistant.toggleVisibility()
+    }
+    
+  } catch (analysisError) {
+    logger.error('Auto error analysis failed:', analysisError)
+  }
+}
+
+const handleErrorDismissed = () => {
+  errorMessage.value = null
 }
 
 // Enhanced code formatting
@@ -1131,6 +1215,22 @@ const runningStatus = computed(() => {
           <Save class="w-4 h-4" />
         </Button>
 
+        <!-- AI Assistant Toggle (hidden in readonly) -->
+        <Button
+          v-if="!isReadOnly && !isPublished"
+          variant="outline"
+          size="sm"
+          @click="toggleAIFeatures"
+          class="h-8 gap-2"
+          :title="aiCodeAssistant.isVisible.value ? 'Hide AI Assistant' : 'Show AI Assistant'"
+          aria-label="Toggle AI assistant"
+          :class="{ 'bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800': aiCodeAssistant.isVisible.value }"
+        >
+          <Brain class="w-4 h-4" />
+          <span class="hidden sm:inline">AI</span>
+          <Sparkles v-if="aiCodeAssistant.isVisible.value" class="w-3 h-3 text-blue-500" />
+        </Button>
+
         <!-- Copy button (always available) -->
         <Button
           variant="outline"
@@ -1218,6 +1318,30 @@ const runningStatus = computed(() => {
         <Loader2 class="h-3 w-3 animate-spin mr-2" />
         <span>Executing code...</span>
       </div>
+    </div>
+
+    <!-- AI Code Assistant (unified AI interface) -->
+    <div v-if="!isReadOnly && !isPublished" class="ai-assistant-container">
+      <AICodeAssistant
+        :code="codeValue"
+        :language="props.language"
+        :error="cell?.hasError ? cell?.output : null"
+        :is-read-only="props.isReadOnly"
+        :block-id="props.id"
+        :is-executing="props.isExecuting || executionInProgress"
+        :execution-time="executionTime"
+        :has-output="!!cell?.output"
+        :session-info="{
+          sessionId: selectedSession,
+          kernelName: selectedKernel
+        }"
+        @code-updated="handleAICodeUpdate"
+        @analysis-started="() => {}"
+        @analysis-completed="() => {}"
+        @action-executed="handleCustomActionExecuted"
+        @trigger-execution="executeCode"
+        @request-execution-context="() => logger.debug('Execution context requested')"
+      />
     </div>
 
     <!-- Code Editor -->
