@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
-import { Maximize2, Minimize2, Download, Copy, Check, Eye, EyeOff, RotateCw } from 'lucide-vue-next'
+import { Maximize2, Minimize2, Download, Copy, Check, Eye, EyeOff, RotateCw, ExternalLink } from 'lucide-vue-next'
 import { Button } from '@/ui/button'
 import { Badge } from '@/ui/badge'
 import { Card, CardContent, CardHeader } from '@/ui/card'
@@ -28,6 +28,8 @@ const props = defineProps<{
   isFullscreenable?: boolean
   isLoading?: boolean
   isPublished?: boolean
+  notaId?: string
+  blockId?: string
 }>()
 
 const emit = defineEmits<{
@@ -35,6 +37,14 @@ const emit = defineEmits<{
   'download': [output: InteractiveOutput]
   'toggle-fullscreen': [isFullscreen: boolean]
 }>()
+
+// Open output in external tab
+const openInExternalTab = () => {
+  if (!props.notaId || !props.blockId) return
+
+  const url = `/output/${props.notaId}/${props.blockId}`
+  window.open(url, '_blank')
+}
 
 // State
 const isFullscreen = ref(false)

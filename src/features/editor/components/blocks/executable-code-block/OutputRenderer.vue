@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, computed } from 'vue'
-import { Copy, Check, Download, Maximize, Minimize, Eye, EyeOff, Loader2 } from 'lucide-vue-next'
+import { Copy, Check, Download, Maximize, Minimize, Eye, EyeOff, Loader2, ExternalLink } from 'lucide-vue-next'
 import { Button } from '@/ui/button'
 import { logger } from '@/services/logger'
 import { ansiToHtml, stripAnsi } from '@/lib/utils'
@@ -16,6 +16,8 @@ const props = defineProps<{
   isLoading?: boolean
   originalCode?: string
   isPublished?: boolean
+  notaId?: string
+  blockId?: string
 }>()
 
 const emit = defineEmits<{
@@ -232,6 +234,14 @@ ${content}
   emit('download')
 }
 
+// Open output in external tab
+const openInExternalTab = () => {
+  if (!props.notaId || !props.blockId || !hasContent.value) return
+
+  const url = `/output/${props.notaId}/${props.blockId}`
+  window.open(url, '_blank')
+}
+
 // Toggle output visibility
 const toggleVisibility = () => {
   isOutputVisible.value = !isOutputVisible.value
@@ -426,6 +436,19 @@ const executionTime = computed(() => {
         >
           <Download class="control-icon" />
           <span class="sr-only">Download</span>
+        </Button>
+        
+        <!-- Open in external tab button -->
+        <Button
+          variant="ghost"
+          size="icon"
+          @click="openInExternalTab"
+          class="control-button"
+          title="Open output in external tab"
+          :disabled="!hasContent || props.isLoading"
+        >
+          <ExternalLink class="control-icon" />
+          <span class="sr-only">Open in external tab</span>
         </Button>
         
         <!-- Fullscreen toggle -->

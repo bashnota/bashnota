@@ -1454,6 +1454,8 @@ watch(() => cell?.value?.hasError, (hasError) => {
             :isLoading="isExecuting && !isPublished"
             :originalCode="codeValue"
             :isPublished="isPublished"
+            :notaId="props.notaId"
+            :blockId="props.id"
             @copy="copyOutput"
           />
           <div v-else class="flex items-center justify-center h-48 text-muted-foreground">
@@ -1505,6 +1507,7 @@ watch(() => cell?.value?.hasError, (hasError) => {
       :is-read-only="isReadOnly"
       :is-published="isPublished"
       :block-id="props.id"
+      :nota-id="props.notaId"
       :session-info="{
         sessionId: selectedSession,
         kernelName: selectedKernel

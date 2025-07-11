@@ -19,6 +19,7 @@ interface Props {
   isReadOnly?: boolean
   isPublished?: boolean
   blockId?: string
+  notaId?: string
   sessionInfo?: {
     sessionId?: string
     kernelName?: string
@@ -400,6 +401,8 @@ function stopExecutionTimer() {
               :originalCode="code"
               :isLoading="isExecuting"
               :isPublished="isPublished"
+              :notaId="props.notaId"
+              :blockId="props.blockId"
               class="h-full flex-1"
               @toggle-fullscreen="toggleOutputFullscreen"
             />
