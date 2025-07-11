@@ -884,6 +884,16 @@ const runningStatus = computed(() => {
   if (executionSuccess.value) return 'success'
   return 'idle'
 })
+
+// State for output/AI view toggle
+const activeOutputView = ref<'output' | 'ai'>('output')
+
+// Auto-switch to AI view when there's an error
+watch(() => cell?.value?.hasError, (hasError) => {
+  if (hasError && !props.isReadOnly && !props.isPublished) {
+    activeOutputView.value = 'ai'
+  }
+}, { immediate: true })
 </script>
 
 <template>
@@ -1215,21 +1225,6 @@ const runningStatus = computed(() => {
           <Save class="w-4 h-4" />
         </Button>
 
-        <!-- AI Assistant Toggle (hidden in readonly) -->
-        <Button
-          v-if="!isReadOnly && !isPublished"
-          variant="outline"
-          size="sm"
-          @click="toggleAIFeatures"
-          class="h-8 gap-2"
-          :title="aiCodeAssistant.isVisible.value ? 'Hide AI Assistant' : 'Show AI Assistant'"
-          aria-label="Toggle AI assistant"
-          :class="{ 'bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800': aiCodeAssistant.isVisible.value }"
-        >
-          <Brain class="w-4 h-4" />
-          <span class="hidden sm:inline">AI</span>
-          <Sparkles v-if="aiCodeAssistant.isVisible.value" class="w-3 h-3 text-blue-500" />
-        </Button>
 
         <!-- Copy button (always available) -->
         <Button
@@ -1320,30 +1315,6 @@ const runningStatus = computed(() => {
       </div>
     </div>
 
-    <!-- AI Code Assistant (unified AI interface) -->
-    <div v-if="!isReadOnly && !isPublished" class="ai-assistant-container">
-      <AICodeAssistant
-        :code="codeValue"
-        :language="props.language"
-        :error="cell?.hasError ? cell?.output : null"
-        :is-read-only="props.isReadOnly"
-        :block-id="props.id"
-        :is-executing="props.isExecuting || executionInProgress"
-        :execution-time="executionTime"
-        :has-output="!!cell?.output"
-        :session-info="{
-          sessionId: selectedSession,
-          kernelName: selectedKernel
-        }"
-        @code-updated="handleAICodeUpdate"
-        @analysis-started="() => {}"
-        @analysis-completed="() => {}"
-        @action-executed="handleCustomActionExecuted"
-        @trigger-execution="executeCode"
-        @request-execution-context="() => logger.debug('Execution context requested')"
-      />
-    </div>
-
     <!-- Code Editor -->
     <div v-show="isCodeVisible" class="relative group code-editor-container">
       <!-- Copy button overlay -->
@@ -1358,7 +1329,7 @@ const runningStatus = computed(() => {
           :disabled="isExecuting && !isPublished"
         >
           <Copy v-if="!isCodeCopied" class="h-4 w-4" />
-          <Check v-else class="h-4 w-4" />
+          <Check v-else class="h-4 h-4" />
         </Button>
       </div>
 
@@ -1376,20 +1347,150 @@ const runningStatus = computed(() => {
       />
     </div>
 
-    <!-- Output Section -->
-    <div v-if="cell?.output" class="border-t">
-      <OutputRenderer
-        ref="outputRendererRef"
-        :content="cell.output"
-        :type="cell?.hasError ? 'error' : undefined"
-        :showControls="true"
-        :isCollapsible="true"
-        :maxHeight="'300px'"
-        :isLoading="isExecuting && !isPublished"
-        :originalCode="codeValue"
-        :isPublished="isPublished"
-        @copy="copyOutput"
-      />
+    <!-- Enhanced Output/AI Section -->
+    <div v-if="cell?.output || (!isReadOnly && !isPublished)" class="border-t bg-muted/20">
+      <!-- Output/AI Toggle Header -->
+      <div class="flex items-center justify-between px-4 py-2 border-b bg-background/50">
+        <div class="flex items-center gap-2">
+          <!-- Toggle Tabs -->
+          <div class="flex items-center gap-1 p-1 bg-muted/50 rounded-lg">
+            <button
+              @click="activeOutputView = 'output'"
+              :class="[
+                'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all',
+                activeOutputView === 'output' 
+                  ? 'bg-background text-foreground shadow-sm' 
+                  : 'text-muted-foreground hover:text-foreground'
+              ]"
+              :disabled="!cell?.output"
+            >
+              <Box class="w-4 h-4" />
+              Output
+              <div v-if="cell?.hasError" class="w-2 h-2 bg-destructive rounded-full"></div>
+              <div v-else-if="cell?.output" class="w-2 h-2 bg-green-500 rounded-full"></div>
+            </button>
+            
+            <button
+              v-if="!isReadOnly && !isPublished"
+              @click="activeOutputView = 'ai'"
+              :class="[
+                'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all',
+                activeOutputView === 'ai' 
+                  ? 'bg-background text-foreground shadow-sm' 
+                  : 'text-muted-foreground hover:text-foreground'
+              ]"
+            >
+              <Brain class="w-4 h-4" />
+              AI Assistant
+              <div v-if="cell?.hasError" class="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+            </button>
+          </div>
+          
+          <!-- Status Indicator -->
+          <div v-if="activeOutputView === 'output' && cell?.output" class="text-xs text-muted-foreground">
+            {{ cell?.hasError ? 'Error Output' : 'Execution Result' }}
+          </div>
+          <div v-else-if="activeOutputView === 'ai'" class="text-xs text-muted-foreground">
+            AI-powered code analysis and suggestions
+          </div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="flex items-center gap-1">
+          <Button
+            v-if="activeOutputView === 'output' && cell?.output"
+            variant="ghost"
+            size="sm"
+            @click="copyOutput"
+            class="h-8 px-2"
+          >
+            <Copy class="w-4 h-4" />
+          </Button>
+          
+          <!-- AI Quick Actions -->
+          <div v-if="activeOutputView === 'ai' && !isReadOnly" class="flex items-center gap-1">
+            <Button
+              v-if="cell?.hasError"
+              variant="ghost"
+              size="sm"
+              @click="() => {
+                activeOutputView = 'ai'
+                // Auto-switch to error view when clicking Fix Error
+              }"
+              class="h-8 px-2 text-destructive hover:bg-destructive/10"
+            >
+              <AlertTriangle class="w-4 h-4 mr-1" />
+              Fix Error
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              @click="() => {
+                activeOutputView = 'ai'
+                // Auto-switch to AI view for analysis
+              }"
+              class="h-8 px-2"
+            >
+              <Sparkles class="w-4 h-4 mr-1" />
+              Analyze
+            </Button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Content Area -->
+      <div class="min-h-[200px] max-h-[400px] overflow-hidden">
+        <!-- Output Renderer -->
+        <div v-if="activeOutputView === 'output'" class="h-full">
+          <OutputRenderer
+            v-if="cell?.output"
+            ref="outputRendererRef"
+            :content="cell.output"
+            :type="cell?.hasError ? 'error' : undefined"
+            :showControls="false"
+            :isCollapsible="false"
+            :maxHeight="'400px'"
+            :isLoading="isExecuting && !isPublished"
+            :originalCode="codeValue"
+            :isPublished="isPublished"
+            @copy="copyOutput"
+          />
+          <div v-else class="flex items-center justify-center h-48 text-muted-foreground">
+            <div class="text-center">
+              <Box class="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p class="text-sm">No output yet</p>
+              <p class="text-xs mt-1">Run the code to see results</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- AI Assistant -->
+        <div v-else-if="activeOutputView === 'ai'" class="h-full">
+          <AICodeAssistant
+            ref="aiAssistantRef"
+            :code="codeValue"
+            :language="props.language"
+            :error="cell?.hasError ? cell?.output : null"
+            :is-read-only="props.isReadOnly"
+            :block-id="props.id"
+            :is-executing="props.isExecuting || executionInProgress"
+            :execution-time="executionTime"
+            :has-output="!!cell?.output"
+            :session-info="{
+              sessionId: selectedSession,
+              kernelName: selectedKernel
+            }"
+            :embedded-mode="true"
+            @code-updated="handleAICodeUpdate"
+            @analysis-started="() => {}"
+            @analysis-completed="() => {}"
+            @action-executed="handleCustomActionExecuted"
+            @trigger-execution="executeCode"
+            @request-execution-context="() => logger.debug('Execution context requested')"
+          />
+        </div>
+      </div>
     </div>
 
     <!-- Fullscreen Modal -->
@@ -1403,6 +1504,11 @@ const runningStatus = computed(() => {
       :is-executing="isExecuting && !isPublished"
       :is-read-only="isReadOnly"
       :is-published="isPublished"
+      :block-id="props.id"
+      :session-info="{
+        sessionId: selectedSession,
+        kernelName: selectedKernel
+      }"
       @execute="executeCode"
     />
 

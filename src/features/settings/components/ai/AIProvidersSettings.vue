@@ -4,6 +4,7 @@ import { useAIActionsStore } from '@/features/editor/stores/aiActionsStore'
 import { aiService } from '@/features/ai/services/aiService'
 import { Button } from '@/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/ui/card'
+import { toast } from '@/ui/toast'
 import { Label } from '@/ui/label'
 import { Input } from '@/ui/input'
 import CustomSelect from '@/ui/CustomSelect.vue'
@@ -11,7 +12,7 @@ import { Switch } from '@/ui/switch'
 import { Badge } from '@/ui/badge'
 import { Separator } from '@/ui/separator'
 import { Alert, AlertDescription } from '@/ui/alert'
-import { useRouter } from 'vue-router'
+
 import { 
   Settings, 
   Key, 
@@ -25,19 +26,19 @@ import {
   Sparkles,
   Server,
   Globe,
-  Zap
+  Zap,
+  HardDrive as HardDriveIcon
 } from 'lucide-vue-next'
 
-// Import WebLLM components
-import WebLLMConfigurationSection from './components/WebLLMConfigurationSection.vue'
-import WebLLMModelManager from './components/WebLLMModelManager.vue'
+// Import WebLLM Settings Modal
+import WebLLMSettingsModal from './components/WebLLMSettingsModal.vue'
 
 const aiActionsStore = useAIActionsStore()
-const router = useRouter()
 
 // Local state
 const availableProviders = ref<Array<{ value: string; label: string; available: boolean; description?: string }>>([])
 const isLoading = ref(false)
+const showWebLLMModal = ref(false)
 const isTestingConnection = ref<Record<string, boolean>>({})
 const connectionStatus = ref<Record<string, 'idle' | 'testing' | 'success' | 'error'>>({})
 const saveStatus = ref<'idle' | 'saving' | 'saved' | 'error'>('idle')
@@ -224,17 +225,18 @@ const selectProvider = (providerId: string) => {
   updateProviderSetting('provider', providerId)
 }
 
-const openFullModelManager = () => {
-  router.push('/settings?tab=ai&section=webllm')
+const openWebLLMSettings = () => {
+  showWebLLMModal.value = true
 }
 
-// WebLLM specific settings
-const webLLMAutoLoad = computed(() => {
-  return preferences.value.webllmAutoLoad || false
-})
+const handleWebLLMModelLoaded = (modelId: string) => {
+  // Update provider settings when a model is loaded via modal
+  selectProvider('webllm')
+}
 
-const setWebLLMAutoLoad = (enabled: boolean) => {
-  updateProviderSetting('webllmAutoLoad', enabled)
+const handleWebLLMSettingsSaved = () => {
+  // Refresh provider status when settings are saved
+  refreshProviders()
 }
 
 // Initialize
@@ -468,37 +470,41 @@ onMounted(() => {
               <span class="text-sm">Connection failed - Check your configuration</span>
             </div>
 
-            <!-- WebLLM Specific Configuration -->
-            <div v-if="config.id === 'webllm' && (connectionStatus[config.id] === 'success' || preferences.provider === 'webllm')" class="mt-4 pt-4 border-t">
-              <div class="space-y-4">
+            <!-- WebLLM Configuration Hub -->
+            <div v-if="config.id === 'webllm'" class="mt-4 pt-4 border-t">
+              <div class="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 rounded-lg border">
                 <div class="flex items-center justify-between">
-                  <h5 class="text-sm font-medium">Model Configuration</h5>
-                  <Button
-                    @click="openFullModelManager"
-                    variant="outline"
-                    size="sm"
-                  >
-                    Advanced Settings
-                  </Button>
-                </div>
-                
-                <WebLLMConfigurationSection 
-                  :is-selected="preferences.provider === 'webllm'"
-                  @model-loaded="() => testConnection('webllm')"
-                />
-                
-                <!-- Quick Auto-Load Setting -->
-                <div class="p-3 bg-muted/30 rounded-lg">
-                  <div class="flex items-center justify-between mb-2">
-                    <span class="text-sm font-medium">Auto-load default model</span>
-                    <Switch
-                      :checked="webLLMAutoLoad"
-                      @update:checked="setWebLLMAutoLoad"
-                    />
+                  <div class="space-y-2">
+                    <div class="flex items-center gap-2">
+                      <Globe class="h-5 w-5 text-blue-600" />
+                      <h4 class="font-medium text-blue-900 dark:text-blue-100">WebLLM Settings</h4>
+                    </div>
+                    <p class="text-sm text-blue-700 dark:text-blue-300">
+                      Complete model management, quick setup wizard, and browser optimization
+                    </p>
+                    <div class="flex flex-wrap gap-2 mt-2">
+                      <Badge variant="outline" class="text-xs border-blue-300 text-blue-700">
+                        <Zap class="h-3 w-3 mr-1" />
+                        Quick Setup
+                      </Badge>
+                      <Badge variant="outline" class="text-xs border-blue-300 text-blue-700">
+                        <HardDriveIcon class="h-3 w-3 mr-1" />
+                        Model Manager
+                      </Badge>
+                      <Badge variant="outline" class="text-xs border-blue-300 text-blue-700">
+                        <Settings class="h-3 w-3 mr-1" />
+                        Auto-Load
+                      </Badge>
+                    </div>
                   </div>
-                  <p class="text-xs text-muted-foreground">
-                    Automatically load a WebLLM model when AI generation is requested
-                  </p>
+                  <Button
+                    @click="openWebLLMSettings"
+                    class="bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm"
+                    size="default"
+                  >
+                    <Settings class="h-4 w-4 mr-2" />
+                    Configure Models
+                  </Button>
                 </div>
               </div>
             </div>
@@ -507,21 +513,7 @@ onMounted(() => {
       </CardContent>
     </Card>
 
-    <!-- Primary Provider Specific Settings -->
-    <Card v-if="preferences.provider === 'webllm'">
-      <CardHeader>
-        <CardTitle class="flex items-center gap-2">
-          <Globe class="h-5 w-5" />
-          WebLLM Model Selection
-        </CardTitle>
-        <CardDescription>
-          Select and manage WebLLM models for local AI processing
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <WebLLMModelManager />
-      </CardContent>
-    </Card>
+    
 
     <!-- Fallback Configuration -->
     <Card>
@@ -603,5 +595,12 @@ onMounted(() => {
         Failed to save settings. Please try again.
       </AlertDescription>
     </Alert>
+
+    <!-- WebLLM Settings Modal -->
+    <WebLLMSettingsModal
+      v-model:open="showWebLLMModal"
+      @model-loaded="handleWebLLMModelLoaded"
+      @settings-saved="handleWebLLMSettingsSaved"
+    />
   </div>
 </template> 

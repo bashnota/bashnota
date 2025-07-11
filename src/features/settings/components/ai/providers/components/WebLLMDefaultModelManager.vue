@@ -77,13 +77,7 @@
             Choose a model below or use quick setup to configure automatic loading
           </p>
         </div>
-        <Button
-          @click="showQuickSetup = true"
-          variant="default"
-        >
-          <Zap class="h-4 w-4 mr-2" />
-          Quick Setup
-        </Button>
+
       </div>
     </div>
 
@@ -217,19 +211,7 @@
     </div>
 
     <!-- Quick Setup Dialog -->
-    <Dialog v-model:open="showQuickSetup">
-      <DialogContent class="max-w-4xl">
-        <DialogHeader>
-          <DialogTitle>Quick WebLLM Setup</DialogTitle>
-        </DialogHeader>
-        <WebLLMQuickSetup
-          :available-models="availableModels"
-          @setup-complete="handleQuickSetupComplete"
-          @skip="showQuickSetup = false"
-          @preview-model="handlePreviewModel"
-        />
-      </DialogContent>
-    </Dialog>
+
   </div>
 </template>
 
@@ -238,7 +220,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { Button } from '@/ui/button'
 import { Badge } from '@/ui/badge'
 import { Switch } from '@/ui/switch'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/ui/dialog'
+
 import { 
   Settings,
   CheckCircle,
@@ -255,7 +237,7 @@ import {
 import { webLLMDefaultModelService } from '@/features/ai/services/webLLMDefaultModelService'
 import type { DefaultModelConfig } from '@/features/ai/services/webLLMDefaultModelService'
 import type { WebLLMModelInfo } from '@/features/ai/services/types'
-import WebLLMQuickSetup from './WebLLMQuickSetup.vue'
+
 import { toast } from '@/ui/toast'
 import { logger } from '@/services/logger'
 
@@ -281,7 +263,7 @@ const emit = defineEmits<Emits>()
 
 // State
 const config = ref<DefaultModelConfig>(webLLMDefaultModelService.getDefaultModelConfig())
-const showQuickSetup = ref(false)
+
 const showAllModels = ref(false)
 
 // Computed
@@ -443,11 +425,7 @@ const refreshModels = () => {
   emit('refresh-models')
 }
 
-const handleQuickSetupComplete = (modelId: string) => {
-  showQuickSetup.value = false
-  config.value = webLLMDefaultModelService.getDefaultModelConfig()
-  emit('model-selected', modelId)
-}
+
 
 const handlePreviewModel = (model: WebLLMModelInfo) => {
   emit('preview-model', model)
@@ -459,12 +437,7 @@ watch(() => props.currentModel, () => {
 }, { immediate: true })
 
 onMounted(() => {
-  // Check if user has completed setup
-  if (!webLLMDefaultModelService.hasCompletedQuickSetup() && props.availableModels.length > 0) {
-    // Auto-show quick setup for new users
-    setTimeout(() => {
-      showQuickSetup.value = true
-    }, 1000)
-  }
+  // Component initialization
+  config.value = webLLMDefaultModelService.getDefaultModelConfig()
 })
 </script> 
