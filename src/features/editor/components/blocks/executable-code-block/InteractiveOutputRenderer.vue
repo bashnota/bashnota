@@ -6,6 +6,7 @@ import { Badge } from '@/ui/badge'
 import { Card, CardContent, CardHeader } from '@/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/ui/tabs'
 import { ansiToHtml, stripAnsi } from '@/lib/utils'
+import IframeOutputRenderer from './IframeOutputRenderer.vue'
 
 export interface InteractiveOutput {
   type: 'text' | 'html' | 'json' | 'image' | 'plotly' | 'matplotlib' | 'widget' | 'dataframe' | 'error'
@@ -374,7 +375,12 @@ onMounted(() => {
             <pre v-else-if="output.type === 'json'" class="whitespace-pre-wrap text-sm p-3 bg-muted/20 rounded border overflow-auto font-mono">{{ formatJson(output.content) }}</pre>
             
             <!-- HTML Output -->
-            <div v-else-if="output.type === 'html'" class="prose prose-sm max-w-none" v-html="output.content"></div>
+            <IframeOutputRenderer
+              v-if="output.type === 'html'"
+              :content="output.content"
+              type="html"
+              :height="props.maxHeight || '400px'"
+            />
             
             <!-- Image Output -->
             <div v-else-if="output.type === 'image'" class="text-center">
@@ -382,16 +388,31 @@ onMounted(() => {
             </div>
             
             <!-- Matplotlib Output -->
-            <div v-else-if="output.type === 'matplotlib'" class="text-center" v-html="renderMatplotlibImage(output.content)"></div>
+            <IframeOutputRenderer
+              v-else-if="output.type === 'matplotlib'"
+              :content="renderMatplotlibImage(output.content)"
+              type="matplotlib"
+              :height="props.maxHeight || '400px'"
+            />
             
             <!-- Plotly Output -->
             <div v-else-if="output.type === 'plotly'" ref="plotlyContainer" class="plotly-container"></div>
             
             <!-- DataFrame Output -->
-            <div v-else-if="output.type === 'dataframe'" v-html="renderDataFrame(output.content)"></div>
+            <IframeOutputRenderer
+              v-else-if="output.type === 'dataframe'"
+              :content="renderDataFrame(output.content)"
+              type="dataframe"
+              :height="props.maxHeight || '400px'"
+            />
             
             <!-- Widget Output -->
-            <div v-else-if="output.type === 'widget'" v-html="renderWidget(output.content)"></div>
+            <IframeOutputRenderer
+              v-else-if="output.type === 'widget'"
+              :content="renderWidget(output.content)"
+              type="widget"
+              :height="props.maxHeight || '400px'"
+            />
             
             <!-- Error Output -->
             <div v-else-if="output.type === 'error'" class="p-3 bg-destructive/10 border border-destructive/20 rounded">
@@ -424,7 +445,12 @@ onMounted(() => {
         <pre v-else-if="currentOutput.type === 'json'" class="whitespace-pre-wrap text-sm p-3 bg-muted/20 rounded border overflow-auto font-mono">{{ formatJson(currentOutput.content) }}</pre>
         
         <!-- HTML Output -->
-        <div v-else-if="currentOutput.type === 'html'" class="prose prose-sm max-w-none" v-html="currentOutput.content"></div>
+        <IframeOutputRenderer
+          v-if="currentOutput.type === 'html'"
+          :content="currentOutput.content"
+          type="html"
+          :height="props.maxHeight || '400px'"
+        />
         
         <!-- Image Output -->
         <div v-else-if="currentOutput.type === 'image'" class="text-center">
@@ -432,16 +458,31 @@ onMounted(() => {
         </div>
         
         <!-- Matplotlib Output -->
-        <div v-else-if="currentOutput.type === 'matplotlib'" class="text-center" v-html="renderMatplotlibImage(currentOutput.content)"></div>
+        <IframeOutputRenderer
+          v-else-if="currentOutput.type === 'matplotlib'"
+          :content="renderMatplotlibImage(currentOutput.content)"
+          type="matplotlib"
+          :height="props.maxHeight || '400px'"
+        />
         
         <!-- Plotly Output -->
         <div v-else-if="currentOutput.type === 'plotly'" ref="plotlyContainer" class="plotly-container"></div>
         
         <!-- DataFrame Output -->
-        <div v-else-if="currentOutput.type === 'dataframe'" v-html="renderDataFrame(currentOutput.content)"></div>
+        <IframeOutputRenderer
+          v-else-if="currentOutput.type === 'dataframe'"
+          :content="renderDataFrame(currentOutput.content)"
+          type="dataframe"
+          :height="props.maxHeight || '400px'"
+        />
         
         <!-- Widget Output -->
-        <div v-else-if="currentOutput.type === 'widget'" v-html="renderWidget(currentOutput.content)"></div>
+        <IframeOutputRenderer
+          v-else-if="currentOutput.type === 'widget'"
+          :content="renderWidget(currentOutput.content)"
+          type="widget"
+          :height="props.maxHeight || '400px'"
+        />
         
         <!-- Error Output -->
         <div v-else-if="currentOutput.type === 'error'" class="p-3 bg-destructive/10 border border-destructive/20 rounded">

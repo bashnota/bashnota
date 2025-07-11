@@ -4,6 +4,7 @@ import { Copy, Check, Download, Maximize, Minimize, Eye, EyeOff, Loader2 } from 
 import { Button } from '@/ui/button'
 import { logger } from '@/services/logger'
 import { ansiToHtml, stripAnsi } from '@/lib/utils'
+import IframeOutputRenderer from './IframeOutputRenderer.vue'
 
 const props = defineProps<{
   content: string
@@ -63,6 +64,27 @@ const formatJson = (jsonString: string) => {
 }
 
 // Process content based on type - modify the text handling to properly handle image tags
+// Check if content contains HTML that should be isolated
+const containsUnsafeHTML = computed(() => {
+  if (!props.content) return false
+  
+  // Check for potentially unsafe HTML tags (not just color formatting)
+  const unsafeHTMLPattern = /<(?!\/?(span|div|br|p|strong|em|b|i|u|pre|code)(\s|>))[^>]+>/i
+  return unsafeHTMLPattern.test(props.content) || 
+         props.content.includes('<script') || 
+         props.content.includes('<style') ||
+         props.content.includes('<iframe') ||
+         props.content.includes('<object') ||
+         props.content.includes('<embed')
+})
+
+// Check if content should be rendered in iframe for safety
+const shouldUseIframe = computed(() => {
+  return effectiveOutputType.value === 'table' || 
+         effectiveOutputType.value === 'image' ||
+         (effectiveOutputType.value === 'text' && containsUnsafeHTML.value)
+})
+
 const processContent = () => {
   if (!props.content) return
   
@@ -441,8 +463,15 @@ const executionTime = computed(() => {
     >
       <!-- Only one of these should render based on the effectiveOutputType -->
       <template v-if="effectiveOutputType === 'text'">
-        <!-- Text output with ANSI escape codes converted to HTML -->
-        <div class="text-output" v-html="formattedContent"></div>
+        <!-- Text output with HTML content - Use iframe for safety when HTML is detected -->
+        <IframeOutputRenderer
+          v-if="shouldUseIframe"
+          :content="formattedContent"
+          type="html"
+          :height="props.maxHeight || '400px'"
+        />
+        <!-- Safe text output without HTML but with ANSI formatting -->
+        <div v-else class="text-output" v-html="formattedContent"></div>
       </template>
       
       <template v-else-if="effectiveOutputType === 'json'">
@@ -454,13 +483,21 @@ const executionTime = computed(() => {
       </template>
       
       <template v-else-if="effectiveOutputType === 'table'">
-        <!-- Table output -->
-        <div class="table-viewer" v-html="content"></div>
+        <!-- Table output - Use iframe for safety -->
+        <IframeOutputRenderer
+          :content="content"
+          type="dataframe"
+          :height="props.maxHeight || '400px'"
+        />
       </template>
       
       <template v-else-if="effectiveOutputType === 'image'">
-        <!-- Image output -->
-        <div class="image-viewer" v-html="content"></div>
+        <!-- Image output - Use iframe for safety -->
+        <IframeOutputRenderer
+          :content="content"
+          type="html"
+          :height="props.maxHeight || '400px'"
+        />
       </template>
       
       <!-- Enhanced error output with line numbers and highlighting -->
