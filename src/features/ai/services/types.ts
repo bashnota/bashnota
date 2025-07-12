@@ -1,5 +1,13 @@
 // AI Service types and interfaces
 
+export interface InitProgressReport {
+  progress: number;
+  text: string;
+}
+
+export type WebLLMInitProgressReport = InitProgressReport
+export type WebLLMProgressCallback = (report: WebLLMInitProgressReport) => void
+
 // Base interface for all AI providers
 export interface AIProvider {
   id: string;

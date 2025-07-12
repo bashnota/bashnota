@@ -3,128 +3,113 @@
 <div align="center">
   <img src="src/assets/logo.svg" alt="BashNota Logo" width="120" />
   <h3>More Than a Second Brain, It's a Second Brain Cracked on Code and AI</h3>
+  
+  [![Issues](https://img.shields.io/github/issues/bashnota/bashnota)](https://github.com/bashnota/bashnota/issues)
+  [![Pull Requests](https://img.shields.io/github/issues-pr/bashnota/bashnota)](https://github.com/bashnota/bashnota/pulls)
+  [![License](https://img.shields.io/github/license/bashnota/bashnota)](LICENSE)
+  [![Deploy](https://img.shields.io/badge/deploy-live-brightgreen)](https://offline.bashnota.com)
 </div>
 
-## 🚀 Overview
+## Overview
 
-BashNota is a powerful note-taking application designed specifically for developers and technical users. It combines the rich text editing capabilities of modern document editors with the code execution power of Jupyter notebooks, all in an offline-first package.
+BashNota combines rich text editing with executable code blocks, AI assistance, and seamless organization. Built for developers who need more than just notes.
 
-Transform your notes into powerful tools with code snippets execution, markdown and LaTeX support, and seamless organization. Built for developers, designed for productivity.
+**Key Features:**
+- 📝 Rich markdown editing with TipTap
+- 💻 Execute Python/JavaScript code blocks
+- 🤖 AI assistant integration
+- 📊 LaTeX math & Mermaid diagrams
+- 🔗 Jupyter notebook integration
+- 🌙 Dark/light themes
 
-## ✨ Features
-
-### 📝 Rich Text Editing
-- **Markdown Support**: Full markdown syntax with live preview
-- **Advanced Formatting**: Headings, lists, tables, blockquotes, and more
-- **Task Lists**: Create and manage to-do lists within your notes
-- **Page Links**: Link between different notes for better organization
-
-### 💻 Code Execution
-- **Executable Code Blocks**: Run code directly in your notes
-- **Multi-language Support**: Python, JavaScript, and more
-- **Jupyter Integration**: Connect to Jupyter servers
-- **Session Management**: Maintain state between executions
-
-### 📊 Visualizations
-- **Math & LaTeX**: First-class support for mathematical notation
-- **Mermaid Diagrams**: Create flowcharts, sequence diagrams, and more
-- **Data Visualization**: Generate charts and plots from your data
-- **Draw.io Integration**: Create and edit diagrams directly in notes
-
-### 🤖 AI Assistance
-- **AI Assistant**: Get help with writing, research, and code
-- **Multiple AI Providers**: Support for various AI models
-- **Context-Aware**: AI that understands your notes and preferences
-
-### 📚 Organization
-- **Hierarchical Structure**: Organize notes in a tree structure
-- **Tagging System**: Categorize and filter notes with tags
-- **Quick Search**: Find notes instantly with full-text search
-- **Favorites**: Mark and quickly access important notes
-
-### 🔄 Collaboration & Sharing
-- **Publishing**: Share notes with public links
-- **User Profiles**: Customize your public presence
-- **Activity Tracking**: Monitor engagement with your published notes
-
-### 🌙 User Experience
-- **Dark/Light Mode**: Choose your preferred theme
-- **Keyboard Shortcuts**: Enhance productivity with shortcuts
-- **Responsive Design**: Works on desktop and mobile devices
-- **Customizable UI**: Adjust the interface to your preferences
-
-## 🔧 Technical Stack
-
-BashNota is built with modern web technologies:
-
-- **Frontend**: Vue 3, TypeScript, Tailwind CSS
-- **Text Editor**: TipTap (based on ProseMirror)
-- **Code Execution**: Jupyter protocol integration
-- **AI Integration**: Multiple provider support (OpenAI, Gemini, etc.)
-- **Data Storage**: Firebase with offline support
-- **Authentication**: Firebase Auth
-
-## 🚀 Getting Started
+## Quick Start
 
 ### Prerequisites
-
 - Node.js 18+
-- npm or yarn
-- Firebase account (for backend services)
+- Firebase account
 
-### Installation
+### Development
+```bash
+git clone https://github.com/bashnota/bashnota.git
+cd bashnota
+npm install
+cp .env.example .env  # Configure your environment
+npm run dev
+```
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/bashnota.git
-   cd bashnota
-   ```
+### Build & Deploy
+```bash
+# Build for production
+npm run build
 
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+# Preview production build
+npm run preview
 
-3. Configure environment variables:
-   Create a `.env` file based on the `.env.example` template.
+# Deploy to Firebase
+npm run deploy
+```
 
-4. Start the development server:
-   ```bash
-   npm run dev
-   ```
+### Firebase Functions
+```bash
+cd functions
+npm install
+npm run build
+npm run deploy
+```
 
-## 📚 Documentation
+## Tech Stack
 
-Visit our [documentation](https://docs.bashnota.com) for detailed guides on:
+- **Frontend**: Vue 3 + TypeScript + Vite
+- **Editor**: TipTap (ProseMirror)
+- **UI**: Tailwind CSS + Radix Vue + Shadcn
+- **Backend**: Firebase (Auth, Firestore, Functions)
+- **Code Execution**: Jupyter protocol
+- **AI**: OpenAI, Gemini, Claude
 
-- Setting up your environment
-- Creating and organizing notes
-- Working with code execution
-- Using AI features
-- Customizing your experience
+## Project Structure
 
-## 🤝 Contributing
+```
+src/
+├── features/           # Feature modules
+│   ├── ai/            # AI assistant
+│   ├── editor/        # Note editor
+│   ├── nota/          # Note management
+│   └── jupyter/       # Jupyter integration
+├── components/        # Shared components
+├── ui/               # UI components
+└── stores/           # State management
+```
 
-Contributions are welcome! Please check our [Contributing Guide](CONTRIBUTING.md) for details on how to submit pull requests, report issues, or request features.
+## Contributing
 
-## 📄 License
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Commit changes: `git commit -m 'Add amazing feature'`
+4. Push to branch: `git push origin feature/amazing-feature`
+5. Open a Pull Request
 
-BashNota is released under the MIT License. See the [LICENSE](LICENSE) file for details.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
-## 🔮 Roadmap
+## Acknowledgments
 
-- Mobile app version
-- Collaborative editing
-- Enhanced AI capabilities
-- Plugin system for extensions
-- Self-hosted option
+Built with these amazing open-source projects:
 
-## 📧 Contact
+- [Vue.js](https://vuejs.org/) - Progressive JavaScript framework
+- [TipTap](https://tiptap.dev/) - Headless rich-text editor
+- [ProseMirror](https://prosemirror.net/) - Rich text editing toolkit
+- [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
+- [Radix Vue](https://www.radix-vue.com/) - Unstyled, accessible components
+- [Firebase](https://firebase.google.com/) - Backend platform
+- [Vite](https://vitejs.dev/) - Build tool
 
-Have questions or feedback? Join our [Discord community](https://discord.gg/bashnota) or reach out at support@bashnota.com.
+## License
+
+GNU AFFERO GENERAL PUBLIC LICENSE License - see [LICENSE](LICENSE) file for details.
 
 ---
 
 <div align="center">
-  <p>Transform the way you work with notes. Try BashNota today!</p>
+  <a href="https://offline.bashnota.com">🚀 Try BashNota</a> • 
+  <a href="https://github.com/bashnota/bashnota/issues">Report Bug</a> • 
+  <a href="https://github.com/bashnota/bashnota/discussions">Discussions</a>
 </div>

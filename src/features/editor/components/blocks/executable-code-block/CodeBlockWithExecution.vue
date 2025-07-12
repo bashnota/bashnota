@@ -28,6 +28,8 @@ import {
   RotateCw,
   Trash2,
   Link2,
+  Brain,
+  Sparkles,
 } from 'lucide-vue-next'
 import { Button } from '@/ui/button'
 import CodeMirror from '@/features/editor/components/blocks/executable-code-block/CodeMirror.vue'
@@ -41,6 +43,9 @@ import ExecutionStatus from '@/features/editor/components/blocks/executable-code
 import ErrorDisplay from '@/features/editor/components/blocks/executable-code-block/ErrorDisplay.vue'
 import { useOutputStreaming } from '@/features/editor/components/blocks/executable-code-block/composables/useOutputStreaming'
 import TemplateSelector from '@/features/editor/components/blocks/executable-code-block/TemplateSelector.vue'
+import AICodeAssistant from '@/features/editor/components/blocks/executable-code-block/AICodeAssistant.vue'
+import { useAICodeAssistant } from '@/features/editor/components/blocks/executable-code-block/composables/useAICodeAssistant'
+import { useAIActionsStore } from '@/features/editor/stores/aiActionsStore'
 
 // Types
 interface Props {
@@ -113,6 +118,16 @@ const isCodeCopied = ref(false)
 // Add new state for enhanced features
 const isTemplateDialogOpen = ref(false)
 const executionId = ref<string | null>(null)
+
+// Initialize AI Code Assistant
+const aiCodeAssistant = useAICodeAssistant(props.id, {
+  autoAnalyzeErrors: true,
+  enableQuickActions: true,
+  enableCustomActions: true
+})
+
+// Keep AI Actions Store for feature flags
+const aiActionsStore = useAIActionsStore()
 
 // Initialize output streaming
 const {
@@ -703,9 +718,19 @@ const executeCodeBlock = async () => {
     
     executionSuccess.value = !cell.value?.hasError
     
+    // 🔥 NEW: Auto-trigger AI error analysis if enabled and execution failed
+    if (cell.value?.hasError && aiActionsStore.state.errorTriggerConfig.autoTrigger) {
+      await triggerAutoErrorAnalysis()
+    }
+    
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Execution failed'
     logger.error('Code execution failed:', error)
+    
+    // 🔥 NEW: Auto-trigger AI error analysis for caught exceptions
+    if (aiActionsStore.state.errorTriggerConfig.autoTrigger) {
+      await triggerAutoErrorAnalysis(error instanceof Error ? error.message : 'Execution failed')
+    }
   } finally {
     executionInProgress.value = false
     stopStreaming()
@@ -729,6 +754,65 @@ const handleTemplateSelected = (templateCode: string) => {
 
 const showTemplateDialog = () => {
   isTemplateDialogOpen.value = true
+}
+
+// AI Features methods
+const toggleAIFeatures = () => {
+  aiCodeAssistant.toggleVisibility()
+}
+
+const handleAICodeUpdate = (newCode: string) => {
+  updateCode(newCode)
+}
+
+const handleCustomActionExecuted = (actionId: string, result: string) => {
+  logger.debug(`Custom action ${actionId} executed with result length: ${result.length}`)
+  
+  // 🔥 NEW: Enhanced result handling for better feedback
+  if (actionId === 'fix-error' && result) {
+    // Show AI suggestion in a more prominent way
+    logger.info('AI Error Fix Suggestion:', result)
+  }
+}
+
+// 🔥 NEW: Auto error analysis trigger
+const triggerAutoErrorAnalysis = async (customError?: string) => {
+  try {
+    const error = customError || cell.value?.output || errorMessage.value
+    if (!error || !props.code.trim()) return
+    
+    logger.info('🤖 Triggering automatic AI error analysis...')
+    
+    // Enhanced execution context for better AI analysis
+    const executionContext = {
+      code: props.code,
+      language: props.language,
+      error: error,
+      // 🔥 NEW: Rich execution context
+      executionTime: executionTime.value,
+      sessionId: selectedSession.value,
+      kernelName: selectedKernel.value,
+      hasOutput: !!cell.value?.output,
+      cellOutput: cell.value?.output
+    }
+    
+    // Auto-run fix-error action if enabled  
+    if (aiActionsStore.state.errorTriggerConfig.showQuickFix) {
+      await aiCodeAssistant.analyzeError(props.code, props.language, error, executionContext)
+    }
+    
+    // Show AI assistant if not already visible
+    if (!aiCodeAssistant.isVisible.value) {
+      aiCodeAssistant.toggleVisibility()
+    }
+    
+  } catch (analysisError) {
+    logger.error('Auto error analysis failed:', analysisError)
+  }
+}
+
+const handleErrorDismissed = () => {
+  errorMessage.value = null
 }
 
 // Enhanced code formatting
@@ -800,6 +884,16 @@ const runningStatus = computed(() => {
   if (executionSuccess.value) return 'success'
   return 'idle'
 })
+
+// State for output/AI view toggle
+const activeOutputView = ref<'output' | 'ai'>('output')
+
+// Auto-switch to AI view when there's an error
+watch(() => cell?.value?.hasError, (hasError) => {
+  if (hasError && !props.isReadOnly && !props.isPublished) {
+    activeOutputView.value = 'ai'
+  }
+}, { immediate: true })
 </script>
 
 <template>
@@ -1131,6 +1225,7 @@ const runningStatus = computed(() => {
           <Save class="w-4 h-4" />
         </Button>
 
+
         <!-- Copy button (always available) -->
         <Button
           variant="outline"
@@ -1234,7 +1329,7 @@ const runningStatus = computed(() => {
           :disabled="isExecuting && !isPublished"
         >
           <Copy v-if="!isCodeCopied" class="h-4 w-4" />
-          <Check v-else class="h-4 w-4" />
+          <Check v-else class="h-4 h-4" />
         </Button>
       </div>
 
@@ -1252,20 +1347,152 @@ const runningStatus = computed(() => {
       />
     </div>
 
-    <!-- Output Section -->
-    <div v-if="cell?.output" class="border-t">
-      <OutputRenderer
-        ref="outputRendererRef"
-        :content="cell.output"
-        :type="cell?.hasError ? 'error' : undefined"
-        :showControls="true"
-        :isCollapsible="true"
-        :maxHeight="'300px'"
-        :isLoading="isExecuting && !isPublished"
-        :originalCode="codeValue"
-        :isPublished="isPublished"
-        @copy="copyOutput"
-      />
+    <!-- Enhanced Output/AI Section -->
+    <div v-if="cell?.output || (!isReadOnly && !isPublished)" class="border-t bg-muted/20">
+      <!-- Output/AI Toggle Header -->
+      <div class="flex items-center justify-between px-4 py-2 border-b bg-background/50">
+        <div class="flex items-center gap-2">
+          <!-- Toggle Tabs -->
+          <div class="flex items-center gap-1 p-1 bg-muted/50 rounded-lg">
+            <button
+              @click="activeOutputView = 'output'"
+              :class="[
+                'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all',
+                activeOutputView === 'output' 
+                  ? 'bg-background text-foreground shadow-sm' 
+                  : 'text-muted-foreground hover:text-foreground'
+              ]"
+              :disabled="!cell?.output"
+            >
+              <Box class="w-4 h-4" />
+              Output
+              <div v-if="cell?.hasError" class="w-2 h-2 bg-destructive rounded-full"></div>
+              <div v-else-if="cell?.output" class="w-2 h-2 bg-green-500 rounded-full"></div>
+            </button>
+            
+            <button
+              v-if="!isReadOnly && !isPublished"
+              @click="activeOutputView = 'ai'"
+              :class="[
+                'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all',
+                activeOutputView === 'ai' 
+                  ? 'bg-background text-foreground shadow-sm' 
+                  : 'text-muted-foreground hover:text-foreground'
+              ]"
+            >
+              <Brain class="w-4 h-4" />
+              AI Assistant
+              <div v-if="cell?.hasError" class="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+            </button>
+          </div>
+          
+          <!-- Status Indicator -->
+          <div v-if="activeOutputView === 'output' && cell?.output" class="text-xs text-muted-foreground">
+            {{ cell?.hasError ? 'Error Output' : 'Execution Result' }}
+          </div>
+          <div v-else-if="activeOutputView === 'ai'" class="text-xs text-muted-foreground">
+            AI-powered code analysis and suggestions
+          </div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="flex items-center gap-1">
+          <Button
+            v-if="activeOutputView === 'output' && cell?.output"
+            variant="ghost"
+            size="sm"
+            @click="copyOutput"
+            class="h-8 px-2"
+          >
+            <Copy class="w-4 h-4" />
+          </Button>
+          
+          <!-- AI Quick Actions -->
+          <div v-if="activeOutputView === 'ai' && !isReadOnly" class="flex items-center gap-1">
+            <Button
+              v-if="cell?.hasError"
+              variant="ghost"
+              size="sm"
+              @click="() => {
+                activeOutputView = 'ai'
+                // Auto-switch to error view when clicking Fix Error
+              }"
+              class="h-8 px-2 text-destructive hover:bg-destructive/10"
+            >
+              <AlertTriangle class="w-4 h-4 mr-1" />
+              Fix Error
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              @click="() => {
+                activeOutputView = 'ai'
+                // Auto-switch to AI view for analysis
+              }"
+              class="h-8 px-2"
+            >
+              <Sparkles class="w-4 h-4 mr-1" />
+              Analyze
+            </Button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Content Area -->
+      <div class="min-h-[200px] max-h-[400px] overflow-hidden">
+        <!-- Output Renderer -->
+        <div v-if="activeOutputView === 'output'" class="h-full">
+          <OutputRenderer
+            v-if="cell?.output"
+            ref="outputRendererRef"
+            :content="cell.output"
+            :type="cell?.hasError ? 'error' : undefined"
+            :showControls="false"
+            :isCollapsible="false"
+            :maxHeight="'400px'"
+            :isLoading="isExecuting && !isPublished"
+            :originalCode="codeValue"
+            :isPublished="isPublished"
+            :notaId="props.notaId"
+            :blockId="props.id"
+            @copy="copyOutput"
+          />
+          <div v-else class="flex items-center justify-center h-48 text-muted-foreground">
+            <div class="text-center">
+              <Box class="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p class="text-sm">No output yet</p>
+              <p class="text-xs mt-1">Run the code to see results</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- AI Assistant -->
+        <div v-else-if="activeOutputView === 'ai'" class="h-full">
+          <AICodeAssistant
+            ref="aiAssistantRef"
+            :code="codeValue"
+            :language="props.language"
+            :error="cell?.hasError ? cell?.output : null"
+            :is-read-only="props.isReadOnly"
+            :block-id="props.id"
+            :is-executing="props.isExecuting || executionInProgress"
+            :execution-time="executionTime"
+            :has-output="!!cell?.output"
+            :session-info="{
+              sessionId: selectedSession,
+              kernelName: selectedKernel
+            }"
+            :embedded-mode="true"
+            @code-updated="handleAICodeUpdate"
+            @analysis-started="() => {}"
+            @analysis-completed="() => {}"
+            @action-executed="handleCustomActionExecuted"
+            @trigger-execution="executeCode"
+            @request-execution-context="() => logger.debug('Execution context requested')"
+          />
+        </div>
+      </div>
     </div>
 
     <!-- Fullscreen Modal -->
@@ -1279,6 +1506,12 @@ const runningStatus = computed(() => {
       :is-executing="isExecuting && !isPublished"
       :is-read-only="isReadOnly"
       :is-published="isPublished"
+      :block-id="props.id"
+      :nota-id="props.notaId"
+      :session-info="{
+        sessionId: selectedSession,
+        kernelName: selectedKernel
+      }"
       @execute="executeCode"
     />
 

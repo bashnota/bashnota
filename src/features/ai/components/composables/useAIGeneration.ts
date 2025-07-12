@@ -28,7 +28,7 @@ interface AIGenerationError {
   originalError?: Error;
 }
 
-export function useAIGeneration(editor: any, notaId: string) {
+export function useAIGeneration(editor: import('vue').Ref<any>, notaId: string) {
   const isLoading = ref(false)
   const aiSettings = useAISettingsStore()
   const { errorMessage, handleGenerationError } = useAIErrorHandling()
@@ -47,7 +47,8 @@ export function useAIGeneration(editor: any, notaId: string) {
     webLLMModels,
     selectProvider,
     isWebLLMSupported,
-    checkAllProviders
+    checkAllProviders,
+    verifyWebLLMReady
   } = useAIProviders()
   
   const { 
@@ -65,38 +66,43 @@ export function useAIGeneration(editor: any, notaId: string) {
     const currentProviderId = aiSettings.settings.preferredProviderId
     console.log(`[useAIGeneration] ensureValidProvider - Current provider ID: ${currentProviderId}, Available providers: ${availableProviders.value.join(', ')}`)
     
-    // Special handling for WebLLM - if it's selected, check if a model is loaded
+    // Special handling for WebLLM - if it's selected, check if a model is loaded and ready
     if (currentProviderId === 'webllm') {
-      // Check if WebLLM is supported
-      console.log(`[useAIGeneration] WebLLM requested and supported: ${isWebLLMSupported.value}`)
+      console.log(`[useAIGeneration] WebLLM requested, verifying readiness...`)
       
-      // Check the current state
-      updateWebLLMState()
-      console.log(`[useAIGeneration] WebLLM model loaded: ${currentWebLLMModel.value || 'none'}`)
+      // Use the comprehensive verification method
+      const isReady = await verifyWebLLMReady()
       
-      // If no model is loaded, try to load one
-      if (!currentWebLLMModel.value) {
-        console.log('[useAIGeneration] No WebLLM model loaded, attempting to load one')
-        
-        // Show loading state in the editor
-        editor.commands.updateAttributes('aiGeneration', {
+      if (isReady) {
+        console.log(`[useAIGeneration] WebLLM is ready with model: ${currentWebLLMModel.value}`)
+        return 'webllm'
+      }
+      
+      console.log('[useAIGeneration] WebLLM not ready, attempting to initialize...')
+      
+      // Show loading state in the editor
+      if (editor.value) {
+        editor.value.commands.updateAttributes('aiGeneration', {
           loading: true,
           error: 'Loading WebLLM model...',
         })
-        
-        // Try to select the WebLLM provider, which will auto-load a model
-        const success = await selectProvider('webllm')
-        console.log(`[useAIGeneration] WebLLM provider selection ${success ? 'succeeded' : 'failed'}`)
-        
-        if (!success) {
-          throw new Error('Failed to load WebLLM model. Please select a model in the settings.')
-        }
-        
-        // Update state after loading
-        updateWebLLMState()
-        console.log(`[useAIGeneration] WebLLM model after loading: ${currentWebLLMModel.value || 'none'}`)
       }
       
+      // Try to select the WebLLM provider, which will auto-load a model
+      const success = await selectProvider('webllm')
+      console.log(`[useAIGeneration] WebLLM provider selection ${success ? 'succeeded' : 'failed'}`)
+      
+      if (!success) {
+        throw new Error('Failed to load WebLLM model. Please select a model in the settings.')
+      }
+      
+      // Verify again after loading
+      const isNowReady = await verifyWebLLMReady()
+      if (!isNowReady) {
+        throw new Error('WebLLM model loading failed. Please try again or select a different model.')
+      }
+      
+      console.log(`[useAIGeneration] WebLLM model successfully loaded: ${currentWebLLMModel.value}`)
       return 'webllm'
     }
     
@@ -161,10 +167,12 @@ export function useAIGeneration(editor: any, notaId: string) {
       const blockId = conversationManager.getOrCreateBlockId(block)
       
       // Update block to show loading state
-      editor.commands.updateAttributes('aiGeneration', {
-        loading: true,
-        error: ''
-      })
+      if (editor.value) {
+        editor.value.commands.updateAttributes('aiGeneration', {
+          loading: true,
+          error: ''
+        })
+      }
 
       // Create user message
       const userMessage: ConversationMessage = {
@@ -189,6 +197,14 @@ export function useAIGeneration(editor: any, notaId: string) {
       
       const apiKey = aiSettings.getApiKey(providerId)
       console.log(`[useAIGeneration] generateText - Final provider selected: ${providerId}`)
+      
+      // Final verification for WebLLM before generation
+      if (providerId === 'webllm') {
+        const isReady = await verifyWebLLMReady()
+        if (!isReady) {
+          throw new Error('WebLLM is not ready for text generation. Please try loading a model again.')
+        }
+      }
       
       const options: GenerationOptions = {
         prompt,
@@ -236,11 +252,13 @@ export function useAIGeneration(editor: any, notaId: string) {
               : aiMessage.content
               
             // Update block with current result
-            editor.commands.updateAttributes('aiGeneration', {
-              result: fullResult,
-              loading: true,
-              lastUpdated: new Date().toISOString()
-            })
+            if (editor.value) {
+              editor.value.commands.updateAttributes('aiGeneration', {
+                result: fullResult,
+                loading: true,
+                lastUpdated: new Date().toISOString()
+              })
+            }
           },
           onComplete: async (result: GenerationResult) => {
             // Streaming complete
@@ -258,11 +276,13 @@ export function useAIGeneration(editor: any, notaId: string) {
               : result.text
               
             // Update block with complete result
-            editor.commands.updateAttributes('aiGeneration', {
-              result: fullResult,
-              loading: false,
-              lastUpdated: new Date().toISOString()
-            })
+            if (editor.value) {
+              editor.value.commands.updateAttributes('aiGeneration', {
+                result: fullResult,
+                loading: false,
+                lastUpdated: new Date().toISOString()
+              })
+            }
           },
           onError: (error: Error) => {
             throw error
@@ -298,16 +318,25 @@ export function useAIGeneration(editor: any, notaId: string) {
           : generationResult.text
 
         // Update block with result
-        editor.commands.updateAttributes('aiGeneration', {
-          result: fullResult,
-          loading: false,
-          lastUpdated: new Date().toISOString()
-        })
+        if (editor.value) {
+          editor.value.commands.updateAttributes('aiGeneration', {
+            result: fullResult,
+            loading: false,
+            lastUpdated: new Date().toISOString()
+          })
+        }
         
         return conversationManager.conversationHistory.value
       }
-    } catch (error) {
-      return handleGenerationError(error, editor, block, conversationHistory)
+    } catch (error: any) {
+      // Update block with error state
+      if (editor.value) {
+        editor.value.commands.updateAttributes('aiGeneration', {
+          loading: false,
+          error: error.message
+        })
+      }
+      return handleGenerationError(error, editor.value, block, conversationHistory)
     } finally {
       isLoading.value = false
     }
@@ -334,10 +363,12 @@ export function useAIGeneration(editor: any, notaId: string) {
       const blockId = conversationManager.getOrCreateBlockId(block)
       
       // Update block to show loading state
-      editor.commands.updateAttributes('aiGeneration', {
-        loading: true,
-        error: ''
-      })
+      if (editor.value) {
+        editor.value.commands.updateAttributes('aiGeneration', {
+          loading: true,
+          error: ''
+        })
+      }
 
       // Create user message
       const userMessage: ConversationMessage = {
@@ -400,15 +431,24 @@ export function useAIGeneration(editor: any, notaId: string) {
         : generationResult.text
 
       // Update block with result
-      editor.commands.updateAttributes('aiGeneration', {
-        result: fullResult,
-        loading: false,
-        lastUpdated: new Date().toISOString()
-      })
+      if (editor.value) {
+        editor.value.commands.updateAttributes('aiGeneration', {
+          result: fullResult,
+          loading: false,
+          lastUpdated: new Date().toISOString()
+        })
+      }
 
       return conversationManager.conversationHistory.value
-    } catch (error) {
-      return handleGenerationError(error, editor, block, conversationHistory)
+    } catch (error: any) {
+      // Update block with error state
+      if (editor.value) {
+        editor.value.commands.updateAttributes('aiGeneration', {
+          loading: false,
+          error: error.message
+        })
+      }
+      return handleGenerationError(error, editor.value, block, conversationHistory)
     } finally {
       isLoading.value = false
     }
@@ -433,10 +473,12 @@ export function useAIGeneration(editor: any, notaId: string) {
       const blockId = conversationManager.getOrCreateBlockId(block)
       
       // Update block to show loading state
-      editor.commands.updateAttributes('aiGeneration', {
-        loading: true,
-        error: ''
-      })
+      if (editor.value) {
+        editor.value.commands.updateAttributes('aiGeneration', {
+          loading: true,
+          error: ''
+        })
+      }
 
       // Get current conversation history
       const currentHistory = conversationManager.conversationHistory.value
@@ -497,15 +539,24 @@ export function useAIGeneration(editor: any, notaId: string) {
       await conversationManager.updateConversationHistory(blockId, [...filteredHistory, aiMessage])
 
       // Update block with result
-      editor.commands.updateAttributes('aiGeneration', {
-        result: generationResult.text,
-        loading: false,
-        lastUpdated: new Date().toISOString()
-      })
+      if (editor.value) {
+        editor.value.commands.updateAttributes('aiGeneration', {
+          result: generationResult.text,
+          loading: false,
+          lastUpdated: new Date().toISOString()
+        })
+      }
 
       return conversationManager.conversationHistory.value
-    } catch (error) {
-      return handleGenerationError(error, editor, block, conversationHistory)
+    } catch (error: any) {
+      // Update block with error state
+      if (editor.value) {
+        editor.value.commands.updateAttributes('aiGeneration', {
+          loading: false,
+          error: error.message
+        })
+      }
+      return handleGenerationError(error, editor.value, block, conversationHistory)
     } finally {
       isLoading.value = false
     }
@@ -529,8 +580,11 @@ export function useAIGeneration(editor: any, notaId: string) {
       }
       
       // Remove the block from the document
-      editor.chain().focus().deleteNode(block.type).run()
-      return true
+      if (editor.value) {
+        editor.value.chain().focus().deleteNode(block.type).run()
+        return true
+      }
+      return false
     } catch (error) {
       logger.error('Error removing block:', error)
       

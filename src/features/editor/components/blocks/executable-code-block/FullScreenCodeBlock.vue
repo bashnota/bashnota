@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref, computed, watch } from 'vue'
 import { Button } from '@/ui/button'
-import { X, Play, Loader2, Copy, Check } from 'lucide-vue-next'
+import { X, Play, Loader2, Copy, Check, Brain, Box, AlertTriangle, Sparkles } from 'lucide-vue-next'
 import CodeMirror from './CodeMirror.vue'
 import OutputRenderer from './OutputRenderer.vue'
+import AICodeAssistant from './AICodeAssistant.vue'
+import { Badge } from '@/ui/badge'
 import { useFullscreenCode } from './composables/useFullscreenCode'
 import { useCodeBlockShortcuts } from './composables/useCodeBlockShortcuts'
 
@@ -16,6 +18,12 @@ interface Props {
   isExecuting?: boolean
   isReadOnly?: boolean
   isPublished?: boolean
+  blockId?: string
+  notaId?: string
+  sessionInfo?: {
+    sessionId?: string
+    kernelName?: string
+  }
 }
 
 const props = defineProps<Props>()
@@ -59,6 +67,16 @@ const executionStartTime = ref(0)
 const executionTime = ref(0)
 const executionTimeInterval = ref<number | null>(null)
 const statusMessage = ref<string | null>(null)
+
+// Output/AI view toggle
+const activeOutputView = ref<'output' | 'ai'>('output')
+
+// Auto-switch to AI view when there's an error
+watch(() => props.outputType, (outputType) => {
+  if (outputType === 'error' && !props.isReadOnly && !props.isPublished) {
+    activeOutputView.value = 'ai'
+  }
+}, { immediate: true })
 
 // Compute readable execution time
 const executionTimeText = computed(() => {
@@ -141,6 +159,15 @@ const onCodeUpdate = (newCode: string) => {
 
 const executeCode = () => {
   emit('execute')
+}
+
+// AI Assistant handlers
+const handleAICodeUpdate = (newCode: string) => {
+  emit('update:code', newCode)
+}
+
+const handleCustomActionExecuted = (actionId: string, result: string) => {
+  console.log(`AI action ${actionId} executed with result:`, result)
 }
 
 // Timer functions for execution feedback
@@ -286,26 +313,134 @@ function stopExecutionTimer() {
         class="flex flex-col h-full transition-all" 
         :style="outputContainerStyle"
       >
-        <OutputRenderer 
-          v-if="output"
-          :content="output" 
-          :type="outputType"
-          :showControls="true"
-          :isFullscreenable="true"
-          :isCollapsible="true"
-          :originalCode="code"
-          :isLoading="isExecuting"
-          :isPublished="isPublished"
-          class="h-full flex-1"
-          @toggle-fullscreen="toggleOutputFullscreen"
-        />
-        <div v-else-if="isExecuting" class="flex-1 flex flex-col items-center justify-center bg-muted/30">
-          <Loader2 class="w-6 h-6 animate-spin text-primary mb-3" />
-          <div class="text-sm text-muted-foreground">Executing code...</div>
-          <div class="text-xs text-muted-foreground mt-1">{{ executionTimeText }}</div>
+        <!-- Output/AI Toggle Header -->
+        <div v-if="output || (!isReadOnly && !isPublished)" class="flex items-center justify-between px-4 py-2 border-b bg-background/50">
+          <div class="flex items-center gap-2">
+            <!-- Toggle Tabs -->
+            <div class="flex items-center gap-1 p-1 bg-muted/50 rounded-lg">
+              <button
+                @click="activeOutputView = 'output'"
+                :class="[
+                  'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all',
+                  activeOutputView === 'output' 
+                    ? 'bg-background text-foreground shadow-sm' 
+                    : 'text-muted-foreground hover:text-foreground'
+                ]"
+                :disabled="!output"
+              >
+                <Box class="w-4 h-4" />
+                Output
+                <div v-if="outputType === 'error'" class="w-2 h-2 bg-destructive rounded-full"></div>
+                <div v-else-if="output" class="w-2 h-2 bg-green-500 rounded-full"></div>
+              </button>
+              
+              <button
+                v-if="!isReadOnly && !isPublished && blockId"
+                @click="activeOutputView = 'ai'"
+                :class="[
+                  'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all',
+                  activeOutputView === 'ai' 
+                    ? 'bg-background text-foreground shadow-sm' 
+                    : 'text-muted-foreground hover:text-foreground'
+                ]"
+              >
+                <Brain class="w-4 h-4" />
+                AI Assistant
+                <div v-if="outputType === 'error'" class="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+              </button>
+            </div>
+            
+            <!-- Status Indicator -->
+            <div v-if="activeOutputView === 'output' && output" class="text-xs text-muted-foreground">
+              {{ outputType === 'error' ? 'Error Output' : 'Execution Result' }}
+            </div>
+            <div v-else-if="activeOutputView === 'ai'" class="text-xs text-muted-foreground">
+              AI-powered code analysis and suggestions
+            </div>
+          </div>
+          
+          <!-- Action Buttons -->
+          <div class="flex items-center gap-1">
+            <!-- AI Quick Actions -->
+            <div v-if="activeOutputView === 'ai' && !isReadOnly" class="flex items-center gap-1">
+              <Button
+                v-if="outputType === 'error'"
+                variant="ghost"
+                size="sm"
+                @click="activeOutputView = 'ai'"
+                class="h-8 px-2 text-destructive hover:bg-destructive/10"
+              >
+                <AlertTriangle class="w-4 h-4 mr-1" />
+                Fix Error
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                @click="activeOutputView = 'ai'"
+                class="h-8 px-2"
+              >
+                <Sparkles class="w-4 h-4 mr-1" />
+                Analyze
+              </Button>
+            </div>
+          </div>
         </div>
-        <div v-else class="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-          No output to display
+
+        <!-- Content Area -->
+        <div class="flex-1 overflow-hidden">
+          <!-- Output Renderer -->
+          <div v-if="activeOutputView === 'output'" class="h-full">
+            <OutputRenderer 
+              v-if="output"
+              :content="output" 
+              :type="outputType"
+              :showControls="true"
+              :isFullscreenable="true"
+              :isCollapsible="false"
+              :originalCode="code"
+              :isLoading="isExecuting"
+              :isPublished="isPublished"
+              :notaId="props.notaId"
+              :blockId="props.blockId"
+              class="h-full flex-1"
+              @toggle-fullscreen="toggleOutputFullscreen"
+            />
+            <div v-else-if="isExecuting" class="flex-1 flex flex-col items-center justify-center bg-muted/30 h-full">
+              <Loader2 class="w-6 h-6 animate-spin text-primary mb-3" />
+              <div class="text-sm text-muted-foreground">Executing code...</div>
+              <div class="text-xs text-muted-foreground mt-1">{{ executionTimeText }}</div>
+            </div>
+            <div v-else class="flex-1 flex items-center justify-center text-sm text-muted-foreground h-full">
+              <div class="text-center">
+                <Box class="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p class="text-sm">No output yet</p>
+                <p class="text-xs mt-1">Run the code to see results</p>
+              </div>
+            </div>
+          </div>
+          
+          <!-- AI Assistant -->
+          <div v-else-if="activeOutputView === 'ai' && blockId" class="h-full">
+            <AICodeAssistant
+              :code="code"
+              :language="language"
+              :error="outputType === 'error' ? output : null"
+              :is-read-only="isReadOnly"
+              :block-id="blockId"
+              :is-executing="isExecuting"
+              :execution-time="executionTime"
+              :has-output="!!output"
+              :session-info="sessionInfo"
+              :embedded-mode="true"
+              @code-updated="handleAICodeUpdate"
+              @analysis-started="() => {}"
+              @analysis-completed="() => {}"
+              @action-executed="handleCustomActionExecuted"
+              @trigger-execution="executeCode"
+              @request-execution-context="() => {}"
+            />
+          </div>
         </div>
       </div>
     </div>

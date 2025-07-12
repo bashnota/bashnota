@@ -8,7 +8,8 @@ import type {
   ProviderConfig,
   StreamCallbacks,
   WebLLMModelInfo,
-  GeminiModelInfo
+  GeminiModelInfo,
+  WebLLMProgressCallback,
 } from './types';
 import { WebLLMProvider } from './providers/webLLMProvider';
 import { GeminiProvider } from './providers/geminiProvider';
@@ -18,10 +19,11 @@ import { logger } from '@/services/logger';
  * Main AI service that manages providers and generation requests
  */
 export class AIService {
+  private static instance: AIService;
   private providerFactory: DefaultProviderFactory;
   private defaultProviderId: string = 'gemini';
   
-  constructor() {
+  private constructor() {
     this.providerFactory = new DefaultProviderFactory();
     
     // Initialize from localStorage if available
@@ -36,6 +38,13 @@ export class AIService {
     } catch (error) {
       logger.error('Error loading provider from settings:', error);
     }
+  }
+  
+  public static getInstance(): AIService {
+    if (!AIService.instance) {
+      AIService.instance = new AIService();
+    }
+    return AIService.instance;
   }
   
   /**
@@ -196,10 +205,10 @@ export class AIService {
   /**
    * Initialize a WebLLM model
    */
-  async initializeWebLLMModel(modelName: string): Promise<void> {
+  async initializeWebLLMModel(modelName: string, progressCallback?: WebLLMProgressCallback): Promise<void> {
     try {
       const provider = this.getProvider('webllm') as WebLLMProvider;
-      await provider.initializeModel(modelName);
+      await provider.initializeModel(modelName, progressCallback);
     } catch (error) {
       logger.error(`Error initializing WebLLM model ${modelName}:`, error);
       throw error;
@@ -308,7 +317,7 @@ export class AIService {
 }
 
 // Export a singleton instance
-export const aiService = new AIService(); 
+export const aiService = AIService.getInstance(); 
 
 
 

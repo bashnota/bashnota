@@ -30,6 +30,13 @@ const router = createRouter({
       name: 'bashhub',
       component: () => import('@/features/bashhub/views/BashHubView.vue'),
     },
+    // Code block output route
+    {
+      path: '/output/:notaId/:blockId',
+      name: 'code-block-output',
+      component: () => import('@/features/editor/views/CodeBlockOutputView.vue'),
+      props: true,
+    },
     // Auth routes
     {
       path: '/login',

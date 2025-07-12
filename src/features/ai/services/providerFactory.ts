@@ -14,8 +14,11 @@ export class DefaultProviderFactory implements AIProviderFactory {
   createProvider(providerId: string, config?: any): AIProvider {
     // If provider already exists, return it
     if (this.providers[providerId]) {
+      logger.debug(`Returning existing provider instance for ${providerId}`);
       return this.providers[providerId];
     }
+    
+    logger.info(`Creating new provider instance for ${providerId}`);
     
     // Create new provider based on ID
     let provider: AIProvider;
@@ -42,6 +45,7 @@ export class DefaultProviderFactory implements AIProviderFactory {
     
     // Store provider for reuse
     this.providers[providerId] = provider;
+    logger.info(`Provider ${providerId} created and stored successfully`);
     
     return provider;
   }

@@ -12,7 +12,9 @@ export type {
   ModelInfo,
   WebLLMModelInfo,
   GeminiModelInfo,
-  GeminiSafetySettings
+  GeminiSafetySettings,
+  WebLLMInitProgressReport,
+  WebLLMProgressCallback
 } from './types';
 
 // Export provider implementations (if needed directly)

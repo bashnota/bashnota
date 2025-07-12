@@ -24,6 +24,7 @@ const componentMap = {
   // AI Settings
   'AIProvidersSettings': defineAsyncComponent(() => import('@/features/settings/components/ai/AIProvidersSettings.vue')),
   'AIActionsSettings': defineAsyncComponent(() => import('@/features/settings/components/ai/AIActionsSettings.vue')),
+  'AICodeActionsSettings': defineAsyncComponent(() => import('@/features/settings/components/ai/AICodeActionsSettings.vue')),
   'AIGenerationSettings': defineAsyncComponent(() => import('@/features/settings/components/ai/AIGenerationSettings.vue')),
   
   // Integration Settings

@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, computed } from 'vue'
-import { Copy, Check, Download, Maximize, Minimize, Eye, EyeOff, Loader2 } from 'lucide-vue-next'
+import { Copy, Check, Download, Maximize, Minimize, Eye, EyeOff, Loader2, ExternalLink } from 'lucide-vue-next'
 import { Button } from '@/ui/button'
 import { logger } from '@/services/logger'
 import { ansiToHtml, stripAnsi } from '@/lib/utils'
+import IframeOutputRenderer from './IframeOutputRenderer.vue'
 
 const props = defineProps<{
   content: string
@@ -15,6 +16,8 @@ const props = defineProps<{
   isLoading?: boolean
   originalCode?: string
   isPublished?: boolean
+  notaId?: string
+  blockId?: string
 }>()
 
 const emit = defineEmits<{
@@ -63,6 +66,27 @@ const formatJson = (jsonString: string) => {
 }
 
 // Process content based on type - modify the text handling to properly handle image tags
+// Check if content contains HTML that should be isolated
+const containsUnsafeHTML = computed(() => {
+  if (!props.content) return false
+  
+  // Check for potentially unsafe HTML tags (not just color formatting)
+  const unsafeHTMLPattern = /<(?!\/?(span|div|br|p|strong|em|b|i|u|pre|code)(\s|>))[^>]+>/i
+  return unsafeHTMLPattern.test(props.content) || 
+         props.content.includes('<script') || 
+         props.content.includes('<style') ||
+         props.content.includes('<iframe') ||
+         props.content.includes('<object') ||
+         props.content.includes('<embed')
+})
+
+// Check if content should be rendered in iframe for safety
+const shouldUseIframe = computed(() => {
+  return effectiveOutputType.value === 'table' || 
+         effectiveOutputType.value === 'image' ||
+         (effectiveOutputType.value === 'text' && containsUnsafeHTML.value)
+})
+
 const processContent = () => {
   if (!props.content) return
   
@@ -208,6 +232,14 @@ ${content}
   URL.revokeObjectURL(url)
   
   emit('download')
+}
+
+// Open output in external tab
+const openInExternalTab = () => {
+  if (!props.notaId || !props.blockId || !hasContent.value) return
+
+  const url = `/output/${props.notaId}/${props.blockId}`
+  window.open(url, '_blank')
 }
 
 // Toggle output visibility
@@ -406,6 +438,19 @@ const executionTime = computed(() => {
           <span class="sr-only">Download</span>
         </Button>
         
+        <!-- Open in external tab button -->
+        <Button
+          variant="ghost"
+          size="icon"
+          @click="openInExternalTab"
+          class="control-button"
+          title="Open output in external tab"
+          :disabled="!hasContent || props.isLoading"
+        >
+          <ExternalLink class="control-icon" />
+          <span class="sr-only">Open in external tab</span>
+        </Button>
+        
         <!-- Fullscreen toggle -->
         <Button
           v-if="props.isFullscreenable"
@@ -441,8 +486,15 @@ const executionTime = computed(() => {
     >
       <!-- Only one of these should render based on the effectiveOutputType -->
       <template v-if="effectiveOutputType === 'text'">
-        <!-- Text output with ANSI escape codes converted to HTML -->
-        <div class="text-output" v-html="formattedContent"></div>
+        <!-- Text output with HTML content - Use iframe for safety when HTML is detected -->
+        <IframeOutputRenderer
+          v-if="shouldUseIframe"
+          :content="formattedContent"
+          type="html"
+          :height="props.maxHeight || '400px'"
+        />
+        <!-- Safe text output without HTML but with ANSI formatting -->
+        <div v-else class="text-output" v-html="formattedContent"></div>
       </template>
       
       <template v-else-if="effectiveOutputType === 'json'">
@@ -454,13 +506,21 @@ const executionTime = computed(() => {
       </template>
       
       <template v-else-if="effectiveOutputType === 'table'">
-        <!-- Table output -->
-        <div class="table-viewer" v-html="content"></div>
+        <!-- Table output - Use iframe for safety -->
+        <IframeOutputRenderer
+          :content="content"
+          type="dataframe"
+          :height="props.maxHeight || '400px'"
+        />
       </template>
       
       <template v-else-if="effectiveOutputType === 'image'">
-        <!-- Image output -->
-        <div class="image-viewer" v-html="content"></div>
+        <!-- Image output - Use iframe for safety -->
+        <IframeOutputRenderer
+          :content="content"
+          type="html"
+          :height="props.maxHeight || '400px'"
+        />
       </template>
       
       <!-- Enhanced error output with line numbers and highlighting -->

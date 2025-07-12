@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch, toRef } from 'vue'
 import { Textarea } from '@/ui/textarea'
 import { Button } from '@/ui/button'
 import { useAISettingsStore } from '@/features/ai/stores/aiSettingsStore'
@@ -25,9 +25,10 @@ import MentionSearch from './MentionSearch.vue'
 
 // Import the icons
 import { List as ListIcon, ArrowLeft as ArrowLeftIcon, Cpu as CpuIcon, Zap as ZapIcon } from 'lucide-vue-next'
+import type { Editor } from '@tiptap/vue-3'
 
 const props = defineProps<{
-  editor: any
+  editor: Editor | null
   notaId: string
   hideHeader?: boolean
 }>()
@@ -108,7 +109,7 @@ const {
   regenerateText: regenerateAction,
   removeBlock: removeBlockAction,
   currentStreamingText: streamingText
-} = useAIGeneration(props.editor, props.notaId)
+} = useAIGeneration(toRef(props, 'editor'), props.notaId)
 
 // Format progress percentage
 const formattedProgress = computed(() => {
@@ -394,27 +395,20 @@ const copyMessageToClipboard = (text: string) => {
 
 // Insert AI response to document
 const insertToDocument = () => {
-  if (!activeAIBlock.value || !activeAIBlock.value.node.attrs.result) return
+  if (!activeAIBlock.value || !activeAIBlock.value.node.attrs.result || !props.editor) return
   
   try {
-    // Get the result text
     const text = activeAIBlock.value.node.attrs.result
-    
-    // Get the current editor state
     const { state } = props.editor
     const { selection } = state
-    
-    // Check if we're in a list item
     const isInListItem = selection.$anchor.parent.type.name === 'listItem'
     
     if (isInListItem) {
-      // When in a list item, insert as paragraphs inside the list item
       props.editor.chain().focus().insertContent({
         type: 'paragraph',
         content: [{ type: 'text', text }]
       }).run()
     } else {
-      // Normal insertion for other contexts
       props.editor.chain().focus().insertContent(text).run()
     }
     
@@ -435,24 +429,19 @@ const insertToDocument = () => {
 
 // Insert selected text to document
 const insertSelectionToDocument = () => {
-  if (!selectedText.value) return
+  if (!selectedText.value || !props.editor) return
   
   try {
-    // Get the current editor state
     const { state } = props.editor
     const { selection } = state
-    
-    // Check if we're in a list item
     const isInListItem = selection.$anchor.parent.type.name === 'listItem'
     
     if (isInListItem) {
-      // When in a list item, insert as paragraphs inside the list item
       props.editor.chain().focus().insertContent({
         type: 'paragraph',
         content: [{ type: 'text', text: selectedText.value }]
       }).run()
     } else {
-      // Normal insertion for other contexts
       props.editor.chain().focus().insertContent(selectedText.value).run()
     }
     
@@ -462,7 +451,6 @@ const insertSelectionToDocument = () => {
       variant: 'default'
     })
     
-    // Clear the selection
     selectedText.value = ''
   } catch (error) {
     logger.error('Failed to insert selection:', error)
@@ -476,22 +464,19 @@ const insertSelectionToDocument = () => {
 
 // Insert specific message to document
 const insertMessageToDocument = (text: string) => {
+  if (!props.editor) return
+
   try {
-    // Get the current editor state
     const { state } = props.editor
     const { selection } = state
-    
-    // Check if we're in a list item
     const isInListItem = selection.$anchor.parent.type.name === 'listItem'
     
     if (isInListItem) {
-      // When in a list item, insert as paragraphs inside the list item
       props.editor.chain().focus().insertContent({
         type: 'paragraph',
         content: [{ type: 'text', text }]
       }).run()
     } else {
-      // Normal insertion for other contexts
       props.editor.chain().focus().insertContent(text).run()
     }
     
@@ -510,12 +495,17 @@ const insertMessageToDocument = (text: string) => {
   }
 }
 
-// Remove the block from the document
+// Remove the AI block from the editor
 const removeBlock = () => {
-  if (!activeAIBlock.value) return
-  
-  if (removeBlockAction(activeAIBlock.value)) {
+  if (activeAIBlock.value) {
+    removeBlockAction(activeAIBlock.value)
     clearActiveBlock()
+    
+    toast({
+      title: 'Removed',
+      description: 'AI response block has been removed',
+      variant: 'default'
+    })
   }
 }
 

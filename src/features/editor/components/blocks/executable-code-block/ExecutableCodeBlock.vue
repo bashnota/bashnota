@@ -152,6 +152,8 @@ const runningStatus = computed(() => {
           :showControls="false"
           :maxHeight="'400px'"
           :isPublished="isPublishedView"
+          :notaId="notaId"
+          :blockId="blockId"
         />
       </CardContent>
     </Card>
