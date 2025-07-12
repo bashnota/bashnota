@@ -367,6 +367,19 @@ export const useAIActionsStore = defineStore('aiActions', () => {
       outputType: 'markdown',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
+    },
+    {
+      id: 'chat-followup',
+      name: 'Chat Follow-up',
+      description: 'Continue conversation about code or analysis',
+      icon: 'MessageCircle',
+      prompt: '{{chatContext}}',
+      category: 'analysis',
+      isBuiltIn: true,
+      isEnabled: true,
+      outputType: 'markdown',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     }
   ]
 
@@ -487,6 +500,7 @@ export const useAIActionsStore = defineStore('aiActions', () => {
       hasOutput?: boolean;
       cellOutput?: string;
       serverConfig?: any;
+      chatContext?: string;
     }
   ): Promise<string> => {
     const action = state.customActions.find(a => a.id === actionId)
@@ -534,6 +548,7 @@ export const useAIActionsStore = defineStore('aiActions', () => {
         .replace(/\{\{language\}\}/g, context.language || '')
         .replace(/\{\{error\}\}/g, context.error || '')
         .replace(/\{\{text\}\}/g, context.text || '')
+        .replace(/\{\{chatContext\}\}/g, context.chatContext || '')
       
       // 🔥 NEW: Add execution context to error-related actions
       if ((action.id === 'fix-error' || action.category === 'debugging') && (executionMetadata || outputContext)) {

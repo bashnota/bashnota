@@ -8,16 +8,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/ui/
 import { Alert, AlertDescription } from '@/ui/alert'
 import { Separator } from '@/ui/separator'
 import { ScrollArea } from '@/ui/scroll-area'
-import { 
-  Brain, 
-  Sparkles, 
-  Shield, 
-  Zap, 
-  MessageSquare, 
-  Code2, 
-  RefreshCw, 
-  AlertTriangle, 
-  CheckCircle, 
+import { Input } from '@/ui/input'
+import { Textarea } from '@/ui/textarea'
+import {
+  Brain,
+  Sparkles,
+  Shield,
+  Zap,
+  MessageSquare,
+  Code2,
+  RefreshCw,
+  AlertTriangle,
+  CheckCircle,
   XCircle,
   Loader2,
   Copy,
@@ -39,7 +41,11 @@ import {
   ArrowRight,
   Lightbulb,
   Target,
-  Rocket
+  Rocket,
+  Send,
+  MessageCircle,
+  Plus,
+  Minus
 } from 'lucide-vue-next'
 
 interface Props {
@@ -67,6 +73,21 @@ interface Emits {
   'request-execution-context': []
 }
 
+interface ChatMessage {
+  id: string
+  content: string
+  type: 'user' | 'assistant'
+  timestamp: Date
+  actionId?: string
+  codeBlockIndex?: number
+}
+
+interface ActionResult {
+  content: string
+  chatHistory: ChatMessage[]
+  isExpanded: boolean
+}
+
 const props = withDefaults(defineProps<Props>(), {
   error: null,
   isReadOnly: false,
@@ -88,13 +109,44 @@ const activeView = ref<'actions' | 'results' | 'error'>('actions')
 const isAnalyzing = ref(false)
 const copiedStates = ref<Record<string, boolean>>({})
 const executingActions = ref<Set<string>>(new Set())
-const actionResults = ref<Record<string, string>>({})
+const actionResults = ref<Record<string, ActionResult>>({})
 const hoveredAction = ref<string | null>(null)
+
+// Chat state
+const chatInputs = ref<Record<string, string>>({})
+const chatLoading = ref<Record<string, boolean>>({})
+const expandedChats = ref<Record<string, boolean>>({})
+
+// Direct prompt state
+const directPrompt = ref<string>('')
 
 // Panel positioning
 const panelRef = ref<HTMLElement>()
 const triggerRef = ref<HTMLElement>()
 const isCompact = ref(false)
+
+// New panel state
+const showPanel = ref(false)
+const compactMode = ref(false)
+
+// Panel style computed
+const panelStyle = computed(() => ({
+  // Add any dynamic positioning styles here if needed
+}))
+
+// Panel toggle function
+const togglePanel = () => {
+  showPanel.value = !showPanel.value
+  if (showPanel.value) {
+    if (hasError.value) {
+      activeView.value = 'error'
+    } else if (hasResults.value) {
+      activeView.value = 'results'
+    } else {
+      activeView.value = 'actions'
+    }
+  }
+}
 
 // Computed
 const hasError = computed(() => !!props.error)
@@ -194,7 +246,14 @@ const executeAction = async (action: CustomAIAction) => {
     }
     
     const result = await aiActionsStore.executeCustomAction(action.id, context)
-    actionResults.value[action.id] = result
+    
+    // Initialize action result with chat history
+    actionResults.value[action.id] = {
+      content: result,
+      chatHistory: [],
+      isExpanded: true
+    }
+    
     emit('action-executed', action.id, result)
     
     // Switch to results view with animation
@@ -212,7 +271,11 @@ const executeAction = async (action: CustomAIAction) => {
   } catch (error) {
     console.error(`Failed to execute action ${action.id}:`, error)
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    actionResults.value[action.id] = `❌ Error: ${errorMessage}`
+    actionResults.value[action.id] = {
+      content: `❌ Error: ${errorMessage}`,
+      chatHistory: [],
+      isExpanded: true
+    }
   } finally {
     executingActions.value.delete(action.id)
     isAnalyzing.value = false
@@ -241,23 +304,205 @@ const copyToClipboard = async (text: string, key: string) => {
   }
 }
 
-const applyCodeFromResult = (result: string) => {
-  if (props.isReadOnly) return
-  
-  // Enhanced code extraction that handles multiple formats
-  const codeMatch = result.match(/```[\w]*\n([\s\S]*?)\n```/)
-  if (codeMatch && codeMatch[1]) {
-    const extractedCode = codeMatch[1].trim()
-    console.log('Applying code:', extractedCode) // Debug log
-    emit('code-updated', extractedCode)
-  } else {
-    console.warn('No code found in result:', result) // Debug log
-  }
-}
+
 
 const clearResults = () => {
   actionResults.value = {}
+  chatInputs.value = {}
+  chatLoading.value = {}
+  expandedChats.value = {}
   activeView.value = 'actions'
+}
+
+const executeDirectPrompt = async () => {
+  if (!directPrompt.value.trim() || isAnalyzing.value) return
+
+  isAnalyzing.value = true
+  try {
+    emit('analysis-started')
+
+    const context = {
+      code: props.code,
+      language: props.language,
+      error: props.error || undefined,
+      executionTime: props.executionTime,
+      sessionId: props.sessionInfo?.sessionId,
+      kernelName: props.sessionInfo?.kernelName,
+      hasOutput: props.hasOutput,
+      chatContext: `User question: ${directPrompt.value}\n\nFor the following ${props.language} code:\n\`\`\`${props.language}\n${props.code}\n\`\`\`\n\nPlease provide a helpful response. If your response includes code changes, provide them in a code block.`
+    }
+
+    const response = await aiActionsStore.executeCustomAction('chat-followup', context)
+
+    // Create result for direct prompt
+    const actionId = 'direct-prompt'
+    if (!actionResults.value[actionId]) {
+      actionResults.value[actionId] = {
+        content: response,
+        chatHistory: [],
+        isExpanded: true
+      }
+    } else {
+      actionResults.value[actionId].content = response
+    }
+
+    emit('action-executed', actionId, response)
+
+    // Switch to results view
+    activeView.value = 'results'
+
+    // Clear input
+    directPrompt.value = ''
+
+  } catch (error) {
+    console.error('Failed to execute direct prompt:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    actionResults.value['direct-prompt'] = {
+      content: `❌ Error: ${errorMessage}`,
+      chatHistory: [],
+      isExpanded: true
+    }
+  } finally {
+    isAnalyzing.value = false
+    emit('analysis-completed')
+  }
+}
+
+const toggleResultExpansion = (actionId: string) => {
+  if (actionResults.value[actionId]) {
+    actionResults.value[actionId].isExpanded = !actionResults.value[actionId].isExpanded
+  }
+}
+
+const toggleChatExpansion = (chatKey: string) => {
+  expandedChats.value[chatKey] = !expandedChats.value[chatKey]
+}
+
+const sendChatMessage = async (actionId: string, codeBlockIndex?: number) => {
+  const chatKey = codeBlockIndex !== undefined ? `${actionId}-${codeBlockIndex}` : actionId
+  const message = chatInputs.value[chatKey]?.trim()
+  
+  if (!message || chatLoading.value[chatKey]) return
+
+  chatLoading.value[chatKey] = true
+  
+  try {
+    // Add user message to chat history
+    const userMessage: ChatMessage = {
+      id: `${Date.now()}-user`,
+      content: message,
+      type: 'user',
+      timestamp: new Date(),
+      actionId,
+      codeBlockIndex
+    }
+    
+    if (!actionResults.value[actionId]) {
+      actionResults.value[actionId] = {
+        content: '',
+        chatHistory: [],
+        isExpanded: true
+      }
+    }
+    
+    actionResults.value[actionId].chatHistory.push(userMessage)
+    
+    // Clear input
+    chatInputs.value[chatKey] = ''
+    
+    // Build context for the chat
+    let contextPrompt = `Previous conversation about ${actionId}:\n`
+    contextPrompt += `Original code (${props.language}):\n\`\`\`${props.language}\n${props.code}\n\`\`\`\n\n`
+    
+    if (actionResults.value[actionId].content) {
+      contextPrompt += `Previous AI response:\n${actionResults.value[actionId].content}\n\n`
+    }
+    
+    // Add recent chat history for context
+    const recentHistory = actionResults.value[actionId].chatHistory.slice(-6) // Last 6 messages
+    if (recentHistory.length > 1) {
+      contextPrompt += `Recent conversation:\n`
+      recentHistory.slice(0, -1).forEach(msg => {
+        contextPrompt += `${msg.type === 'user' ? 'User' : 'Assistant'}: ${msg.content}\n`
+      })
+    }
+    
+    contextPrompt += `\nUser's new question: ${message}\n\nPlease provide a helpful response:`
+    
+    // Send to AI
+    const context = {
+      code: props.code,
+      language: props.language,
+      error: props.error || undefined,
+      executionTime: props.executionTime,
+      sessionId: props.sessionInfo?.sessionId,
+      kernelName: props.sessionInfo?.kernelName,
+      hasOutput: props.hasOutput,
+      chatContext: contextPrompt
+    }
+    
+    const response = await aiActionsStore.executeCustomAction('chat-followup', context)
+    
+    // Add assistant response to chat history
+    const assistantMessage: ChatMessage = {
+      id: `${Date.now()}-assistant`,
+      content: response,
+      type: 'assistant',
+      timestamp: new Date(),
+      actionId,
+      codeBlockIndex
+    }
+    
+    actionResults.value[actionId].chatHistory.push(assistantMessage)
+    
+  } catch (error) {
+    console.error('Failed to send chat message:', error)
+    const errorMessage: ChatMessage = {
+      id: `${Date.now()}-error`,
+      content: `❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      type: 'assistant',
+      timestamp: new Date(),
+      actionId,
+      codeBlockIndex
+    }
+    actionResults.value[actionId].chatHistory.push(errorMessage)
+  } finally {
+    chatLoading.value[chatKey] = false
+  }
+}
+
+const applyCodeFromResult = (resultContent: string) => {
+  if (props.isReadOnly) return
+  
+  // Extract code from markdown code blocks
+  const codeBlockRegex = /```(?:(\w+)\n)?([\s\S]*?)```/g
+  let match
+  let extractedCode = ''
+  
+  while ((match = codeBlockRegex.exec(resultContent)) !== null) {
+    const [, language, code] = match
+    if (!language || language.toLowerCase() === props.language.toLowerCase()) {
+      extractedCode += code.trim() + '\n'
+    }
+  }
+  
+  if (extractedCode.trim()) {
+    // Apply the extracted code
+    emit('code-updated', extractedCode.trim())
+  } else {
+    // If no code blocks found, try to extract code from the content
+    const lines = resultContent.split('\n')
+    const codeLines = lines.filter(line => 
+      !line.startsWith('Here') && 
+      !line.startsWith('This') && 
+      !line.includes('```') &&
+      line.trim().length > 0
+    )
+    
+    if (codeLines.length > 0) {
+      emit('code-updated', codeLines.join('\n'))
+    }
+  }
 }
 
 const getIconComponent = (iconName: string) => {
@@ -321,248 +566,219 @@ onUnmounted(() => {
   document.removeEventListener('keydown', handleEscapeKey)
   window.removeEventListener('resize', checkCompactMode)
 })
+
+// Input event handlers with proper typing
+const updateDirectPrompt = (event: any) => {
+  directPrompt.value = event.target.value
+}
+
+const updateChatInput = (chatKey: string) => (event: any) => {
+  chatInputs.value[chatKey] = event.target.value
+}
+
+// Simple wrapper to avoid inline typing
+const handleChatInput = (event: any) => {
+  const input = event.target
+  const chatKey = input.dataset.chatKey
+  if (chatKey) {
+    chatInputs.value[chatKey] = input.value
+  }
+}
 </script>
 
 <template>
-  <div class="ai-assistant">
-    <!-- Compact Trigger Button (when not embedded) -->
-    <div v-if="!props.embeddedMode" ref="triggerRef" class="ai-trigger">
+  <div class="ai-code-assistant" :class="{ 'ai-code-assistant--embedded': embeddedMode }">
+    <!-- Floating Action Button (non-embedded mode) -->
+    <Transition name="ai-fab" appear>
       <Button
-        @click="toggleVisibility"
-        variant="ghost"
-        size="sm"
-        class="ai-trigger-btn"
-        :class="{ 
-          'ai-trigger-btn--active': isVisible,
-          'ai-trigger-btn--error': hasError,
-          'ai-trigger-btn--results': hasResults && !hasError,
-          'ai-trigger-btn--analyzing': isAnalyzing
-        }"
+        v-if="!props.embeddedMode"
+        @click="togglePanel"
+        :class="[
+          'ai-fab',
+          {
+            'ai-fab--error': hasError,
+            'ai-fab--compact': compactMode
+          }
+        ]"
+        :size="compactMode ? 'sm' : 'default'"
+        :variant="hasError ? 'destructive' : 'outline'"
       >
-        <div class="ai-trigger-icon">
-          <Brain class="w-4 h-4" />
-          <div v-if="isAnalyzing" class="ai-trigger-pulse"></div>
-        </div>
-        
-        <!-- Enhanced Status Indicators -->
-        <div v-if="hasError" class="ai-status-badge ai-status-badge--error" title="Error detected">
-          <AlertTriangle class="w-3 h-3" />
-        </div>
-        <div v-else-if="hasResults" class="ai-status-badge ai-status-badge--success" title="Results available">
-          <CheckCircle class="w-3 h-3" />
-          <span class="ai-status-count">{{ Object.keys(actionResults).length }}</span>
-        </div>
-        <div v-else-if="isAnalyzing" class="ai-status-badge ai-status-badge--analyzing" title="Analyzing...">
-          <Loader2 class="w-3 h-3 animate-spin" />
-        </div>
+        <AlertTriangle v-if="hasError" class="w-4 h-4" />
+        <Brain v-else class="w-4 h-4" />
+        <span v-if="!compactMode" class="ml-2">AI Assistant</span>
       </Button>
-    </div>
+    </Transition>
 
-    <!-- Floating Panel (when not embedded) -->
+    <!-- Floating Panel (non-embedded mode) -->
     <Transition name="ai-panel" appear>
       <div
-        v-if="!props.embeddedMode && isVisible"
+        v-if="!props.embeddedMode && showPanel"
         ref="panelRef"
         class="ai-panel"
-        :class="{ 
-          'ai-panel--compact': isCompact,
-          'ai-panel--collapsed': !isExpanded
-        }"
+        :style="panelStyle"
       >
-        <!-- Modern Header -->
-        <div class="ai-header">
-          <div class="ai-header-content">
-            <div class="ai-header-icon">
-              <div class="ai-icon-wrapper">
-                <Brain class="w-5 h-5" />
-                <div v-if="isAnalyzing" class="ai-icon-pulse"></div>
-              </div>
-            </div>
-            <div class="ai-header-text">
-              <h3 class="ai-title">AI Assistant</h3>
-              <p class="ai-subtitle">{{ props.language }} • {{ props.code.length }} chars</p>
-            </div>
+        <div class="ai-panel-header">
+          <div class="ai-panel-title">
+            <Brain class="w-4 h-4" />
+            <span>AI Code Assistant</span>
+            <Badge v-if="hasError" variant="destructive" class="ml-2 text-xs">Error</Badge>
           </div>
-          
-          <div class="ai-header-actions">
-            <Button
-              @click="toggleExpanded"
-              variant="ghost"
-              size="sm"
-              class="ai-header-btn"
-              :title="isExpanded ? 'Collapse' : 'Expand'"
-            >
-              <ChevronDown v-if="isExpanded" class="w-4 h-4" />
-              <ChevronRight v-else class="w-4 h-4" />
-            </Button>
-            <Button
-              @click="isVisible = false"
-              variant="ghost"
-              size="sm"
-              class="ai-header-btn"
-            >
-              <X class="w-4 h-4" />
-            </Button>
-          </div>
+          <Button @click="showPanel = false" variant="ghost" size="sm" class="ai-panel-close">
+            <X class="w-3 h-3" />
+          </Button>
         </div>
 
-        <!-- Panel Content -->
-        <div v-if="isExpanded" class="ai-content">
-          <!-- Provider Status -->
-          <Alert v-if="!isProviderConfigured" variant="destructive" class="ai-provider-alert">
-            <AlertTriangle class="w-4 h-4" />
-            <div class="flex-1">
-              <AlertDescription class="text-sm">
-                {{ providerConfigMessage }}
-              </AlertDescription>
-            </div>
-            <Button 
-              @click="$router.push('/settings?section=ai-providers')"
-              variant="outline" 
-              size="sm"
-              class="ml-3"
+        <!-- Provider Status -->
+        <Alert v-if="!isProviderConfigured" variant="destructive" class="ai-provider-alert">
+          <AlertTriangle class="w-4 h-4" />
+          <div class="flex-1">
+            <AlertDescription class="text-sm">
+              {{ providerConfigMessage }}
+            </AlertDescription>
+          </div>
+          <Button 
+            @click="$router.push('/settings?section=ai-providers')"
+            variant="outline" 
+            size="sm"
+            class="ml-3"
+          >
+            <Settings class="w-3 h-3 mr-1" />
+            Configure
+          </Button>
+        </Alert>
+
+        <!-- Panel Navigation -->
+        <div class="ai-nav">
+          <div class="ai-nav-tabs">
+            <button
+              @click="activeView = 'actions'"
+              class="ai-nav-tab"
+              :class="{ 'ai-nav-tab--active': activeView === 'actions' }"
             >
-              <Settings class="w-4 h-4 mr-1" />
-              Configure
-            </Button>
-          </Alert>
-
-          <!-- Smart Navigation -->
-          <div class="ai-nav">
-            <div class="ai-nav-tabs">
-              <button
-                @click="activeView = 'actions'"
-                class="ai-nav-tab"
-                :class="{ 'ai-nav-tab--active': activeView === 'actions' }"
-              >
-                <Sparkles class="w-4 h-4" />
-                <span>Actions</span>
-                <Badge v-if="suggestedActions.length > 0" variant="secondary" class="ml-1">
-                  {{ suggestedActions.length }}
-                </Badge>
-              </button>
-              
-              <button
-                v-if="hasResults"
-                @click="activeView = 'results'"
-                class="ai-nav-tab"
-                :class="{ 'ai-nav-tab--active': activeView === 'results' }"
-              >
-                <FileText class="w-4 h-4" />
-                <span>Results</span>
-                <Badge variant="secondary" class="ml-1">{{ Object.keys(actionResults).length }}</Badge>
-              </button>
-              
-              <button
-                v-if="hasError"
-                @click="activeView = 'error'"
-                class="ai-nav-tab ai-nav-tab--error"
-                :class="{ 'ai-nav-tab--active': activeView === 'error' }"
-              >
-                <AlertTriangle class="w-4 h-4" />
-                <span>Fix Error</span>
-              </button>
-            </div>
-
-            <Button
+              <Sparkles class="w-4 h-4" />
+              <span>Actions</span>
+              <Badge v-if="suggestedActions.length > 0" variant="secondary" class="ml-1 text-xs">
+                {{ suggestedActions.length }}
+              </Badge>
+            </button>
+            
+            <button
               v-if="hasResults"
-              @click="clearResults"
-              variant="ghost"
-              size="sm"
-              class="ai-clear-btn"
+              @click="activeView = 'results'"
+              class="ai-nav-tab"
+              :class="{ 'ai-nav-tab--active': activeView === 'results' }"
             >
-              <X class="w-3 h-3" />
-            </Button>
+              <FileText class="w-4 h-4" />
+              <span>Results</span>
+              <Badge variant="secondary" class="ml-1 text-xs">{{ Object.keys(actionResults).length }}</Badge>
+            </button>
+            
+            <button
+              v-if="hasError"
+              @click="activeView = 'error'"
+              class="ai-nav-tab ai-nav-tab--error"
+              :class="{ 'ai-nav-tab--active': activeView === 'error' }"
+            >
+              <AlertTriangle class="w-4 h-4" />
+              <span>Fix Error</span>
+            </button>
           </div>
 
-          <!-- Enhanced Actions View -->
-          <div v-if="activeView === 'actions'" class="ai-view">
-            <!-- Suggested Actions (Smart recommendations) -->
-            <div v-if="suggestedActions.length > 0" class="ai-section">
-              <div class="ai-section-header">
-                <Lightbulb class="w-4 h-4 text-yellow-500" />
-                <h4 class="ai-section-title">Suggested for {{ props.language }}</h4>
-              </div>
-              <div class="ai-action-grid ai-action-grid--featured">
-                <button
-                  v-for="action in suggestedActions.slice(0, 3)"
-                  :key="action.id"
-                  @click="executeAction(action)"
-                  @mouseenter="hoveredAction = action.id"
-                  @mouseleave="hoveredAction = null"
-                  :disabled="!props.code.trim() || executingActions.has(action.id) || !isProviderConfigured"
-                  class="ai-action-card ai-action-card--featured"
-                  :class="{ 'ai-action-card--loading': executingActions.has(action.id) }"
-                >
-                  <div class="ai-action-icon">
-                    <Loader2 v-if="executingActions.has(action.id)" class="w-5 h-5 animate-spin" />
-                    <component v-else :is="getIconComponent(action.icon)" class="w-5 h-5" />
-                  </div>
-                  <div class="ai-action-content">
-                    <h5 class="ai-action-title">{{ action.name }}</h5>
-                    <p class="ai-action-desc">{{ action.description || 'Enhance your code' }}</p>
-                  </div>
-                  <ArrowRight 
-                    class="ai-action-arrow" 
-                    :class="{ 'ai-action-arrow--visible': hoveredAction === action.id }"
-                  />
-                </button>
-              </div>
+          <Button
+            v-if="hasResults"
+            @click="clearResults"
+            variant="ghost"
+            size="sm"
+            class="ai-clear-btn"
+          >
+            <X class="w-3 h-3" />
+          </Button>
+        </div>
+
+        <!-- Views for Panel Mode -->
+        <div class="flex-1 overflow-hidden">
+          <!-- Direct Prompt Input -->
+          <div class="ai-direct-prompt mb-4">
+            <div class="ai-prompt-header mb-2">
+              <MessageSquare class="w-4 h-4 text-primary" />
+              <span class="text-sm font-medium">Ask AI about your code</span>
             </div>
-
-            <Separator class="my-4" />
-
-            <!-- All Actions by Category -->
-            <div class="ai-section">
-              <div class="ai-section-header">
-                <Target class="w-4 h-4 text-blue-500" />
-                <h4 class="ai-section-title">Analysis & Review</h4>
-              </div>
-              <div class="ai-action-grid">
-                <button
-                  v-for="action in quickActions.analysis"
-                  :key="action.id"
-                  @click="executeAction(action)"
-                  :disabled="!props.code.trim() || executingActions.has(action.id) || !isProviderConfigured"
-                  class="ai-action-card"
-                  :class="{ 'ai-action-card--loading': executingActions.has(action.id) }"
-                >
-                  <div class="ai-action-icon">
-                    <Loader2 v-if="executingActions.has(action.id)" class="w-4 h-4 animate-spin" />
-                    <component v-else :is="getIconComponent(action.icon)" class="w-4 h-4" />
-                  </div>
-                  <span class="ai-action-name">{{ action.name }}</span>
-                </button>
-              </div>
-            </div>
-
-            <div class="ai-section">
-              <div class="ai-section-header">
-                <Rocket class="w-4 h-4 text-green-500" />
-                <h4 class="ai-section-title">Improve & Optimize</h4>
-              </div>
-              <div class="ai-action-grid">
-                <button
-                  v-for="action in quickActions.improvement"
-                  :key="action.id"
-                  @click="executeAction(action)"
-                  :disabled="!props.code.trim() || executingActions.has(action.id) || !isProviderConfigured"
-                  class="ai-action-card"
-                  :class="{ 'ai-action-card--loading': executingActions.has(action.id) }"
-                >
-                  <div class="ai-action-icon">
-                    <Loader2 v-if="executingActions.has(action.id)" class="w-4 h-4 animate-spin" />
-                    <component v-else :is="getIconComponent(action.icon)" class="w-4 h-4" />
-                  </div>
-                  <span class="ai-action-name">{{ action.name }}</span>
-                </button>
-              </div>
+            <div class="ai-prompt-input">
+              <Input
+                :value="directPrompt"
+                @input="updateDirectPrompt"
+                placeholder="Ask anything about your code or request specific changes..."
+                class="text-sm"
+                @keydown.enter.prevent="executeDirectPrompt"
+                :disabled="isAnalyzing || !isProviderConfigured"
+              />
+              <Button
+                @click="executeDirectPrompt"
+                variant="default"
+                size="sm"
+                class="ml-2"
+                :disabled="!directPrompt.trim() || isAnalyzing || !isProviderConfigured"
+              >
+                <Loader2 v-if="isAnalyzing" class="w-4 h-4 animate-spin mr-1" />
+                <Send v-else class="w-4 h-4 mr-1" />
+                {{ isAnalyzing ? 'Thinking...' : 'Ask' }}
+              </Button>
             </div>
           </div>
 
-          <!-- Enhanced Results View -->
-          <div v-if="activeView === 'results'" class="ai-view">
-            <ScrollArea class="ai-results-area">
+          <!-- Actions View -->
+          <div v-if="activeView === 'actions'" class="ai-view h-full">
+            <ScrollArea class="h-full max-h-64">
+              <!-- Suggested Actions - Compact -->
+              <div v-if="suggestedActions.length > 0" class="ai-section mb-4">
+                <div class="ai-section-header mb-2">
+                  <Lightbulb class="w-3 h-3 text-yellow-500" />
+                  <h4 class="ai-section-title text-xs">Suggested</h4>
+                </div>
+                <div class="flex flex-wrap gap-1">
+                  <button
+                    v-for="action in suggestedActions.slice(0, 4)"
+                    :key="action.id"
+                    @click="executeAction(action)"
+                    :disabled="!props.code.trim() || executingActions.has(action.id) || !isProviderConfigured"
+                    class="ai-action-chip"
+                    :class="{ 'ai-action-chip--loading': executingActions.has(action.id) }"
+                  >
+                    <Loader2 v-if="executingActions.has(action.id)" class="w-3 h-3 animate-spin mr-1" />
+                    <component v-else :is="getIconComponent(action.icon)" class="w-3 h-3 mr-1" />
+                    {{ action.name }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- Quick Actions - Very Compact Grid -->
+              <div class="ai-section">
+                <div class="ai-section-header mb-2">
+                  <Target class="w-3 h-3 text-blue-500" />
+                  <h4 class="ai-section-title text-xs">Quick Actions</h4>
+                </div>
+                <div class="grid grid-cols-3 gap-1">
+                  <button
+                    v-for="action in [...quickActions.analysis.slice(0, 3), ...quickActions.improvement.slice(0, 3)]"
+                    :key="action.id"
+                    @click="executeAction(action)"
+                    :disabled="!props.code.trim() || executingActions.has(action.id) || !isProviderConfigured"
+                    class="ai-action-mini"
+                    :class="{ 'ai-action-mini--loading': executingActions.has(action.id) }"
+                    :title="action.description"
+                  >
+                    <Loader2 v-if="executingActions.has(action.id)" class="w-3 h-3 animate-spin" />
+                    <component v-else :is="getIconComponent(action.icon)" class="w-3 h-3" />
+                    <span class="text-xs">{{ action.name.split(' ')[0] }}</span>
+                  </button>
+                </div>
+              </div>
+            </ScrollArea>
+          </div>
+
+          <!-- Results View -->
+          <div v-if="activeView === 'results'" class="ai-view h-full">
+            <ScrollArea class="h-full max-h-80">
               <div class="ai-results-list">
                 <div
                   v-for="(result, actionId) in actionResults"
@@ -572,32 +788,42 @@ onUnmounted(() => {
                   <div class="ai-result-header">
                     <div class="ai-result-meta">
                       <Badge 
-                        :variant="getActionCategory(actionId) === 'analysis' ? 'secondary' : 'outline'" 
-                        class="ai-result-badge"
+                        :variant="actionId === 'direct-prompt' ? 'default' : getActionCategory(actionId) === 'analysis' ? 'secondary' : 'outline'" 
+                        class="ai-result-badge text-xs"
                       >
-                        {{ quickActions.analysis.find(a => a.id === actionId)?.name || 
+                        {{ actionId === 'direct-prompt' ? 'Custom Prompt' : 
+                           quickActions.analysis.find(a => a.id === actionId)?.name || 
                            quickActions.improvement.find(a => a.id === actionId)?.name || 
                            quickActions.generation.find(a => a.id === actionId)?.name || actionId }}
                       </Badge>
-                      <span class="ai-result-category">{{ getActionCategory(actionId) }}</span>
                     </div>
                     <div class="ai-result-actions">
                       <Button
-                        @click="copyToClipboard(result, actionId)"
+                        @click="toggleResultExpansion(actionId)"
                         variant="ghost"
                         size="sm"
-                        class="ai-result-btn ai-result-btn--compact"
+                        class="ai-result-btn ai-result-btn--small"
+                        :title="result.isExpanded ? 'Collapse' : 'Expand'"
+                      >
+                        <ChevronDown v-if="result.isExpanded" class="w-3 h-3" />
+                        <ChevronRight v-else class="w-3 h-3" />
+                      </Button>
+                      <Button
+                        @click="copyToClipboard(result.content, actionId)"
+                        variant="ghost"
+                        size="sm"
+                        class="ai-result-btn ai-result-btn--small"
                         title="Copy result"
                       >
                         <Copy v-if="!copiedStates[actionId]" class="w-3 h-3" />
                         <Check v-else class="w-3 h-3 text-green-500" />
                       </Button>
                       <Button
-                        v-if="result.includes('```') && !props.isReadOnly"
-                        @click="applyCodeFromResult(result)"
-                        variant="outline"
+                        v-if="result.content.includes('```') && !props.isReadOnly"
+                        @click="applyCodeFromResult(result.content)"
+                        variant="default"
                         size="sm"
-                        class="ai-result-btn ai-result-btn--compact"
+                        class="ai-result-btn ai-result-btn--small ai-apply-btn"
                         title="Apply code changes"
                       >
                         <Wand2 class="w-3 h-3 mr-1" />
@@ -606,18 +832,20 @@ onUnmounted(() => {
                     </div>
                   </div>
                   
-                  <div class="ai-result-content">
-                    <template v-for="(part, index) in formatResult(result)" :key="index">
+                  <div v-if="result.isExpanded" class="ai-result-content">
+                    <template v-for="(part, index) in formatResult(result.content)" :key="index">
                       <div v-if="part.type === 'code'" class="ai-code-section">
                         <div class="ai-code-header">
-                          <Code2 class="w-4 h-4" />
-                          <span class="ai-code-lang">{{ part.language || props.language }}</span>
+                          <div class="flex items-center gap-2">
+                            <Code2 class="w-3 h-3" />
+                            <span class="ai-code-lang text-xs">{{ part.language || props.language }}</span>
+                          </div>
                           <div class="flex items-center gap-1">
                             <Button
                               @click="copyToClipboard(part.content, `${actionId}-code-${index}`)"
                               variant="ghost"
                               size="sm"
-                              class="ai-code-copy"
+                              class="ai-code-copy ai-code-copy--small"
                             >
                               <Copy v-if="!copiedStates[`${actionId}-code-${index}`]" class="w-3 h-3" />
                               <Check v-else class="w-3 h-3 text-green-500" />
@@ -625,23 +853,131 @@ onUnmounted(() => {
                             <Button
                               v-if="!props.isReadOnly"
                               @click="applyCodeFromResult(`\`\`\`${part.language || props.language}\n${part.content}\n\`\`\``)"
-                              variant="outline"
+                              variant="default"
                               size="sm"
-                              class="ai-code-copy"
+                              class="ai-code-copy ai-code-copy--small ai-apply-btn"
                               title="Apply this code"
                             >
-                              <Wand2 class="w-3 h-3" />
+                              <Wand2 class="w-3 h-3 mr-1" />
+                              Apply
+                            </Button>
+                            <Button
+                              @click="toggleChatExpansion(`${actionId}-${index}`)"
+                              variant="ghost"
+                              size="sm"
+                              class="ai-code-copy ai-code-copy--small"
+                              :title="expandedChats[`${actionId}-${index}`] ? 'Hide chat' : 'Chat about this code'"
+                            >
+                              <MessageCircle class="w-3 h-3" />
                             </Button>
                           </div>
                         </div>
-                        <pre class="ai-code-block"><code>{{ part.content }}</code></pre>
+                        <pre class="ai-code-block text-xs"><code>{{ part.content }}</code></pre>
+                        
+                        <!-- Per-Code-Block Chat -->
+                        <div v-if="expandedChats[`${actionId}-${index}`]" class="ai-code-chat">
+                          <div class="ai-chat-header">
+                            <MessageCircle class="w-3 h-3" />
+                            <span class="text-xs font-medium">Chat about this code</span>
+                          </div>
+                          
+                          <!-- Chat messages for this code block -->
+                          <div v-if="result.chatHistory.filter(msg => msg.codeBlockIndex === index).length > 0" class="ai-chat-messages">
+                            <div
+                              v-for="message in result.chatHistory.filter(msg => msg.codeBlockIndex === index)"
+                              :key="message.id"
+                              class="ai-chat-message"
+                              :class="{ 'ai-chat-message--user': message.type === 'user' }"
+                            >
+                              <div class="ai-chat-avatar">
+                                <MessageSquare v-if="message.type === 'user'" class="w-3 h-3" />
+                                <Brain v-else class="w-3 h-3" />
+                              </div>
+                              <div class="ai-chat-content">
+                                <p class="text-xs">{{ message.content }}</p>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <!-- Chat input for this code block -->
+                          <div class="ai-chat-input">
+                            <Input
+                              :value="chatInputs[`${actionId}-${index}`] || ''"
+                              @input="handleChatInput"
+                              :data-chat-key="`${actionId}-${index}`"
+                              placeholder="Ask about this code..."
+                              class="ai-chat-field text-xs"
+                              @keydown.enter.prevent="sendChatMessage(actionId, index)"
+                              :disabled="chatLoading[`${actionId}-${index}`]"
+                            />
+                            <Button
+                              @click="sendChatMessage(actionId, index)"
+                              variant="ghost"
+                              size="sm"
+                              class="ai-chat-send"
+                              :disabled="!chatInputs[`${actionId}-${index}`]?.trim() || chatLoading[`${actionId}-${index}`]"
+                            >
+                              <Loader2 v-if="chatLoading[`${actionId}-${index}`]" class="w-3 h-3 animate-spin" />
+                              <Send v-else class="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
                       </div>
                       <div v-else class="ai-text-content">
-                        <p v-for="(line, lineIndex) in part.content.split('\n')" :key="lineIndex" class="ai-text-line">
+                        <p v-for="(line, lineIndex) in part.content.split('\n')" :key="lineIndex" class="ai-text-line text-sm">
                           {{ line }}
                         </p>
                       </div>
                     </template>
+                    
+                    <!-- General Chat for the entire result -->
+                    <div class="ai-general-chat">
+                      <div class="ai-chat-header">
+                        <MessageCircle class="w-3 h-3" />
+                        <span class="text-xs font-medium">Continue conversation</span>
+                      </div>
+                      
+                      <!-- General chat messages -->
+                      <div v-if="result.chatHistory.filter(msg => msg.codeBlockIndex === undefined).length > 0" class="ai-chat-messages">
+                        <div
+                          v-for="message in result.chatHistory.filter(msg => msg.codeBlockIndex === undefined)"
+                          :key="message.id"
+                          class="ai-chat-message"
+                          :class="{ 'ai-chat-message--user': message.type === 'user' }"
+                        >
+                          <div class="ai-chat-avatar">
+                            <MessageSquare v-if="message.type === 'user'" class="w-3 h-3" />
+                            <Brain v-else class="w-3 h-3" />
+                          </div>
+                          <div class="ai-chat-content">
+                            <p class="text-xs">{{ message.content }}</p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <!-- General chat input -->
+                      <div class="ai-chat-input">
+                        <Input
+                          :value="chatInputs[actionId] || ''"
+                          @input="handleChatInput"
+                          :data-chat-key="actionId"
+                          placeholder="Ask a follow-up question..."
+                          class="ai-chat-field text-xs"
+                          @keydown.enter.prevent="sendChatMessage(actionId)"
+                          :disabled="chatLoading[actionId]"
+                        />
+                        <Button
+                          @click="sendChatMessage(actionId)"
+                          variant="ghost"
+                          size="sm"
+                          class="ai-chat-send"
+                          :disabled="!chatInputs[actionId]?.trim() || chatLoading[actionId]"
+                        >
+                          <Loader2 v-if="chatLoading[actionId]" class="w-3 h-3 animate-spin" />
+                          <Send v-else class="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -694,7 +1030,7 @@ onUnmounted(() => {
             size="sm"
             class="ml-3"
           >
-            <Settings class="w-4 h-4 mr-1" />
+            <Settings class="w-3 h-3 mr-1" />
             Configure
           </Button>
         </Alert>
@@ -709,7 +1045,7 @@ onUnmounted(() => {
             >
               <Sparkles class="w-4 h-4" />
               <span>Actions</span>
-              <Badge v-if="suggestedActions.length > 0" variant="secondary" class="ml-1">
+              <Badge v-if="suggestedActions.length > 0" variant="secondary" class="ml-1 text-xs">
                 {{ suggestedActions.length }}
               </Badge>
             </button>
@@ -722,7 +1058,7 @@ onUnmounted(() => {
             >
               <FileText class="w-4 h-4" />
               <span>Results</span>
-              <Badge variant="secondary" class="ml-1">{{ Object.keys(actionResults).length }}</Badge>
+              <Badge variant="secondary" class="ml-1 text-xs">{{ Object.keys(actionResults).length }}</Badge>
             </button>
             
             <button
@@ -749,64 +1085,79 @@ onUnmounted(() => {
 
         <!-- Views for Embedded Mode -->
         <div class="flex-1 overflow-hidden">
+          <!-- Direct Prompt Input -->
+          <div class="ai-direct-prompt mb-4">
+            <div class="ai-prompt-header mb-2">
+              <MessageSquare class="w-4 h-4 text-primary" />
+              <span class="text-sm font-medium">Ask AI about your code</span>
+            </div>
+            <div class="ai-prompt-input">
+              <Input
+                :value="directPrompt"
+                @input="updateDirectPrompt"
+                placeholder="Ask anything about your code or request specific changes..."
+                class="text-sm"
+                @keydown.enter.prevent="executeDirectPrompt"
+                :disabled="isAnalyzing || !isProviderConfigured"
+              />
+              <Button
+                @click="executeDirectPrompt"
+                variant="default"
+                size="sm"
+                class="ml-2"
+                :disabled="!directPrompt.trim() || isAnalyzing || !isProviderConfigured"
+              >
+                <Loader2 v-if="isAnalyzing" class="w-4 h-4 animate-spin mr-1" />
+                <Send v-else class="w-4 h-4 mr-1" />
+                {{ isAnalyzing ? 'Thinking...' : 'Ask' }}
+              </Button>
+            </div>
+          </div>
+
           <!-- Actions View -->
           <div v-if="activeView === 'actions'" class="ai-view h-full">
-            <ScrollArea class="h-full max-h-80">
-              <!-- Suggested Actions -->
-              <div v-if="suggestedActions.length > 0" class="ai-section">
-                <div class="ai-section-header">
-                  <Lightbulb class="w-4 h-4 text-yellow-500" />
-                  <h4 class="ai-section-title">Suggested for {{ props.language }}</h4>
+            <ScrollArea class="h-full max-h-64">
+              <!-- Suggested Actions - Compact -->
+              <div v-if="suggestedActions.length > 0" class="ai-section mb-4">
+                <div class="ai-section-header mb-2">
+                  <Lightbulb class="w-3 h-3 text-yellow-500" />
+                  <h4 class="ai-section-title text-xs">Suggested</h4>
                 </div>
-                <div class="ai-action-grid ai-action-grid--featured">
+                <div class="flex flex-wrap gap-1">
                   <button
-                    v-for="action in suggestedActions.slice(0, 3)"
+                    v-for="action in suggestedActions.slice(0, 4)"
                     :key="action.id"
                     @click="executeAction(action)"
-                    @mouseenter="hoveredAction = action.id"
-                    @mouseleave="hoveredAction = null"
                     :disabled="!props.code.trim() || executingActions.has(action.id) || !isProviderConfigured"
-                    class="ai-action-card ai-action-card--featured ai-action-card--compact"
-                    :class="{ 'ai-action-card--loading': executingActions.has(action.id) }"
+                    class="ai-action-chip"
+                    :class="{ 'ai-action-chip--loading': executingActions.has(action.id) }"
                   >
-                    <div class="ai-action-icon ai-action-icon--compact">
-                      <Loader2 v-if="executingActions.has(action.id)" class="w-4 h-4 animate-spin" />
-                      <component v-else :is="getIconComponent(action.icon)" class="w-4 h-4" />
-                    </div>
-                    <div class="ai-action-content">
-                      <h5 class="ai-action-title">{{ action.name }}</h5>
-                      <p class="ai-action-desc">{{ action.description || 'Enhance your code' }}</p>
-                    </div>
-                    <ArrowRight 
-                      class="ai-action-arrow" 
-                      :class="{ 'ai-action-arrow--visible': hoveredAction === action.id }"
-                    />
+                    <Loader2 v-if="executingActions.has(action.id)" class="w-3 h-3 animate-spin mr-1" />
+                    <component v-else :is="getIconComponent(action.icon)" class="w-3 h-3 mr-1" />
+                    {{ action.name }}
                   </button>
                 </div>
               </div>
 
-              <Separator v-if="suggestedActions.length > 0" class="my-4" />
-
-              <!-- Quick Actions -->
+              <!-- Quick Actions - Very Compact Grid -->
               <div class="ai-section">
-                <div class="ai-section-header">
-                  <Target class="w-4 h-4 text-blue-500" />
-                  <h4 class="ai-section-title">Quick Actions</h4>
+                <div class="ai-section-header mb-2">
+                  <Target class="w-3 h-3 text-blue-500" />
+                  <h4 class="ai-section-title text-xs">Quick Actions</h4>
                 </div>
-                <div class="grid grid-cols-2 gap-2">
+                <div class="grid grid-cols-3 gap-1">
                   <button
-                    v-for="action in [...quickActions.analysis.slice(0, 2), ...quickActions.improvement.slice(0, 2)]"
+                    v-for="action in [...quickActions.analysis.slice(0, 3), ...quickActions.improvement.slice(0, 3)]"
                     :key="action.id"
                     @click="executeAction(action)"
                     :disabled="!props.code.trim() || executingActions.has(action.id) || !isProviderConfigured"
-                    class="ai-action-card ai-action-card--compact"
-                    :class="{ 'ai-action-card--loading': executingActions.has(action.id) }"
+                    class="ai-action-mini"
+                    :class="{ 'ai-action-mini--loading': executingActions.has(action.id) }"
+                    :title="action.description"
                   >
-                    <div class="ai-action-icon ai-action-icon--compact">
-                      <Loader2 v-if="executingActions.has(action.id)" class="w-3 h-3 animate-spin" />
-                      <component v-else :is="getIconComponent(action.icon)" class="w-3 h-3" />
-                    </div>
-                    <span class="ai-action-name ai-action-name--compact">{{ action.name }}</span>
+                    <Loader2 v-if="executingActions.has(action.id)" class="w-3 h-3 animate-spin" />
+                    <component v-else :is="getIconComponent(action.icon)" class="w-3 h-3" />
+                    <span class="text-xs">{{ action.name.split(' ')[0] }}</span>
                   </button>
                 </div>
               </div>
@@ -825,32 +1176,42 @@ onUnmounted(() => {
                   <div class="ai-result-header">
                     <div class="ai-result-meta">
                       <Badge 
-                        :variant="getActionCategory(actionId) === 'analysis' ? 'secondary' : 'outline'" 
-                        class="ai-result-badge"
+                        :variant="actionId === 'direct-prompt' ? 'default' : getActionCategory(actionId) === 'analysis' ? 'secondary' : 'outline'" 
+                        class="ai-result-badge text-xs"
                       >
-                        {{ quickActions.analysis.find(a => a.id === actionId)?.name || 
+                        {{ actionId === 'direct-prompt' ? 'Custom Prompt' : 
+                           quickActions.analysis.find(a => a.id === actionId)?.name || 
                            quickActions.improvement.find(a => a.id === actionId)?.name || 
                            quickActions.generation.find(a => a.id === actionId)?.name || actionId }}
                       </Badge>
-                      <span class="ai-result-category">{{ getActionCategory(actionId) }}</span>
                     </div>
                     <div class="ai-result-actions">
                       <Button
-                        @click="copyToClipboard(result, actionId)"
+                        @click="toggleResultExpansion(actionId)"
                         variant="ghost"
                         size="sm"
-                        class="ai-result-btn ai-result-btn--compact"
+                        class="ai-result-btn ai-result-btn--small"
+                        :title="result.isExpanded ? 'Collapse' : 'Expand'"
+                      >
+                        <ChevronDown v-if="result.isExpanded" class="w-3 h-3" />
+                        <ChevronRight v-else class="w-3 h-3" />
+                      </Button>
+                      <Button
+                        @click="copyToClipboard(result.content, actionId)"
+                        variant="ghost"
+                        size="sm"
+                        class="ai-result-btn ai-result-btn--small"
                         title="Copy result"
                       >
                         <Copy v-if="!copiedStates[actionId]" class="w-3 h-3" />
                         <Check v-else class="w-3 h-3 text-green-500" />
                       </Button>
                       <Button
-                        v-if="result.includes('```') && !props.isReadOnly"
-                        @click="applyCodeFromResult(result)"
-                        variant="outline"
+                        v-if="result.content.includes('```') && !props.isReadOnly"
+                        @click="applyCodeFromResult(result.content)"
+                        variant="default"
                         size="sm"
-                        class="ai-result-btn ai-result-btn--compact"
+                        class="ai-result-btn ai-result-btn--small ai-apply-btn"
                         title="Apply code changes"
                       >
                         <Wand2 class="w-3 h-3 mr-1" />
@@ -859,18 +1220,20 @@ onUnmounted(() => {
                     </div>
                   </div>
                   
-                  <div class="ai-result-content">
-                    <template v-for="(part, index) in formatResult(result)" :key="index">
+                  <div v-if="result.isExpanded" class="ai-result-content">
+                    <template v-for="(part, index) in formatResult(result.content)" :key="index">
                       <div v-if="part.type === 'code'" class="ai-code-section">
                         <div class="ai-code-header">
-                          <Code2 class="w-4 h-4" />
-                          <span class="ai-code-lang">{{ part.language || props.language }}</span>
+                          <div class="flex items-center gap-2">
+                            <Code2 class="w-3 h-3" />
+                            <span class="ai-code-lang text-xs">{{ part.language || props.language }}</span>
+                          </div>
                           <div class="flex items-center gap-1">
                             <Button
                               @click="copyToClipboard(part.content, `${actionId}-code-${index}`)"
                               variant="ghost"
                               size="sm"
-                              class="ai-code-copy"
+                              class="ai-code-copy ai-code-copy--small"
                             >
                               <Copy v-if="!copiedStates[`${actionId}-code-${index}`]" class="w-3 h-3" />
                               <Check v-else class="w-3 h-3 text-green-500" />
@@ -878,55 +1241,161 @@ onUnmounted(() => {
                             <Button
                               v-if="!props.isReadOnly"
                               @click="applyCodeFromResult(`\`\`\`${part.language || props.language}\n${part.content}\n\`\`\``)"
-                              variant="outline"
+                              variant="default"
                               size="sm"
-                              class="ai-code-copy"
+                              class="ai-code-copy ai-code-copy--small ai-apply-btn"
                               title="Apply this code"
                             >
-                              <Wand2 class="w-3 h-3" />
+                              <Wand2 class="w-3 h-3 mr-1" />
+                              Apply
+                            </Button>
+                            <Button
+                              @click="toggleChatExpansion(`${actionId}-${index}`)"
+                              variant="ghost"
+                              size="sm"
+                              class="ai-code-copy ai-code-copy--small"
+                              :title="expandedChats[`${actionId}-${index}`] ? 'Hide chat' : 'Chat about this code'"
+                            >
+                              <MessageCircle class="w-3 h-3" />
                             </Button>
                           </div>
                         </div>
-                        <pre class="ai-code-block"><code>{{ part.content }}</code></pre>
+                        <pre class="ai-code-block text-xs"><code>{{ part.content }}</code></pre>
+                        
+                        <!-- Per-Code-Block Chat -->
+                        <div v-if="expandedChats[`${actionId}-${index}`]" class="ai-code-chat">
+                          <div class="ai-chat-header">
+                            <MessageCircle class="w-3 h-3" />
+                            <span class="text-xs font-medium">Chat about this code</span>
+                          </div>
+                          
+                          <!-- Chat messages for this code block -->
+                          <div v-if="result.chatHistory.filter(msg => msg.codeBlockIndex === index).length > 0" class="ai-chat-messages">
+                            <div
+                              v-for="message in result.chatHistory.filter(msg => msg.codeBlockIndex === index)"
+                              :key="message.id"
+                              class="ai-chat-message"
+                              :class="{ 'ai-chat-message--user': message.type === 'user' }"
+                            >
+                              <div class="ai-chat-avatar">
+                                <MessageSquare v-if="message.type === 'user'" class="w-3 h-3" />
+                                <Brain v-else class="w-3 h-3" />
+                              </div>
+                              <div class="ai-chat-content">
+                                <p class="text-xs">{{ message.content }}</p>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <!-- Chat input for this code block -->
+                          <div class="ai-chat-input">
+                            <Input
+                              :value="chatInputs[`${actionId}-${index}`] || ''"
+                              @input="handleChatInput"
+                              :data-chat-key="`${actionId}-${index}`"
+                              placeholder="Ask about this code..."
+                              class="ai-chat-field text-xs"
+                              @keydown.enter.prevent="sendChatMessage(actionId, index)"
+                              :disabled="chatLoading[`${actionId}-${index}`]"
+                            />
+                            <Button
+                              @click="sendChatMessage(actionId, index)"
+                              variant="ghost"
+                              size="sm"
+                              class="ai-chat-send"
+                              :disabled="!chatInputs[`${actionId}-${index}`]?.trim() || chatLoading[`${actionId}-${index}`]"
+                            >
+                              <Loader2 v-if="chatLoading[`${actionId}-${index}`]" class="w-3 h-3 animate-spin" />
+                              <Send v-else class="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
                       </div>
                       <div v-else class="ai-text-content">
-                        <p v-for="(line, lineIndex) in part.content.split('\n')" :key="lineIndex" class="ai-text-line">
+                        <p v-for="(line, lineIndex) in part.content.split('\n')" :key="lineIndex" class="ai-text-line text-sm">
                           {{ line }}
                         </p>
                       </div>
                     </template>
+                    
+                    <!-- General Chat for the entire result -->
+                    <div class="ai-general-chat">
+                      <div class="ai-chat-header">
+                        <MessageCircle class="w-3 h-3" />
+                        <span class="text-xs font-medium">Continue conversation</span>
+                      </div>
+                      
+                      <!-- General chat messages -->
+                      <div v-if="result.chatHistory.filter(msg => msg.codeBlockIndex === undefined).length > 0" class="ai-chat-messages">
+                        <div
+                          v-for="message in result.chatHistory.filter(msg => msg.codeBlockIndex === undefined)"
+                          :key="message.id"
+                          class="ai-chat-message"
+                          :class="{ 'ai-chat-message--user': message.type === 'user' }"
+                        >
+                          <div class="ai-chat-avatar">
+                            <MessageSquare v-if="message.type === 'user'" class="w-3 h-3" />
+                            <Brain v-else class="w-3 h-3" />
+                          </div>
+                          <div class="ai-chat-content">
+                            <p class="text-xs">{{ message.content }}</p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <!-- General chat input -->
+                      <div class="ai-chat-input">
+                        <Input
+                          :value="chatInputs[actionId] || ''"
+                          @input="handleChatInput"
+                          :data-chat-key="actionId"
+                          placeholder="Ask a follow-up question..."
+                          class="ai-chat-field text-xs"
+                          @keydown.enter.prevent="sendChatMessage(actionId)"
+                          :disabled="chatLoading[actionId]"
+                        />
+                        <Button
+                          @click="sendChatMessage(actionId)"
+                          variant="ghost"
+                          size="sm"
+                          class="ai-chat-send"
+                          :disabled="!chatInputs[actionId]?.trim() || chatLoading[actionId]"
+                        >
+                          <Loader2 v-if="chatLoading[actionId]" class="w-3 h-3 animate-spin" />
+                          <Send v-else class="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             </ScrollArea>
           </div>
 
-          <!-- Error View -->
-          <div v-if="activeView === 'error' && hasError" class="ai-view h-full">
-            <ScrollArea class="h-full max-h-80">
-              <div class="ai-error-section">
-                <Alert variant="destructive" class="ai-error-alert">
-                  <AlertTriangle class="w-5 h-5" />
-                  <div class="flex-1">
-                    <h4 class="ai-error-title">Error Detected</h4>
-                    <AlertDescription class="ai-error-message">{{ props.error }}</AlertDescription>
-                  </div>
-                </Alert>
-
-                <div class="ai-error-actions">
-                  <Button
-                    @click="analyzeError"
-                    :disabled="executingActions.has('explain-code') || !isProviderConfigured"
-                    class="ai-error-btn"
-                    size="default"
-                  >
-                    <Loader2 v-if="executingActions.has('explain-code')" class="w-4 h-4 animate-spin mr-2" />
-                    <Wrench v-else class="w-4 h-4 mr-2" />
-                    Analyze & Suggest Fix
-                  </Button>
+          <!-- Enhanced Error View -->
+          <div v-if="activeView === 'error' && hasError" class="ai-view">
+            <div class="ai-error-section">
+              <Alert variant="destructive" class="ai-error-alert">
+                <AlertTriangle class="w-5 h-5" />
+                <div class="flex-1">
+                  <h4 class="ai-error-title">Error Detected</h4>
+                  <AlertDescription class="ai-error-message">{{ props.error }}</AlertDescription>
                 </div>
+              </Alert>
+
+              <div class="ai-error-actions">
+                <Button
+                  @click="analyzeError"
+                  :disabled="executingActions.has('explain-code') || !isProviderConfigured"
+                  class="ai-error-btn"
+                  size="lg"
+                >
+                  <Loader2 v-if="executingActions.has('explain-code')" class="w-5 h-5 animate-spin mr-2" />
+                  <Wrench v-else class="w-5 h-5 mr-2" />
+                  Analyze & Suggest Fix
+                </Button>
               </div>
-            </ScrollArea>
+            </div>
           </div>
         </div>
       </div>
@@ -1027,7 +1496,7 @@ onUnmounted(() => {
 
 /* Enhanced AI Panel */
 .ai-panel {
-  @apply absolute bg-background border-0 rounded-2xl overflow-hidden;
+  @apply absolute bg-background border-0 rounded-2xl overflow-hidden flex flex-col;
   width: var(--ai-panel-width);
   max-height: var(--ai-panel-max-height);
   top: calc(100% + 8px);
@@ -1240,7 +1709,7 @@ onUnmounted(() => {
 }
 
 .ai-results-list {
-  @apply space-y-3;
+  @apply space-y-3 overflow-y-auto;
 }
 
 .ai-result-card {
@@ -1293,7 +1762,10 @@ onUnmounted(() => {
 }
 
 .ai-code-block {
-  @apply p-3 text-xs font-mono overflow-x-auto bg-muted/10;
+  @apply p-3 rounded-md bg-muted/30 border;
+  @apply font-mono leading-relaxed overflow-x-auto;
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
 }
 
 .ai-text-content {
@@ -1373,16 +1845,17 @@ onUnmounted(() => {
 
 /* Views */
 .ai-view {
-  @apply space-y-4;
+  @apply space-y-4 overflow-y-auto;
+  max-height: inherit;
 }
 
 /* Embedded Mode Styles */
 .ai-embedded {
-  @apply w-full h-full bg-background;
+  @apply w-full h-full bg-background overflow-hidden;
 }
 
 .ai-embedded-content {
-  @apply flex flex-col h-full;
+  @apply flex flex-col h-full overflow-hidden;
   min-height: 320px;
 }
 
@@ -1409,5 +1882,334 @@ onUnmounted(() => {
 /* Auto-switch to error view when embedded and error occurs */
 .ai-embedded .ai-nav-tab--error.ai-nav-tab--active {
   @apply bg-destructive/15 text-destructive;
+}
+
+/* Smaller Action Buttons */
+.ai-action-card--compact {
+  @apply gap-2 p-2 text-sm;
+}
+
+.ai-action-icon--small {
+  @apply p-1 rounded;
+}
+
+.ai-action-name--small {
+  @apply text-xs font-medium;
+}
+
+.ai-result-btn--small {
+  @apply p-1 rounded;
+}
+
+.ai-code-copy--small {
+  @apply p-1 rounded;
+}
+
+/* Chat Styles */
+.ai-code-chat {
+  @apply mt-3 border-t bg-muted/10 rounded-b-lg overflow-hidden;
+}
+
+.ai-general-chat {
+  @apply mt-4 border-t pt-3;
+}
+
+.ai-chat-header {
+  @apply flex items-center gap-2 px-3 py-2 bg-muted/20 text-muted-foreground;
+}
+
+.ai-chat-messages {
+  @apply p-3 space-y-2 max-h-32 overflow-y-auto;
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+  
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 2px;
+  }
+}
+
+.ai-chat-message {
+  @apply flex gap-2 items-start;
+  
+  &--user {
+    @apply flex-row-reverse;
+    
+    .ai-chat-content {
+      @apply bg-primary/10 ml-auto text-right;
+    }
+  }
+}
+
+.ai-chat-avatar {
+  @apply p-1 rounded-full bg-muted/50 flex-shrink-0;
+}
+
+.ai-chat-content {
+  @apply flex-1 p-2 rounded-lg bg-muted/30;
+}
+
+.ai-chat-input {
+  @apply flex gap-1 p-2 border-t bg-background/50;
+}
+
+.ai-chat-field {
+  @apply flex-1 h-7 text-xs;
+}
+
+.ai-chat-send {
+  @apply p-1.5 rounded;
+}
+
+/* Enhanced responsive design */
+@media (max-width: 768px) {
+  .ai-action-grid {
+    @apply grid-cols-1;
+  }
+  
+  .ai-action-card {
+    @apply text-xs;
+  }
+  
+  .ai-result-actions {
+    @apply flex-wrap gap-1;
+  }
+  
+  .ai-chat-messages {
+    @apply max-h-24;
+  }
+}
+
+/* Modern animations for chat */
+.ai-chat-message {
+  animation: slideInChat 0.3s ease-out;
+}
+
+@keyframes slideInChat {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Enhanced button sizing */
+.ai-result-badge {
+  @apply px-1.5 py-0.5 text-xs;
+}
+
+.ai-nav-tab {
+  @apply px-2 py-1.5 text-xs;
+}
+
+/* Code block improvements */
+.ai-code-header {
+  @apply px-2 py-1.5 text-xs;
+}
+
+.ai-code-block {
+  @apply p-2 text-xs;
+}
+
+/* Action buttons and suggestions - compact styles */
+.ai-action-chip {
+  @apply inline-flex items-center px-2 py-1 rounded-md text-xs font-medium;
+  @apply bg-muted hover:bg-muted/80 border border-border;
+  @apply transition-all duration-200 ease-in-out;
+  @apply cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
+  @apply max-w-[120px] truncate;
+}
+
+.ai-action-chip:hover:not(:disabled) {
+  @apply bg-primary/10 border-primary/20;
+}
+
+.ai-action-chip--loading {
+  @apply bg-primary/5 border-primary/10;
+}
+
+.ai-action-mini {
+  @apply flex flex-col items-center justify-center p-2 rounded-md;
+  @apply bg-muted hover:bg-muted/80 border border-border;
+  @apply transition-all duration-200 ease-in-out;
+  @apply cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
+  @apply min-h-[60px] gap-1;
+}
+
+.ai-action-mini:hover:not(:disabled) {
+  @apply bg-primary/10 border-primary/20;
+}
+
+.ai-action-mini--loading {
+  @apply bg-primary/5 border-primary/10;
+}
+
+/* Direct prompt styles */
+.ai-direct-prompt {
+  @apply border border-border rounded-lg p-3 bg-card;
+}
+
+.ai-prompt-header {
+  @apply flex items-center gap-2 text-muted-foreground;
+}
+
+.ai-prompt-input {
+  @apply flex items-center gap-2;
+}
+
+/* Apply button styling */
+.ai-apply-btn {
+  @apply bg-primary text-primary-foreground hover:bg-primary/90;
+  @apply border-primary/20;
+}
+
+/* Enhanced result styling */
+.ai-result-btn--small {
+  @apply px-2 py-1 h-auto min-h-0;
+}
+
+.ai-code-copy--small {
+  @apply px-2 py-1 h-auto min-h-0;
+}
+
+/* Section headers compact */
+.ai-section-header {
+  @apply flex items-center gap-2;
+}
+
+.ai-section-title {
+  @apply font-medium text-muted-foreground;
+}
+
+/* Improved spacing */
+.ai-section {
+  @apply space-y-2;
+}
+
+.ai-chat-field {
+  @apply h-8 text-xs;
+}
+
+.ai-chat-send {
+  @apply px-2 py-1 h-8 min-h-0;
+}
+
+.ai-code-block {
+  @apply p-3 rounded-md bg-muted/30 border;
+  @apply font-mono leading-relaxed;
+}
+
+.ai-code-header {
+  @apply flex items-center justify-between mb-2 p-2 bg-muted/50 rounded-t-md border-b;
+}
+
+.ai-code-lang {
+  @apply font-medium text-muted-foreground;
+}
+
+/* Chat improvements */
+.ai-chat-message {
+  @apply flex gap-2 mb-2 p-2 rounded-md;
+}
+
+.ai-chat-message--user {
+  @apply bg-primary/5 border border-primary/10;
+}
+
+.ai-chat-message:not(.ai-chat-message--user) {
+  @apply bg-muted/30;
+}
+
+.ai-chat-avatar {
+  @apply flex-shrink-0 w-6 h-6 rounded-full bg-muted flex items-center justify-center;
+}
+
+.ai-chat-message--user .ai-chat-avatar {
+  @apply bg-primary/10;
+}
+
+.ai-chat-content {
+  @apply flex-1 min-w-0;
+}
+
+/* Mobile responsive improvements */
+@media (max-width: 640px) {
+  .ai-action-chip {
+    @apply text-xs px-1.5 py-0.5 max-w-[100px];
+  }
+  
+  .ai-action-mini {
+    @apply min-h-[50px] p-1.5;
+  }
+  
+  .ai-prompt-input {
+    @apply flex-col gap-2;
+  }
+  
+  .ai-result-actions {
+    @apply flex-wrap gap-1;
+  }
+}
+
+/* Enhanced ScrollArea styling */
+.ai-view .scroll-area {
+  @apply h-full;
+}
+
+.ai-view .scroll-area > div {
+  @apply h-full;
+}
+
+/* Panel views with proper height and overflow */
+.ai-panel .ai-view {
+  @apply flex-1 overflow-hidden;
+}
+
+.ai-embedded .ai-view {
+  @apply flex-1 overflow-hidden;
+}
+
+/* Ensure ScrollArea components work properly */
+[data-radix-scroll-area-viewport] {
+  height: 100% !important;
+  overflow-y: auto !important;
+}
+
+/* Fix for all scrollable content */
+.ai-view h-full {
+  display: flex;
+  flex-direction: column;
+}
+
+.ai-view h-full > * {
+  flex-shrink: 0;
+}
+
+.ai-view h-full > [data-radix-scroll-area-root] {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Direct prompt area should not scroll */
+.ai-direct-prompt {
+  flex-shrink: 0;
+}
+
+/* Results and actions content should scroll */
+.ai-results-list,
+.ai-section {
+  flex: 1;
+  min-height: 0;
 }
 </style> 
