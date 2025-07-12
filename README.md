@@ -104,7 +104,7 @@ Built with these amazing open-source projects:
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details.
+GNU AFFERO GENERAL PUBLIC LICENSE License - see [LICENSE](LICENSE) file for details.
 
 ---
 
