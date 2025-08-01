@@ -13,8 +13,6 @@ import StatusIndicator from './components/StatusIndicator.vue'
 import WarningBanners from './components/WarningBanners.vue'
 import CodeEditor from './components/CodeEditor.vue'
 import OutputSection from './components/OutputSection.vue'
-import SessionSelector from './components/SessionSelector.vue'
-import ServerKernelSelector from './components/ServerKernelSelector.vue'
 import FullScreenCodeBlock from './FullScreenCodeBlock.vue'
 import ExecutionStatus from './ExecutionStatus.vue'
 import ErrorDisplay from './ErrorDisplay.vue'
@@ -276,7 +274,6 @@ const updateCode = (newCode: string) => {
 const copyCode = async () => {
   try {
     await navigator.clipboard.writeText(codeValue.value)
-    const isCodeCopied = ref(false)
     isCodeCopied.value = true
     setTimeout(() => {
       isCodeCopied.value = false
@@ -444,6 +441,17 @@ onMounted(async () => {
       :has-unsaved-changes="hasUnsavedChanges"
       :is-code-copied="isCodeCopied"
       :is-shared-session-mode="isSharedSessionMode"
+      :selected-session="selectedSession"
+      :available-sessions="availableSessions"
+      :running-kernels="runningKernels"
+      :is-session-open="isSessionOpen"
+      :is-setting-up="isSettingUp"
+      :selected-server="selectedServer"
+      :selected-kernel="selectedKernel"
+      :available-servers="availableServers"
+      :available-kernels="availableKernels"
+      :is-server-open="isServerOpen"
+      :is-kernel-open="isKernelOpen"
       @execute-code="executeCode"
       @toggle-toolbar="showToolbar = !showToolbar"
       @toggle-code-visibility="toggleCodeVisibility"
@@ -452,43 +460,17 @@ onMounted(async () => {
       @show-templates="showTemplateDialog"
       @copy-code="copyCode"
       @save-changes="saveChanges"
-    >
-      <template #session-selector>
-        <SessionSelector
-          :is-shared-session-mode="isSharedSessionMode"
-          :is-executing="isExecuting || executionInProgress || false"
-          :selected-session="selectedSession"
-          :available-sessions="availableSessions"
-          :running-kernels="runningKernels"
-          :is-session-open="isSessionOpen"
-          :is-setting-up="isSettingUp"
-          :selected-server="selectedServer"
-          @update:is-session-open="isSessionOpen = $event"
-          @session-change="handleSessionChange"
-          @create-new-session="handleCreateNewSession"
-          @clear-all-kernels="handleClearAllKernels"
-          @refresh-sessions="handleRefreshSessions"
-          @select-running-kernel="handleRunningKernelSelect"
-        />
-      </template>
-
-      <template #server-kernel-selector>
-        <ServerKernelSelector
-          :is-shared-session-mode="isSharedSessionMode"
-          :is-executing="isExecuting || executionInProgress || false"
-          :selected-server="selectedServer"
-          :selected-kernel="selectedKernel"
-          :available-servers="availableServers"
-          :available-kernels="availableKernels"
-          :is-server-open="isServerOpen"
-          :is-kernel-open="isKernelOpen"
-          @update:is-server-open="isServerOpen = $event"
-          @update:is-kernel-open="isKernelOpen = $event"
-          @server-change="handleServerChange"
-          @kernel-change="handleKernelChange"
-        />
-      </template>
-    </CodeBlockToolbar>
+      @update:is-session-open="isSessionOpen = $event"
+      @session-change="handleSessionChange"
+      @create-new-session="handleCreateNewSession"
+      @clear-all-kernels="handleClearAllKernels"
+      @refresh-sessions="handleRefreshSessions"
+      @select-running-kernel="handleRunningKernelSelect"
+      @update:is-server-open="isServerOpen = $event"
+      @update:is-kernel-open="isKernelOpen = $event"
+      @server-change="handleServerChange"
+      @kernel-change="handleKernelChange"
+    />
 
     <!-- Warning Banners -->
     <WarningBanners

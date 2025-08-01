@@ -61,24 +61,19 @@
           </div>
           
           <div class="code-editor-container">
-            <CodeBlockWithExecution
+            <CodeBlockWithExecutionModular
               :id="nodeId"
               :code="nodeData.code"
               :language="nodeData.language"
-              :result="nodeData.output"
-              :serverID="nodeData.serverID"
-              :kernel-name="nodeData.kernelName"
               :session-id="nodeData.sessionId || null"
               :nota-id="notaId"
               :is-read-only="false"
               :is-executing="isExecuting"
               :is-published="false"
-              :running-status="nodeData.status"
-              @update:code="code => $emit('update:node-data', { ...nodeData, code })"
-              @kernel-select="(kernelName, serverID) => $emit('update:node-data', { ...nodeData, kernelName, serverID })"
-              @update:output="output => $emit('update:node-data', { ...nodeData, output })"
-              @update:session-id="sessionId => $emit('update:node-data', { ...nodeData, sessionId })"
-              @execute="$emit('run-node')"
+              @update:code="(code: string) => $emit('update:node-data', { ...nodeData, code })"
+              @kernel-select="(kernelName: string, serverID: string) => $emit('update:node-data', { ...nodeData, kernelName, serverID })"
+              @update:output="(output: string) => $emit('update:node-data', { ...nodeData, output })"
+              @update:session-id="(sessionId: string) => $emit('update:node-data', { ...nodeData, sessionId })"
             />
           </div>
         </div>
@@ -98,7 +93,7 @@
 
 <script setup lang="ts">
 import { PlayIcon } from 'lucide-vue-next'
-import CodeBlockWithExecution from '../../executable-code-block/CodeBlockWithExecution.vue'
+import CodeBlockWithExecutionModular from '../../executable-code-block/CodeBlockWithExecutionModular.vue'
 
 defineProps<{
   nodeId: string,

@@ -17,6 +17,21 @@ import { Button } from '@/ui/button'
 import { ButtonGroup } from '@/ui/button-group'
 import ServerKernelSelector from './ServerKernelSelector.vue'
 import SessionSelector from './SessionSelector.vue'
+import type { JupyterServer, KernelSpec } from '@/features/jupyter/types/jupyter'
+
+interface Session {
+  id: string
+  name: string
+  kernel: { name: string; id: string }
+}
+
+interface RunningKernel {
+  id: string
+  name: string
+  lastActivity: string
+  executionState: string
+  connections: number
+}
 
 interface Props {
   isHovered: boolean
@@ -29,6 +44,19 @@ interface Props {
   hasUnsavedChanges: boolean
   isCodeCopied: boolean
   isSharedSessionMode: boolean
+  // Session management props
+  selectedSession?: string
+  availableSessions?: Session[]
+  runningKernels?: RunningKernel[]
+  isSessionOpen?: boolean
+  isSettingUp?: boolean
+  // Server/kernel management props
+  selectedServer?: string
+  selectedKernel?: string
+  availableServers?: JupyterServer[]
+  availableKernels?: KernelSpec[]
+  isServerOpen?: boolean
+  isKernelOpen?: boolean
 }
 
 interface Emits {
@@ -40,6 +68,18 @@ interface Emits {
   'show-templates': []
   'copy-code': []
   'save-changes': []
+  // Session management events
+  'update:is-session-open': [value: boolean]
+  'session-change': [sessionId: string]
+  'create-new-session': []
+  'clear-all-kernels': []
+  'refresh-sessions': []
+  'select-running-kernel': [kernelId: string]
+  // Server/kernel management events
+  'update:is-server-open': [value: boolean]
+  'update:is-kernel-open': [value: boolean]
+  'server-change': [serverId: string]
+  'kernel-change': [kernelName: string]
 }
 
 const props = defineProps<Props>()
@@ -87,11 +127,33 @@ const emit = defineEmits<Emits>()
         <SessionSelector
           :is-shared-session-mode="isSharedSessionMode"
           :is-executing="isExecuting"
+          :selected-session="selectedSession"
+          :available-sessions="availableSessions || []"
+          :running-kernels="runningKernels || []"
+          :is-session-open="isSessionOpen || false"
+          :is-setting-up="isSettingUp || false"
+          :selected-server="selectedServer"
+          @update:is-session-open="emit('update:is-session-open', $event)"
+          @session-change="emit('session-change', $event)"
+          @create-new-session="emit('create-new-session')"
+          @clear-all-kernels="emit('clear-all-kernels')"
+          @refresh-sessions="emit('refresh-sessions')"
+          @select-running-kernel="emit('select-running-kernel', $event)"
         />
 
         <ServerKernelSelector
           :is-shared-session-mode="isSharedSessionMode"
           :is-executing="isExecuting"
+          :selected-server="selectedServer"
+          :selected-kernel="selectedKernel"
+          :available-servers="availableServers || []"
+          :available-kernels="availableKernels || []"
+          :is-server-open="isServerOpen || false"
+          :is-kernel-open="isKernelOpen || false"
+          @update:is-server-open="emit('update:is-server-open', $event)"
+          @update:is-kernel-open="emit('update:is-kernel-open', $event)"
+          @server-change="emit('server-change', $event)"
+          @kernel-change="emit('kernel-change', $event)"
         />
       </template>
     </div>

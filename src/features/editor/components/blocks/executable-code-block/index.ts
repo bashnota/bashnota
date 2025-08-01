@@ -1,6 +1,6 @@
-// Core Components
-export { default as CodeBlockWithExecution } from './CodeBlockWithExecution.vue'
+// Core Components - Modular Design (Recommended)
 export { default as CodeBlockWithExecutionModular } from './CodeBlockWithExecutionModular.vue'
+export { default as CodeBlockWithExecution } from './CodeBlockWithExecutionModular.vue' // Alias for compatibility
 
 // Sub Components
 export { default as CodeBlockToolbar } from './components/CodeBlockToolbar.vue'

@@ -275,7 +275,7 @@ onUnmounted(() => {
           <!-- Provider Status -->
           <AIProviderStatus
             v-if="!aiActions.isProviderConfigured.value"
-            :message="aiActions.providerConfigMessage.value"
+            :message="aiActions.providerConfigMessage.value || undefined"
           />
 
           <!-- Navigation Tabs -->
@@ -358,7 +358,7 @@ onUnmounted(() => {
       <!-- Provider Status -->
       <AIProviderStatus
         v-if="!aiActions.isProviderConfigured.value"
-        :message="aiActions.providerConfigMessage.value"
+        :message="aiActions.providerConfigMessage.value || undefined"
       />
 
       <!-- Navigation -->
