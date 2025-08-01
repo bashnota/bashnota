@@ -30,6 +30,8 @@ import {
   Link2,
   Brain,
   Sparkles,
+  Code,
+  FileText,
 } from 'lucide-vue-next'
 import { Button } from '@/ui/button'
 import CodeMirror from '@/features/editor/components/blocks/executable-code-block/CodeMirror.vue'
@@ -46,6 +48,7 @@ import TemplateSelector from '@/features/editor/components/blocks/executable-cod
 import AICodeAssistant from '@/features/editor/components/blocks/executable-code-block/AICodeAssistant.vue'
 import { useAICodeAssistant } from '@/features/editor/components/blocks/executable-code-block/composables/useAICodeAssistant'
 import { useAIActionsStore } from '@/features/editor/stores/aiActionsStore'
+import { ButtonGroup } from '@/ui/button-group'
 
 // Types
 interface Props {
@@ -888,6 +891,10 @@ const runningStatus = computed(() => {
 // State for output/AI view toggle
 const activeOutputView = ref<'output' | 'ai'>('output')
 
+// State for showing/hiding toolbar buttons
+const showToolbar = ref(false)
+const isHovered = ref(false)
+
 // Auto-switch to AI view when there's an error
 watch(() => cell?.value?.hasError, (hasError) => {
   if (hasError && !props.isReadOnly && !props.isPublished) {
@@ -899,376 +906,407 @@ watch(() => cell?.value?.hasError, (hasError) => {
 <template>
   <div
     ref="codeBlockRef"
-    class="flex flex-col bg-card text-card-foreground rounded-lg overflow-hidden border shadow-sm transition-all duration-200"
+    class="flex flex-col bg-card text-card-foreground rounded-lg overflow-hidden border shadow-sm transition-all duration-200 group hover:shadow-md relative"
     :class="codeBlockClasses"
+    @mouseenter="isHovered = true"
+    @mouseleave="isHovered = false"
   >
-    <!-- Toolbar -->
+    <!-- Status indicator bar (minimal - only when needed) -->
     <div
-      class="flex flex-wrap items-center gap-2 p-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+      v-if="(isExecuting || cell?.isExecuting || cell?.hasError) && !isPublished"
+      class="flex items-center px-3 py-1.5 bg-muted/20 border-b"
+    >
+      <!-- Execution status indicator -->
+      <div
+        v-if="(isExecuting || cell?.isExecuting) && !isPublished"
+        class="flex items-center text-xs gap-1 px-2 py-1 rounded-full status-running"
+      >
+        <Loader2 class="h-3 w-3 animate-spin" />
+        <span>Running</span>
+      </div>
+      
+      <!-- Error indicator -->
+      <div
+        v-else-if="cell?.hasError && !isPublished"
+        class="flex items-center text-xs gap-1 px-2 py-1 rounded-full status-error"
+      >
+        <AlertTriangle class="h-3 w-3" />
+        <span>Error</span>
+      </div>
+    </div>
+
+    <!-- Subtle hover hint (when toolbar is hidden) -->
+    <div
+      v-if="!isHovered && !showToolbar && !isReadOnly"
+      class="absolute top-2 right-2 opacity-30 hover:opacity-70 transition-opacity duration-200 pointer-events-none"
+    >
+      <div class="w-1 h-1 bg-muted-foreground rounded-full"></div>
+    </div>
+
+    <!-- Main toolbar (shows on hover) -->
+    <div
+      v-if="isHovered || showToolbar"
+      class="flex flex-wrap items-center gap-2 p-2 border-b bg-background/95 backdrop-blur transition-all duration-200"
     >
       <!-- Left toolbar group -->
       <div class="flex items-center gap-2 flex-wrap">
-        <!-- Session Selector - Hide when readonly or in shared mode -->
+        <!-- Primary Action Group -->
+        <ButtonGroup>
+          <Button
+            v-if="!isReadOnly"
+            variant="default"
+            size="sm"
+            @click="executeCode"
+            class="h-7 px-3 text-xs"
+            :disabled="!isReadyToExecute"
+            :title="isExecuting || cell?.isExecuting ? 'Executing...' : 'Run Code'"
+          >
+            <Loader2 class="w-3 h-3 animate-spin mr-1" v-if="isExecuting || cell?.isExecuting" />
+            <Play class="w-3 h-3 mr-1" v-else />
+            {{ isExecuting || cell?.isExecuting ? 'Running' : 'Run' }}
+          </Button>
+
+          <!-- Toolbar toggle button -->
+          <Button
+            variant="outline"
+            size="sm"
+            @click="showToolbar = !showToolbar"
+            class="h-7 w-7 p-0"
+            :class="{ 'bg-muted': showToolbar }"
+            title="Pin toolbar"
+          >
+            <Sparkles class="h-3 w-3" />
+          </Button>
+        </ButtonGroup>
+
+        <!-- Session Management Group -->
         <template v-if="!isReadOnly">
-          <Popover v-model:open="isSessionOpen">
-            <PopoverTrigger as-child>
-              <Button
-                variant="outline"
-                size="sm"
-                class="gap-2 h-8 relative"
-                :class="{ 
-                  'bg-amber-500/20 hover:bg-amber-500/30': !selectedSession,
-                  'bg-blue-500/20 hover:bg-blue-500/30': isSharedSessionMode && selectedSession,
-                  'opacity-70': isExecuting
-                }"
-                :title="isSharedSessionMode ? 'Using shared session mode' : selectedSession ? `Current Session: ${availableSessions.find(s => s.id === selectedSession)?.name || selectedSession}` : 'Select Session'"
-                aria-label="Session management"
-                :disabled="isSharedSessionMode || isExecuting"
-              >
-                <Layers class="h-4 w-4" v-if="!isSharedSessionMode" />
-                <Link2 class="h-4 w-4" v-else />
-                <span class="text-xs ml-1 max-w-[100px] truncate" v-if="selectedSession">
-                  {{ isSharedSessionMode ? 'Shared Session' : availableSessions.find(s => s.id === selectedSession)?.name || selectedSession }}
-                </span>
-                <span
-                  v-if="selectedSession"
-                  class="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full"
-                  aria-hidden="true"
-                ></span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent
-              class="w-[300px] p-0"
-              align="start"
-              :side="'bottom'"
-              description="Select or create a new session for code execution"
-            >
-              <div class="p-2 text-xs font-medium text-muted-foreground flex justify-between items-center">
-                <span>Sessions and Running Kernels</span>
+          <ButtonGroup>
+            <!-- Session Selector -->
+            <Popover v-model:open="isSessionOpen">
+              <PopoverTrigger as-child>
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
-                  class="h-6 w-6 p-0"
-                  @click="() => {
-                    const server = availableServers.find(s => `${s.ip}:${s.port}` === selectedServer)
-                    if (server) refreshSessionsAndKernels(server)
+                  class="h-7 text-xs px-2"
+                  :class="{ 
+                    'bg-warning/20 hover:bg-warning/30': !selectedSession,
+                    'bg-primary/20 hover:bg-primary/30': isSharedSessionMode && selectedSession,
+                    'opacity-70': isExecuting
                   }"
-                  :disabled="!selectedServer || selectedServer === 'none'"
-                  title="Refresh sessions and kernels"
+                  :title="isSharedSessionMode ? 'Using shared session mode' : selectedSession ? `Current Session: ${availableSessions.find(s => s.id === selectedSession)?.name || selectedSession}` : 'Select Session'"
+                  :disabled="isSharedSessionMode || isExecuting"
                 >
-                  <RotateCw class="h-3 w-3" />
+                  <Layers class="h-3 w-3 mr-1" v-if="!isSharedSessionMode" />
+                  <Link2 class="h-3 w-3 mr-1" v-else />
+                  <span class="max-w-[60px] truncate" v-if="selectedSession">
+                    {{ isSharedSessionMode ? 'Shared' : availableSessions.find(s => s.id === selectedSession)?.name || selectedSession }}
+                  </span>
+                  <span v-else>Session</span>
                 </Button>
-              </div>
-              <div class="p-1 border-t">
-                <div class="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    class="flex-1 gap-2 h-8"
-                    @click="createNewSession"
-                    :disabled="isSettingUp || !selectedServer || !selectedKernel"
-                  >
-                    <Loader2 v-if="isSettingUp" class="h-3 w-3 animate-spin" />
-                    <Plus v-else class="h-4 w-4" />
-                    New Session
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    class="flex-1 gap-2 h-8"
-                    @click="() => {
-                      const server = availableServers.find(s => `${s.ip}:${s.port}` === selectedServer)
-                      if (server) clearAllKernels(server)
-                    }"
-                    :disabled="!selectedServer || selectedServer === 'none' || runningKernels.length === 0"
-                    title="Clear all running kernels"
-                  >
-                    <Trash2 class="h-4 w-4" />
-                    Clear All Kernels
-                  </Button>
-                </div>
-              </div>
-              <div class="max-h-[300px] overflow-y-auto">
-                <!-- Active Sessions -->
-                <div v-if="availableSessions.length > 0">
-                  <div class="px-2 py-1 text-xs font-medium text-muted-foreground bg-accent/50">
-                    Active Sessions
-                  </div>
-                  <div class="divide-y">
-                    <div
-                      v-for="session in availableSessions"
-                      :key="session.id"
-                      class="p-2 hover:bg-accent cursor-pointer"
-                      @click="handleSessionChange(session.id)"
+              </PopoverTrigger>
+                <!-- Keep existing PopoverContent -->
+                <PopoverContent
+                  class="w-[300px] p-0"
+                  align="start"
+                  :side="'bottom'"
+                  description="Select or create a new session for code execution"
+                >
+                  <div class="p-2 text-xs font-medium text-muted-foreground flex justify-between items-center">
+                    <span>Sessions and Running Kernels</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      class="h-6 w-6 p-0"
+                      @click="() => {
+                        const server = availableServers.find(s => `${s.ip}:${s.port}` === selectedServer)
+                        if (server) refreshSessionsAndKernels(server)
+                      }"
+                      :disabled="!selectedServer || selectedServer === 'none'"
+                      title="Refresh sessions and kernels"
                     >
-                      <div class="flex items-center justify-between">
-                        <div class="flex-1">
-                          <div class="font-medium text-sm">
-                            {{ session.name || session.id }}
-                          </div>
-                          <div class="text-xs text-muted-foreground">
-                            Kernel: {{ session.kernel.name }}
-                          </div>
-                        </div>
-                        <div v-if="selectedSession === session.id" class="text-primary">
-                          <Check class="h-4 w-4" />
-                        </div>
-                      </div>
+                      <RotateCw class="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <div class="p-1 border-t">
+                    <div class="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        class="flex-1 gap-2 h-8"
+                        @click="createNewSession"
+                        :disabled="isSettingUp || !selectedServer || !selectedKernel"
+                      >
+                        <Loader2 v-if="isSettingUp" class="h-3 w-3 animate-spin" />
+                        <Plus v-else class="h-4 w-4" />
+                        New Session
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        class="flex-1 gap-2 h-8"
+                        @click="() => {
+                          const server = availableServers.find(s => `${s.ip}:${s.port}` === selectedServer)
+                          if (server) clearAllKernels(server)
+                        }"
+                        :disabled="!selectedServer || selectedServer === 'none' || runningKernels.length === 0"
+                        title="Clear all running kernels"
+                      >
+                        <Trash2 class="h-4 w-4" />
+                        Clear All Kernels
+                      </Button>
                     </div>
                   </div>
-                </div>
-
-                <!-- Running Kernels -->
-                <div v-if="runningKernels.length > 0">
-                  <div class="px-2 py-1 text-xs font-medium text-muted-foreground bg-accent/50">
-                    Running Kernels
-                  </div>
-                  <div class="divide-y">
-                    <div
-                      v-for="kernel in runningKernels"
-                      :key="kernel.id"
-                      class="p-2 hover:bg-accent cursor-pointer"
-                      @click="selectRunningKernel(kernel.id)"
-                    >
-                      <div class="flex items-center justify-between">
-                        <div class="flex-1">
-                          <div class="flex items-center gap-2">
-                            <Cpu class="w-4 h-4" :class="{
-                              'text-green-500': kernel.executionState === 'idle',
-                              'text-yellow-500': kernel.executionState === 'busy',
-                              'text-blue-500': kernel.executionState === 'starting'
-                            }" />
-                            <div class="font-medium text-sm">
-                              {{ kernel.name }}
+                  <div class="max-h-[300px] overflow-y-auto">
+                    <!-- Active Sessions -->
+                    <div v-if="availableSessions.length > 0">
+                      <div class="px-2 py-1 text-xs font-medium text-muted-foreground bg-accent/50">
+                        Active Sessions
+                      </div>
+                      <div class="divide-y">
+                        <div
+                          v-for="session in availableSessions"
+                          :key="session.id"
+                          class="p-2 hover:bg-accent cursor-pointer"
+                          @click="handleSessionChange(session.id)"
+                        >
+                          <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                              <div class="font-medium text-sm">
+                                {{ session.name || session.id }}
+                              </div>
+                              <div class="text-xs text-muted-foreground">
+                                Kernel: {{ session.kernel.name }}
+                              </div>
+                            </div>
+                            <div v-if="selectedSession === session.id" class="text-primary">
+                              <Check class="h-4 w-4" />
                             </div>
                           </div>
-                          <div class="text-xs text-muted-foreground mt-1">
-                            <span class="capitalize">{{ kernel.executionState || 'unknown' }}</span>
-                            <span v-if="kernel.connections"> • {{ kernel.connections }} connection(s)</span>
-                            <span> • Last activity {{ new Date(kernel.lastActivity).toLocaleString() }}</span>
-                          </div>
-                          <div class="text-xs text-muted-foreground">
-                            ID: {{ kernel.id }}
-                          </div>
-                        </div>
-                        <div v-if="selectedSession && codeExecutionStore.kernelSessions.get(selectedSession)?.kernelId === kernel.id" class="text-primary">
-                          <Check class="h-4 w-4" />
                         </div>
                       </div>
                     </div>
+
+                    <!-- Running Kernels -->
+                    <div v-if="runningKernels.length > 0">
+                      <div class="px-2 py-1 text-xs font-medium text-muted-foreground bg-accent/50">
+                        Running Kernels
+                      </div>
+                      <div class="divide-y">
+                        <div
+                          v-for="kernel in runningKernels"
+                          :key="kernel.id"
+                          class="p-2 hover:bg-accent cursor-pointer"
+                          @click="selectRunningKernel(kernel.id)"
+                        >
+                          <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                              <div class="flex items-center gap-2">
+                                <Cpu class="w-4 h-4" :class="{
+                                  'text-green-500': kernel.executionState === 'idle',
+                                  'text-yellow-500': kernel.executionState === 'busy',
+                                  'text-blue-500': kernel.executionState === 'starting'
+                                }" />
+                                <div class="font-medium text-sm">
+                                  {{ kernel.name }}
+                                </div>
+                              </div>
+                              <div class="text-xs text-muted-foreground mt-1">
+                                <span class="capitalize">{{ kernel.executionState || 'unknown' }}</span>
+                                <span v-if="kernel.connections"> • {{ kernel.connections }} connection(s)</span>
+                                <span> • Last activity {{ new Date(kernel.lastActivity).toLocaleString() }}</span>
+                              </div>
+                              <div class="text-xs text-muted-foreground">
+                                ID: {{ kernel.id }}
+                              </div>
+                            </div>
+                            <div v-if="selectedSession && codeExecutionStore.kernelSessions.get(selectedSession)?.kernelId === kernel.id" class="text-primary">
+                              <Check class="h-4 w-4" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- No Sessions/Kernels Message -->
+                    <div 
+                      v-if="availableSessions.length === 0 && runningKernels.length === 0" 
+                      class="p-3 text-sm text-center text-muted-foreground"
+                    >
+                      No active sessions or running kernels. Create a new session to start.
+                    </div>
                   </div>
-                </div>
+                </PopoverContent>
+              </Popover>
 
-                <!-- No Sessions/Kernels Message -->
-                <div 
-                  v-if="availableSessions.length === 0 && runningKernels.length === 0" 
-                  class="p-3 text-sm text-center text-muted-foreground"
-                >
-                  No active sessions or running kernels. Create a new session to start.
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
-        </template>
-
-        <!-- Code Visibility Toggle -->
-        <Button
-          variant="outline"
-          size="sm"
-          class="gap-2 h-8"
-          @click="toggleCodeVisibility"
-          :title="isCodeVisible ? 'Hide Code' : 'Show Code'"
-          aria-label="Toggle code visibility"
-          :disabled="isExecuting && !isPublished"
-        >
-          <Eye v-if="!isCodeVisible" class="h-4 w-4" />
-          <EyeOff v-else class="h-4 w-4" />
-        </Button>
-
-        <!-- Server & Kernel Selector - Hide when readonly -->
-        <template v-if="!isReadOnly">
-          <Popover v-model:open="isServerOpen">
-            <PopoverTrigger as-child>
-              <Button
-                variant="outline"
-                size="sm"
-                class="gap-2 h-8 relative"
-                :class="{
-                  'bg-amber-500/20 hover:bg-amber-500/30':
-                    !selectedServer || selectedServer === 'none' || !selectedKernel || selectedKernel === 'none',
-                  'bg-blue-500/20 hover:bg-blue-500/30': isSharedSessionMode,
-                  'opacity-70': isExecuting
-                }"
-                :title="
-                  isSharedSessionMode
-                    ? 'Using shared server & kernel'
-                    : selectedServer && selectedServer !== 'none' && selectedKernel && selectedKernel !== 'none'
-                      ? `${selectedServer} - ${selectedKernel}`
-                    : 'Select Server & Kernel'
-                "
-                aria-label="Select server and kernel"
-                :disabled="isSharedSessionMode || isExecuting"
-              >
-                <Server class="h-4 w-4" />
-                <Box v-if="selectedServer && selectedServer !== 'none'" class="h-4 w-4 ml-1" />
-                <span
-                  v-if="selectedServer && selectedServer !== 'none' && selectedKernel && selectedKernel !== 'none'"
-                  class="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full"
-                  aria-hidden="true"
-                ></span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent
-              class="w-[300px] p-0"
-              align="start"
-              :side="'bottom'"
-              description="Select a Jupyter server and kernel for code execution"
-            >
-              <div class="p-2 text-xs font-medium text-muted-foreground">
-                Select a server and kernel for code execution
-              </div>
-              <div class="border-t p-2">
-                <div class="mb-2">
-                  <div class="text-xs font-medium mb-1">Server</div>
-                  <CustomSelect
-                    :options="
-                      availableServers.map(server => ({
-                        value: `${server.ip}:${server.port}`,
-                        label: `${server.ip}:${server.port}`,
-                      }))
+              <!-- Server & Kernel Selector -->
+              <Popover v-model:open="isServerOpen">
+                <PopoverTrigger as-child>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    class="h-7 text-xs px-2"
+                    :class="{
+                      'bg-warning/20 hover:bg-warning/30':
+                        !selectedServer || selectedServer === 'none' || !selectedKernel || selectedKernel === 'none',
+                      'bg-primary/20 hover:bg-primary/30': isSharedSessionMode,
+                      'opacity-70': isExecuting
+                    }"
+                    :title="
+                      isSharedSessionMode
+                        ? 'Using shared server & kernel'
+                        : selectedServer && selectedServer !== 'none' && selectedKernel && selectedKernel !== 'none'
+                          ? `${selectedServer} - ${selectedKernel}`
+                          : 'Select Server & Kernel'
                     "
-                    :model-value="selectedServer"
-                    placeholder="Search servers..."
-                    :searchable="true"
-                    @select="handleServerChange"
-                  />
-                </div>
-                <div>
-                  <div class="text-xs font-medium mb-1">Kernel</div>
-                  <CustomSelect
-                    :options="availableKernels.map((kernel) => ({
-                      value: kernel.name,
-                      label: kernel.spec.display_name || kernel.name
-                    }))"
-                    :model-value="selectedKernel"
-                    placeholder="Search kernels..."
-                    :searchable="true"
-                    :disabled="!selectedServer || selectedServer === 'none'"
-                    @select="handleKernelChange"
-                  />
-                </div>
-              </div>
-              <div
-                v-if="availableServers.length === 0"
-                class="p-3 text-sm text-center text-muted-foreground"
-              >
-                No servers available. Configure servers in the settings.
-              </div>
-              <div
-                v-else-if="selectedServer && selectedServer !== 'none' && availableKernels.length === 0"
-                class="p-3 text-sm text-center text-muted-foreground"
-              >
-                No kernels available on the selected server.
-              </div>
-            </PopoverContent>
-          </Popover>
-        </template>
+                    :disabled="isSharedSessionMode || isExecuting"
+                  >
+                    <Server class="h-3 w-3 mr-1" />
+                    <span class="max-w-[60px] truncate">
+                      {{ selectedServer && selectedServer !== 'none' ? selectedServer.split(':')[0] : 'Server' }}
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  class="w-[300px] p-0"
+                  align="start"
+                  :side="'bottom'"
+                  description="Select a Jupyter server and kernel for code execution"
+                >
+                  <div class="p-2 text-xs font-medium text-muted-foreground">
+                    Select a server and kernel for code execution
+                  </div>
+                  <div class="border-t p-2">
+                    <div class="mb-2">
+                      <div class="text-xs font-medium mb-1">Server</div>
+                      <CustomSelect
+                        :options="
+                          availableServers.map(server => ({
+                            value: `${server.ip}:${server.port}`,
+                            label: `${server.ip}:${server.port}`,
+                          }))
+                        "
+                        :model-value="selectedServer"
+                        placeholder="Search servers..."
+                        :searchable="true"
+                        @select="handleServerChange"
+                      />
+                    </div>
+                    <div>
+                      <div class="text-xs font-medium mb-1">Kernel</div>
+                      <CustomSelect
+                        :options="availableKernels.map((kernel) => ({
+                          value: kernel.name,
+                          label: kernel.spec.display_name || kernel.name
+                        }))"
+                        :model-value="selectedKernel"
+                        placeholder="Search kernels..."
+                        :searchable="true"
+                        :disabled="!selectedServer || selectedServer === 'none'"
+                        @select="handleKernelChange"
+                      />
+                    </div>
+                  </div>
+                  <div
+                    v-if="availableServers.length === 0"
+                    class="p-3 text-sm text-center text-muted-foreground"
+                  >
+                    No servers available. Configure servers in the settings.
+                  </div>
+                  <div
+                    v-else-if="selectedServer && selectedServer !== 'none' && availableKernels.length === 0"
+                    class="p-3 text-sm text-center text-muted-foreground"
+                  >
+                    No kernels available on the selected server.
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </ButtonGroup>
+          </template>
+        </div>
+
+        <div class="flex-1"></div>
+
+        <!-- Right side utility buttons -->
+        <div class="flex items-center gap-2">
+          <!-- View Controls Group -->
+          <ButtonGroup>
+            <Button
+              variant="ghost"
+              size="sm"
+              class="h-7 w-7 p-0"
+              @click="toggleCodeVisibility"
+              :title="isCodeVisible ? 'Hide Code' : 'Show Code'"
+            >
+              <Eye v-if="!isCodeVisible" class="h-3 w-3" />
+              <EyeOff v-else class="h-3 w-3" />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              class="h-7 w-7 p-0"
+              @click="isFullScreen = true"
+              title="Full Screen Mode"
+              :disabled="isExecuting && !isPublished"
+            >
+              <Maximize2 class="h-3 w-3" />
+            </Button>
+          </ButtonGroup>
+
+          <!-- Code Tools Group -->
+          <ButtonGroup v-if="!isReadOnly">
+            <Button
+              variant="ghost"
+              size="sm"
+              @click="handleCodeFormatted"
+              class="h-7 px-2 text-xs"
+              title="Format code"
+              :disabled="isExecuting"
+            >
+              <Code class="h-3 w-3 mr-1" />
+              Format
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              @click="showTemplateDialog"
+              class="h-7 px-2 text-xs"
+              title="Insert template"
+              :disabled="isExecuting"
+            >
+              <FileText class="h-3 w-3 mr-1" />
+              Templates
+            </Button>
+          </ButtonGroup>
+
+          <!-- Action Controls Group -->
+          <ButtonGroup>
+            <Button
+              variant="ghost"
+              size="sm"
+              @click="copyCode"
+              class="h-7 w-7 p-0"
+              title="Copy code"
+            >
+              <Copy v-if="!isCodeCopied" class="h-3 w-3" />
+              <Check v-else class="h-3 w-3" />
+            </Button>
+
+            <Button
+              v-if="!isReadOnly && hasUnsavedChanges && !isExecuting"
+              variant="ghost"
+              size="sm"
+              @click="saveChanges"
+              class="h-7 w-7 p-0"
+              title="Save changes"
+            >
+              <Save class="w-3 h-3" />
+            </Button>
+          </ButtonGroup>
+        </div>
       </div>
-
-      <div class="flex-1"></div>
-
-      <!-- Right toolbar group -->
-      <div class="flex items-center gap-2">
-        <!-- Execution Status Indicator - hide in published mode -->
-        <div
-          v-if="(isExecuting || cell?.isExecuting) && !isPublished"
-          class="flex items-center text-xs text-primary gap-1 mr-2 px-2 py-0.5 rounded-full bg-primary/10"
-        >
-          <Loader2 class="h-3.5 w-3.5 animate-spin" />
-          <span>Executing...</span>
-        </div>
-
-        <!-- Shared Session Indicator - hide in published mode -->
-        <div
-          v-else-if="isSharedSessionMode && !isPublished"
-          class="text-xs text-muted-foreground flex items-center gap-1.5 mr-2"
-        >
-          <Link2 class="h-3.5 w-3.5 text-blue-500" />
-          <span>Shared Session</span>
-        </div>
-
-        <!-- Keyboard shortcuts (hidden in readonly) -->
-        <div
-          v-if="!isReadOnly && !isExecuting"
-          class="hidden md:flex items-center text-xs text-muted-foreground mr-1 gap-2"
-        >
-          <div class="flex items-center">
-            <kbd class="px-1.5 py-0.5 border rounded text-[10px]">{{ getShortcutText('Ctrl+Alt+Shift+Enter') }}</kbd>
-            <span class="ml-1">run</span>
-          </div>
-          <div class="flex items-center">
-            <kbd class="px-1.5 py-0.5 border rounded text-[10px]">{{ getShortcutText('Ctrl+Alt+Shift+F') }}</kbd>
-            <span class="ml-1">fullscreen</span>
-          </div>
-        </div>
-
-        <!-- Save Changes Button (hidden in readonly) -->
-        <Button
-          v-if="!isReadOnly && hasUnsavedChanges && !isExecuting"
-          variant="outline"
-          size="sm"
-          @click="saveChanges"
-          class="h-8"
-          title="Save changes"
-          aria-label="Save changes"
-        >
-          <Save class="w-4 h-4" />
-        </Button>
-
-
-        <!-- Copy button (always available) -->
-        <Button
-          variant="outline"
-          size="sm"
-          @click="copyCode"
-          class="h-8"
-          title="Copy code"
-          aria-label="Copy code"
-        >
-          <Copy v-if="!isCodeCopied" class="w-4 h-4" />
-          <Check v-else class="w-4 h-4" />
-        </Button>
-
-        <!-- Run Code Button (hidden in readonly) -->
-        <Button
-          v-if="!isReadOnly"
-          variant="default"
-          size="sm"
-          :disabled="!isReadyToExecute"
-          @click="executeCode"
-          class="h-8 min-w-[80px]"
-          :title="isExecuting || cell?.isExecuting ? 'Executing...' : 'Run Code'"
-          aria-label="Run code"
-        >
-          <Loader2 class="w-4 h-4 animate-spin mr-2" v-if="isExecuting || cell?.isExecuting" />
-          <Play class="w-4 h-4 mr-2" v-else />
-          {{ isExecuting || cell?.isExecuting ? 'Running...' : 'Run' }}
-        </Button>
-
-        <!-- Fullscreen Button (always available, even in readonly) -->
-        <Button
-          variant="ghost"
-          size="sm"
-          class="h-8 w-8 p-0"
-          @click="isFullScreen = true"
-          title="Full Screen Mode"
-          aria-label="Full screen mode"
-          :disabled="isExecuting && !isPublished"
-        >
-          <Maximize2 class="h-4 w-4" />
-        </Button>
-      </div>
-    </div>
 
     <!-- Warning Banner (hidden in readonly and public mode) -->
     <div
@@ -1282,7 +1320,7 @@ watch(() => cell?.value?.hasError, (hasError) => {
           !selectedKernel ||
           selectedKernel === 'none')
       "
-      class="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800 border-b p-2 flex items-center text-xs text-amber-600 dark:text-amber-400"
+      class="border-b px-3 py-2 flex items-center text-xs status-warning"
     >
       <AlertTriangle class="h-3 w-3 mr-2" />
       <span v-if="!selectedServer || selectedServer === 'none'">
@@ -1296,7 +1334,7 @@ watch(() => cell?.value?.hasError, (hasError) => {
     <!-- Shared Mode Info Banner - hidden in public mode -->
     <div
       v-else-if="!isReadOnly && !isPublished && isSharedSessionMode && !selectedSession && !isExecuting"
-      class="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800 border-b p-2 flex items-center text-xs text-blue-600 dark:text-blue-400"
+      class="border-b px-3 py-2 flex items-center text-xs status-running"
     >
       <Link2 class="h-3 w-3 mr-2" />
       <span>
@@ -1304,47 +1342,40 @@ watch(() => cell?.value?.hasError, (hasError) => {
       </span>
     </div>
 
-    <!-- Executing Banner - hidden in public mode -->
-    <div
-      v-else-if="!isPublished && (isExecuting || cell?.isExecuting)"
-      class="bg-primary/5 dark:bg-primary/20 border-primary/20 dark:border-primary/30 border-b p-2 flex items-center justify-between text-xs text-primary-foreground"
-    >
-      <div class="flex items-center">
-        <Loader2 class="h-3 w-3 animate-spin mr-2" />
-        <span>Executing code...</span>
-      </div>
-    </div>
-
-    <!-- Code Editor -->
-    <div v-show="isCodeVisible" class="relative group code-editor-container">
-      <!-- Copy button overlay -->
-      <div class="absolute right-2 top-2 z-10 opacity-0 transition-opacity group-hover:opacity-100">
-        <Button
-          variant="ghost"
-          size="sm"
-          @click="copyCode"
-          class="h-8 w-8 p-0"
-          title="Copy code to clipboard"
-          aria-label="Copy code"
-          :disabled="isExecuting && !isPublished"
-        >
-          <Copy v-if="!isCodeCopied" class="h-4 w-4" />
-          <Check v-else class="h-4 h-4" />
-        </Button>
+    <!-- Code Editor with cleaner markdown-like appearance -->
+    <div v-show="isCodeVisible" class="relative">
+      <!-- Floating action buttons overlay (only visible on hover) -->
+      <div class="absolute right-3 top-3 z-10 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+        <ButtonGroup class="btn-group-tight">
+          <Button
+            variant="secondary"
+            size="sm"
+            @click="copyCode"
+            class="h-6 w-6 p-0 shadow-sm"
+            title="Copy code to clipboard"
+          >
+            <Copy v-if="!isCodeCopied" class="h-3 w-3" />
+            <Check v-else class="h-3 w-3 text-success" />
+          </Button>
+        </ButtonGroup>
       </div>
 
-      <CodeMirror
-        :model-value="codeValue"
-        :language="props.language"
-        :readonly="props.isReadOnly"
-        :running-status="runningStatus"
-        :is-published="props.isPublished"
-        :auto-format="true"
-        :show-template-button="true"
-        @update:model-value="updateCode"
-        @format-code="handleCodeFormatted"
-        @show-templates="showTemplateDialog"
-      />
+      <!-- Code editor with minimal styling -->
+      <div class="code-editor-wrapper">
+        <CodeMirror
+          :model-value="codeValue"
+          :language="props.language"
+          :readonly="props.isReadOnly"
+          :running-status="runningStatus"
+          :is-published="props.isPublished"
+          :auto-format="true"
+          :show-template-button="false"
+          :show-formatting-toolbar="false"
+          @update:model-value="updateCode"
+          @format-code="handleCodeFormatted"
+          @show-templates="showTemplateDialog"
+        />
+      </div>
     </div>
 
     <!-- Enhanced Output/AI Section -->
@@ -1541,20 +1572,45 @@ watch(() => cell?.value?.hasError, (hasError) => {
 
 <style scoped>
 .cmd-group {
-  @apply py-1.5 px-2 text-xs font-semibold text-muted-foreground;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
 }
 
 .cmd-item {
-  @apply relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50;
+  position: relative;
+  display: flex;
+  cursor: pointer;
+  user-select: none;
+  align-items: center;
+  border-radius: calc(var(--radius) - 2px);
+  padding: 0.375rem 0.5rem 0.375rem 0.5rem;
+  font-size: 0.875rem;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+.cmd-item:hover {
+  background-color: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+
+.cmd-item[data-disabled] {
+  pointer-events: none;
+  opacity: 0.5;
 }
 
 .cmd-empty {
-  @apply py-6 text-center text-sm text-muted-foreground;
+  padding: 1.5rem 0;
+  text-align: center;
+  font-size: 0.875rem;
+  color: hsl(var(--muted-foreground));
 }
 
 div[v-html] {
   scrollbar-width: thin;
-  scrollbar-color: rgba(155, 155, 155, 0.5) transparent;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.5) transparent;
   word-break: break-word;
 }
 
@@ -1568,8 +1624,8 @@ div[v-html]::-webkit-scrollbar-track {
 }
 
 div[v-html]::-webkit-scrollbar-thumb {
-  background-color: rgba(155, 155, 155, 0.5);
-  border-radius: 4px;
+  background-color: hsl(var(--muted-foreground) / 0.5);
+  border-radius: calc(var(--radius) / 2);
 }
 
 @media (max-width: 640px) {
@@ -1578,44 +1634,112 @@ div[v-html]::-webkit-scrollbar-thumb {
   }
 }
 
-/* Add new styles for code editor container */
-.code-editor-container {
-  height: 300px;
-  min-height: 100px;
-  max-height: 600px;
-  overflow: hidden;
-  border-radius: 0.375rem;
-  background-color: var(--background);
+/* Improved code editor styling for markdown-like appearance */
+.code-editor-wrapper {
+  background: hsl(var(--muted) / 0.3);
+  border-radius: var(--radius);
+  padding: 1rem;
+  font-family: 'Fira Code', 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  border: 1px solid hsl(var(--border));
+  position: relative;
 }
 
-/* Ensure proper scrolling behavior */
-:deep(.cm-editor) {
-  height: 100%;
-  overflow: hidden;
+/* Remove the heavy box styling from the container */
+.group {
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  box-shadow: 0 1px 3px 0 hsl(var(--ring) / 0.1), 0 1px 2px -1px hsl(var(--ring) / 0.1);
+  transition: all 0.2s ease;
+  background-color: hsl(var(--card));
+  color: hsl(var(--card-foreground));
 }
 
-:deep(.cm-scroller) {
-  overflow: auto;
-  padding: 0.5rem 0;
+.group:hover {
+  box-shadow: 0 4px 6px -1px hsl(var(--ring) / 0.1), 0 2px 4px -2px hsl(var(--ring) / 0.1);
 }
 
 /* Enhance styles for different states */
 .executing-block {
-  @apply border-primary/30;
-  box-shadow: 0 0 0 2px rgba(var(--primary), 0.1);
+  border-color: hsl(var(--primary) / 0.3);
+  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.1);
 }
 
 .error-block {
-  @apply border-destructive/30;
+  border-color: hsl(var(--destructive) / 0.3);
+  box-shadow: 0 0 0 2px hsl(var(--destructive) / 0.1);
 }
 
 .published-block {
-  @apply border shadow-sm;
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 1px 3px 0 hsl(var(--ring) / 0.1), 0 1px 2px -1px hsl(var(--ring) / 0.1);
 }
 
-/* Transition for status changes */
+/* Smooth transitions */
 .flex-col {
   transition: all 0.3s ease;
+}
+
+/* Ensure proper CodeMirror styling */
+:deep(.cm-editor) {
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  border: none;
+}
+
+:deep(.cm-scroller) {
+  overflow: auto;
+  padding: 0;
+  font-family: inherit;
+}
+
+:deep(.cm-content) {
+  padding: 0;
+  min-height: 120px;
+}
+
+:deep(.cm-focused) {
+  outline: none;
+}
+
+/* Language indicator styling */
+.language-indicator {
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+/* Status indicators using CSS variables */
+.status-running {
+  background-color: hsl(var(--primary) / 0.1);
+  color: hsl(var(--primary));
+}
+
+.status-error {
+  background-color: hsl(var(--destructive) / 0.1);
+  color: hsl(var(--destructive));
+}
+
+.status-success {
+  background-color: hsl(var(--success) / 0.1);
+  color: hsl(var(--success));
+}
+
+.status-warning {
+  background-color: hsl(var(--warning) / 0.1);
+  color: hsl(var(--warning));
+}
+
+/* Button group spacing override for tighter groups */
+.btn-group-tight > :deep(button) {
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+
+.btn-group-tight > :deep(button:not(:first-child)) {
+  margin-left: -1px;
 }
 </style>
 
