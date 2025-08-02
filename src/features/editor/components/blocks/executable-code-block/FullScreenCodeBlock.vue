@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref, computed, watch } from 'vue'
 import { Button } from '@/ui/button'
-import { X, Play, Loader2, Copy, Check, Brain, Box, AlertTriangle, Sparkles } from 'lucide-vue-next'
+import { X, Play, Loader2, Copy, Check, Eye, EyeOff, Code, FileText, Save, Maximize2 } from 'lucide-vue-next'
 import CodeMirror from './CodeMirror.vue'
-import OutputRenderer from './OutputRenderer.vue'
-import AICodeAssistant from './AICodeAssistant.vue'
-import { Badge } from '@/ui/badge'
-import { useFullscreenCode } from './composables/useFullscreenCode'
-import { useCodeBlockShortcuts } from './composables/useCodeBlockShortcuts'
+import OutputSection from './components/OutputSection.vue'
+import StatusIndicator from './components/StatusIndicator.vue'
+import { useFullscreenCode } from './composables/ui/useFullscreenCode'
+import { useCodeBlockShortcuts } from './composables/ui/useCodeBlockShortcuts'
+import { useCodeExecution } from './composables/core/useCodeExecution'
 
 interface Props {
   code: string
@@ -20,6 +20,7 @@ interface Props {
   isPublished?: boolean
   blockId?: string
   notaId?: string
+  hasUnsavedChanges?: boolean
   sessionInfo?: {
     sessionId?: string
     kernelName?: string
@@ -31,6 +32,10 @@ const emit = defineEmits<{
   'update:isOpen': [value: boolean]
   'update:code': [code: string]
   'execute': []
+  'format-code': []
+  'show-templates': []
+  'save-changes': []
+  'toggle-code-visibility': []
 }>()
 
 const {
@@ -61,22 +66,35 @@ const { shortcuts, getShortcutText } = useCodeBlockShortcuts({
   }
 })
 
-// New reactive state for improved UX
+// Enhanced keyboard handling for better UX
+const handleGlobalKeyDown = (e: KeyboardEvent) => {
+  // ESC to close
+  if (e.key === 'Escape' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+    e.preventDefault()
+    onClose()
+    return
+  }
+  
+  // Ctrl+Shift+Enter or Cmd+Shift+Enter to run
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'Enter') {
+    e.preventDefault()
+    if (!props.isExecuting && !props.isReadOnly) {
+      executeCode()
+    }
+    return
+  }
+  
+  // Pass to existing handler
+  handleKeyDown(e, onClose, props.isExecuting || false)
+}
+
+// Simplified state management (timer functionality)
 const isCodeCopied = ref(false)
+const isCodeVisible = ref(true)
 const executionStartTime = ref(0)
 const executionTime = ref(0)
 const executionTimeInterval = ref<number | null>(null)
 const statusMessage = ref<string | null>(null)
-
-// Output/AI view toggle
-const activeOutputView = ref<'output' | 'ai'>('output')
-
-// Auto-switch to AI view when there's an error
-watch(() => props.outputType, (outputType) => {
-  if (outputType === 'error' && !props.isReadOnly && !props.isPublished) {
-    activeOutputView.value = 'ai'
-  }
-}, { immediate: true })
 
 // Compute readable execution time
 const executionTimeText = computed(() => {
@@ -97,18 +115,26 @@ const executionTimeText = computed(() => {
 onMounted(() => {
   document.addEventListener('mousemove', handleResize)
   document.addEventListener('mouseup', endResize)
-  document.addEventListener('keydown', (e) => handleKeyDown(e, onClose, props.isExecuting || false))
+  document.addEventListener('keydown', handleGlobalKeyDown)
   
   // Start execution timer if code is already executing
   if (props.isExecuting) {
     startExecutionTimer()
   }
+  
+  // Focus management - ensure CodeMirror gets focus
+  setTimeout(() => {
+    const codeMirrorElement = document.querySelector('.cm-editor .cm-content')
+    if (codeMirrorElement && codeMirrorElement instanceof HTMLElement) {
+      codeMirrorElement.focus()
+    }
+  }, 100)
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('mousemove', handleResize)
   document.removeEventListener('mouseup', endResize)
-  document.removeEventListener('keydown', (e) => handleKeyDown(e, onClose, props.isExecuting || false))
+  document.removeEventListener('keydown', handleGlobalKeyDown)
   
   // Clean up timer
   if (executionTimeInterval.value) {
@@ -161,13 +187,21 @@ const executeCode = () => {
   emit('execute')
 }
 
-// AI Assistant handlers
-const handleAICodeUpdate = (newCode: string) => {
+// Handle events from OutputSection
+const handleCodeUpdated = (newCode: string) => {
   emit('update:code', newCode)
 }
 
 const handleCustomActionExecuted = (actionId: string, result: string) => {
   console.log(`AI action ${actionId} executed with result:`, result)
+}
+
+const handleTriggerExecution = () => {
+  executeCode()
+}
+
+const handleCopyOutput = () => {
+  // This will be handled by the OutputSection component
 }
 
 // Timer functions for execution feedback
@@ -202,69 +236,123 @@ function stopExecutionTimer() {
 <template>
   <div
     v-if="isOpen"
-    class="fixed inset-0 z-50 bg-background flex flex-col"
+    class="fixed inset-0 z-[9999] bg-background/95 backdrop-blur-sm flex flex-col animate-in fade-in duration-200"
     role="dialog"
     aria-modal="true"
     aria-label="Code Editor"
     :class="{ 'published-mode': isPublished }"
   >
-    <!-- Header -->
-    <div class="flex items-center justify-between p-4 border-b bg-background/90 backdrop-blur-sm">
-      <div class="flex items-center gap-3">
-        <h2 class="text-lg font-semibold">
-          Code Editor
-          <span class="text-xs ml-2 text-muted-foreground">{{ language }}</span>
-        </h2>
+    <!-- Compact Header -->
+    <div class="flex items-center justify-between px-3 py-2 border-b bg-background/95 backdrop-blur-sm">
+      <div class="flex items-center gap-2">
+        <!-- Execution status - compact version -->
+        <div v-if="isExecuting" 
+             class="flex items-center gap-1.5 px-2 py-1 bg-primary/10 text-primary rounded text-xs">
+          <Loader2 class="w-3 h-3 animate-spin" />
+          <span>{{ executionTimeText || 'Running...' }}</span>
+        </div>
         
-        <!-- Execution status indicator -->
-        <div v-if="isExecuting || statusMessage" 
-             class="flex items-center gap-2 px-2 py-1 rounded-full text-xs"
-             :class="isExecuting ? 'bg-primary/10 text-primary' : 'bg-green-500/10 text-green-600 dark:text-green-400'">
-          <Loader2 v-if="isExecuting" class="w-3 h-3 animate-spin" />
-          <span>{{ isExecuting ? `Executing (${executionTimeText})` : statusMessage }}</span>
+        <div v-else-if="statusMessage && !isPublished" 
+             class="flex items-center gap-1.5 px-2 py-1 bg-green-500/10 text-green-600 dark:text-green-400 rounded text-xs">
+          <span>{{ statusMessage }}</span>
+        </div>
+        
+        <!-- Error indicator -->
+        <div v-if="outputType === 'error' && !isPublished" 
+             class="flex items-center gap-1.5 px-2 py-1 bg-destructive/10 text-destructive rounded text-xs">
+          <span>Error</span>
         </div>
       </div>
       
-      <div class="flex items-center gap-3">
-        <!-- Keyboard shortcut help text (hidden in readonly mode) -->
-        <div v-if="!isReadOnly" class="hidden sm:flex text-xs text-muted-foreground mr-2">
-          <kbd class="px-1.5 py-0.5 border rounded">{{ isMac() ? '⌘' : 'Ctrl' }}+Alt+Shift+Enter</kbd>
-          <span class="ml-1">to run</span>
+      <div class="flex items-center gap-1">
+        <!-- Keyboard shortcut tooltip (hover to show) -->
+        <div v-if="!isReadOnly" 
+             class="hidden lg:flex text-xs text-muted-foreground/70 mr-2"
+             title="Keyboard shortcut to run code">
+          <kbd class="px-1 py-0.5 bg-muted/30 border rounded text-xs">{{ isMac() ? '⌘⇧↵' : 'Ctrl+Shift+Enter' }}</kbd>
         </div>
 
-        <!-- Copy button -->
+        <!-- Code Tools Group -->
+        <div v-if="!isReadOnly" class="flex items-center gap-1 mr-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            @click="emit('format-code')"
+            class="h-7 px-2"
+            title="Format code"
+            :disabled="isExecuting"
+          >
+            <Code class="w-3.5 h-3.5 mr-1" />
+            <span class="text-xs">Format</span>
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            @click="emit('show-templates')"
+            class="h-7 px-2"
+            title="Insert template"
+            :disabled="isExecuting"
+          >
+            <FileText class="w-3.5 h-3.5 mr-1" />
+            <span class="text-xs">Templates</span>
+          </Button>
+        </div>
+
+        <!-- View Controls -->
+        <div class="flex items-center gap-1 mr-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            @click="emit('toggle-code-visibility')"
+            class="h-7 px-2"
+            :title="isCodeVisible ? 'Hide Code' : 'Show Code'"
+          >
+            <Eye v-if="!isCodeVisible" class="w-3.5 h-3.5" />
+            <EyeOff v-else class="w-3.5 h-3.5" />
+          </Button>
+        </div>
+
+        <!-- Action buttons -->
         <Button
-          variant="outline"
+          variant="ghost"
           size="sm"
           @click="copyCode"
-          class="h-8"
-          title="Copy code to clipboard"
+          class="h-7 px-2"
+          title="Copy code"
           aria-label="Copy code"
         >
-          <Copy v-if="!isCodeCopied" class="w-4 h-4 mr-1" />
-          <Check v-else class="w-4 h-4 mr-1" />
-          <span>Copy</span>
+          <Copy v-if="!isCodeCopied" class="w-3.5 h-3.5" />
+          <Check v-else class="w-3.5 h-3.5 text-green-500" />
         </Button>
 
-        <!-- Run button (hidden when readonly) -->
+        <Button
+          v-if="!isReadOnly && hasUnsavedChanges && !isExecuting"
+          variant="ghost"
+          size="sm"
+          @click="emit('save-changes')"
+          class="h-7 px-2"
+          title="Save changes"
+        >
+          <Save class="w-3.5 h-3.5" />
+        </Button>
+
         <Button
           v-if="!isReadOnly"
           variant="default"
           size="sm"
           :disabled="isExecuting"
           @click="executeCode"
-          class="h-8 min-w-[70px]"
+          class="h-7 px-3"
           aria-label="Run code"
         >
-          <Loader2 class="w-4 h-4 animate-spin mr-2" v-if="isExecuting" />
-          <Play class="w-4 h-4 mr-2" v-else />
-          {{ isExecuting ? 'Running' : 'Run' }}
+          <Loader2 class="w-3.5 h-3.5 animate-spin mr-1" v-if="isExecuting" />
+          <Play class="w-3.5 h-3.5 mr-1" v-else />
+          <span class="text-xs">Run</span>
         </Button>
 
-        <!-- Close button -->
-        <Button variant="ghost" size="icon" @click="onClose" aria-label="Close editor">
-          <X class="h-4 w-4" />
-          <span class="sr-only">Close</span>
+        <Button variant="ghost" size="sm" @click="onClose" class="h-7 px-2" aria-label="Close editor">
+          <X class="w-3.5 h-3.5" />
         </Button>
       </div>
     </div>
@@ -273,6 +361,7 @@ function stopExecutionTimer() {
     <div class="flex flex-1 overflow-hidden editor-container">
       <!-- Code Editor -->
       <div 
+        v-show="isCodeVisible"
         class="h-full overflow-hidden transition-all" 
         :style="editorContainerStyle"
       >
@@ -291,157 +380,50 @@ function stopExecutionTimer() {
           :tab-size="4"
         />
         
-        <!-- Overlay for executing state -->
-        <div v-if="isExecuting" class="absolute top-0 right-0 m-4 z-10">
-          <div class="px-3 py-1 bg-primary text-primary-foreground rounded-full text-xs flex items-center gap-2 shadow-md">
+        <!-- Subtle overlay for executing state -->
+        <div v-if="isExecuting" class="absolute top-2 right-2 z-10">
+          <div class="px-2 py-1 bg-primary/90 text-primary-foreground rounded text-xs flex items-center gap-1.5 shadow-sm backdrop-blur-sm">
             <Loader2 class="w-3 h-3 animate-spin" />
-            <span>Executing...</span>
+            <span>{{ executionTimeText || 'Running' }}</span>
           </div>
         </div>
       </div>
 
-      <!-- Resize handle -->
+      <!-- Enhanced resize handle -->
       <div
-        v-if="!isOutputFullscreen"
-        class="w-1 cursor-col-resize hover:bg-primary/20 active:bg-primary/40 transition-colors"
+        v-if="!isOutputFullscreen && isCodeVisible"
+        class="group w-1 cursor-col-resize hover:w-1.5 active:w-2 transition-all duration-200 bg-border/50 hover:bg-border active:bg-primary/50 flex items-center justify-center relative"
         @mousedown="startResize"
         aria-hidden="true"
-      ></div>
+      >
+        <!-- Subtle grip indicator -->
+        <div class="absolute inset-y-0 w-px bg-background/20 group-hover:bg-background/40 transition-colors"></div>
+      </div>
 
-      <!-- Output -->
+      <!-- Output Section -->
       <div 
         class="flex flex-col h-full transition-all" 
         :style="outputContainerStyle"
       >
-        <!-- Output/AI Toggle Header -->
-        <div v-if="output || (!isReadOnly && !isPublished)" class="flex items-center justify-between px-4 py-2 border-b bg-background/50">
-          <div class="flex items-center gap-2">
-            <!-- Toggle Tabs -->
-            <div class="flex items-center gap-1 p-1 bg-muted/50 rounded-lg">
-              <button
-                @click="activeOutputView = 'output'"
-                :class="[
-                  'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all',
-                  activeOutputView === 'output' 
-                    ? 'bg-background text-foreground shadow-sm' 
-                    : 'text-muted-foreground hover:text-foreground'
-                ]"
-                :disabled="!output"
-              >
-                <Box class="w-4 h-4" />
-                Output
-                <div v-if="outputType === 'error'" class="w-2 h-2 bg-destructive rounded-full"></div>
-                <div v-else-if="output" class="w-2 h-2 bg-green-500 rounded-full"></div>
-              </button>
-              
-              <button
-                v-if="!isReadOnly && !isPublished && blockId"
-                @click="activeOutputView = 'ai'"
-                :class="[
-                  'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all',
-                  activeOutputView === 'ai' 
-                    ? 'bg-background text-foreground shadow-sm' 
-                    : 'text-muted-foreground hover:text-foreground'
-                ]"
-              >
-                <Brain class="w-4 h-4" />
-                AI Assistant
-                <div v-if="outputType === 'error'" class="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
-              </button>
-            </div>
-            
-            <!-- Status Indicator -->
-            <div v-if="activeOutputView === 'output' && output" class="text-xs text-muted-foreground">
-              {{ outputType === 'error' ? 'Error Output' : 'Execution Result' }}
-            </div>
-            <div v-else-if="activeOutputView === 'ai'" class="text-xs text-muted-foreground">
-              AI-powered code analysis and suggestions
-            </div>
-          </div>
-          
-          <!-- Action Buttons -->
-          <div class="flex items-center gap-1">
-            <!-- AI Quick Actions -->
-            <div v-if="activeOutputView === 'ai' && !isReadOnly" class="flex items-center gap-1">
-              <Button
-                v-if="outputType === 'error'"
-                variant="ghost"
-                size="sm"
-                @click="activeOutputView = 'ai'"
-                class="h-8 px-2 text-destructive hover:bg-destructive/10"
-              >
-                <AlertTriangle class="w-4 h-4 mr-1" />
-                Fix Error
-              </Button>
-              
-              <Button
-                variant="ghost"
-                size="sm"
-                @click="activeOutputView = 'ai'"
-                class="h-8 px-2"
-              >
-                <Sparkles class="w-4 h-4 mr-1" />
-                Analyze
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Content Area -->
-        <div class="flex-1 overflow-hidden">
-          <!-- Output Renderer -->
-          <div v-if="activeOutputView === 'output'" class="h-full">
-            <OutputRenderer 
-              v-if="output"
-              :content="output" 
-              :type="outputType"
-              :showControls="true"
-              :isFullscreenable="true"
-              :isCollapsible="false"
-              :originalCode="code"
-              :isLoading="isExecuting"
-              :isPublished="isPublished"
-              :notaId="props.notaId"
-              :blockId="props.blockId"
-              class="h-full flex-1"
-              @toggle-fullscreen="toggleOutputFullscreen"
-            />
-            <div v-else-if="isExecuting" class="flex-1 flex flex-col items-center justify-center bg-muted/30 h-full">
-              <Loader2 class="w-6 h-6 animate-spin text-primary mb-3" />
-              <div class="text-sm text-muted-foreground">Executing code...</div>
-              <div class="text-xs text-muted-foreground mt-1">{{ executionTimeText }}</div>
-            </div>
-            <div v-else class="flex-1 flex items-center justify-center text-sm text-muted-foreground h-full">
-              <div class="text-center">
-                <Box class="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p class="text-sm">No output yet</p>
-                <p class="text-xs mt-1">Run the code to see results</p>
-              </div>
-            </div>
-          </div>
-          
-          <!-- AI Assistant -->
-          <div v-else-if="activeOutputView === 'ai' && blockId" class="h-full">
-            <AICodeAssistant
-              :code="code"
-              :language="language"
-              :error="outputType === 'error' ? output : null"
-              :is-read-only="isReadOnly"
-              :block-id="blockId"
-              :is-executing="isExecuting"
-              :execution-time="executionTime"
-              :has-output="!!output"
-              :session-info="sessionInfo"
-              :embedded-mode="true"
-              @code-updated="handleAICodeUpdate"
-              @analysis-started="() => {}"
-              @analysis-completed="() => {}"
-              @action-executed="handleCustomActionExecuted"
-              @trigger-execution="executeCode"
-              @request-execution-context="() => {}"
-            />
-          </div>
-        </div>
+        <OutputSection
+          :hasOutput="!!output"
+          :hasError="outputType === 'error'"
+          :isReadOnly="isReadOnly || false"
+          :isPublished="isPublished || false"
+          :isExecuting="isExecuting || false"
+          :output="output || undefined"
+          :code="code"
+          :language="language"
+          :blockId="blockId || ''"
+          :notaId="notaId || ''"
+          :executionTime="executionTime"
+          :selectedSession="sessionInfo?.sessionId"
+          :selectedKernel="sessionInfo?.kernelName"
+          @copy-output="handleCopyOutput"
+          @code-updated="handleCodeUpdated"
+          @custom-action-executed="handleCustomActionExecuted"
+          @trigger-execution="handleTriggerExecution"
+        />
       </div>
     </div>
   </div>
@@ -463,9 +445,9 @@ function stopExecutionTimer() {
   min-height: 100% !important;
 }
 
-/* Add transition for smooth resizing */
+/* Enhanced transitions for smooth resizing */
 .editor-container > div {
-  transition: width 0.2s ease;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* When actively resizing, disable transitions for better performance */
@@ -475,11 +457,12 @@ function stopExecutionTimer() {
 
 /* Published mode styles */
 .published-mode {
-  @apply bg-card;
+  background-color: hsl(var(--card));
+  backdrop-filter: none;
 }
 
 .published-mode .editor-container {
-  @apply border-t;
+  border-top: 1px solid hsl(var(--border));
 }
 
 /* Disabled state styles */
@@ -492,7 +475,7 @@ function stopExecutionTimer() {
   cursor: not-allowed;
 }
 
-/* Animation for loading state */
+/* Enhanced animations */
 @keyframes pulse {
   0%, 100% {
     opacity: 0.6;
@@ -504,6 +487,52 @@ function stopExecutionTimer() {
 
 .animate-pulse {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Smooth entrance animation */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+/* Focus states for better accessibility */
+:deep(.cm-editor.cm-focused) {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: -2px;
+}
+
+/* Compact scrollbars for better space utilization */
+:deep(.cm-scroller::-webkit-scrollbar) {
+  width: 8px;
+  height: 8px;
+}
+
+:deep(.cm-scroller::-webkit-scrollbar-track) {
+  background: hsl(var(--muted));
+}
+
+:deep(.cm-scroller::-webkit-scrollbar-thumb) {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 4px;
+}
+
+:deep(.cm-scroller::-webkit-scrollbar-thumb:hover) {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* Resize handle hover effects */
+.group:hover .absolute {
+  background-color: hsl(var(--primary) / 0.2);
 }
 </style>
 

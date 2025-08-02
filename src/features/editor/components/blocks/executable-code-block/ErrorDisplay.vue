@@ -114,6 +114,15 @@ const formattedError = computed(() => {
                     />
                   </Button>
                 </CollapsibleTrigger>
+                
+                <CollapsibleContent>
+                  <div class="mt-3 pt-3 border-t border-red-200 dark:border-red-800">
+                    <pre
+                      class="text-sm text-red-700 dark:text-red-300 whitespace-pre-wrap font-mono"
+                      v-html="formattedError"
+                    />
+                  </div>
+                </CollapsibleContent>
               </Collapsible>
             </div>
           </div>
@@ -123,15 +132,6 @@ const formattedError = computed(() => {
           </p>
         </div>
       </div>
-      
-      <CollapsibleContent>
-        <div class="mt-3 pt-3 border-t border-red-200 dark:border-red-800">
-          <pre
-            class="text-sm text-red-700 dark:text-red-300 whitespace-pre-wrap font-mono"
-            v-html="formattedError"
-          />
-        </div>
-      </CollapsibleContent>
     </div>
   </div>
 </template>

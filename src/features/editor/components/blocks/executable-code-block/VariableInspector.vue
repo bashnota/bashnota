@@ -6,6 +6,10 @@ import { Input } from '@/ui/input'
 import { Badge } from '@/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/ui/collapsible'
+import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
+import { useCodeExecutionStore } from '@/features/editor/stores/codeExecutionStore'
+import { JupyterService } from '@/features/jupyter/services/jupyterService'
+import { logger } from '@/services/logger'
 
 export interface Variable {
   name: string
@@ -27,9 +31,16 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
+  'variable-selected': [variable: Variable]
   'update:isVisible': [value: boolean]
-  'refresh': []
 }>()
+
+// Initialize stores and services
+const jupyterStore = useJupyterStore()
+const codeExecutionStore = useCodeExecutionStore()
+const jupyterService = new JupyterService()
+
+// Reactive state
 
 // State
 const variables = ref<Variable[]>([])
@@ -95,75 +106,136 @@ const variableStats = computed(() => {
 
 // Methods
 const refreshVariables = async () => {
-  if (!props.sessionId || isLoading.value) return
+  if (!props.sessionId) {
+    logger.warn('No session ID provided for variable inspection')
+    return
+  }
 
   isLoading.value = true
   try {
-    // In a real implementation, this would call your backend API
-    // to get the current variables from the Python/Jupyter session
-    const response = await fetch(`/api/sessions/${props.sessionId}/variables`)
-    if (response.ok) {
-      const data = await response.json()
-      variables.value = data.variables || []
+    // Get the session from the code execution store
+    const session = codeExecutionStore.kernelSessions.get(props.sessionId)
+    if (!session) {
+      logger.warn('Session not found:', props.sessionId)
+      variables.value = []
+      return
+    }
+
+    // Get server configuration from session
+    const server = session.serverConfig
+    if (!server) {
+      logger.warn('No server configuration found for session')
+      variables.value = []
+      return
+    }
+
+    // Execute code to get variable information
+    const inspectionCode = `
+import sys
+import json
+import types
+
+def get_variable_info():
+    variables = []
+    namespace = globals()
+    
+    for name, obj in namespace.items():
+        if name.startswith('_'):
+            continue
+            
+        try:
+            var_type = type(obj).__name__
+            var_size = sys.getsizeof(obj)
+            
+            # Determine if it's a function or class
+            is_function = callable(obj) and not isinstance(obj, type)
+            is_class = isinstance(obj, type)
+            
+            # Get shape for arrays/dataframes
+            shape = None
+            if hasattr(obj, 'shape'):
+                shape = str(obj.shape)
+            elif hasattr(obj, '__len__') and not isinstance(obj, (str, bytes)):
+                try:
+                    shape = f"({len(obj)},)"
+                except:
+                    pass
+            
+            # Get value representation
+            if var_size > 1000:  # Large objects
+                value = f"<{var_type} object>"
+            else:
+                try:
+                    value = str(obj)[:100]  # Truncate long values
+                    if len(str(obj)) > 100:
+                        value += "..."
+                except:
+                    value = f"<{var_type} object>"
+            
+            variables.append({
+                "name": name,
+                "type": var_type,
+                "value": value,
+                "size": f"{var_size / 1024:.1f} KB" if var_size > 1024 else f"{var_size} bytes",
+                "shape": shape,
+                "isFunction": is_function,
+                "isClass": is_class
+            })
+        except Exception as e:
+            continue
+    
+    return json.dumps(variables)
+
+print(get_variable_info())
+`
+
+    // Execute the inspection code via Jupyter service
+    const result = await jupyterService.executeCode(server, inspectionCode, session.kernelId)
+    
+    if (result && result.content) {
+      try {
+        // Get the output from stdout or text/plain data
+        let output = ''
+        if (result.content.stdout) {
+          output = result.content.stdout
+        } else if (result.content.data?.['text/plain']) {
+          output = result.content.data['text/plain']
+        }
+        
+        if (output) {
+          const lastLine = output.trim().split('\\n').pop() || '{}'
+          const variableData = JSON.parse(lastLine)
+          
+          // Transform the data to match our Variable interface
+          variables.value = variableData.map((v: any) => ({
+            name: v.name,
+            type: v.type,
+            value: v.value,
+            size: v.size,
+            shape: v.shape,
+            isFunction: v.isFunction || false,
+            isClass: v.isClass || false
+          }))
+          
+          logger.log(`Loaded ${variables.value.length} variables from session`)
+        } else {
+          logger.warn('No output from variable inspection code')
+          variables.value = []
+        }
+      } catch (parseError) {
+        logger.error('Failed to parse variable data:', parseError)
+        variables.value = []
+      }
+    } else {
+      logger.warn('No execution result received')
+      variables.value = []
     }
   } catch (error) {
-    console.error('Failed to refresh variables:', error)
-    // Mock data for demonstration
-    variables.value = generateMockVariables()
+    logger.error('Failed to refresh variables:', error)
+    variables.value = []
   } finally {
     isLoading.value = false
   }
-}
-
-const generateMockVariables = (): Variable[] => {
-  return [
-    {
-      name: 'df',
-      type: 'DataFrame',
-      value: 'pandas.DataFrame',
-      size: '1.2 MB',
-      shape: '(1000, 15)',
-      dtype: 'mixed'
-    },
-    {
-      name: 'x',
-      type: 'ndarray',
-      value: 'numpy.ndarray',
-      size: '8.0 KB',
-      shape: '(100,)',
-      dtype: 'float64'
-    },
-    {
-      name: 'result',
-      type: 'dict',
-      value: "{'accuracy': 0.95, 'loss': 0.05}",
-      size: '256 B'
-    },
-    {
-      name: 'model',
-      type: 'Sequential',
-      value: 'tensorflow.keras.Sequential',
-      size: '45.2 MB'
-    },
-    {
-      name: 'process_data',
-      type: 'function',
-      value: '<function process_data at 0x...>',
-      isFunction: true
-    },
-    {
-      name: 'MyClass',
-      type: 'type',
-      value: "<class '__main__.MyClass'>",
-      isClass: true
-    },
-    {
-      name: '_private_var',
-      type: 'str',
-      value: "'hidden value'",
-      isPrivate: true
-    }
-  ]
 }
 
 const toggleVariable = (variableName: string) => {

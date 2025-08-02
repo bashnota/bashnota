@@ -11,7 +11,7 @@ import { json } from '@codemirror/lang-json'
 import { EditorView, lineNumbers } from '@codemirror/view'
 import { indentUnit } from '@codemirror/language'
 import { computed, ref, onMounted, watch, onUnmounted } from 'vue'
-import { useCodeFormatting } from './composables/useCodeFormatting'
+import { useCodeFormatting } from './composables/features/useCodeFormatting'
 import { Button } from '@/ui/button'
 
 const props = defineProps<{
@@ -29,6 +29,7 @@ const props = defineProps<{
   tabSize?: number
   autoFormat?: boolean
   showTemplateButton?: boolean
+  showFormattingToolbar?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -290,7 +291,7 @@ const onEditorReady = (payload: any) => {
     :style="{ maxHeight: maxHeight }"
   >
     <!-- Formatting Toolbar -->
-    <div v-if="!readonly && !disabled && !isPublished" class="flex items-center gap-2 p-2 border-b bg-muted/30">
+    <div v-if="showFormattingToolbar !== false && !readonly && !disabled && !isPublished" class="flex items-center gap-2 p-2 border-b bg-muted/30">
       <Button
         variant="ghost"
         size="sm"

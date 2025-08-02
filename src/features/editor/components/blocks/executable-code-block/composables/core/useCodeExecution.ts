@@ -2,6 +2,7 @@ import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useCodeExecutionStore } from '@/features/editor/stores/codeExecutionStore'
+import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
 import type { CodeBlockNode } from '@/features/editor/components/blocks/executable-code-block/types'
 import { logger } from '@/services/logger'
 
@@ -12,6 +13,7 @@ export function useCodeExecution(props: {
   const route = useRoute()
   const store = useNotaStore()
   const codeExecutionStore = useCodeExecutionStore()
+  const jupyterStore = useJupyterStore()
 
   const isExecuting = ref(false)
   const notaId = computed(() => route.params.id as string)
@@ -52,6 +54,9 @@ export function useCodeExecution(props: {
       sessionId: sessionId.value,
       routeName: route.name
     })
+    
+    // Ensure Jupyter servers are loaded from localStorage
+    jupyterStore.loadServers()
     
     if (sessionId.value) {
       const existingSession = codeExecutionStore.kernelSessions.get(sessionId.value)
