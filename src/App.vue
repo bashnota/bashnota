@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 import Toaster from '@/ui/toast/Toaster.vue'
 import { useAuthStore } from '@/features/auth/stores/auth'
 import { useEditorStore } from '@/features/editor/stores/editorStore'
+import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
 
 import { Menu, Home, Globe, PanelTopClose } from 'lucide-vue-next'
 import { logger } from '@/services/logger'
@@ -24,6 +25,7 @@ const sidebarWidth = ref(300)
 const isResizing = ref(false)
 const authStore = useAuthStore()
 const editorStore = useEditorStore()
+const jupyterStore = useJupyterStore()
 const route = useRoute()
 const router = useRouter()
 const sidebarManager = useSidebarManager()
@@ -35,6 +37,9 @@ const isNotaView = computed(() => route.name === 'nota')
 onMounted(async () => {
   // Initialize auth state
   await authStore.init()
+  
+  // Initialize Jupyter servers from localStorage
+  jupyterStore.loadServers()
   
   // Initialize sidebar manager
   sidebarManager.initialize()

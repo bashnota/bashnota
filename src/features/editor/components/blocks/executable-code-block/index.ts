@@ -1,6 +1,5 @@
-// Core Components - Modular Design (Recommended)
-export { default as CodeBlockWithExecutionModular } from './CodeBlockWithExecutionModular.vue'
-export { default as CodeBlockWithExecution } from './CodeBlockWithExecutionModular.vue' // Alias for compatibility
+// Core Components - Modular Design
+export { default as CodeBlockWithExecution } from './CodeBlockWithExecution.vue'
 
 // Sub Components
 export { default as CodeBlockToolbar } from './components/CodeBlockToolbar.vue'
@@ -12,7 +11,7 @@ export { default as ServerKernelSelector } from './components/ServerKernelSelect
 export { default as SessionSelector } from './components/SessionSelector.vue'
 
 // Existing Components
-export { default as AICodeAssistant } from './AICodeAssistant.vue'
+export { default as AICodeAssistantContainer } from './ai/components/AICodeAssistantContainer.vue'
 export { default as CodeMirror } from './CodeMirror.vue'
 export { default as ExecutionStatus } from './ExecutionStatus.vue'
 export { default as ErrorDisplay } from './ErrorDisplay.vue'
@@ -20,15 +19,19 @@ export { default as FullScreenCodeBlock } from './FullScreenCodeBlock.vue'
 export { default as OutputRenderer } from './OutputRenderer.vue'
 export { default as TemplateSelector } from './TemplateSelector.vue'
 
-// Composables
-export { useCodeBlockState } from './composables/useCodeBlockState'
-export { useSessionManagement } from './composables/useSessionManagement'
+// Composables  
+export { useCodeBlockState } from './composables/core/useCodeBlockState'
+export { useSessionManagement } from './composables/core/useSessionManagement'
+export { useCodeExecution } from './composables/core/useCodeExecution'
+export { usePreferencesManagement } from './composables/core/usePreferencesManagement'
 export { useCodeBlockExecution } from './composables/useCodeBlockExecution'
-export { usePreferencesManagement } from './composables/usePreferencesManagement'
-export { useCodeBlockToolbar } from './composables/useCodeBlockToolbar'
-export { useCodeBlockShortcuts } from './composables/useCodeBlockShortcuts'
-export { useOutputStreaming } from './composables/useOutputStreaming'
-export { useAICodeAssistant } from './composables/useAICodeAssistant'
+export { useCodeBlockToolbar } from './composables/ui/useCodeBlockToolbar'
+export { useCodeBlockShortcuts } from './composables/ui/useCodeBlockShortcuts'
+export { useFullscreenCode } from './composables/ui/useFullscreenCode'
+export { useOutputStreaming } from './composables/features/useOutputStreaming'
+export { useAICodeAssistant } from './composables/features/useAICodeAssistant'
+export { useCodeTemplates } from './composables/features/useCodeTemplates'
+export { useCodeFormatting } from './composables/features/useCodeFormatting'
 
 // Types
 export type * from './types'

@@ -2,8 +2,8 @@
 import { computed, onMounted } from 'vue'
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import { Card, CardContent } from '@/ui/card'
-import { useCodeExecution } from './composables/useCodeExecution'
-import CodeBlockWithExecutionModular from './CodeBlockWithExecutionModular.vue'
+import { useCodeExecution } from './composables/core/useCodeExecution'
+import CodeBlockWithExecution from './CodeBlockWithExecution.vue'
 import OutputRenderer from './OutputRenderer.vue'
 import type { CodeBlockProps } from './types'
 
@@ -51,7 +51,7 @@ const updateOutput = (newOutput: string) => {
   <NodeViewWrapper class="my-6">
     <Card v-if="isExecutable" class="overflow-hidden border-none shadow-md" :class="{ 'published-card': isPublishedView }">
       <CardContent class="p-0">
-        <CodeBlockWithExecutionModular
+        <CodeBlockWithExecution
           :id="blockId"
           :code="code"
           :language="language"

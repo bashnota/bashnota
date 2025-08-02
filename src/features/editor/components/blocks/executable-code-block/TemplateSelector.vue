@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/ui/
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/ui/tabs'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/ui/dialog'
 import { Label } from '@/ui/label'
-import { useCodeTemplates, type CodeTemplate, type TemplateVariable } from './composables/useCodeTemplates'
+import { useCodeTemplates, type CodeTemplate, type TemplateVariable } from './composables/features/useCodeTemplates'
 
 const props = defineProps<{
   language: string

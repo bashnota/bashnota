@@ -3,7 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { Box, Brain, Copy, AlertTriangle, Sparkles } from 'lucide-vue-next'
 import { Button } from '@/ui/button'
 import OutputRenderer from '../OutputRenderer.vue'
-import AICodeAssistant from '../AICodeAssistant.vue'
+import AICodeAssistantContainer from '../ai/components/AICodeAssistantContainer.vue'
 
 interface Props {
   hasOutput: boolean
@@ -177,7 +177,7 @@ const switchToAIForAnalysis = () => {
       
       <!-- AI Assistant -->
       <div v-else-if="activeOutputView === 'ai'" class="h-full">
-        <AICodeAssistant
+        <AICodeAssistantContainer
           :code="code"
           :language="language"
           :error="hasError ? output : null"

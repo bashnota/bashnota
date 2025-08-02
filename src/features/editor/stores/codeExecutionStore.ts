@@ -700,25 +700,36 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
 
       // Execute code with streaming updates
       logger.log(`Executing code for cell ${cellId} with session ${session.id}, kernel ${session.kernelId}`);
+      logger.log(`Code to execute: "${cell.code}"`);
+      
       const results = await executionService.executeNotebookBlocks(
         cell.serverConfig,
         session.kernelId,
         [{ id: cellId, notebookId: session.id, code: cell.code }],
         (blockId: string, output: string) => {
+          logger.log(`Streaming output for ${blockId}:`, output);
           const updatedCell = cells.value.get(blockId);
           if (updatedCell) {
             updatedCell.output += output;
             cells.value.set(blockId, { ...updatedCell });
+            logger.log(`Updated cell output to: "${updatedCell.output}"`);
           }
         },
       );
 
       // Final output update
       const result = results[0];
+      logger.log(`Final execution result:`, result);
       if (result) {
         cell.output = result.output;
         cell.hasError = result.hasError || false;
+        logger.log(`Final cell state - output: "${cell.output}", hasError: ${cell.hasError}`);
       }
+      
+      // Force update the cell in the Map
+      cells.value.set(cellId, { ...cell });
+      logger.log(`Cell ${cellId} execution completed. Final output: "${cell.output}"`);
+      
     } catch (error: any) {
       logger.error(`Execution error for cell ${cellId}:`, error);
       cell.hasError = true;

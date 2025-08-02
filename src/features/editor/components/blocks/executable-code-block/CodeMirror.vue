@@ -11,7 +11,7 @@ import { json } from '@codemirror/lang-json'
 import { EditorView, lineNumbers } from '@codemirror/view'
 import { indentUnit } from '@codemirror/language'
 import { computed, ref, onMounted, watch, onUnmounted } from 'vue'
-import { useCodeFormatting } from './composables/useCodeFormatting'
+import { useCodeFormatting } from './composables/features/useCodeFormatting'
 import { Button } from '@/ui/button'
 
 const props = defineProps<{

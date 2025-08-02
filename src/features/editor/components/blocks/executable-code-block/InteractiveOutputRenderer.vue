@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader } from '@/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/ui/tabs'
 import { ansiToHtml, stripAnsi } from '@/lib/utils'
 import IframeOutputRenderer from './IframeOutputRenderer.vue'
+import { logger } from '@/services/logger'
 
 export interface InteractiveOutput {
   type: 'text' | 'html' | 'json' | 'image' | 'plotly' | 'matplotlib' | 'widget' | 'dataframe' | 'error'
@@ -144,29 +145,59 @@ const downloadOutput = () => {
 
 const renderPlotlyChart = async (data: any) => {
   if (!plotlyContainer.value) return
-
+  
   try {
-    // In a real implementation, you would import Plotly.js
-    // const Plotly = await import('plotly.js-dist')
-    // await Plotly.newPlot(plotlyContainer.value, data.data, data.layout, data.config)
+    // Try to dynamically import Plotly (fallback gracefully if not available)
+    let Plotly: any
+    try {
+      // @ts-ignore - Dynamic import may not be available
+      Plotly = await import('plotly.js-dist-min')
+    } catch (importError) {
+      // Fallback if plotly.js-dist-min is not available
+      try {
+        // @ts-ignore - Dynamic import may not be available
+        Plotly = await import('plotly.js')
+      } catch (fallbackError) {
+        throw new Error('Plotly.js is not installed. Install with: npm install plotly.js-dist-min')
+      }
+    }
     
-    // Mock implementation
-    plotlyContainer.value.innerHTML = `
-      <div class="flex items-center justify-center h-64 bg-muted/20 border-2 border-dashed border-muted rounded-lg">
-        <div class="text-center">
-          <div class="text-2xl mb-2">📊</div>
-          <div class="text-sm text-muted-foreground">Plotly Chart</div>
-          <div class="text-xs text-muted-foreground mt-1">${data.title || 'Interactive Plot'}</div>
-        </div>
-      </div>
-    `
+    // Clean up any existing plot
+    if (plotlyContainer.value && plotlyContainer.value.hasChildNodes()) {
+      Plotly.purge(plotlyContainer.value)
+    }
+    
+    // Render the new plot
+    await Plotly.newPlot(
+      plotlyContainer.value, 
+      data.data || [],
+      data.layout || {},
+      {
+        responsive: true,
+        displayModeBar: true,
+        modeBarButtonsToRemove: ['sendDataToCloud'],
+        displaylogo: false,
+        ...data.config
+      }
+    )
+    
+    logger.log('Plotly chart rendered successfully')
   } catch (error) {
-    console.error('Failed to render Plotly chart:', error)
-    plotlyContainer.value.innerHTML = `
-      <div class="text-center p-4 text-destructive">
-        Failed to render chart: ${error}
-      </div>
-    `
+    logger.error('Failed to render Plotly chart:', error)
+    
+    // Fallback to a descriptive placeholder
+    if (plotlyContainer.value) {
+      plotlyContainer.value.innerHTML = `
+        <div class="flex items-center justify-center h-64 bg-muted/20 border-2 border-dashed border-muted rounded-lg">
+          <div class="text-center">
+            <div class="text-2xl mb-2">⚠️</div>
+            <div class="text-sm text-muted-foreground">Failed to load Plotly</div>
+            <div class="text-xs text-muted-foreground mt-1">Install plotly.js for interactive charts</div>
+            <div class="text-xs text-destructive mt-2">${error instanceof Error ? error.message : 'Unknown error'}</div>
+          </div>
+        </div>
+      `
+    }
   }
 }
 
@@ -208,21 +239,113 @@ const renderDataFrame = (data: any) => {
 }
 
 const renderWidget = (widgetData: any) => {
-  // Mock widget rendering
-  return `
-    <div class="border rounded-lg p-4 bg-muted/10">
-      <div class="flex items-center gap-2 mb-2">
-        <div class="w-3 h-3 bg-primary rounded-full"></div>
-        <span class="text-sm font-medium">Interactive Widget</span>
+  // Enhanced widget rendering with better support for common widget types
+  if (!widgetData || !widgetData.model_name) {
+    return `
+      <div class="border rounded-lg p-4 bg-muted/10">
+        <div class="flex items-center gap-2">
+          <div class="w-3 h-3 bg-orange-500 rounded-full"></div>
+          <span class="text-sm font-medium">Unknown Widget</span>
+        </div>
+        <div class="text-xs text-muted-foreground mt-2">
+          Widget data not available or invalid format
+        </div>
       </div>
-      <div class="text-xs text-muted-foreground">
-        Widget Type: ${widgetData.widget_type || 'Unknown'}
-      </div>
-      <div class="mt-2 p-2 bg-background rounded border">
-        ${JSON.stringify(widgetData, null, 2)}
-      </div>
-    </div>
-  `
+    `
+  }
+
+  const { model_name, model_module, state = {} } = widgetData
+  
+  // Handle common Jupyter widget types
+  switch (model_name) {
+    case 'ButtonModel':
+      return `
+        <div class="border rounded-lg p-4 bg-muted/10">
+          <button class="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90" disabled>
+            ${state.description || 'Button'}
+          </button>
+          <div class="text-xs text-muted-foreground mt-2">
+            Interactive button (disabled in output view)
+          </div>
+        </div>
+      `
+    
+    case 'TextModel':
+    case 'TextareaModel':
+      return `
+        <div class="border rounded-lg p-4 bg-muted/10">
+          <div class="mb-2">
+            <label class="text-sm font-medium">${state.description || 'Text Input'}</label>
+          </div>
+          <input 
+            type="text" 
+            class="w-full px-3 py-2 border rounded bg-background"
+            value="${state.value || ''}"
+            placeholder="${state.placeholder || ''}"
+            disabled
+          />
+          <div class="text-xs text-muted-foreground mt-2">
+            Text input (disabled in output view)
+          </div>
+        </div>
+      `
+    
+    case 'SliderModel':
+    case 'IntSliderModel':
+    case 'FloatSliderModel':
+      return `
+        <div class="border rounded-lg p-4 bg-muted/10">
+          <div class="mb-2">
+            <label class="text-sm font-medium">${state.description || 'Slider'}</label>
+          </div>
+          <div class="flex items-center gap-4">
+            <span class="text-sm">${state.min || 0}</span>
+            <div class="flex-1 bg-muted rounded h-2 relative">
+              <div class="bg-primary h-2 rounded" style="width: 50%"></div>
+            </div>
+            <span class="text-sm">${state.max || 100}</span>
+          </div>
+          <div class="text-center mt-2">
+            <span class="text-sm font-mono">${state.value || 50}</span>
+          </div>
+          <div class="text-xs text-muted-foreground mt-2">
+            Slider control (disabled in output view)
+          </div>
+        </div>
+      `
+    
+    case 'SelectModel':
+    case 'DropdownModel':
+      return `
+        <div class="border rounded-lg p-4 bg-muted/10">
+          <div class="mb-2">
+            <label class="text-sm font-medium">${state.description || 'Select'}</label>
+          </div>
+          <select class="w-full px-3 py-2 border rounded bg-background" disabled>
+            <option>${state.value || 'Selected option'}</option>
+          </select>
+          <div class="text-xs text-muted-foreground mt-2">
+            Dropdown menu (disabled in output view)
+          </div>
+        </div>
+      `
+    
+    default:
+      return `
+        <div class="border rounded-lg p-4 bg-muted/10">
+          <div class="flex items-center gap-2">
+            <div class="w-3 h-3 bg-blue-500 rounded-full"></div>
+            <span class="text-sm font-medium">${model_name}</span>
+          </div>
+          <div class="text-xs text-muted-foreground mt-1">
+            Module: ${model_module || 'Unknown'}
+          </div>
+          <div class="text-xs text-muted-foreground mt-2">
+            Interactive widget (view-only in output)
+          </div>
+        </div>
+      `
+  }
 }
 
 const formatJson = (data: any) => {

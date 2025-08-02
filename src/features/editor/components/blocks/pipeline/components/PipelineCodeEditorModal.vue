@@ -61,7 +61,7 @@
           </div>
           
           <div class="code-editor-container">
-            <CodeBlockWithExecutionModular
+            <CodeBlockWithExecution
               :id="nodeId"
               :code="nodeData.code"
               :language="nodeData.language"
@@ -93,7 +93,7 @@
 
 <script setup lang="ts">
 import { PlayIcon } from 'lucide-vue-next'
-import CodeBlockWithExecutionModular from '../../executable-code-block/CodeBlockWithExecutionModular.vue'
+import CodeBlockWithExecution from '../../executable-code-block/CodeBlockWithExecution.vue'
 
 defineProps<{
   nodeId: string,
