@@ -6,6 +6,7 @@ import type { KernelConfig } from '@/features/jupyter/types/jupyter'
 import { useCodeBlockCore } from '@/features/editor/components/blocks/executable-code-block/composables/useCodeBlockCore'
 import { useCodeBlockUI } from '@/features/editor/components/blocks/executable-code-block/composables/ui/useCodeBlockUI'
 import { useCodeBlockExecutionSimplified } from '@/features/editor/components/blocks/executable-code-block/composables/useCodeBlockExecutionSimplified'
+import { useCodeExecutionStore } from '@/features/editor/stores/codeExecutionStore'
 
 // Components
 import CodeBlockToolbar from './components/CodeBlockToolbar.vue'
@@ -17,6 +18,10 @@ import FullScreenCodeBlock from './FullScreenCodeBlock.vue'
 import ExecutionStatus from './ExecutionStatus.vue'
 import ErrorDisplay from './ErrorDisplay.vue'
 import TemplateSelector from './TemplateSelector.vue'
+import KernelConfigurationModal from './components/KernelConfigurationModal.vue'
+
+// UI utilities
+import { toast } from '@/ui/toast/use-toast'
 
 // Types
 interface Props {
@@ -67,6 +72,9 @@ const {
   toggleCodeVisibility,
   showTemplateDialog
 } = useCodeBlockUI()
+
+// Configuration modal state
+const isConfigurationModalOpen = ref(false)
 
 // Execution and session management
 const {
@@ -187,6 +195,61 @@ const handleMouseLeave = () => {
     console.warn('Error in mouse leave handler:', error)
   }
 }
+
+// Configuration modal handler
+const handleOpenConfiguration = () => {
+  isConfigurationModalOpen.value = true
+}
+
+// Handle shared session mode toggle
+const handleToggleSharedSessionMode = async () => {
+  try {
+    const codeExecutionStore = useCodeExecutionStore()
+    
+    // If enabling shared session mode, ensure we have server and kernel configured
+    if (!isSharedSessionMode.value) {
+      // Check if we have a server and kernel selected
+      if (!selectedServer.value || !selectedKernel.value) {
+        // We need to configure server and kernel first
+        toast({
+          title: "Configuration Required",
+          description: "Please select a Jupyter server and kernel first before enabling shared session mode.",
+          variant: "destructive"
+        })
+        isConfigurationModalOpen.value = true
+        return
+      }
+      
+      // Enable shared session mode first
+      await codeExecutionStore.toggleSharedSessionMode(props.notaId)
+      
+      // Then ensure a shared session is created with the selected server and kernel
+      await codeExecutionStore.ensureSharedSession()
+      
+      toast({
+        title: "Shared Session Enabled",
+        description: "All code blocks now share the same session.",
+        variant: "default"
+      })
+    } else {
+      // Just disable shared session mode
+      await codeExecutionStore.toggleSharedSessionMode(props.notaId)
+      
+      toast({
+        title: "Shared Session Disabled",
+        description: "Code blocks will use individual sessions.",
+        variant: "default"
+      })
+    }
+  } catch (error) {
+    console.error('Failed to toggle shared session mode:', error)
+    toast({
+      title: "Failed to Toggle Shared Session",
+      description: "Could not toggle shared session mode. Please try again.",
+      variant: "destructive"
+    })
+  }
+}
 </script>
 
 <template>
@@ -243,6 +306,7 @@ const handleMouseLeave = () => {
       @show-templates="showTemplateDialog"
       @copy-code="copyCode"
       @save-changes="saveChanges"
+      @open-configuration="handleOpenConfiguration"
       @update:is-session-open="isSessionOpen = $event"
       @session-change="handleSessionChange"
       @create-new-session="handleCreateNewSession"
@@ -344,6 +408,30 @@ const handleMouseLeave = () => {
       :is-open="isTemplateDialogOpen"
       @update:is-open="(value) => isTemplateDialogOpen = value"
       @template-selected="handleTemplateSelected"
+    />
+
+    <!-- Kernel Configuration Modal -->
+    <KernelConfigurationModal
+      :is-open="isConfigurationModalOpen"
+      :is-shared-session-mode="isSharedSessionMode"
+      :is-executing="isExecuting || false"
+      :is-setting-up="isSettingUp"
+      :selected-server="selectedServer"
+      :selected-kernel="selectedKernel"
+      :available-servers="availableServers || []"
+      :available-kernels="availableKernels || []"
+      :selected-session="selectedSession"
+      :available-sessions="availableSessions || []"
+      :running-kernels="runningKernels || []"
+      @update:is-open="isConfigurationModalOpen = $event"
+      @server-change="handleServerChange"
+      @kernel-change="handleKernelChange"
+      @session-change="handleSessionChange"
+      @create-new-session="handleCreateNewSession"
+      @clear-all-kernels="handleClearAllKernels"
+      @refresh-sessions="handleRefreshSessions"
+      @select-running-kernel="handleRunningKernelSelect"
+      @toggle-shared-session-mode="handleToggleSharedSessionMode"
     />
   </div>
 </template>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { Box, Brain, Copy, AlertTriangle, Sparkles } from 'lucide-vue-next'
+import { Box, Brain, Copy, AlertTriangle, Sparkles, ExternalLink } from 'lucide-vue-next'
 import { Button } from '@/ui/button'
 import OutputRenderer from '../OutputRenderer.vue'
 import AICodeAssistantContainer from '../ai/components/AICodeAssistantContainer.vue'
@@ -51,6 +51,14 @@ const handleAICodeUpdate = (newCode: string) => {
 
 const handleCustomActionExecuted = (actionId: string, result: string) => {
   emit('custom-action-executed', actionId, result)
+}
+
+// Open output in external tab
+const openInExternalTab = () => {
+  if (!props.notaId || !props.blockId || !props.hasOutput) return
+
+  const url = `/output/${props.notaId}/${props.blockId}`
+  window.open(url, '_blank')
 }
 
 const switchToAIForErrorFix = () => {
@@ -118,8 +126,20 @@ const switchToAIForAnalysis = () => {
           size="sm"
           @click="emit('copy-output')"
           class="h-8 px-2"
+          title="Copy output"
         >
           <Copy class="w-4 h-4" />
+        </Button>
+        
+        <Button
+          v-if="activeOutputView === 'output' && hasOutput && !isPublished"
+          variant="ghost"
+          size="sm"
+          @click="openInExternalTab"
+          class="h-8 px-2"
+          title="Open output in new tab"
+        >
+          <ExternalLink class="w-4 h-4" />
         </Button>
         
         <!-- AI Quick Actions -->
@@ -156,7 +176,7 @@ const switchToAIForAnalysis = () => {
           v-if="hasOutput"
           :content="output || ''"
           :type="hasError ? 'error' : undefined"
-          :showControls="false"
+          :showControls="true"
           :isCollapsible="false"
           :maxHeight="'400px'"
           :isLoading="isExecuting && !isPublished"

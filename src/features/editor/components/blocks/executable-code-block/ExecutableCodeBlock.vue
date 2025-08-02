@@ -73,7 +73,7 @@ const updateOutput = (newOutput: string) => {
         <OutputRenderer
           :content="code"
           type="text"
-          :showControls="false"
+          :showControls="true"
           :maxHeight="'400px'"
           :isPublished="isPublishedView"
           :notaId="notaId"

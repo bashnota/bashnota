@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { defineEmits, defineProps } from 'vue'
+import { computed, defineEmits, defineProps } from 'vue'
 import {
   Play,
   Loader2,
@@ -11,12 +11,12 @@ import {
   FileText,
   Copy,
   Check,
-  Save
+  Save,
+  Settings
 } from 'lucide-vue-next'
 import { Button } from '@/ui/button'
 import { ButtonGroup } from '@/ui/button-group'
-import ServerKernelSelector from './ServerKernelSelector.vue'
-import SessionSelector from './SessionSelector.vue'
+import KernelConfigurationModal from './KernelConfigurationModal.vue'
 import type { JupyterServer, KernelSpec } from '@/features/jupyter/types/jupyter'
 
 interface Session {
@@ -68,6 +68,8 @@ interface Emits {
   'show-templates': []
   'copy-code': []
   'save-changes': []
+  // Configuration modal events
+  'open-configuration': []
   // Session management events
   'update:is-session-open': [value: boolean]
   'session-change': [sessionId: string]
@@ -84,6 +86,37 @@ interface Emits {
 
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
+
+// Configuration status helpers
+const isConfigurationIncomplete = computed(() => 
+  !props.selectedServer || 
+  props.selectedServer === 'none' || 
+  !props.selectedKernel || 
+  props.selectedKernel === 'none'
+)
+
+const configurationStatusText = computed(() => {
+  if (props.isSharedSessionMode) {
+    return 'Shared Mode'
+  }
+  if (!props.selectedServer || props.selectedServer === 'none') {
+    return 'Configure'
+  }
+  if (!props.selectedKernel || props.selectedKernel === 'none') {
+    return props.selectedServer.split(':')[0]
+  }
+  return `${props.selectedServer.split(':')[0]} • ${props.selectedKernel}`
+})
+
+const configurationTitle = computed(() => {
+  if (props.isSharedSessionMode) {
+    return 'Using shared server & kernel configuration'
+  }
+  if (isConfigurationIncomplete.value) {
+    return 'Click to configure server, kernel, and session'
+  }
+  return `Server: ${props.selectedServer} | Kernel: ${props.selectedKernel} | Session: ${props.selectedSession || 'None'}`
+})
 </script>
 
 <template>
@@ -122,39 +155,26 @@ const emit = defineEmits<Emits>()
         </Button>
       </ButtonGroup>
 
-      <!-- Session Management Group -->
+      <!-- Configuration Button -->
       <template v-if="!isReadOnly">
-        <SessionSelector
-          :is-shared-session-mode="isSharedSessionMode"
-          :is-executing="isExecuting"
-          :selected-session="selectedSession"
-          :available-sessions="availableSessions || []"
-          :running-kernels="runningKernels || []"
-          :is-session-open="isSessionOpen || false"
-          :is-setting-up="isSettingUp || false"
-          :selected-server="selectedServer"
-          @update:is-session-open="emit('update:is-session-open', $event)"
-          @session-change="emit('session-change', $event)"
-          @create-new-session="emit('create-new-session')"
-          @clear-all-kernels="emit('clear-all-kernels')"
-          @refresh-sessions="emit('refresh-sessions')"
-          @select-running-kernel="emit('select-running-kernel', $event)"
-        />
-
-        <ServerKernelSelector
-          :is-shared-session-mode="isSharedSessionMode"
-          :is-executing="isExecuting"
-          :selected-server="selectedServer"
-          :selected-kernel="selectedKernel"
-          :available-servers="availableServers || []"
-          :available-kernels="availableKernels || []"
-          :is-server-open="isServerOpen || false"
-          :is-kernel-open="isKernelOpen || false"
-          @update:is-server-open="emit('update:is-server-open', $event)"
-          @update:is-kernel-open="emit('update:is-kernel-open', $event)"
-          @server-change="emit('server-change', $event)"
-          @kernel-change="emit('kernel-change', $event)"
-        />
+        <Button
+          variant="outline"
+          size="sm"
+          class="h-7 text-xs px-3 gap-1"
+          :class="{
+            'bg-warning/20 hover:bg-warning/30': isConfigurationIncomplete,
+            'bg-primary/20 hover:bg-primary/30': isSharedSessionMode,
+            'opacity-70': isExecuting
+          }"
+          :title="configurationTitle"
+          :disabled="isExecuting"
+          @click="emit('open-configuration')"
+        >
+          <Settings class="h-3 w-3" />
+          <span class="max-w-[80px] truncate">
+            {{ configurationStatusText }}
+          </span>
+        </Button>
       </template>
     </div>
 
