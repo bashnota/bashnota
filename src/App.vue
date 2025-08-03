@@ -9,21 +9,16 @@ import { onMounted, computed } from 'vue'
 import { Button } from '@/components/ui/button'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar'
-import { cn } from '@/lib/utils'
 
 import { useAuthStore } from '@/features/auth/stores/auth'
-import { useEditorStore } from '@/features/editor/stores/editorStore'
 import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
 
-import { Home, Globe, PanelTopClose } from 'lucide-vue-next'
-import { logger } from '@/services/logger'
-import { useNotaImport } from '@/features/nota/composables/useNotaImport'
+import { Home, Globe } from 'lucide-vue-next'
 import MenubarSidebars from '@/components/MenubarSidebars.vue'
 import PinnedSidebars from '@/components/PinnedSidebars.vue'
 import { useSidebarManager } from '@/composables/useSidebarManager'
 
 const authStore = useAuthStore()
-const editorStore = useEditorStore()
 const jupyterStore = useJupyterStore()
 const route = useRoute()
 const router = useRouter()
@@ -65,15 +60,6 @@ const toggleBashHub = () => {
           <div class="flex items-center justify-between px-4 h-14">
             <div class="flex items-center gap-4">
               <SidebarTrigger />
-              <Button
-                v-if="isNotaView"
-                variant="ghost"
-                size="icon"
-                @click="editorStore.toggleToolbar"
-                title="Toggle toolbar"
-              >
-                <PanelTopClose class="h-5 w-5" />
-              </Button>
               
               <!-- Pinned Sidebars -->
               <PinnedSidebars />

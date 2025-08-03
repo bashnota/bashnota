@@ -317,7 +317,7 @@ const handleAuthNavigation = () => {
 </script>
 
 <template>
-  <Sidebar collapsible="none" class="border-r">
+  <Sidebar collapsible="icon" class="border-r">
     <!-- Header -->
     <SidebarHeader>
       <!-- Logo and User Info -->
