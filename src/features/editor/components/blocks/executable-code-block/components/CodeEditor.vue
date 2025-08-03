@@ -2,7 +2,6 @@
 import { ref } from 'vue'
 import { Copy, Check } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
-// ButtonGroup functionality will be replaced with flex grouping
 import CodeMirror from '../CodeMirror.vue'
 
 interface Props {
