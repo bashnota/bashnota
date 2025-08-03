@@ -1,60 +1,65 @@
 <script setup lang="ts">
-import { computed, ref, watch, nextTick } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TableEmpty
+} from '@/components/ui/table'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { 
   Search, 
   Filter, 
   X, 
   Star, 
   Clock, 
-  Grid3X3, 
-  List, 
-  Table2,
   SortAsc,
   SortDesc,
   Eye,
-  Share,
   Download,
   Trash2,
   Archive,
   MoreHorizontal,
   FileText,
-  Plus,
-  ArrowUp
+  Calendar,
+  Tag,
+  Heart
 } from 'lucide-vue-next'
-import { useNotaStore } from '@/features/nota/stores/nota'
 import { useNotaActions } from '@/features/nota/composables/useNotaActions'
-import { useVirtualList } from '@vueuse/core'
 import type { Nota } from '@/features/nota/types/nota'
-
-// Import enhanced components
-import {
-  NotaCard,
-  NotaListEmptyState,
-  NotaListSkeleton
-} from './nota-list'
 
 interface Props {
   isLoading: boolean
-  viewType: 'grid' | 'list' | 'compact'
   showFavorites: boolean
   searchQuery: string
   selectedTag: string
   notas: Nota[]
+  totalCount?: number
 }
 
 interface Emits {
   (e: 'create-nota'): void
   (e: 'update:selectedTag', value: string): void
   (e: 'clear-filters'): void
-  (e: 'update:viewType', value: 'grid' | 'list' | 'compact'): void
   (e: 'update:searchQuery', value: string): void
   (e: 'update:showFavorites', value: boolean): void
+  (e: 'page-change', page: number): void
 }
 
 const props = defineProps<Props>()
@@ -62,26 +67,26 @@ const emit = defineEmits<Emits>()
 const router = useRouter()
 const { toggleNotaFavorite, navigateToNotaSettings } = useNotaActions()
 
-// Enhanced state management
+// State management
 const selectedNotas = ref<Set<string>>(new Set())
 const quickPreviewNota = ref<Nota | null>(null)
 const showQuickPreview = ref(false)
 const sortBy = ref<'updated' | 'created' | 'title' | 'size'>('updated')
 const sortDirection = ref<'asc' | 'desc'>('desc')
 const showFilters = ref(false)
-const scrollContainer = ref<HTMLElement>()
-const showScrollTop = ref(false)
-
-// View configuration
-const VIEW_CONFIGS = {
-  grid: { itemHeight: 280, itemsPerRow: 3, gap: 16 },
-  list: { itemHeight: 120, itemsPerRow: 1, gap: 12 },
-  compact: { itemHeight: 80, itemsPerRow: 1, gap: 8 }
-}
+const currentPage = ref(1)
+const itemsPerPage = 10
+const viewFilter = ref<'all' | 'favorites'>('all')
+const bulkAction = ref<'delete' | 'archive' | 'export' | null>(null)
 
 // Enhanced filtering and sorting
 const filteredAndSortedNotas = computed(() => {
   let result = [...props.notas]
+  
+  // Apply view filtering (all or favorites)
+  if (viewFilter.value === 'favorites') {
+    result = result.filter(nota => nota.favorite)
+  }
   
   // Apply search filtering
   if (props.searchQuery.trim()) {
@@ -100,8 +105,8 @@ const filteredAndSortedNotas = computed(() => {
     )
   }
   
-  // Apply favorites filtering
-  if (props.showFavorites) {
+  // Apply legacy favorites filtering (for backward compatibility)
+  if (props.showFavorites && viewFilter.value === 'all') {
     result = result.filter(nota => nota.favorite)
   }
   
@@ -135,34 +140,49 @@ const filteredAndSortedNotas = computed(() => {
   return result
 })
 
-// Virtual scrolling setup
-const { list, containerProps, wrapperProps, scrollTo } = useVirtualList(
-  filteredAndSortedNotas,
-  {
-    itemHeight: () => VIEW_CONFIGS[props.viewType].itemHeight,
-    overscan: 5,
-  }
-)
+// Pagination
+const totalPages = computed(() => Math.ceil(filteredAndSortedNotas.value.length / itemsPerPage))
+const paginatedNotas = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage
+  const end = start + itemsPerPage
+  return filteredAndSortedNotas.value.slice(start, end)
+})
 
 // Selection management
 const isAllSelected = computed(() => 
-  filteredAndSortedNotas.value.length > 0 && 
-  filteredAndSortedNotas.value.every(nota => selectedNotas.value.has(nota.id))
+  paginatedNotas.value.length > 0 && 
+  paginatedNotas.value.every(nota => selectedNotas.value.has(nota.id))
 )
 
-const isIndeterminate = computed(() => 
-  selectedNotas.value.size > 0 && 
-  selectedNotas.value.size < filteredAndSortedNotas.value.length
-)
+const isIndeterminate = computed(() => {
+  const pageSelection = paginatedNotas.value.filter(nota => selectedNotas.value.has(nota.id))
+  return pageSelection.length > 0 && pageSelection.length < paginatedNotas.value.length
+})
 
 const hasSelection = computed(() => selectedNotas.value.size > 0)
+
+// Computed values for count displays
+const totalAllNotas = computed(() => props.notas.length)
+const totalFavoriteNotas = computed(() => props.notas.filter(nota => nota.favorite).length)
+
+// Get visible page numbers for pagination
+const getVisiblePages = (): number[] => {
+  const pages: number[] = []
+  const start = Math.max(1, currentPage.value - 1)
+  const end = Math.min(totalPages.value, currentPage.value + 1)
+  for (let i = start; i <= end; i++) {
+    pages.push(i)
+  }
+  return pages
+}
 
 // Filter status
 const activeFiltersCount = computed(() => {
   let count = 0
   if (props.searchQuery) count++
   if (props.selectedTag) count++
-  if (props.showFavorites) count++
+  if (props.showFavorites && viewFilter.value === 'all') count++
+  if (viewFilter.value === 'favorites') count++
   return count
 })
 
@@ -175,12 +195,22 @@ const availableTags = computed(() => {
   return Array.from(tags).sort()
 })
 
+// View counts
+const allNotasCount = computed(() => props.notas.length)
+const favoriteNotasCount = computed(() => props.notas.filter(nota => nota.favorite).length)
+
 // Event handlers
 const handleSelectAll = () => {
   if (isAllSelected.value) {
-    selectedNotas.value.clear()
+    // Deselect all on current page
+    paginatedNotas.value.forEach(nota => {
+      selectedNotas.value.delete(nota.id)
+    })
   } else {
-    selectedNotas.value = new Set(filteredAndSortedNotas.value.map(n => n.id))
+    // Select all on current page
+    paginatedNotas.value.forEach(nota => {
+      selectedNotas.value.add(nota.id)
+    })
   }
 }
 
@@ -197,6 +227,15 @@ const handleQuickPreview = (nota: Nota) => {
   showQuickPreview.value = true
 }
 
+const handleDeleteNota = async (notaId: string) => {
+  if (confirm('Are you sure you want to delete this nota?')) {
+    // Implement delete functionality
+    console.log('Delete nota:', notaId)
+    // You can add actual delete logic here
+    // await deleteNota(notaId)
+  }
+}
+
 const handleSort = (field: typeof sortBy.value) => {
   if (sortBy.value === field) {
     sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
@@ -207,6 +246,8 @@ const handleSort = (field: typeof sortBy.value) => {
 }
 
 const handleBulkAction = async (action: 'favorite' | 'archive' | 'delete' | 'export') => {
+  if (selectedNotas.value.size === 0) return
+  
   const selectedIds = Array.from(selectedNotas.value)
   
   switch (action) {
@@ -220,8 +261,10 @@ const handleBulkAction = async (action: 'favorite' | 'archive' | 'delete' | 'exp
       console.log('Archive:', selectedIds)
       break
     case 'delete':
-      // Implement delete functionality
-      console.log('Delete:', selectedIds)
+      if (confirm(`Are you sure you want to delete ${selectedIds.length} nota(s)?`)) {
+        // Implement delete functionality
+        console.log('Delete:', selectedIds)
+      }
       break
     case 'export':
       // Implement export functionality
@@ -230,6 +273,18 @@ const handleBulkAction = async (action: 'favorite' | 'archive' | 'delete' | 'exp
   }
   
   selectedNotas.value.clear()
+  bulkAction.value = null
+}
+
+const handlePageChange = (page: number) => {
+  currentPage.value = page
+  emit('page-change', page)
+}
+
+const handleViewFilterChange = (value: 'all' | 'favorites') => {
+  viewFilter.value = value
+  currentPage.value = 1
+  selectedNotas.value.clear()
 }
 
 const clearAllFilters = () => {
@@ -237,50 +292,31 @@ const clearAllFilters = () => {
   emit('update:searchQuery', '')
   emit('update:selectedTag', '')
   emit('update:showFavorites', false)
+  viewFilter.value = 'all'
+  currentPage.value = 1
 }
 
-// Scroll handling
-const handleScroll = (e: Event) => {
-  const target = e.target as HTMLElement
-  showScrollTop.value = target.scrollTop > 500
-}
-
-const scrollToTop = () => {
-  scrollTo(0)
-  nextTick(() => {
-    showScrollTop.value = false
+const formatDate = (date: string | Date) => {
+  return new Date(date).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
   })
+}
+
+const getContentPreview = (content: string | null) => {
+  if (!content) return 'No content'
+  return content.length > 100 ? content.slice(0, 100) + '...' : content
 }
 
 // Clear selection when filters change
 watch(
-  [() => props.searchQuery, () => props.selectedTag, () => props.showFavorites],
+  [() => props.searchQuery, () => props.selectedTag, () => props.showFavorites, viewFilter],
   () => {
     selectedNotas.value.clear()
+    currentPage.value = 1
   }
 )
-
-// Container classes for different view types
-const containerClasses = computed(() => {
-  const config = VIEW_CONFIGS[props.viewType]
-  const baseClasses = 'transition-all duration-200'
-  
-  switch (props.viewType) {
-    case 'grid':
-      return `${baseClasses} grid gap-4 auto-rows-max`
-    case 'list':
-      return `${baseClasses} space-y-3`
-    case 'compact':
-      return `${baseClasses} divide-y divide-border/30`
-    default:
-      return baseClasses
-  }
-})
-
-const gridCols = computed(() => {
-  const cols = VIEW_CONFIGS[props.viewType].itemsPerRow
-  return `grid-cols-1 ${cols > 1 ? `md:grid-cols-2 lg:grid-cols-${cols}` : ''}`
-})
 </script>
 
 <template>
@@ -293,7 +329,7 @@ const gridCols = computed(() => {
           <div class="flex-1">
             <CardTitle class="flex items-center gap-2 text-lg">
               <Clock class="h-5 w-5" />
-              {{ props.showFavorites ? 'Favorite' : 'Recent' }} Notas
+              Notas
               <Badge variant="secondary" class="ml-2">
                 {{ filteredAndSortedNotas.length }}
               </Badge>
@@ -340,23 +376,6 @@ const gridCols = computed(() => {
                   {{ activeFiltersCount }}
                 </Badge>
               </Button>
-
-              <!-- View Type -->
-              <div class="flex border rounded-md p-0.5">
-                <Button
-                  v-for="type in ['grid', 'list', 'compact']"
-                  :key="type"
-                  variant="ghost"
-                  size="icon"
-                  class="h-8 w-8"
-                  :class="{ 'bg-primary/10 text-primary': props.viewType === type }"
-                  @click="emit('update:viewType', type as any)"
-                >
-                  <Grid3X3 v-if="type === 'grid'" class="h-4 w-4" />
-                  <List v-else-if="type === 'list'" class="h-4 w-4" />
-                  <Table2 v-else class="h-4 w-4" />
-                </Button>
-              </div>
             </div>
           </div>
         </div>
@@ -364,16 +383,29 @@ const gridCols = computed(() => {
         <!-- Expandable Filters Panel -->
         <div v-if="showFilters" class="mt-4 pt-4 border-t space-y-4">
           <div class="flex flex-wrap items-center gap-3">
-            <!-- Quick Filters -->
-            <Button
-              variant="outline"
-              size="sm"
-              :class="{ 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400': props.showFavorites }"
-              @click="emit('update:showFavorites', !props.showFavorites)"
-            >
-              <Star class="h-4 w-4 mr-2" :class="{ 'fill-current': props.showFavorites }" />
-              Favorites Only
-            </Button>
+            <!-- View Filter -->
+            <div class="flex items-center gap-2">
+              <span class="text-sm text-muted-foreground">View:</span>
+              <Select v-model:value="viewFilter" @update:value="handleViewFilterChange">
+                <SelectTrigger class="w-36 h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    <div class="flex items-center justify-between w-full">
+                      <span>All Notas</span>
+                      <Badge variant="secondary" class="ml-2">{{ totalAllNotas }}</Badge>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="favorites">
+                    <div class="flex items-center justify-between w-full">
+                      <span>Favorites</span>
+                      <Badge variant="secondary" class="ml-2">{{ totalFavoriteNotas }}</Badge>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
             <!-- Tag Filter -->
             <div class="flex items-center gap-2" v-if="availableTags.length > 0">
@@ -439,7 +471,7 @@ const gridCols = computed(() => {
                 @update:checked="handleSelectAll"
               />
               <span class="text-sm text-muted-foreground">
-                {{ selectedNotas.size }} of {{ filteredAndSortedNotas.length }} selected
+                {{ selectedNotas.size }} of {{ paginatedNotas.length }} selected on this page
               </span>
             </div>
 
@@ -482,109 +514,217 @@ const gridCols = computed(() => {
       </CardHeader>
     </Card>
 
-    <!-- Content Area -->
-    <div class="flex-1 min-h-0 relative">
-      <!-- Loading State -->
-      <NotaListSkeleton 
-        v-if="isLoading"
-        :view-type="props.viewType"
-        :count="12"
-      />
+    <!-- Main Content -->
+    <Card>
+                    <CardContent class="p-0">
+            <!-- Empty State -->
+            <div v-if="isLoading" class="p-8">
+              <div class="space-y-4">
+                <Skeleton class="h-8 w-full" />
+                <Skeleton class="h-8 w-full" />
+                <Skeleton class="h-8 w-full" />
+                <Skeleton class="h-8 w-full" />
+                <Skeleton class="h-8 w-full" />
+              </div>
+            </div>
 
-      <!-- Empty State -->
-      <NotaListEmptyState
-        v-else-if="filteredAndSortedNotas.length === 0"
-        :show-favorites="props.showFavorites"
-        :has-search-query="Boolean(props.searchQuery)"
-        :has-selected-tag="Boolean(props.selectedTag)"
-        :search-query="props.searchQuery"
-        :selected-tag="props.selectedTag"
-        @create-nota="emit('create-nota')"
-        @clear-filters="clearAllFilters"
-      />
+            <!-- Table Content with max height and scroll -->
+            <div v-else-if="paginatedNotas.length > 0" class="max-h-[600px] overflow-y-auto border rounded-md">
+              <Table>
+                <TableHeader class="sticky top-0 bg-background border-b z-10">
+                  <TableRow>
+                    <TableHead class="w-12">
+                      <!-- Empty header for checkbox column -->
+                    </TableHead>
+                    <TableHead class="cursor-pointer" @click="handleSort('title')">
+                      <div class="flex items-center gap-2">
+                        Title
+                        <SortAsc v-if="sortBy === 'title' && sortDirection === 'asc'" class="h-3 w-3" />
+                        <SortDesc v-else-if="sortBy === 'title' && sortDirection === 'desc'" class="h-3 w-3" />
+                      </div>
+                    </TableHead>
+                    <TableHead>Tags</TableHead>
+                    <TableHead class="cursor-pointer" @click="handleSort('updated')">
+                      <div class="flex items-center gap-2">
+                        Updated
+                        <SortAsc v-if="sortBy === 'updated' && sortDirection === 'asc'" class="h-3 w-3" />
+                        <SortDesc v-else-if="sortBy === 'updated' && sortDirection === 'desc'" class="h-3 w-3" />
+                      </div>
+                    </TableHead>
+                    <TableHead class="w-32">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow
+                    v-for="nota in paginatedNotas"
+                    :key="nota.id"
+                    class="cursor-pointer hover:bg-muted/50 group"
+                    @click="router.push(`/nota/${nota.id}`)"
+                  >
+                    <TableCell @click.stop>
+                      <Checkbox
+                        :checked="selectedNotas.has(nota.id)"
+                        @update:checked="(checked: boolean) => handleSelectNota(nota.id, checked)"
+                        class="transition-opacity duration-200"
+                        :class="selectedNotas.has(nota.id) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'"
+                      />
+                    </TableCell>
+                    <TableCell class="font-medium">
+                      <div class="flex items-center gap-2">
+                        <Star 
+                          v-if="nota.favorite"
+                          class="h-4 w-4 text-yellow-500 fill-current"
+                        />
+                        {{ nota.title }}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div class="flex flex-wrap gap-1">
+                        <Badge
+                          v-for="tag in nota.tags?.slice(0, 2)"
+                          :key="tag"
+                          variant="secondary"
+                          class="text-xs cursor-pointer"
+                          @click.stop="emit('update:selectedTag', tag)"
+                        >
+                          {{ tag }}
+                        </Badge>
+                        <Badge
+                          v-if="nota.tags && nota.tags.length > 2"
+                          variant="outline"
+                          class="text-xs"
+                        >
+                          +{{ nota.tags.length - 2 }}
+                        </Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div class="flex items-center gap-1 text-sm text-muted-foreground">
+                        <Calendar class="h-3 w-3" />
+                        {{ formatDate(nota.updatedAt) }}
+                      </div>
+                    </TableCell>
+                    <TableCell @click.stop>
+                      <div class="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          class="h-8 w-8"
+                          @click="handleQuickPreview(nota)"
+                          title="Preview"
+                        >
+                          <Eye class="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          class="h-8 w-8"
+                          @click="router.push(`/nota/${nota.id}`)"
+                          title="Open"
+                        >
+                          <FileText class="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          class="h-8 w-8 text-destructive hover:text-destructive"
+                          @click="handleDeleteNota(nota.id)"
+                          title="Delete"
+                        >
+                          <Trash2 class="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
 
-      <!-- Virtual Scrolled Content -->
-      <div
-        v-else
-        v-bind="containerProps"
-        class="h-full overflow-auto scrollbar-thin scrollbar-thumb-muted scrollbar-track-background"
-        @scroll="handleScroll"
-      >
-        <div v-bind="wrapperProps" :class="[containerClasses, gridCols]">
-          <div
-            v-for="{ data: nota, index } in list"
-            :key="nota.id"
-            class="relative group"
-          >
-            <!-- Selection Checkbox (for non-compact view) -->
-            <div 
-              v-if="props.viewType !== 'compact'"
-              class="absolute top-2 left-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <Checkbox
-                :checked="selectedNotas.has(nota.id)"
-                @update:checked="(checked: boolean) => handleSelectNota(nota.id, checked)"
-                class="bg-background/80 backdrop-blur-sm"
+              <!-- Pagination -->
+              <div class="border-t p-4">
+                <div class="flex items-center justify-between">
+                  <div class="text-sm text-muted-foreground">
+                    Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to 
+                    {{ Math.min(currentPage * itemsPerPage, filteredAndSortedNotas.length) }} of 
+                    {{ filteredAndSortedNotas.length }} entries
+                  </div>
+                  
+                  <div v-if="totalPages > 1" class="flex items-center gap-1">
+                    <!-- Previous button -->
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      :disabled="currentPage === 1" 
+                      @click="currentPage = Math.max(1, currentPage - 1)"
+                      class="h-9 px-3"
+                    >
+                      Previous
+                    </Button>
+                    
+                    <!-- First page if not near beginning -->
+                    <Button
+                      v-if="currentPage > 3"
+                      variant="ghost" 
+                      size="sm" 
+                      @click="currentPage = 1"
+                      class="h-9 w-9"
+                    >
+                      1
+                    </Button>
+                    
+                    <!-- Ellipsis if gap -->
+                    <span v-if="currentPage > 4" class="px-2 text-muted-foreground">...</span>
+                    
+                    <!-- Page numbers around current -->
+                    <Button
+                      v-for="page in getVisiblePages()"
+                      :key="page"
+                      :variant="page === currentPage ? 'default' : 'ghost'"
+                      size="sm"
+                      @click="currentPage = page"
+                      class="h-9 w-9"
+                    >
+                      {{ page }}
+                    </Button>
+                    
+                    <!-- Ellipsis if gap -->
+                    <span v-if="currentPage < totalPages - 3" class="px-2 text-muted-foreground">...</span>
+                    
+                    <!-- Last page if not near end -->
+                    <Button
+                      v-if="currentPage < totalPages - 2"
+                      variant="ghost" 
+                      size="sm" 
+                      @click="currentPage = totalPages"
+                      class="h-9 w-9"
+                    >
+                      {{ totalPages }}
+                    </Button>
+                    
+                    <!-- Next button -->
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      :disabled="currentPage === totalPages" 
+                      @click="currentPage = Math.min(totalPages, currentPage + 1)"
+                      class="h-9 px-3"
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Empty State -->
+            <div v-else>
+              <TableEmpty 
+                icon="FileText"
+                title="No notas found"
+                description="Start creating your first nota or adjust your filters."
               />
             </div>
-
-            <!-- Quick Actions Overlay -->
-            <div 
-              class="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1"
-            >
-              <Button
-                variant="secondary"
-                size="icon"
-                class="h-8 w-8 bg-background/80 backdrop-blur-sm"
-                @click="handleQuickPreview(nota)"
-              >
-                <Eye class="h-4 w-4" />
-              </Button>
-              <Button
-                variant="secondary"
-                size="icon"
-                class="h-8 w-8 bg-background/80 backdrop-blur-sm"
-                @click="navigateToNotaSettings(nota.id)"
-              >
-                <MoreHorizontal class="h-4 w-4" />
-              </Button>
-            </div>
-
-            <!-- Enhanced Nota Card -->
-            <NotaCard
-              :nota="nota"
-              :view-type="props.viewType"
-              :is-selected="selectedNotas.has(nota.id)"
-              @toggle-favorite="toggleNotaFavorite"
-              @tag-click="(tag: string) => emit('update:selectedTag', tag)"
-              @more-actions="navigateToNotaSettings"
-              @click="router.push(`/nota/${nota.id}`)"
-              class="cursor-pointer h-full"
-            />
-          </div>
-        </div>
-      </div>
-
-      <!-- Scroll to Top Button -->
-      <Transition
-        enter-active-class="transition-all duration-300"
-        enter-from-class="opacity-0 translate-y-4"
-        enter-to-class="opacity-100 translate-y-0"
-        leave-active-class="transition-all duration-300"
-        leave-from-class="opacity-100 translate-y-0"
-        leave-to-class="opacity-0 translate-y-4"
-      >
-        <Button
-          v-if="showScrollTop"
-          variant="secondary"
-          size="icon"
-          class="fixed bottom-6 right-6 h-12 w-12 rounded-full shadow-lg z-20"
-          @click="scrollToTop"
-        >
-          <ArrowUp class="h-5 w-5" />
-        </Button>
-      </Transition>
-    </div>
+          </CardContent>
+        </Card>
 
     <!-- Quick Preview Modal -->
     <div
@@ -620,7 +760,7 @@ const gridCols = computed(() => {
         </CardHeader>
         <CardContent class="p-6 overflow-y-auto max-h-96">
           <div class="prose prose-sm max-w-none">
-            {{ quickPreviewNota.content?.slice(0, 500) }}...
+            {{ getContentPreview(quickPreviewNota.content) }}
           </div>
         </CardContent>
       </Card>
@@ -629,35 +769,9 @@ const gridCols = computed(() => {
 </template>
 
 <style scoped>
-/* Enhanced grid responsive behavior */
-.grid {
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-}
-
-@media (min-width: 768px) {
-  .md\:grid-cols-2 {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 1024px) {
-  .lg\:grid-cols-3 {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
 /* Smooth transitions */
 .transition-all {
   transition: all 0.2s ease-in-out;
-}
-
-/* Enhanced scrollbar */
-.scrollbar-thin {
-  scrollbar-width: thin;
-}
-
-.scrollbar-thumb-muted {
-  scrollbar-color: hsl(var(--muted)) transparent;
 }
 
 /* Focus management */
@@ -666,11 +780,9 @@ const gridCols = computed(() => {
   outline-offset: 2px;
 }
 
-/* Selection state */
-.group[data-selected="true"] {
-  ring: 2px;
-  ring-color: hsl(var(--primary));
-  ring-opacity: 0.5;
+/* Custom scrollbar for modal */
+.prose {
+  max-width: none;
 }
 </style>
 

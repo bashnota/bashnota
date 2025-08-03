@@ -96,9 +96,6 @@ const toggleBashHub = () => {
       </SidebarInset>
     </SidebarProvider>
     
-    <!-- Toast notifications -->
-    
-    
     <!-- Global components that need to be available anywhere -->
     <ServerSelectionDialogWrapper />
   </TooltipProvider>
