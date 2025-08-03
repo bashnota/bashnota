@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { BookIcon, Plus } from 'lucide-vue-next'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 
 defineEmits<{
   addReference: []

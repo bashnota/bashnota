@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
-import { ScrollArea } from '@/ui/scroll-area'
-import { Button } from '@/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Button } from '@/components/ui/button'
 import { ListIcon } from 'lucide-vue-next'
-import LoadingSpinner from '@/ui/LoadingSpinner.vue'
+import { Skeleton } from '@/components/ui/skeleton'
 import { getViewerExtensions } from '@/features/editor/components/extensions'
 import TableOfContents from '@/features/editor/components/ui/TableOfContents.vue'
 import { logger } from '@/services/logger'
@@ -47,7 +47,7 @@ initializeCitations()
 const registerCodeCells = (content: any) => {
   // Find all executable code blocks in the content
   const findCodeBlocks = (node: any): any[] => {
-    const blocks = []
+    const blocks: any[] = []
     if (node.type === 'executableCodeBlock') {
       blocks.push(node)
     }
@@ -297,7 +297,7 @@ onMounted(() => {
       <div class="relative min-h-[300px] flex-1">
         <!-- Loading state -->
         <div v-if="isLoading" class="absolute inset-0 flex items-center justify-center">
-          <LoadingSpinner class="w-8 h-8" />
+          <Skeleton class="w-8 h-8 rounded-full" />
         </div>
 
         <!-- Editor content (read-only) -->

@@ -3,7 +3,7 @@ import { ref, computed, reactive, readonly } from 'vue'
 import { CodeExecutionService } from '@/services/codeExecutionService'
 import { JupyterService } from '@/features/jupyter/services/jupyterService'
 import type { CodeCell, KernelSession } from '@/features/editor/types/codeExecution'
-import type { JupyterServer, NotaConfig, SavedSession } from '@/features/jupyter/types/jupyter'
+import type { JupyterServer, KernelSpec, NotaConfig, SavedSession } from '@/features/jupyter/types/jupyter'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
 import { getURLWithoutProtocol } from '@/lib/utils'
@@ -359,7 +359,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
     logger.log(`[CodeExecStore] Registering code cells for nota ${notaId}, isPublished=${isPublished}`);
     
     const findCodeBlocks = (node: any): any[] => {
-      const blocks = []
+      const blocks: any[] = []
       if (node.type === 'executableCodeBlock') {
         blocks.push(node)
       }
@@ -582,8 +582,8 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
         }
 
         // Try each server until we find one that works
-        let selectedServer = null;
-        let selectedKernel = null;
+        let selectedServer: JupyterServer | null = null;
+        let selectedKernel: KernelSpec | null = null;
 
         for (const server of servers) {
           try {

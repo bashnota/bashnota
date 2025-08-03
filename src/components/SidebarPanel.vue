@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Button } from '@/ui/button'
-import { Separator } from '@/ui/separator'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/ui/collapsible'
-import { Tooltip } from '@/ui/tooltip'
-import { Badge } from '@/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { Tooltip } from '@/components/ui/tooltip'
+import { Badge } from '@/components/ui/badge'
 import {
   ChevronDown,
   ChevronRight,

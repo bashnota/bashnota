@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Avatar } from '@/ui/avatar'
+import { Avatar } from '@/components/ui/avatar'
 import { RefreshCwIcon } from 'lucide-vue-next'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import MessageItem from '@/features/ai/components/components/MessageItem.vue'
 import { type ConversationMessage } from '@/features/ai/components/composables/useConversation'
 

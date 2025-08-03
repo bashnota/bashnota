@@ -59,7 +59,7 @@ export function useNotaFiltering(
   )
 
   const activeFiltersText = computed(() => {
-    const filterTexts = []
+    const filterTexts: string[] = []
     if (filters.value.showFavorites) filterTexts.push('favorites')
     if (filters.value.searchQuery) filterTexts.push(`"${filters.value.searchQuery}"`)
     if (filters.value.selectedTag) filterTexts.push(`#${filters.value.selectedTag}`)

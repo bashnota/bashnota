@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { Card, CardHeader, CardTitle, CardContent } from '@/ui/card'
-import { Button } from '@/ui/button'
-import { Badge } from '@/ui/badge'
-import { Input } from '@/ui/input'
-import { Checkbox } from '@/ui/checkbox'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
 import { 
   Search, 
   Filter, 

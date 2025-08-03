@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import { MessageSquare, RefreshCw, Shield } from 'lucide-vue-next'
 import { commentService } from '@/features/nota/services/commentService'
 import { toast } from 'vue-sonner'

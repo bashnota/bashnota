@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, computed, onUnmounted } from 'vue'
 import { useNotaStore } from '@/features/nota/stores/nota'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/ui/card'
-import { Button } from '@/ui/button'
-import { Badge } from '@/ui/badge'
-import { Tabs, TabsList, TabsTrigger } from '@/ui/tabs'
-import { Alert, AlertDescription } from '@/ui/alert'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
   Clock, 
   Plus, 

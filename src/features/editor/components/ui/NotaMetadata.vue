@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { ref, computed, watchEffect } from 'vue'
-import { TagsInput } from '@/ui/tags-input'
-import TagsInputItem from '@/ui/tags-input/TagsInputItem.vue'
-import TagsInputItemText from '@/ui/tags-input/TagsInputItemText.vue'
-import TagsInputItemDelete from '@/ui/tags-input/TagsInputItemDelete.vue'
-import TagsInputInput from '@/ui/tags-input/TagsInputInput.vue'
-import SaveIndicator from '@/ui/SaveIndicator.vue'
-import { Button } from '@/ui/button'
+import { TagsInput } from '@/components/ui/tags-input'
+import TagsInputItem from '@/components/ui/tags-input/TagsInputItem.vue'
+import TagsInputItemText from '@/components/ui/tags-input/TagsInputItemText.vue'
+import TagsInputItemDelete from '@/components/ui/tags-input/TagsInputItemDelete.vue'
+import TagsInputInput from '@/components/ui/tags-input/TagsInputInput.vue'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useNotaMetadata } from '@/features/nota/composables/useNotaMetadata'
 import { toast } from 'vue-sonner'
+import { formatDate } from '@/lib/utils'
 import { 
   Clock, 
   Calendar, 
@@ -179,13 +180,19 @@ const formattedId = computed(() => {
     </div>
     
     <!-- Integrated save indicator -->
-    <SaveIndicator 
-      :is-saving="isSaving" 
-      :show-saved="showSaved"
-      :auto-save-enabled="autoSaveEnabled"
-      :updated-at="typeof nota.updatedAt === 'string' ? new Date(nota.updatedAt) : nota.updatedAt"
-      class="compact"
-    />
+    <div class="flex items-center gap-2 text-xs text-muted-foreground">
+      <Badge v-if="isSaving" variant="secondary" class="text-xs">
+        <Clock class="w-3 h-3 mr-1" />
+        Saving...
+      </Badge>
+      <Badge v-else-if="showSaved" variant="secondary" class="text-xs">
+        <Check class="w-3 h-3 mr-1" />
+        Saved
+      </Badge>
+      <div v-if="typeof nota.updatedAt === 'string' ? new Date(nota.updatedAt) : nota.updatedAt" class="text-xs">
+        Updated {{ formatDate(typeof nota.updatedAt === 'string' ? new Date(nota.updatedAt) : nota.updatedAt) }}
+      </div>
+    </div>
     
     <!-- Compact Expanded Metadata -->
     <div v-if="showFullMetadata" class="mt-1 p-2 rounded-md bg-muted/30 text-xs space-y-1 animate-in fade-in-50 slide-in-from-top-5 duration-200">

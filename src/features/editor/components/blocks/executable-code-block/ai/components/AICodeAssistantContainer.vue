@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import { Brain, Loader2, Maximize2, Minimize2, X } from 'lucide-vue-next'
 import AIActionPanel from './AIActionPanel.vue'
 import AIResultsPanel from './AIResultsPanel.vue'

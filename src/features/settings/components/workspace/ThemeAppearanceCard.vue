@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/ui/card'
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Palette } from 'lucide-vue-next'
 import { useTheme } from '@/composables/theme'
 import ThemeSelector from '@/features/nota/components/ThemeSelector.vue'

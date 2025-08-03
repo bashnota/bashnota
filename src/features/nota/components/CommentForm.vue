@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { Button } from '@/ui/button'
-import { Textarea } from '@/ui/textarea'
+import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 import { Send, Loader2 } from 'lucide-vue-next'
 import { useAuthStore } from '@/features/auth/stores/auth'
 import { commentService } from '@/features/nota/services/commentService'

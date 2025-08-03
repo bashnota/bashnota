@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Button } from '@/ui/button'
-import { Input } from '@/ui/input'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { ref, watch, onMounted } from 'vue'
 import { COLUMN_TYPES } from '@/features/editor/components/blocks/table-block/constants/columnTypes'
 import type { ColumnType } from '@/features/editor/components/blocks/table-block/composables/useTableOperations'

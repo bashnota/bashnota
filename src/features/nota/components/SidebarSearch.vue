@@ -2,8 +2,8 @@
 import { ref, watch, nextTick } from 'vue'
 import { Search, X } from 'lucide-vue-next'
 import { onKeyStroke } from '@vueuse/core'
-import { Input } from '@/ui/input'
-import { Button } from '@/ui/button'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 
 const props = defineProps<{
   modelValue: string

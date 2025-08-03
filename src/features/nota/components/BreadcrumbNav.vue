@@ -8,7 +8,7 @@ const route = useRoute()
 const store = useNotaStore()
 
 const breadcrumbs = computed(() => {
-  const items = []
+  const items: { name: string; path: string }[] = []
   const id = route.params.id as string
   const nota = store.getCurrentNota(id)
 

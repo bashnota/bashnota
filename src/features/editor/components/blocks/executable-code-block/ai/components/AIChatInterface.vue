@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { Button } from '@/ui/button'
-import { Badge } from '@/ui/badge'
-import { ScrollArea } from '@/ui/scroll-area'
-import { Textarea } from '@/ui/textarea'
-import { Separator } from '@/ui/separator'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Textarea } from '@/components/ui/textarea'
+import { Separator } from '@/components/ui/separator'
 import { 
   MessageSquare, 
   Send, 

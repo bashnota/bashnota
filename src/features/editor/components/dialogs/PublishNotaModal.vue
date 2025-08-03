@@ -9,13 +9,13 @@ import {
   DialogTitle,
   DialogFooter,
   DialogDescription,
-} from '@/ui/dialog'
-import { Button } from '@/ui/button'
-import { Input } from '@/ui/input'
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { toast } from 'vue-sonner'
 import { Copy, Share2, Globe, EyeOff, Loader2, RefreshCw, FolderTree } from 'lucide-vue-next'
-import { Switch } from '@/ui/switch'
-import { Checkbox } from '@/ui/checkbox'
+import { Switch } from '@/components/ui/switch'
+import { Checkbox } from '@/components/ui/checkbox'
 import { logger } from '@/services/logger'
 
 const props = defineProps<{

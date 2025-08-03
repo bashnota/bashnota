@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { Avatar } from '@/ui/avatar'
-import { Button } from '@/ui/button'
+import { Avatar } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
 import { Bot, User, CopyIcon, ScissorsIcon, CheckIcon } from 'lucide-vue-next'
-import MarkdownRenderer from '@/ui/markdown-renderer/MarkdownRenderer.vue'
+// TODO: Replace MarkdownRenderer with shadcn equivalent when updating AI components
+// import MarkdownRenderer from '@/ui/markdown-renderer/MarkdownRenderer.vue'
 import { ref } from 'vue'
 import { type ConversationMessage } from '@/features/ai/components/composables/useConversation'
-import { toast } from '@/ui/toast'
+import { toast } from 'vue-sonner'
 
 const props = defineProps<{
   message: ConversationMessage

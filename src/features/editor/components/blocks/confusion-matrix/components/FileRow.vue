@@ -55,7 +55,7 @@
 </template>
 
 <script setup lang="ts">
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import { ChevronRight } from 'lucide-vue-next'
 import type { JupyterFile } from '@/features/jupyter/types/jupyter'
 import FileIcon from './FileIcon.vue'

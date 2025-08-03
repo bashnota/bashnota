@@ -3,14 +3,14 @@ import { ref, onMounted, computed, watch, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useAuthStore } from '@/features/auth/stores/auth'
-import { Button } from '@/ui/button'
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/ui/card'
-import { Input } from '@/ui/input'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { formatDate } from '@/lib/utils'
 import { toast } from 'vue-sonner'
 import { Trash2, Clock, Search, Grid, Table, AlertCircle, CalendarDays, BarChart, Eye, Filter, DownloadCloud, ThumbsUp, ThumbsDown, FileText } from 'lucide-vue-next'
-import { Avatar, AvatarFallback } from '@/ui/avatar'
-import LoadingSpinner from '@/ui/LoadingSpinner.vue'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Skeleton } from '@/components/ui/skeleton'
 import { type PublishedNota } from '@/features/nota/types/nota'
 import { logger } from '@/services/logger'
 import { collection, query, where, getDocs, doc, getDoc, limit } from 'firebase/firestore'
@@ -54,7 +54,7 @@ const totalPages = computed(() => {
 
 // Page numbers to display
 const pageNumbers = computed(() => {
-  const pages = [];
+  const pages: (number | string)[] = [];
   const maxPagesToShow = 5;
 
   if (totalPages.value <= maxPagesToShow) {
@@ -792,7 +792,7 @@ const handlePageSizeChange = (event: Event) => {
 
     <!-- Loading state -->
     <div v-if="isLoading" class="flex justify-center items-center h-64">
-      <LoadingSpinner class="w-10 h-10" />
+      <Skeleton class="w-10 h-10 rounded-full" />
     </div>
 
     <!-- Error state -->

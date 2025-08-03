@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/ui/card'
-import { Button } from '@/ui/button'
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { RotateCw, ExternalLink } from 'lucide-vue-next'
-import { toast } from '@/ui/toast'
+import { toast } from 'vue-sonner'
 
 // Reset to defaults (placeholder)
 const resetToDefaults = () => {

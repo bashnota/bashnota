@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/ui/card'
-import { Badge } from '@/ui/badge'
-import { Button } from '@/ui/button'
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { 
   Clock, 
   Users, 

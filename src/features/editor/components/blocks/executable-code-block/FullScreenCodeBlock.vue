@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref, computed, watch } from 'vue'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import { X, Play, Loader2, Copy, Check, Eye, EyeOff, Code, FileText, Save, Maximize2 } from 'lucide-vue-next'
 import CodeMirror from './CodeMirror.vue'
 import OutputSection from './components/OutputSection.vue'

@@ -26,8 +26,8 @@
 </template>
 
 <script setup lang="ts">
-import { Button } from '@/ui/button'
-import { Label } from '@/ui/label'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
 import { useTheme } from '@/composables/theme'
 
 const { themeColor: currentTheme, setThemeColor: setTheme } = useTheme()

@@ -236,10 +236,10 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-} from '@/ui/card'
+} from '@/components/ui/card'
 import {
   Badge
-} from '@/ui/badge'
+} from '@/components/ui/badge'
 import {
   LineChart,
   TrendingUp,

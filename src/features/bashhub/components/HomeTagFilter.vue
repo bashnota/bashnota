@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import { 
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/ui/select'
-import { Badge } from '@/ui/badge'
+} from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
 import { X, Hash } from 'lucide-vue-next'
 import type { Nota } from '@/features/nota/types/nota'
 

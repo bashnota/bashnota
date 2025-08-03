@@ -350,16 +350,16 @@
 // This is a simplified content-only version for modal usage
 import { ref, computed, onMounted, watch } from 'vue'
 import { Crown, Settings, RefreshCw as RefreshCwIcon, HardDrive as HardDriveIcon, CheckCircle as CheckCircleIcon, Download as DownloadIcon, XCircle as XCircleIcon, AlertTriangle as AlertTriangleIcon, Play, MoreHorizontal, Eye, Trash, Search } from 'lucide-vue-next'
-import { Button } from '@/ui/button'
-import { Badge } from '@/ui/badge'
-import { Input } from '@/ui/input'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
   DropdownMenuTrigger 
-} from '@/ui/dropdown-menu'
-import { toast } from '@/ui/toast'
+} from '@/components/ui/dropdown-menu'
+import { toast } from 'vue-sonner'
 import { useAIProviders } from '@/features/ai/components/composables/useAIProviders'
 import { useProviderSettings, type ModelInfo } from '@/features/settings/components/ai/composables/useProviderSettings'
 import { logger } from '@/services/logger'

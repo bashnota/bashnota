@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useNotaStore } from '@/features/nota/stores/nota'
-import { Card, CardContent, CardHeader, CardTitle } from '@/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { FileText, Clock, Star } from 'lucide-vue-next'
 import { formatDate } from '@/lib/utils'
 

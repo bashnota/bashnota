@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { Button } from '@/components/ui/button'
-import { ButtonGroup } from '@/ui/button-group'
+// ButtonGroup functionality will be replaced with flex grouping
 import {
   Dialog,
   DialogContent,
@@ -375,13 +375,13 @@ const formatLastActivity = (lastActivity: string) => {
               </span>
             </div>
             
-            <ButtonGroup>
+            <div class="flex items-center border rounded-md">
               <Button
                 variant="outline"
                 size="sm"
                 @click="handleRefreshSessions"
                 :disabled="isExecuting || isSettingUp"
-                class="h-6 px-2 text-xs"
+                class="h-6 px-2 text-xs rounded-r-none border-r-0"
               >
                 <RotateCw class="h-3 w-3 mr-1" />
                 Refresh
@@ -392,12 +392,12 @@ const formatLastActivity = (lastActivity: string) => {
                 size="sm"
                 @click="handleCreateNewSession"
                 :disabled="!isKernelSelected || isExecuting || isSettingUp"
-                class="h-6 px-2 text-xs"
+                class="h-6 px-2 text-xs rounded-l-none"
               >
                 <Plus class="h-3 w-3 mr-1" />
                 New Session
               </Button>
-            </ButtonGroup>
+            </div>
           </div>
 
           <!-- Session Selection -->

@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useCitationStore } from '@/features/editor/stores/citationStore'
-import { Input } from '@/ui/input'
-import { Button } from '@/ui/button'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { Search, BookIcon, Loader2, X, ChevronUp, ChevronDown } from 'lucide-vue-next'
 import type { CitationEntry } from '@/features/nota/types/nota'
 import { toast } from 'vue-sonner'
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/ui/select'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 
 const props = defineProps<{
   notaId: string

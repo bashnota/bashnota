@@ -49,9 +49,9 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/ui/card'
-import { Button } from '@/ui/button'
-import { toast } from '@/ui/toast'
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { toast } from 'vue-sonner'
 import { RefreshCwIcon, Save } from 'lucide-vue-next'
 
 export interface BaseProviderSettingsProps {

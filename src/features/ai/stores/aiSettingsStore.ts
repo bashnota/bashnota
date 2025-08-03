@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { aiService } from '@/features/ai/services'
 import type { ProviderConfig as LLMProvider } from '@/features/ai/services'
-import { toast } from '@/ui/toast'
+import { toast } from 'vue-sonner'
 import { logger } from '@/services/logger'
 
 export interface AISettings {

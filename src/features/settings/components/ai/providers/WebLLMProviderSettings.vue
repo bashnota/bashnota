@@ -353,15 +353,15 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { Globe as GlobeIcon, RefreshCw as RefreshCwIcon, HardDrive as HardDriveIcon, CheckCircle as CheckCircleIcon, Download as DownloadIcon, XCircle as XCircleIcon, AlertTriangle as AlertTriangleIcon, Gauge as GaugeIcon, X as XIcon, Info as InfoIcon, Crown, Settings, Play, MoreHorizontal, Eye, Trash } from 'lucide-vue-next'
-import { toast } from '@/ui/toast'
-import { Button } from '@/ui/button'
-import { Badge } from '@/ui/badge'
+import { toast } from 'vue-sonner'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
   DropdownMenuTrigger 
-} from '@/ui/dropdown-menu'
+} from '@/components/ui/dropdown-menu'
 import BaseProviderSettings from '@/features/settings/components/ai/BaseProviderSettings.vue'
 import ConnectionStatus from '@/features/settings/components/ai/components/ConnectionStatus.vue'
 import WebLLMDefaultModelManager from './components/WebLLMDefaultModelManager.vue'

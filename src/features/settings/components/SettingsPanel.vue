@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent } from 'vue'
-import { Alert, AlertDescription } from '@/ui/alert'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertCircle } from 'lucide-vue-next'
 
 interface Props {

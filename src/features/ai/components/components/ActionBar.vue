@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Button } from '@/ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu'
+import { Button } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { RefreshCwIcon, SendIcon, MoreHorizontal, CopyIcon, EditIcon, ScissorsIcon, XIcon } from 'lucide-vue-next'
 
 const props = defineProps<{

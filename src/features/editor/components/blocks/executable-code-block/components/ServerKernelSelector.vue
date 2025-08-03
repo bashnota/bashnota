@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Button } from '@/ui/button'
-import { ButtonGroup } from '@/ui/button-group'
-import Popover from '@/ui/popover/Popover.vue'
-import PopoverContent from '@/ui/popover/PopoverContent.vue'
-import PopoverTrigger from '@/ui/popover/PopoverTrigger.vue'
-import CustomSelect from '@/ui/CustomSelect.vue'
+import { Button } from '@/components/ui/button'
+// ButtonGroup functionality will be replaced with flex grouping
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+
+
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Server } from 'lucide-vue-next'
 import type { JupyterServer, KernelSpec } from '@/features/jupyter/types/jupyter'
 

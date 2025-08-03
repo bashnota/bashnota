@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch, toRef } from 'vue'
-import { Textarea } from '@/ui/textarea'
-import { Button } from '@/ui/button'
+import { Textarea } from '@/components/ui/textarea'
+import { Button } from '@/components/ui/button'
 import { useAISettingsStore } from '@/features/ai/stores/aiSettingsStore'
 import { logger } from '@/services/logger'
-import { toast } from '@/ui/toast'
+import { toast } from 'vue-sonner'
 
 // Import composables
 import { useConversation } from '@/features/ai/components/composables/useConversation'
@@ -15,7 +15,7 @@ import { useAIProviders } from '@/features/ai/components/composables/useAIProvid
 import { useStreamingMode } from '@/features/ai/components/composables/useStreamingMode'
 
 // Import components
-import { ScrollArea } from '@/ui/scroll-area'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import ConversationHistory from './ConversationHistory.vue'
 import ConversationInput from './ConversationInput.vue'
 import ActionBar from './ActionBar.vue'

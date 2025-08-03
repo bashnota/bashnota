@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, computed } from 'vue'
 import { Copy, Check, Download, Maximize, Minimize, Eye, EyeOff, Loader2, ExternalLink } from 'lucide-vue-next'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import { logger } from '@/services/logger'
 import { ansiToHtml, stripAnsi } from '@/lib/utils'
 import IframeOutputRenderer from './IframeOutputRenderer.vue'

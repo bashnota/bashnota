@@ -20,7 +20,7 @@
 
 <script setup lang="ts">
 import { RefreshCw as RefreshCwIcon } from 'lucide-vue-next'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 
 interface Props {
   availableCount: number

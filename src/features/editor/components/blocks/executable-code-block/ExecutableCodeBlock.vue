@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { NodeViewWrapper } from '@tiptap/vue-3'
-import { Card, CardContent } from '@/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { useCodeExecution } from './composables/core/useCodeExecution'
 import CodeBlockWithExecution from './CodeBlockWithExecution.vue'
 import OutputRenderer from './OutputRenderer.vue'

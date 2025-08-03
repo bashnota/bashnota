@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useTheme, type DarkModeIntensity } from '@/composables/theme'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import { MoonIcon } from 'lucide-vue-next'
 
 const { darkIntensity, setDarkIntensity, darkModeIntensities, isDark, currentIntensityDescription } = useTheme()

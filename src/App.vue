@@ -6,9 +6,10 @@ import AppTabs from '@/features/nota/components/AppTabs.vue'
 
 import ServerSelectionDialogWrapper from '@/features/editor/components/jupyter/ServerSelectionDialogWrapper.vue'
 import { ref, onMounted, watch, onUnmounted, computed } from 'vue'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import Toaster from '@/ui/toast/Toaster.vue'
+
 import { useAuthStore } from '@/features/auth/stores/auth'
 import { useEditorStore } from '@/features/editor/stores/editorStore'
 import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
@@ -122,7 +123,8 @@ const toggleBashHub = () => {
 </script>
 
 <template>
-  <div class="flex h-screen w-screen overflow-hidden bg-background">
+  <TooltipProvider>
+    <div class="flex h-screen w-screen overflow-hidden bg-background">
     <!-- Sidebar -->
     <div
       :style="{ width: `${sidebarWidth}px` }"
@@ -205,11 +207,11 @@ const toggleBashHub = () => {
   </div>
   
   <!-- Toast notifications -->
-  <Toaster />
+  
   
   <!-- Global components that need to be available anywhere -->
   <ServerSelectionDialogWrapper />
-  
+  </TooltipProvider>
 </template>
 
 <style>

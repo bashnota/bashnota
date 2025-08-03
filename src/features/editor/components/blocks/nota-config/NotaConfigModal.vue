@@ -7,8 +7,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from '@/ui/dialog'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/ui/tabs'
+} from '@/components/ui/dialog'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import NotaConfigServers from './NotaConfigServers.vue'
 import NotaConfigSessions from './NotaConfigSessions.vue'
 import { Server, PlayCircle } from 'lucide-vue-next'

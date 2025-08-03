@@ -47,7 +47,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import { AlertTriangle, RotateCw } from 'lucide-vue-next'
 
 interface Props {

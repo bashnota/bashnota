@@ -5,14 +5,14 @@ import {
   Zap,
   BookOpen
 } from 'lucide-vue-next'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-} from '@/ui/dropdown-menu'
+} from '@/components/ui/dropdown-menu'
 
 const emit = defineEmits<{
   'quick-create': []

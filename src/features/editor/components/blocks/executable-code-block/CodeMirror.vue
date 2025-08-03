@@ -12,7 +12,7 @@ import { EditorView, lineNumbers } from '@codemirror/view'
 import { indentUnit } from '@codemirror/language'
 import { computed, ref, onMounted, watch, onUnmounted } from 'vue'
 import { useCodeFormatting } from './composables/features/useCodeFormatting'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 
 const props = defineProps<{
   modelValue: string

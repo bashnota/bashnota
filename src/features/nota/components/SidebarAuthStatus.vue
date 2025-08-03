@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/features/auth/stores/auth'
 import { RouterLink } from 'vue-router'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import { 
   LogIn, 
   UserPlus, 
@@ -11,7 +11,7 @@ import {
   AtSign,
   Settings
 } from 'lucide-vue-next'
-import { Tooltip } from '@/ui/tooltip'
+import { Tooltip } from '@/components/ui/tooltip'
 
 const props = defineProps<{
   compact?: boolean

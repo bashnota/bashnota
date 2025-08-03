@@ -12,11 +12,12 @@ import {
   Search,
   Settings2
 } from 'lucide-vue-next'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import NotaTree from '@/features/nota/components/NotaTree.vue'
 import { RouterLink } from 'vue-router'
-import { ScrollArea } from '@/ui/scroll-area'
-import ShortcutsDialog from '@/ui/ShortcutsDialog.vue'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Badge } from '@/components/ui/badge'
 import { logger } from '@/services/logger'
 
 // Import our new modular components
@@ -37,7 +38,7 @@ const newNotaTitle = ref('')
 const searchQuery = ref('')
 const showNewNotaInput = ref<boolean>(false)
 const expandedItems = ref<Set<string>>(new Set())
-const shortcutsDialog = ref<{ isOpen: boolean }>({ isOpen: false })
+const showShortcutsDialog = ref(false)
 const activeView = ref<'all' | 'favorites' | 'recent'>('all')
 const showSearch = ref(false)
 const debouncedSearchQuery = ref('')
@@ -196,6 +197,14 @@ onKeyStroke('Escape', () => {
   }
 })
 
+// Show shortcuts dialog
+onKeyStroke('?', (e: KeyboardEvent) => {
+  if (e.shiftKey) {
+    e.preventDefault()
+    showShortcutsDialog.value = true
+  }
+})
+
 // Handle login/profile navigation
 const handleAuthNavigation = () => {
   if (authStore.isAuthenticated) {
@@ -233,6 +242,16 @@ const handleAuthNavigation = () => {
             title="Settings"
           >
             <Settings class="h-4 w-4" />
+          </Button>
+          
+          <!-- Shortcuts Dialog Trigger -->
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            @click="showShortcutsDialog = true"
+            title="Keyboard Shortcuts (Shift + ?)"
+          >
+            <Settings2 class="h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -331,7 +350,57 @@ const handleAuthNavigation = () => {
       </div>
     </ScrollArea>
 
-    <ShortcutsDialog ref="shortcutsDialog" />
+    <!-- Keyboard Shortcuts Dialog -->
+    <Dialog :open="showShortcutsDialog" @update:open="showShortcutsDialog = $event">
+      <DialogContent class="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Keyboard Shortcuts</DialogTitle>
+        </DialogHeader>
+        <div class="space-y-4">
+          <div class="space-y-2">
+            <h4 class="text-sm font-medium">Navigation</h4>
+            <div class="space-y-1 text-sm">
+              <div class="flex justify-between">
+                <span>New nota</span>
+                <Badge variant="outline" class="text-xs">Ctrl/⌘ + N</Badge>
+              </div>
+              <div class="flex justify-between">
+                <span>All notas</span>
+                <Badge variant="outline" class="text-xs">Ctrl/⌘ + 1</Badge>
+              </div>
+              <div class="flex justify-between">
+                <span>Favorites</span>
+                <Badge variant="outline" class="text-xs">Ctrl/⌘ + 2</Badge>
+              </div>
+              <div class="flex justify-between">
+                <span>Recent</span>
+                <Badge variant="outline" class="text-xs">Ctrl/⌘ + 3</Badge>
+              </div>
+            </div>
+          </div>
+          
+          <div class="space-y-2">
+            <h4 class="text-sm font-medium">Search</h4>
+            <div class="space-y-1 text-sm">
+              <div class="flex justify-between">
+                <span>Clear search</span>
+                <Badge variant="outline" class="text-xs">Escape</Badge>
+              </div>
+            </div>
+          </div>
+          
+          <div class="space-y-2">
+            <h4 class="text-sm font-medium">Help</h4>
+            <div class="space-y-1 text-sm">
+              <div class="flex justify-between">
+                <span>Show shortcuts</span>
+                <Badge variant="outline" class="text-xs">Shift + ?</Badge>
+              </div>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
     
     <!-- New Nota Modal -->
     <NewNotaModal
@@ -348,15 +417,15 @@ const handleAuthNavigation = () => {
 <style scoped>
 /* Mobile optimizations */
 .mobile-sidebar {
-  @apply text-sm;
+  font-size: 0.875rem; /* text-sm */
 }
 
 .mobile-sidebar .h-7 {
-  @apply h-8;
+  height: 2rem; /* h-8 */
 }
 
 .mobile-sidebar .text-xs {
-  @apply text-sm;
+  font-size: 0.875rem; /* text-sm */
 }
 
 /* Enhanced transitions */
@@ -381,7 +450,8 @@ const handleAuthNavigation = () => {
 /* Better focus states for accessibility */
 button:focus-visible,
 a:focus-visible {
-  @apply ring-2 ring-primary ring-offset-2 outline-none;
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
 }
 
 /* Mobile touch targets */
@@ -392,22 +462,22 @@ a:focus-visible {
   }
   
   .gap-1 {
-    @apply gap-1.5;
+    gap: 0.375rem; /* gap-1.5 */
   }
   
   .gap-1\.5 {
-    @apply gap-2;
+    gap: 0.5rem; /* gap-2 */
   }
 }
 
 /* Responsive text scaling */
 @media (max-width: 640px) {
   .text-sm {
-    @apply text-base;
+    font-size: 1rem; /* text-base */
   }
   
   .text-xs {
-    @apply text-sm;
+    font-size: 0.875rem; /* text-sm */
   }
 }
 </style>

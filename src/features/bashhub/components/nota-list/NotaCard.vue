@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import { Button } from '@/ui/button'
-import { Badge } from '@/ui/badge'
-import { Card, CardHeader, CardTitle, CardContent } from '@/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { 
   FileText, 
   Star, 

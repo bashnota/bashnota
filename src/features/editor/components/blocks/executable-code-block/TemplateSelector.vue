@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { Search, Code, Tag, Sparkles, Clock, TrendingUp } from 'lucide-vue-next'
-import { Button } from '@/ui/button'
-import { Input } from '@/ui/input'
-import { Badge } from '@/ui/badge'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/ui/tabs'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/ui/dialog'
-import { Label } from '@/ui/label'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
 import { useCodeTemplates, type CodeTemplate, type TemplateVariable } from './composables/features/useCodeTemplates'
 
 const props = defineProps<{

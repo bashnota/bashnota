@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import { 
   FileText, 
   Star, 
@@ -45,7 +45,7 @@ const emptyStateConfig = computed(() => {
   }
   
   if (props.hasSearchQuery || props.hasSelectedTag) {
-    const filters = []
+    const filters: string[] = []
     if (props.hasSearchQuery) filters.push(`"${props.searchQuery}"`)
     if (props.hasSelectedTag) filters.push(`#${props.selectedTag}`)
     
@@ -95,7 +95,7 @@ const emptyStateConfig = computed(() => {
         <Button 
           v-if="emptyStateConfig.showCreateButton"
           @click="$emit('create-nota')"
-          class="gap-2"
+          class="flex gap-2"
         >
           <Plus class="h-4 w-4" />
           Create Your First Nota
@@ -105,7 +105,7 @@ const emptyStateConfig = computed(() => {
           v-if="emptyStateConfig.showClearButton"
           variant="outline"
           @click="$emit('clear-filters')"
-          class="gap-2"
+          class="flex gap-2"
         >
           <Search class="h-4 w-4" />
           Clear Filters

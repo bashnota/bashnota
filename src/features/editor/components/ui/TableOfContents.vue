@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { ListOrdered, Heading1, Heading2, Heading3 } from 'lucide-vue-next'
-import { ScrollArea } from '@/ui/scroll-area'
-import { Button } from '@/ui/button'
-import { Separator } from '@/ui/separator'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
 import type { Editor } from '@tiptap/vue-3'
 
 const props = defineProps<{

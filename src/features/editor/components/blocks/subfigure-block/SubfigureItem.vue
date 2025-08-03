@@ -12,15 +12,17 @@
         ]"
         @click="showPreview = true"
       />
-      <UploadZone
-        v-else-if="!isReadOnly"
-        @file-selected="handleFileSelected"
-        @file-dropped="handleFileDrop"
-        @files-selected="handleMultipleFilesSelected"
-        :allow-multiple="true"
-        class="rounded-md"
-        :disabled="isLocked"
-      />
+      <div v-else-if="!isReadOnly" class="grid w-full max-w-sm items-center gap-1.5 rounded-md border border-dashed border-gray-300 p-6">
+        <Label for="subfigure-upload">Upload Image</Label>
+        <Input 
+          id="subfigure-upload" 
+          type="file" 
+          accept="image/*"
+          multiple
+          :disabled="isLocked"
+          @change="handleFileSelected"
+        />
+      </div>
 
       <Button
         v-if="!isLocked && subfigure.src && !isReadOnly"
@@ -81,9 +83,9 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { TrashIcon, LockIcon } from 'lucide-vue-next'
-import { Button } from '@/ui/button'
-import { Input } from '@/ui/input'
-import UploadZone from '@/ui/UploadZone.vue'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import ImagePreviewModal from './ImagePreviewModal.vue'
 import { logger } from '@/services/logger'
 

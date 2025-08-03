@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Loader2, CheckCircle2, AlertCircle, Clock } from 'lucide-vue-next'
-import { Progress } from '@/ui/progress'
+import { Progress } from '@/components/ui/progress'
 
 const props = defineProps<{
   status: 'idle' | 'running' | 'error' | 'success'

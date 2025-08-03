@@ -42,7 +42,7 @@
 
 <script setup lang="ts">
 import { CheckCircle as CheckCircleIcon, XCircle as XCircleIcon, AlertTriangle as AlertTriangleIcon } from 'lucide-vue-next'
-import { Label } from '@/ui/label'
+import { Label } from '@/components/ui/label'
 
 interface Props {
   webglSupported: boolean

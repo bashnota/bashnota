@@ -34,8 +34,8 @@
 </template>
 
 <script setup lang="ts">
-import { Button } from '@/ui/button'
-import { Label } from '@/ui/label'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
 import { SunIcon, MoonIcon, LaptopIcon } from 'lucide-vue-next'
 import { useTheme } from '@/composables/theme'
 

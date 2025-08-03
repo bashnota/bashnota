@@ -43,7 +43,7 @@ const daysInMonth = computed(() => {
   const month = props.currentDate.getMonth()
   const firstDay = new Date(year, month, 1)
   const lastDay = new Date(year, month + 1, 0)
-  const days = []
+  const days: (Date | null)[] = []
 
   // Add empty cells for days before the first day of the month
   const firstDayOfWeek = firstDay.getDay()
@@ -133,7 +133,7 @@ const formatTime = (dateString: string) => {
       <div v-if="day" class="flex flex-col gap-1">
         <div class="flex items-center justify-between">
           <div class="text-sm font-medium">{{ formatDay(day) }}</div>
-          <div v-if="day.toDateString() === new Date().toDateString()" class="text-xs text-primary">
+          <div v-if="day && day.toDateString() === new Date().toDateString()" class="text-xs text-primary">
             Today
           </div>
         </div>

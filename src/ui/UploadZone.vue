@@ -27,7 +27,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import { UploadCloud } from 'lucide-vue-next'
 import { logger } from '@/services/logger'
 

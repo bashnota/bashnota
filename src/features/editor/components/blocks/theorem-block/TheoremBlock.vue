@@ -182,29 +182,29 @@ import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import type { NodeViewProps } from '@tiptap/vue-3'
 import { Pencil, ChevronRight, ChevronDown, Keyboard } from 'lucide-vue-next'
-import { Card, CardContent, CardHeader } from '@/ui/card'
-import { Button } from '@/ui/button'
-import { Input } from '@/ui/input'
-import { Textarea } from '@/ui/textarea'
-import { Label } from '@/ui/label'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
 import { 
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue
-} from '@/ui/select'
+} from '@/components/ui/select'
 import { 
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger
-} from '@/ui/collapsible'
+} from '@/components/ui/collapsible'
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger
-} from '@/ui/tabs'
+} from '@/components/ui/tabs'
 import MixedContentDisplay from './MixedContentDisplay.vue'
 import { logger } from '@/services/logger'
 import { toast } from 'vue-sonner'

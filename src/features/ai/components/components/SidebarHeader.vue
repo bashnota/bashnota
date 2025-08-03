@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { CardHeader, CardTitle } from '@/ui/card'
-import { Button } from '@/ui/button'
-import { Badge } from '@/ui/badge'
+import { CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Sparkles as SparklesIcon, XIcon, LoaderIcon, Maximize2, Minimize2 } from 'lucide-vue-next'
 
 const props = defineProps<{

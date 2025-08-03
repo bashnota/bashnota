@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Folder, Star, Clock } from 'lucide-vue-next'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import { watch } from 'vue'
 
 type ViewType = 'all' | 'favorites' | 'recent'

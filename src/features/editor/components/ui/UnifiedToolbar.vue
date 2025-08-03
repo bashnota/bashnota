@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { useEditorStore } from '@/features/editor/stores/editorStore'
-import { Button } from '@/ui/button'
-import { Separator } from '@/ui/separator'
-import { Tooltip } from '@/ui/tooltip'
+import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
+import { Tooltip } from '@/components/ui/tooltip'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/ui/select'
+} from '@/components/ui/select'
 import {
   // Editor formatting
   Bold,

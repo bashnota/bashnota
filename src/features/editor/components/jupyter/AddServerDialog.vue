@@ -170,16 +170,16 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/ui/dialog'
+} from '@/components/ui/dialog'
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
-} from '@/ui/tabs'
-import { Button } from '@/ui/button'
-import { Input } from '@/ui/input'
-import { Label } from '@/ui/label'
+} from '@/components/ui/tabs'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Loader2, Eye as EyeIcon, EyeOff as EyeOffIcon } from 'lucide-vue-next'
 
 interface ServerForm {

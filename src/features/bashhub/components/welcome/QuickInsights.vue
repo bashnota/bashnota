@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Badge } from '@/ui/badge'
+import { Badge } from '@/components/ui/badge'
 import { 
   TrendingUp, 
   Calendar, 

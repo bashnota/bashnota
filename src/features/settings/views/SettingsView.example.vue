@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/ui/tabs'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { AICodeActionsSettings } from '@/features/settings/components/ai'
 import { Settings, Brain, Palette, User, Shield, Globe } from 'lucide-vue-next'
 

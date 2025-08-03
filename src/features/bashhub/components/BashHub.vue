@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Button } from '@/ui/button'
-import { Input } from '@/ui/input'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/ui/tabs'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { 
   FileText, 
   TrendingUp, 

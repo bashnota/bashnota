@@ -77,7 +77,7 @@ import { X, SplitSquareHorizontal, SplitSquareVertical } from 'lucide-vue-next'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useLayoutStore, type Pane } from '@/stores/layoutStore'
 import { logger } from '@/services/logger'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 
 const props = defineProps<{
   pane: Pane

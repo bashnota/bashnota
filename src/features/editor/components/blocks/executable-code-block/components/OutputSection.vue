@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { Box, Brain, Copy, AlertTriangle, Sparkles, ExternalLink } from 'lucide-vue-next'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import OutputRenderer from '../OutputRenderer.vue'
 import AICodeAssistantContainer from '../ai/components/AICodeAssistantContainer.vue'
 

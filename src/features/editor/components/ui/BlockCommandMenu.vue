@@ -5,7 +5,7 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-} from '@/ui/command'
+} from '@/components/ui/command'
 import { 
   Trash2 as Trash2Icon, 
   Scissors as ScissorsIcon, 
@@ -18,7 +18,7 @@ import { serializeForClipboard } from '@/features/editor/components/extensions/D
 import type { Selection } from '@tiptap/pm/state'
 import { useFavoriteBlocksStore } from '@/features/nota/stores/favoriteBlocksStore'
 import AddToFavoritesModal from '@/features/editor/components/dialogs/AddToFavoritesModal.vue'
-import { toast } from '@/ui/toast'
+import { toast } from 'vue-sonner'
 import { logger } from '@/services/logger'
 import { useAIActionsStore } from '@/features/ai/stores/aiActionsStore'
 import { useAIActions } from '@/features/ai/components/composables/useAIActions'

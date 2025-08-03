@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { Search, ChevronRight, ChevronDown, FileText, Palette, SparklesIcon, Plug, Keyboard, Settings } from 'lucide-vue-next'
-import { Input } from '@/ui/input'
+import { Input } from '@/components/ui/input'
 import SettingsPanel from '@/features/settings/components/SettingsPanel.vue'
 
 const route = useRoute()

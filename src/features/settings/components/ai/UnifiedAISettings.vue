@@ -217,14 +217,14 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/ui/card'
-import { Button } from '@/ui/button'
-import { Label } from '@/ui/label'
-import { Slider } from '@/ui/slider'
-import { Textarea } from '@/ui/textarea'
-import { Checkbox } from '@/ui/checkbox'
-import { Badge } from '@/ui/badge'
-import { toast } from '@/ui/toast'
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Slider } from '@/components/ui/slider'
+import { Textarea } from '@/components/ui/textarea'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Badge } from '@/components/ui/badge'
+import { toast } from 'vue-sonner'
 import { 
   Sparkles as SparklesIcon, 
   Server as ServerIcon, 

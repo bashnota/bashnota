@@ -2,9 +2,9 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import type { JupyterServer, KernelSpec } from '@/features/jupyter/types/jupyter'
 import { Server, Cpu, RotateCw, Trash2, ChevronDown } from 'lucide-vue-next'
-import { Button } from '@/ui/button'
-import { Card } from '@/ui/card'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/ui/collapsible'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { JupyterService } from '@/features/jupyter/services/jupyterService'
 
 const props = defineProps<{

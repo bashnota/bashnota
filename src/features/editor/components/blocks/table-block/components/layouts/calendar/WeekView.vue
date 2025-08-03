@@ -43,7 +43,7 @@ const events = computed(() => {
 const daysInWeek = computed(() => {
   const startOfWeek = new Date(props.currentDate)
   startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay())
-  const days = []
+  const days: Date[] = []
 
   for (let i = 0; i < 7; i++) {
     const day = new Date(startOfWeek)

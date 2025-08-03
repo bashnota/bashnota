@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight } from 'lucide-vue-next'
 
 interface PaginationProps {

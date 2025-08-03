@@ -172,18 +172,18 @@ import { ref } from 'vue'
 import {
   Card,
   CardContent,
-} from '@/ui/card'
+} from '@/components/ui/card'
 import {
   Button
-} from '@/ui/button'
+} from '@/components/ui/button'
 import {
   Badge
-} from '@/ui/badge'
+} from '@/components/ui/badge'
 import {
   Alert,
   AlertDescription,
   AlertTitle,
-} from '@/ui/alert'
+} from '@/components/ui/alert'
 import {
   Upload,
   FileText,

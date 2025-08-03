@@ -659,7 +659,7 @@ function createSubNotaCommand(): CommandItem {
     command: safeExecuteCommand(({ editor, range }: CommandArgs) => {
       // Get the current nota ID from the router
       const currentRoute = router.currentRoute.value;
-      let parentId = null;
+      let parentId: string | null = null;
       
       if (currentRoute.params.id && typeof currentRoute.params.id === 'string') {
         parentId = currentRoute.params.id;

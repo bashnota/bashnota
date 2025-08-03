@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Card, CardHeader, CardTitle, CardContent } from '@/ui/card'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 
 interface ContributorCardProps {
   contributor: {

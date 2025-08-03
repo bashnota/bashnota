@@ -127,11 +127,11 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Label } from '@/ui/label'
-import { Button } from '@/ui/button'
-import { Badge } from '@/ui/badge'
+import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { RefreshCwIcon } from 'lucide-vue-next'
-import SearchableSelect from '@/ui/searchable-select.vue'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { ModelInfo } from '@/features/settings/components/ai/composables/useProviderSettings'
 
 export interface ModelSelectorProps {

@@ -33,7 +33,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch, defineProps, defineEmits, nextTick } from 'vue'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 
 const props = defineProps<{
   modelValue: string

@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/ui/card'
-import { Label } from '@/ui/label'
-import { Slider } from '@/ui/slider'
-import { Switch } from '@/ui/switch'
-import { toast } from '@/ui/toast'
-import { Button } from '@/ui/button'
-import { Input } from '@/ui/input'
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
+import { Slider } from '@/components/ui/slider'
+import { Switch } from '@/components/ui/switch'
+import { toast } from 'vue-sonner'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { RotateCw, Eye, Palette } from 'lucide-vue-next'
 
 // Apply text color to CSS custom properties

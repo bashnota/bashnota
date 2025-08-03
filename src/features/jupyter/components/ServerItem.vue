@@ -107,7 +107,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import { RotateCw, Trash2, ChevronDown } from 'lucide-vue-next'
 import type { JupyterServer, KernelSpec } from '@/features/jupyter/types/jupyter'
 import type { JupyterSession, RunningKernel } from '@/features/jupyter/composables/useJupyterSessions'

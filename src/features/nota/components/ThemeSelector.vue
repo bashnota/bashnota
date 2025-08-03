@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useThemeColor, type ThemeColor } from '@/composables/theme'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import { Check } from 'lucide-vue-next'
 
 const { color: themeColor, setColor: setThemeColor, themeDefinitions } = useThemeColor()

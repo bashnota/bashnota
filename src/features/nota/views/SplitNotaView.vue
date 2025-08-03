@@ -84,7 +84,7 @@ import { useRoute } from 'vue-router'
 import { watch, onMounted, reactive, computed, ref } from 'vue'
 import { useEditorStore } from '@/features/editor/stores/editorStore'
 import { useNotaStore } from '@/features/nota/stores/nota'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import type { Editor } from '@tiptap/vue-3'
 
 import TableOfContents from '@/features/editor/components/ui/TableOfContents.vue'

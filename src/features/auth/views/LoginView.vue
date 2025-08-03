@@ -2,9 +2,9 @@
 import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/features/auth/stores/auth'
-import { Button } from '@/ui/button'
-import { Input } from '@/ui/input'
-import { Label } from '@/ui/label'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Card,
   CardContent,
@@ -12,8 +12,8 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from '@/ui/card'
-import { Checkbox } from '@/ui/checkbox'
+} from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Eye, EyeOff, Mail, Lock } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { logger } from '@/services/logger'

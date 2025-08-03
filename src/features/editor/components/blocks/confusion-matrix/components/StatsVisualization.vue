@@ -263,16 +263,16 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-} from '@/ui/card'
+} from '@/components/ui/card'
 import {
   Badge
-} from '@/ui/badge'
+} from '@/components/ui/badge'
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
-} from '@/ui/tabs'
+} from '@/components/ui/tabs'
 import {
   Target,
   XCircle,

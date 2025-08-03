@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Button } from '@/ui/button'
-import { Tooltip } from '@/ui/tooltip'
-import { Separator } from '@/ui/separator'
+import { Button } from '@/components/ui/button'
+import { Tooltip } from '@/components/ui/tooltip'
+import { Separator } from '@/components/ui/separator'
 import {
   BookIcon,
   ServerIcon,

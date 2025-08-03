@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/ui/card'
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Code2 } from 'lucide-vue-next'
-import { Switch } from '@/ui/switch'
-import { Label } from '@/ui/label'
-import { Slider } from '@/ui/slider'
-import { Badge } from '@/ui/badge'
-import { Separator } from '@/ui/separator'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
+import { Slider } from '@/components/ui/slider'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
 import { logger } from '@/services/logger'
 
 // Editor settings state (text-specific)

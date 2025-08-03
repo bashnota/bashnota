@@ -223,11 +223,11 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { Button } from '@/ui/button'
-import { Input } from '@/ui/input'
-import { Label } from '@/ui/label'
-import { Switch } from '@/ui/switch'
-import { Textarea } from '@/ui/textarea'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog,
   DialogContent,
@@ -235,21 +235,21 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/ui/dialog'
+} from '@/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/ui/dropdown-menu'
+} from '@/components/ui/dropdown-menu'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/ui/select'
+} from '@/components/ui/select'
 import { 
   Plus as PlusIcon, 
   MoreHorizontal,
@@ -264,7 +264,7 @@ import { useAIActionsStore } from '@/features/ai/stores/aiActionsStore'
 import { getIconComponent, getColorClasses } from '@/features/ai/utils/iconResolver'
 import { AVAILABLE_ICONS, AVAILABLE_COLORS } from '@/features/ai/types/aiActions'
 import type { AIAction } from '@/features/ai/types/aiActions'
-import { toast } from '@/ui/toast'
+import { toast } from 'vue-sonner'
 
 const aiActionsStore = useAIActionsStore()
 

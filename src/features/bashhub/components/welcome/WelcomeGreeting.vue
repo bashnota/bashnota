@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Badge } from '@/ui/badge'
+import { Badge } from '@/components/ui/badge'
 import { Sparkles, Zap, Coffee, Rocket, Heart } from 'lucide-vue-next'
 
 interface Props {

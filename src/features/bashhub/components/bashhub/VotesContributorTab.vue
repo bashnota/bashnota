@@ -3,8 +3,8 @@ import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import PodiumView from './PodiumView.vue'
 import EmptyState from './EmptyState.vue'
-import LoadingSpinner from '@/ui/LoadingSpinner.vue'
-import { Button } from '@/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Button } from '@/components/ui/button'
 import { 
   Heart, 
   ChevronRight, 
@@ -154,7 +154,7 @@ const getVoteRatio = (contributor: any) => {
     
     <!-- Loading state -->
     <div v-if="showLoading" class="flex justify-center py-8">
-      <LoadingSpinner />
+      <div class="flex flex-col space-y-3"><Skeleton class="h-4 w-full" /><Skeleton class="h-4 w-4/5" /><Skeleton class="h-4 w-3/5" /></div>
     </div>
     
     <!-- Error state -->

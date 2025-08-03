@@ -57,8 +57,8 @@
 
 <script setup lang="ts">
 import { Gauge as GaugeIcon, X as XIcon, XCircle as XCircleIcon } from 'lucide-vue-next'
-import { Badge } from '@/ui/badge'
-import { Button } from '@/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 
 interface Props {
   currentModel: string | null

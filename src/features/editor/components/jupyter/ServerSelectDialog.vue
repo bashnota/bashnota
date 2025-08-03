@@ -68,8 +68,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle
-} from '@/ui/dialog'
-import { Button } from '@/ui/button'
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 import { ServerIcon, CheckIcon, Loader2 } from 'lucide-vue-next'
 import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
 import { JupyterService } from '@/features/jupyter/services/jupyterService'

@@ -104,9 +104,9 @@ import {
   Plus,
   RotateCw,
 } from 'lucide-vue-next'
-import { ScrollArea } from '@/ui/scroll-area'
-import { Button } from '@/ui/button'
-import { Tooltip } from '@/ui/tooltip'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Button } from '@/components/ui/button'
+import { Tooltip } from '@/components/ui/tooltip'
 import type { JupyterServer } from '@/features/jupyter/types/jupyter'
 import { BaseSidebar, KeyboardShortcut } from '@/ui/sidebars'
 import ServerItem from '@/features/jupyter/components/ServerItem.vue'

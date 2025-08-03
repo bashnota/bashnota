@@ -5,7 +5,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-} from '@/ui/dropdown-menu'
+} from '@/components/ui/dropdown-menu'
 
 const props = defineProps<{
   hasClipboard: boolean

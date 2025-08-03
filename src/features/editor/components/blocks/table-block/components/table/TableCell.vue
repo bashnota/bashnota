@@ -1,16 +1,16 @@
 <script setup lang="ts">
 import { computed, ref, nextTick } from 'vue'
-import { Input } from '@/ui/input'
+import { Input } from '@/components/ui/input'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/ui/dropdown-menu'
-import { Button } from '@/ui/button'
+} from '@/components/ui/dropdown-menu'
+import { Button } from '@/components/ui/button'
 import { ChevronDown, Calendar as CalendarIcon } from 'lucide-vue-next'
-import Calendar from '@/ui/calendar.vue'
-import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover'
+import { Calendar } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import type { TableData } from '@/features/editor/components/blocks/table-block/TableExtension'
 
 const props = defineProps<{

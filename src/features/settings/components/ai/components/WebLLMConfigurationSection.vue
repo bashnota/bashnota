@@ -113,8 +113,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { AlertTriangle as AlertTriangleIcon, Gauge as GaugeIcon, ExternalLink as ExternalLinkIcon, Loader2 as Loader2Icon } from 'lucide-vue-next'
-import { Badge } from '@/ui/badge'
-import { Button } from '@/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { useAIProviders } from '@/features/ai/components/composables/useAIProviders'
 import { useRouter } from 'vue-router'
 import type { WebLLMModelInfo } from '@/features/ai/services'

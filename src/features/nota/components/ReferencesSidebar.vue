@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { BookIcon, Plus } from 'lucide-vue-next'
-import { ScrollArea } from '@/ui/scroll-area'
-import { Button } from '@/ui/button'
-import { Input } from '@/ui/input'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { useCitationStore } from '@/features/editor/stores/citationStore'
 import { BaseSidebar, KeyboardShortcut } from '@/ui/sidebars'
 import { useSidebarComposable } from '@/composables/useSidebarComposable'

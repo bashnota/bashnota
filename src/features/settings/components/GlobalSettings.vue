@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/ui/tabs'
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { 
   Keyboard, 
   Database, 
@@ -17,14 +17,14 @@ import {
   User,
 } from 'lucide-vue-next'
 import { useShortcutsStore } from '@/stores/shortcutsStore'
-import { Label } from '@/ui/label'
-import { Input } from '@/ui/input'
-import { Button } from '@/ui/button'
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { useNotaStore } from '@/features/nota/stores/nota'
-import { Separator } from '@/ui/separator'
-import { toast } from '@/ui/toast'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/ui/dialog'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/ui/table'
+import { Separator } from '@/components/ui/separator'
+import { toast } from 'vue-sonner'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import UnifiedAISettings from '@/features/settings/components/ai/UnifiedAISettings.vue'
 import JupyterSettings from '@/features/settings/components/JupyterSettings.vue'
 import UserTagEditor from '@/features/auth/components/UserTagEditor.vue'

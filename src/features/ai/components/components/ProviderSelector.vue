@@ -6,8 +6,8 @@ import {
   SelectContent, 
   SelectItem, 
   SelectTrigger, 
-} from '@/ui/select'
-import { Badge } from '@/ui/badge'
+} from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
 import { 
   SparklesIcon, 
   CpuIcon, 
@@ -77,6 +77,13 @@ const getProviderLabel = (provider: any) => {
   return provider.name
 }
 
+// Wrapper function to handle Select component's AcceptableValue type
+const handleProviderUpdate = async (value: any) => {
+  if (value && typeof value === 'string') {
+    await updateProvider(value)
+  }
+}
+
 // Update the provider when changed
 const updateProvider = async (providerId: string) => {
   console.log('[ProviderSelector] updateProvider called with:', providerId, 'current:', currentProviderId.value)
@@ -132,7 +139,7 @@ onMounted(async () => {
   <div>
     <Select 
       v-model="currentProviderId" 
-      @update:modelValue="updateProvider"
+      @update:modelValue="handleProviderUpdate"
     >
       <SelectTrigger
         class="w-full text-sm border-none bg-background shadow-none px-0 h-6 font-normal"

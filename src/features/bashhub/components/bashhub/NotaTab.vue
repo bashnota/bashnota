@@ -4,7 +4,7 @@ import NotaCard from './NotaCard.vue'
 import NotaListItem from './NotaListItem.vue'
 import Pagination from './Pagination.vue'
 import EmptyState from './EmptyState.vue'
-import LoadingSpinner from '@/ui/LoadingSpinner.vue'
+import { Skeleton } from '@/components/ui/skeleton'
 import type { PublishedNota } from '@/features/nota/types/nota'
 import { useAuthStore } from '@/features/auth/stores/auth'
 
@@ -59,8 +59,10 @@ const handleCloneNota = (nota: PublishedNota, event: Event) => {
     <h2 class="text-xl font-semibold mb-4">{{ title }}</h2>
     
     <!-- Loading state -->
-    <div v-if="showInitialLoading" class="flex justify-center py-8">
-      <LoadingSpinner />
+    <div v-if="showInitialLoading" class="flex flex-col space-y-3 py-8">
+      <Skeleton class="h-4 w-full" />
+      <Skeleton class="h-4 w-4/5" />
+      <Skeleton class="h-4 w-3/5" />
     </div>
     
     <!-- Error state -->
@@ -112,7 +114,7 @@ const handleCloneNota = (nota: PublishedNota, event: Event) => {
 
     <!-- Loading indicator for pagination -->
     <div v-if="showPaginationLoading" class="flex justify-center py-4 mt-4">
-      <LoadingSpinner />
+      <Skeleton class="h-8 w-32" />
     </div>
   </div>
 </template>

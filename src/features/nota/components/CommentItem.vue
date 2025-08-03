@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Button } from '@/ui/button'
-import { Badge } from '@/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { 
   MessageSquare, 
   ThumbsUp, 
@@ -10,13 +10,13 @@ import {
   Trash2, 
   X
 } from 'lucide-vue-next'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useAuthStore } from '@/features/auth/stores/auth'
 import { commentService } from '@/features/nota/services/commentService'
 import { formatDate } from '@/lib/utils'
 import { toast } from 'vue-sonner'
 import { logger } from '@/services/logger'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import CommentForm from './CommentForm.vue'
 import type { Comment } from '@/features/nota/types/nota'
 import { useRouter } from 'vue-router'

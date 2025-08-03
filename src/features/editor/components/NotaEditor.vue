@@ -1,18 +1,18 @@
 <script setup lang="ts">
 import { useEditor, EditorContent } from '@tiptap/vue-3'
-import { TagsInput } from '@/ui/tags-input'
+import { TagsInput } from '@/components/ui/tags-input'
 import { RotateCw, CheckCircle, Star, Share2, Download, PlayCircle, Loader2, Save, Clock, Sparkles, Book, Server, Tag, Link2 } from 'lucide-vue-next'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
 import { ref, watch, computed, onUnmounted, onMounted, reactive, provide } from 'vue'
 import 'highlight.js/styles/github.css'
 import { useRouter } from 'vue-router'
-import LoadingSpinner from '@/ui/LoadingSpinner.vue'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useCodeExecutionStore } from '@/features/editor/stores/codeExecutionStore'
 import { getURLWithoutProtocol } from '@/lib/utils'
 import { toast } from 'vue-sonner'
 import VersionHistoryDialog from './dialogs/VersionHistoryDialog.vue'
-import { ScrollArea } from '@/ui/scroll-area'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { getEditorExtensions } from './extensions'
 import { useEquationCounter, EQUATION_COUNTER_KEY } from '@/features/editor/composables/useEquationCounter'
 import { useCitationStore } from '@/features/editor/stores/citationStore'
@@ -111,7 +111,7 @@ const content = computed(() => {
 const registerCodeCells = (content: any, notaId: string) => {
   // Find all executable code blocks in the content
   const findCodeBlocks = (node: any): any[] => {
-    const blocks = []
+    const blocks: any[] = []
     if (node.type === 'executableCodeBlock') {
       blocks.push(node)
     }
@@ -634,8 +634,10 @@ defineExpose({
 
 <template>
   <div class="h-full w-full flex overflow-hidden">
-    <!-- Loading spinner -->
-    <LoadingSpinner v-if="isLoading" class="absolute inset-0 z-10" />
+    <!-- Loading skeleton -->
+    <div v-if="isLoading" class="absolute inset-0 z-10 flex items-center justify-center bg-background/80">
+      <Skeleton class="w-8 h-8 rounded-full" />
+    </div>
 
     <!-- Main Editor Area -->
     <div class="flex-1 flex flex-col min-w-0 h-full overflow-hidden">

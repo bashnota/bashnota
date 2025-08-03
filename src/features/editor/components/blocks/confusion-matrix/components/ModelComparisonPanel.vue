@@ -256,23 +256,23 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-} from '@/ui/card'
+} from '@/components/ui/card'
 import {
   Button
-} from '@/ui/button'
+} from '@/components/ui/button'
 import {
   Input
-} from '@/ui/input'
+} from '@/components/ui/input'
 import {
   Label
-} from '@/ui/label'
+} from '@/components/ui/label'
 import {
   Badge
-} from '@/ui/badge'
+} from '@/components/ui/badge'
 import {
   Collapsible,
   CollapsibleContent,
-} from '@/ui/collapsible'
+} from '@/components/ui/collapsible'
 import {
   GitCompare,
   Plus,

@@ -65,8 +65,8 @@ import {
   LockIcon,
   UnlockIcon,
 } from 'lucide-vue-next'
-import { Button } from '@/ui/button'
-import { Switch } from '@/ui/switch'
+import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
 
 type LayoutType = 'horizontal' | 'vertical' | 'grid'
 

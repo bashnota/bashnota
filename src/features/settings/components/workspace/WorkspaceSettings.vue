@@ -4,7 +4,7 @@ import ThemeAppearanceCard from './ThemeAppearanceCard.vue'
 import InterfaceBehaviorCard from './InterfaceBehaviorCard.vue'
 import TextEditingCard from './TextEditingCard.vue'
 import CodeEditingCard from './CodeEditingCard.vue'
-import { toast } from '@/ui/toast'
+import { toast } from 'vue-sonner'
 
 // Component refs for accessing child component methods
 const interfaceBehaviorRef = ref()

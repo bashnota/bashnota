@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/ui/card'
-import { Alert, AlertDescription } from '@/ui/alert'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Settings, Info } from 'lucide-vue-next'
 </script>
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-vue-next'
 import type { CustomAIAction } from '@/features/editor/stores/aiActionsStore'
 

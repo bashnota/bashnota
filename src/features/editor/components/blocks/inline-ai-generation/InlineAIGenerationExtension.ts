@@ -3,7 +3,7 @@ import { VueNodeViewRenderer } from '@tiptap/vue-3'
 import InlineAIGenerationComponent from './InlineAIGeneration.vue'
 import { aiService } from '@/services/aiService'
 import { useAISettingsStore } from '@/features/ai/stores/aiSettingsStore'
-import { toast } from '@/ui/toast'
+import { toast } from 'vue-sonner'
 import { logger } from '@/services/logger'
 
 export interface InlineAIGenerationAttributes {

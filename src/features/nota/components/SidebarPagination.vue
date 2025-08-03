@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ChevronLeft, ChevronRight } from 'lucide-vue-next'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 
 interface Props {
   currentPage: number
@@ -21,7 +21,7 @@ const goToPage = (page: number) => {
 }
 
 const pageNumbers = () => {
-  const pages = []
+  const pages: (number | string)[] = []
   const maxVisiblePages = 3
   
   // Always show first page

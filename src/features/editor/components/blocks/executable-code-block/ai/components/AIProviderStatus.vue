@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Button } from '@/ui/button'
-import { Badge } from '@/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { AlertTriangle, Settings, ExternalLink, CheckCircle } from 'lucide-vue-next'
 
 interface Props {

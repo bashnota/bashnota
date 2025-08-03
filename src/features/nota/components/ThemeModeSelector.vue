@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useTheme, type ThemeMode } from '@/composables/theme'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import { Sun, Moon, Laptop } from 'lucide-vue-next'
 
 const { themeMode, setThemeMode } = useTheme()

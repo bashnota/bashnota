@@ -51,9 +51,9 @@
 </template>
 
 <script setup lang="ts">
-import { Card, CardContent } from '@/ui/card'
-import { Button } from '@/ui/button'
-import { Badge } from '@/ui/badge'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Eye, Code, CheckCircle } from 'lucide-vue-next'
 import type { JupyterFile } from '@/features/jupyter/types/jupyter'
 import type { ConfusionMatrixData } from '@/features/editor/components/blocks/confusion-matrix/utils/confusionMatrixUtils'

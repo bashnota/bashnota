@@ -12,15 +12,15 @@ import {
   Calendar,
   List
 } from 'lucide-vue-next'
-import { Button } from '@/ui/button'
-import { Input } from '@/ui/input'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-} from '@/ui/dropdown-menu'
+} from '@/components/ui/dropdown-menu'
 import { COLUMN_TYPES, getColumnTypeIcon } from '@/features/editor/components/blocks/table-block/constants/columnTypes'
 import type { ColumnType } from '@/features/editor/components/blocks/table-block/composables/useTableOperations'
 

@@ -40,10 +40,10 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { Input } from '@/ui/input'
-import { Label } from '@/ui/label'
-import { Button } from '@/ui/button'
-import { Badge } from '@/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Trash2Icon } from 'lucide-vue-next'
 
 export interface ApiKeySectionProps {

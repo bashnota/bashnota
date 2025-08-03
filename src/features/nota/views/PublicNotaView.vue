@@ -3,11 +3,11 @@ import { ref, onMounted, computed, onBeforeMount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useAuthStore } from '@/features/auth/stores/auth'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import { formatDate } from '@/lib/utils'
 import { toast } from 'vue-sonner'
 import { Share2, ChevronLeft, ChevronUp, ChevronDown, FileText, FileCode } from 'lucide-vue-next'
-import LoadingSpinner from '@/ui/LoadingSpinner.vue'
+import { Skeleton } from '@/components/ui/skeleton'
 import NotaContentViewer from '@/features/editor/components/NotaContentViewer.vue'
 import { type PublishedNota } from '@/features/nota/types/nota'
 import { logger } from '@/services/logger'
@@ -450,7 +450,7 @@ const openCitationDialog = () => {
   <main class="container mx-auto py-8 px-4">
     <!-- Loading state -->
     <div v-if="isLoading" class="flex justify-center items-center h-64" aria-live="polite">
-      <LoadingSpinner class="w-10 h-10" />
+      <Skeleton class="w-10 h-10 rounded-full" />
       <span class="sr-only">Loading note content</span>
     </div>
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, watch, ref } from 'vue'
 import { NodeViewWrapper } from '@tiptap/vue-3'
-import LoadingSpinner from '@/ui/LoadingSpinner.vue'
+import { Skeleton } from '@/components/ui/skeleton'
 import type { TableData } from '@/features/editor/components/blocks/table-block/TableExtension'
 import type { NodeViewProps } from '@tiptap/vue-3'
 import { logger } from '@/services/logger'
@@ -281,7 +281,7 @@ const handleReorderRows = async (fromRowId: string, toRowId: string) => {
     <div class="rounded-lg border bg-card">
       <!-- Loading State -->
       <div v-if="isLoading" class="p-8 flex justify-center items-center">
-        <LoadingSpinner class="w-8 h-8" />
+        <Skeleton class="w-8 h-8 rounded-full" />
       </div>
 
       <!-- Error State -->

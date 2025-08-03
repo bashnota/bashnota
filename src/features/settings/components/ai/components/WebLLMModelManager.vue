@@ -373,11 +373,11 @@ import {
   Download as DownloadIcon,
   Loader2 as Loader2Icon
 } from 'lucide-vue-next'
-import { Badge } from '@/ui/badge'
-import { Button } from '@/ui/button'
-import { Switch } from '@/ui/switch'
-import CustomSelect from '@/ui/CustomSelect.vue'
-import { toast } from '@/ui/toast'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { toast } from 'vue-sonner'
 import { useAIProviders } from '@/features/ai/components/composables/useAIProviders'
 import { useAISettingsStore } from '@/features/ai/stores/aiSettingsStore'
 
