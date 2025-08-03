@@ -1,16 +1,63 @@
 <template>
-  <div class="flex flex-col items-center justify-center h-screen bg-gray-100 dark:bg-gray-900">
-    <h1 class="text-6xl font-bold text-gray-800 dark:text-gray-200">404</h1>
-    <p class="text-xl text-gray-600 dark:text-gray-400">Page Not Found</p>
-    <p class="mt-4 text-gray-500 dark:text-gray-500">
-      The page you are looking for does not exist.
-    </p>
-    <RouterLink to="/" class="mt-8 px-4 py-2 text-white bg-blue-500 rounded hover:bg-blue-600">
-      Go Home
-    </RouterLink>
+  <div class="flex flex-col items-center justify-center min-h-screen bg-background">
+    <div class="text-center space-y-6 max-w-md mx-auto px-6">
+      <!-- 404 Number -->
+      <div class="space-y-2">
+        <h1 class="text-8xl md:text-9xl font-bold text-muted-foreground/20 select-none">
+          404
+        </h1>
+        <div class="relative -mt-8">
+          <h2 class="text-2xl md:text-3xl font-semibold text-foreground">
+            Page Not Found
+          </h2>
+        </div>
+      </div>
+      
+      <!-- Description -->
+      <div class="space-y-2">
+        <p class="text-muted-foreground text-lg">
+          Oops! The page you're looking for doesn't exist.
+        </p>
+        <p class="text-sm text-muted-foreground/80">
+          It might have been moved, deleted, or you entered the wrong URL.
+        </p>
+      </div>
+      
+      <!-- Actions -->
+      <div class="flex flex-col sm:flex-row gap-3 pt-4">
+        <Button asChild class="flex-1">
+          <RouterLink to="/" class="flex items-center gap-2">
+            <Home class="h-4 w-4" />
+            Go Home
+          </RouterLink>
+        </Button>
+        <Button variant="outline" asChild class="flex-1">
+          <RouterLink to="/docs" class="flex items-center gap-2">
+            <BookOpen class="h-4 w-4" />
+            Documentation
+          </RouterLink>
+        </Button>
+      </div>
+      
+      <!-- Additional Help -->
+      <div class="pt-6 border-t border-border">
+        <p class="text-xs text-muted-foreground">
+          Need help? Check out our 
+          <RouterLink to="/help" class="text-primary hover:underline">
+            help center
+          </RouterLink>
+          or
+          <RouterLink to="/contact" class="text-primary hover:underline">
+            contact support
+          </RouterLink>
+        </p>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
+import { Button } from '@/components/ui/button'
+import { Home, BookOpen } from 'lucide-vue-next'
 </script> 
