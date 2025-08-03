@@ -12,7 +12,7 @@ import {
 } from '@/ui/dialog'
 import { Button } from '@/ui/button'
 import { Input } from '@/ui/input'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { Copy, Share2, Globe, EyeOff, Loader2, RefreshCw, FolderTree } from 'lucide-vue-next'
 import { Switch } from '@/ui/switch'
 import { Checkbox } from '@/ui/checkbox'

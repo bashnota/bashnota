@@ -9,7 +9,7 @@ import { Button } from '@/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/ui/card'
 import { Alert, AlertDescription } from '@/ui/alert'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/ui/tabs'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { logger } from '@/services/logger'
 
 const props = defineProps<{

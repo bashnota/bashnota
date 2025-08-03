@@ -5,7 +5,7 @@ import { Input } from '@/ui/input'
 import { Button } from '@/ui/button'
 import { Search, BookIcon, Loader2, X, ChevronUp, ChevronDown } from 'lucide-vue-next'
 import type { CitationEntry } from '@/features/nota/types/nota'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/ui/select'
 
 const props = defineProps<{
@@ -173,7 +173,7 @@ const searchServices = {
         }))
       } catch (error) {
         console.error('Semantic Scholar search error:', error)
-        toast('Failed to search Semantic Scholar. Please try again.', 'Error', 'destructive')
+        toast('Failed to search Semantic Scholar. Please try again.', { description: 'Error' })
         return []
       }
     }
@@ -250,11 +250,11 @@ const handleSearchSelect = async (citation: CitationEntry) => {
       const index = citations.value.length // New citation will be at the end
       props.onSelect(newCitation, index)
       emit('close')
-      toast('Citation added successfully', 'Success')
+      toast('Citation added successfully', { description: 'Success' })
     }
   } catch (error) {
     console.error('Error importing citation:', error)
-    toast('Failed to add citation. Please try again.', 'Error', 'destructive')
+    toast('Failed to add citation. Please try again.', { description: 'Error' })
   }
 }
 

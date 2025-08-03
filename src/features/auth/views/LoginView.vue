@@ -15,7 +15,7 @@ import {
 } from '@/ui/card'
 import { Checkbox } from '@/ui/checkbox'
 import { Eye, EyeOff, Mail, Lock } from 'lucide-vue-next'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { logger } from '@/services/logger'
 
 const authStore = useAuthStore()
@@ -48,7 +48,9 @@ const isFormValid = computed(() => {
 // Handle login with email/password
 const handleLogin = async () => {
   if (!isFormValid.value) {
-    toast('Please fill in all fields correctly', 'Invalid Form', 'destructive')
+    toast('Please fill in all fields correctly', {
+      description: 'Invalid Form'
+    })
     return
   }
 
@@ -64,6 +66,10 @@ const handleLogin = async () => {
       } else {
         localStorage.removeItem('rememberedEmail')
       }
+
+      toast('Login successful!', {
+        description: 'Welcome back!'
+      })
 
       // Navigate to the redirect URL or home page
       const redirectUrl = (route.query.redirect as string) || '/'
@@ -84,6 +90,10 @@ const handleGoogleLogin = async () => {
     const result = await authStore.loginWithGoogle()
 
     if (result) {
+      toast('Google login successful!', {
+        description: 'Welcome back!'
+      })
+
       // Navigate to the redirect URL or home page
       const redirectUrl = (route.query.redirect as string) || '/'
       router.push(redirectUrl)
@@ -98,7 +108,9 @@ const handleGoogleLogin = async () => {
 // Handle forgotten password
 const handleForgotPassword = async () => {
   if (!email.value || !isEmailValid.value) {
-    toast('Please enter a valid email address', 'Invalid Email', 'destructive')
+    toast('Please enter a valid email address', {
+      description: 'Invalid Email'
+    })
     return
   }
 
@@ -106,6 +118,9 @@ const handleForgotPassword = async () => {
 
   try {
     await authStore.resetPassword(email.value)
+    toast('Password reset email sent!', {
+      description: 'Check your email for reset instructions'
+    })
   } catch (error) {
     logger.error('Password reset error:', error)
   } finally {

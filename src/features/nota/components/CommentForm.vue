@@ -5,7 +5,7 @@ import { Textarea } from '@/ui/textarea'
 import { Send, Loader2 } from 'lucide-vue-next'
 import { useAuthStore } from '@/features/auth/stores/auth'
 import { commentService } from '@/features/nota/services/commentService'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { logger } from '@/services/logger'
 
 const props = defineProps<{
@@ -39,12 +39,12 @@ const handleSubmit = async () => {
   // Validate comment
   const text = commentText.value.trim()
   if (text.length === 0) {
-    toast('Comment cannot be empty', '', 'destructive')
+    toast('Comment cannot be empty')
     return
   }
   
   if (text.length > MAX_COMMENT_LENGTH) {
-    toast(`Comment is too long (max ${MAX_COMMENT_LENGTH} characters)`, '', 'destructive')
+    toast(`Comment is too long (max ${MAX_COMMENT_LENGTH} characters)`)
     return
   }
   
@@ -69,7 +69,7 @@ const handleSubmit = async () => {
     toast(props.isReply ? 'Reply posted' : 'Comment posted')
   } catch (error) {
     logger.error('Error posting comment:', error)
-    toast('Failed to post comment. Please try again.', '', 'destructive')
+    toast('Failed to post comment. Please try again.')
   } finally {
     isSubmitting.value = false
   }

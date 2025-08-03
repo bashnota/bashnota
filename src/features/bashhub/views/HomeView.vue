@@ -26,7 +26,7 @@ import HomeQuickActions from '@/features/bashhub/components/HomeQuickActions.vue
 // Composables
 import { useHomePreferences, type ActiveView } from '@/features/bashhub/composables/useHomePreferences'
 import { useNotaActions } from '@/features/nota/composables/useNotaActions'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 
 // Store
 const store = useNotaStore()

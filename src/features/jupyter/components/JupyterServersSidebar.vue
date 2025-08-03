@@ -115,7 +115,6 @@ import { useSidebarComposable } from '@/composables/useSidebarComposable'
 import { useJupyterServers } from '@/features/jupyter/composables/useJupyterServers'
 import { useJupyterSessions } from '@/features/jupyter/composables/useJupyterSessions'
 import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
-import { toast } from "@/lib/utils"
 
 const props = defineProps<{
   notaId: string

@@ -30,7 +30,7 @@ import {
   BookIcon,
   FileText,
 } from 'lucide-vue-next'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { logger } from '@/services/logger'
 
 /**
@@ -275,7 +275,9 @@ function safeExecuteCommand(callback: Function) {
       return callback(...args);
     } catch (error) {
       logger.error('Error executing editor command:', error);
-      toast('An error occurred while executing the command', 'Error', 'destructive');
+      toast('An error occurred while executing the command', {
+        description: 'Error'
+      });
       return null;
     }
   };

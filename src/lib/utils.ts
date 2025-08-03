@@ -1,11 +1,22 @@
+import type { Updater } from '@tanstack/vue-table'
+import type { Ref } from 'vue'
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
-import { useToast } from '@/ui/toast'
+
 import { formatDistanceToNow } from 'date-fns'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
+
+export function valueUpdater<T extends Updater<any>>(updaterOrValue: T, ref: Ref) {
+  ref.value
+    = typeof updaterOrValue === 'function'
+      ? updaterOrValue(ref.value)
+      : updaterOrValue
+}
+
+
 
 export const formatDate = (date: Date | string) => {
   return formatDistanceToNow(new Date(date), { addSuffix: true })
@@ -21,21 +32,6 @@ export const formatRelativeTime = (date: Date | string) => {
   return formatDistanceToNow(dateObj, { addSuffix: true })
 }
 
-export const toast = (
-  message: string,
-  title: string = '',
-  variant: 'default' | 'destructive' = 'default',
-) => {
-  const { toast } = useToast()
-
-  toast({
-    title,
-    description: message,
-    variant,
-    duration: 2000,
-    class: cn('top-0 right-0 flex fixed md:max-w-[420px] md:top-4 md:right-4'),
-  })
-}
 
 export const getURLWithoutProtocol = (url: string) => {
   return url.replace(/(^\w+:|^)\/\//, '')
@@ -192,7 +188,6 @@ export const stripAnsi = (text: string): string => {
   if (!text) return ''
   return text.replace(/\x1b\[[0-9;]*m/g, '')
 }
-
 
 
 

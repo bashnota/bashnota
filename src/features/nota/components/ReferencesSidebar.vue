@@ -9,7 +9,7 @@ import { BaseSidebar, KeyboardShortcut } from '@/ui/sidebars'
 import { useSidebarComposable } from '@/composables/useSidebarComposable'
 import type { CitationEntry } from '@/features/nota/types/nota'
 import type { Editor } from '@tiptap/vue-3'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 
 // Import modular components
 import ReferencesList from './references/ReferencesList.vue'
@@ -64,7 +64,7 @@ const deleteCitation = async (id: string) => {
     toast('Reference deleted successfully')
   } catch (error) {
     console.error('Failed to delete citation:', error)
-    toast('Failed to delete reference', 'destructive')
+    toast('Failed to delete reference')
   }
 }
 

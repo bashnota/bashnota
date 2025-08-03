@@ -12,7 +12,7 @@ import {
 import { useDebounceFn } from '@vueuse/core'
 import { ref } from 'vue'
 import { useNotaStore } from '@/features/nota/stores/nota'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 
 const props = defineProps<{
   search: string

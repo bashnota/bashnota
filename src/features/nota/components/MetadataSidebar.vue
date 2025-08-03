@@ -10,7 +10,7 @@ import { Button } from '@/ui/button'
 import { FileText } from 'lucide-vue-next'
 import { Editor } from '@tiptap/vue-3'
 import { logger } from '@/services/logger'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { BaseSidebar, SidebarSection, KeyboardShortcut } from '@/ui/sidebars'
 import { useSidebarComposable } from '@/composables/useSidebarComposable'
 

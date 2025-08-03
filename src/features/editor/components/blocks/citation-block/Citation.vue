@@ -8,7 +8,7 @@ import { Link, ExternalLink, Edit, Copy, ClipboardCheck, X, Search, Loader2 } fr
 import type { CitationEntry } from '@/features/nota/types/nota'
 import { Input } from '@/ui/input'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/ui/tabs'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 
 const props = defineProps({
   node: {
@@ -341,7 +341,7 @@ const importCitation = async (citation: CitationEntry) => {
     toast('Citation imported successfully')
   } catch (error) {
     console.error('Error importing citation:', error)
-    toast('Failed to import citation', 'Error', 'destructive')
+    toast('Failed to import citation', { description: 'Error' })
   }
 }
 </script>

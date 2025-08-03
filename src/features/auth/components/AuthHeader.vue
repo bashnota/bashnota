@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/ui/dropdown-menu'
 import { LogOut, User } from 'lucide-vue-next'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { logger } from '@/services/logger'
 
 const authStore = useAuthStore()

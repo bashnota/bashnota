@@ -6,7 +6,7 @@ import { useRouter } from 'vue-router'
 import { Input } from '@/ui/input'
 import { Button } from '@/ui/button'
 import { Search, SortAsc, SortDesc, Filter, Copy, FileText, ChevronDown, ChevronUp } from 'lucide-vue-next'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { logger } from '@/services/logger'
 import type { CitationEntry } from '@/features/nota/types/nota'
 

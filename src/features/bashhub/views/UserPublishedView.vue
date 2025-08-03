@@ -6,7 +6,8 @@ import { useAuthStore } from '@/features/auth/stores/auth'
 import { Button } from '@/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/ui/card'
 import { Input } from '@/ui/input'
-import { formatDate, toast } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { Trash2, Clock, Search, Grid, Table, AlertCircle, CalendarDays, BarChart, Eye, Filter, DownloadCloud, ThumbsUp, ThumbsDown, FileText } from 'lucide-vue-next'
 import { Avatar, AvatarFallback } from '@/ui/avatar'
 import LoadingSpinner from '@/ui/LoadingSpinner.vue'
@@ -706,7 +707,7 @@ const unpublishNota = async () => {
     toast('Nota unpublished successfully')
   } catch (error) {
     logger.error('Error unpublishing nota:', error)
-    toast('Failed to unpublish nota', undefined, 'destructive')
+    toast('Failed to unpublish nota')
   } finally {
     isConfirmDeleteOpen.value = false
     notaToDelete.value = null

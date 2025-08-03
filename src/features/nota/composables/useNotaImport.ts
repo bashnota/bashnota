@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNotaStore } from '@/features/nota/stores/nota'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { logger } from '@/services/logger'
 import { FILE_EXTENSIONS } from '@/constants/app'
 
@@ -56,7 +56,9 @@ export function useNotaImport(options: ImportOptions = {}) {
           } catch (error) {
             logger.error('Import failed:', error)
             const errorMessage = error instanceof Error ? error : new Error('Import failed')
-            toast('Failed to import notas', 'Import Error', 'destructive')
+            toast('Failed to import notas', {
+              description: 'Import Error'
+            })
             defaultOptions.onError?.(errorMessage)
             resolve(false)
           } finally {
@@ -85,7 +87,9 @@ export function useNotaImport(options: ImportOptions = {}) {
         if (file) {
           try {
             if (!file.name.endsWith('.ipynb')) {
-              toast('Please select a .ipynb file', 'Invalid File', 'destructive')
+              toast('Please select a .ipynb file', {
+                description: 'Invalid File'
+              })
               resolve(false)
               return
             }
@@ -119,7 +123,9 @@ export function useNotaImport(options: ImportOptions = {}) {
           } catch (error) {
             logger.error('Failed to import notebook:', error)
             const errorMessage = error instanceof Error ? error : new Error('Failed to import notebook')
-            toast('Failed to import the notebook file', 'Import Failed', 'destructive')
+            toast('Failed to import the notebook file', {
+              description: 'Import Failed'
+            })
             defaultOptions.onError?.(errorMessage)
             resolve(false)
           } finally {

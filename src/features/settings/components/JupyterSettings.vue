@@ -8,7 +8,7 @@ import { Button } from '@/ui/button'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/ui/card'
 import { Input } from '@/ui/input'
 import ServerListItem from '@/features/editor/components/blocks/nota-config/ServerListItem.vue'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { logger } from '@/services/logger'
 
 const jupyterStore = useJupyterStore()

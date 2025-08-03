@@ -9,7 +9,7 @@ import { Button } from '@/ui/button'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/ui/card'
 import { Input } from '@/ui/input'
 import ServerListItem from './ServerListItem.vue'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { logger } from '@/services/logger'
 
 const props = defineProps<{

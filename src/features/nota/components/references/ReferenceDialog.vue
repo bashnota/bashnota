@@ -12,7 +12,7 @@ import { Separator } from '@/ui/separator'
 import { FileText, Wand2, AlertCircle, CheckCircle2, Loader2 } from 'lucide-vue-next'
 import { useCitationStore } from '@/features/editor/stores/citationStore'
 import type { CitationEntry } from '@/features/nota/types/nota'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { useBibTexParser } from '@/features/nota/composables/useBibTexParser'
 import { useReferenceForm } from '@/features/nota/composables/useReferenceForm'
 
@@ -71,7 +71,7 @@ watch(() => props.open, (isOpen) => {
 // Save citation
 const saveCitation = async () => {
   if (!validateForm()) {
-    toast('Please fix the validation errors', 'destructive')
+    toast('Please fix the validation errors')
     return
   }
   
@@ -109,7 +109,7 @@ const saveCitation = async () => {
     emit('saved')
   } catch (error) {
     console.error('Failed to save citation:', error)
-    toast('Failed to save reference', 'destructive')
+    toast('Failed to save reference')
   } finally {
     isSaving.value = false
   }

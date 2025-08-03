@@ -9,7 +9,7 @@ import SaveIndicator from '@/ui/SaveIndicator.vue'
 import { Button } from '@/ui/button'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useNotaMetadata } from '@/features/nota/composables/useNotaMetadata'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { 
   Clock, 
   Calendar, 
@@ -99,9 +99,9 @@ const copyToClipboard = async (text: string, type: 'id' | 'link') => {
       setTimeout(() => { hasCopiedLink.value = false }, 2000)
     }
     
-    toast(`${type === 'id' ? 'Nota ID' : 'Link'} copied to clipboard`, 'Success')
+    toast(`${type === 'id' ? 'Nota ID' : 'Link'} copied to clipboard`, { description: 'Success' })
   } catch (error) {
-    toast('Failed to copy to clipboard', 'Error', 'destructive')
+    toast('Failed to copy to clipboard', { description: 'Error' })
   }
 }
 

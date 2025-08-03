@@ -10,7 +10,7 @@ import {
   onAuthStateChanged,
 } from 'firebase/auth'
 import { auth, firestore } from '@/services/firebase'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { logAnalyticsEvent } from '@/services/firebase'
 import type { UserProfile } from '@/features/auth/types/user'
 import { collection, doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore'
@@ -26,7 +26,9 @@ export class AuthService {
     } catch (error: any) {
       const errorCode = error.code
       const errorMessage = this.getReadableErrorMessage(errorCode)
-      toast(errorMessage, 'Login Failed', 'destructive')
+      toast(errorMessage, {
+        description: 'Login Failed'
+      })
       throw error
     }
   }
@@ -41,7 +43,9 @@ export class AuthService {
     } catch (error: any) {
       const errorCode = error.code
       const errorMessage = this.getReadableErrorMessage(errorCode)
-      toast(errorMessage, 'Google Login Failed', 'destructive')
+      toast(errorMessage, {
+        description: 'Google Login Failed'
+      })
       throw error
     }
   }
@@ -65,7 +69,9 @@ export class AuthService {
     } catch (error: any) {
       const errorCode = error.code
       const errorMessage = this.getReadableErrorMessage(errorCode)
-      toast(errorMessage, 'Registration Failed', 'destructive')
+      toast(errorMessage, {
+        description: 'Registration Failed'
+      })
       throw error
     }
   }
@@ -159,10 +165,14 @@ export class AuthService {
         }
       }
       
-      toast('Your user tag has been updated successfully', 'User Tag Updated')
+      toast('Your user tag has been updated successfully', {
+        description: 'User Tag Updated'
+      })
     } catch (error: any) {
       const errorMessage = error.message || 'An error occurred while updating your user tag'
-      toast(errorMessage, 'User Tag Update Failed', 'destructive')
+      toast(errorMessage, {
+        description: 'User Tag Update Failed'
+      })
       throw error
     }
   }
@@ -189,10 +199,14 @@ export class AuthService {
     try {
       await signOut(auth)
       logAnalyticsEvent('logout')
-      toast('You have been successfully logged out', 'Logout Successful')
+      toast('You have been successfully logged out', {
+        description: 'Logout Successful'
+      })
     } catch (error: any) {
       const errorMessage = error.message || 'An error occurred during logout'
-      toast(errorMessage, 'Logout Failed', 'destructive')
+      toast(errorMessage, {
+        description: 'Logout Failed'
+      })
       throw error
     }
   }
@@ -201,11 +215,15 @@ export class AuthService {
   async resetPassword(email: string): Promise<void> {
     try {
       await sendPasswordResetEmail(auth, email)
-      toast('Password reset email sent. Check your inbox.', 'Password Reset')
+      toast('Password reset email sent. Check your inbox.', {
+        description: 'Password Reset'
+      })
     } catch (error: any) {
       const errorCode = error.code
       const errorMessage = this.getReadableErrorMessage(errorCode)
-      toast(errorMessage, 'Password Reset Failed', 'destructive')
+      toast(errorMessage, {
+        description: 'Password Reset Failed'
+      })
       throw error
     }
   }

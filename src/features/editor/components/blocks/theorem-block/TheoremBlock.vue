@@ -207,7 +207,7 @@ import {
 } from '@/ui/tabs'
 import MixedContentDisplay from './MixedContentDisplay.vue'
 import { logger } from '@/services/logger'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 
 // Props - use NodeViewProps interface
 const props = defineProps<NodeViewProps>()
@@ -286,7 +286,7 @@ const saveChanges = () => {
     
     if (!content.value.trim()) {
       theoremLogger.warn('Empty content detected, showing error toast')
-      toast('Please add content to your theorem before saving.', 'Content Required', 'destructive')
+      toast('Please add content to your theorem before saving.', { description: 'Content Required' })
       return
     }
     
@@ -315,7 +315,7 @@ const saveChanges = () => {
     savedSuccessfully()
   } catch (err) {
     theoremLogger.error('Error saving theorem:', err)
-    toast('Error saving theorem', 'Save Error', 'destructive')
+    toast('Error saving theorem', { description: 'Save Error' })
   }
 }
 
@@ -389,7 +389,7 @@ const handleKeyDown = (event: KeyboardEvent) => {
 
 // Success message when theorem is saved
 const savedSuccessfully = () => {
-  toast(`${capitalizeType.value} saved successfully`, '', 'default')
+  toast(`${capitalizeType.value} saved successfully`)
 }
 </script>
 

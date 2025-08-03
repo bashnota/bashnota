@@ -19,7 +19,7 @@ import ContributorTab from './bashhub/ContributorTab.vue'
 import VotesContributorTab from './bashhub/VotesContributorTab.vue'
 import type { PublishedNota } from '@/features/nota/types/nota'
 import { logger } from '@/services/logger'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { doc, getDoc, collection, query, where, limit, getDocs } from 'firebase/firestore'
 import { firestore } from '@/services/firebase'
 
@@ -161,12 +161,12 @@ const viewNota = async (nota: PublishedNota) => {
     } else {
       // If no tag is found, log the error but don't navigate
       logger.error(`Cannot view nota: No user tag found for user ID ${nota.authorId}`)
-      toast('Unable to view this nota', 'User tag required', 'destructive')
+      toast('Unable to view this nota', { description: 'User tag required' })
     }
   } catch (error) {
     // Log the error but don't navigate anywhere
     logger.error('Error resolving author tag:', error)
-    toast('Unable to view this nota', 'Error loading user information', 'destructive')
+    toast('Unable to view this nota', { description: 'Error loading user information' })
   }
 }
 
@@ -187,14 +187,14 @@ const cloneNota = async (nota: PublishedNota, event: Event) => {
     
     if (clonedNota) {
       // Show success message
-      toast(`"${nota.title}" has been added to your notas`, 'Nota cloned successfully', 'default')
+      toast(`"${nota.title}" has been added to your notas`, { description: 'Nota cloned successfully' })
       
       // Navigate to the cloned nota
       router.push(`/nota/${clonedNota.id}`)
     }
   } catch (err) {
     logger.error('Error cloning nota:', err)
-    toast('Please try again later', 'Failed to clone nota', 'destructive')
+    toast('Please try again later', { description: 'Failed to clone nota' })
   }
 }
 

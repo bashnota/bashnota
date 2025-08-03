@@ -7,7 +7,7 @@ import { Textarea } from '@/ui/textarea'
 import { Checkbox } from '@/ui/checkbox'
 import { Label } from '@/ui/label'
 import { generateCitation, type CitationFormat } from '@/lib/citation'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { Copy, FileDown, FileCode } from 'lucide-vue-next'
 import type { PublishedNota } from '@/features/nota/types/nota'
 
@@ -43,7 +43,7 @@ const copyCitation = () => {
       }, 2000)
     })
     .catch(() => {
-      toast('Failed to copy citation', '', 'destructive')
+      toast('Failed to copy citation')
     })
 }
 
