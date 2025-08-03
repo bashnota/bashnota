@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { BookIcon, Plus } from 'lucide-vue-next'
+import { BookIcon, Plus, X } from 'lucide-vue-next'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useCitationStore } from '@/features/editor/stores/citationStore'
-import { BaseSidebar, KeyboardShortcut } from '@/ui/sidebars'
-import { useSidebarComposable } from '@/composables/useSidebarComposable'
+import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter } from '@/components/ui/sidebar'
 import type { CitationEntry } from '@/features/nota/types/nota'
 import type { Editor } from '@tiptap/vue-3'
 import { toast } from 'vue-sonner'
@@ -28,16 +27,6 @@ const emit = defineEmits<{
 }>()
 
 const citationStore = useCitationStore()
-
-// Use our sidebar composable for consistent behavior
-const { } = useSidebarComposable({
-  id: 'references-sidebar',
-  keyboard: {
-    ctrl: true,
-    shift: true,
-    key: 'r'
-  }
-})
 
 // References for the current nota
 const notaCitations = computed(() => {
@@ -94,26 +83,35 @@ const handleCitationSaved = () => {
 </script>
 
 <template>
-  <BaseSidebar 
-    id="references-sidebar"
-    title="References" 
-    :icon="BookIcon" 
-    position="right" 
-    @close="$emit('close')"
-  >
-    <template #actions>
-      <Button 
-        variant="ghost" 
-        size="sm" 
-        @click="openAddDialog"
-        class="h-8 w-8 p-0"
-      >
-        <Plus class="h-4 w-4" />
-      </Button>
-    </template>
+  <Sidebar side="right" class="w-96">
+    <SidebarHeader class="border-b">
+      <div class="flex items-center justify-between p-3">
+        <div class="flex items-center gap-2">
+          <BookIcon class="h-5 w-5" />
+          <h2 class="font-semibold">References</h2>
+        </div>
+        <div class="flex items-center gap-1">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            @click="openAddDialog"
+            class="h-8 w-8 p-0"
+          >
+            <Plus class="h-4 w-4" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            @click="$emit('close')"
+            class="h-8 w-8 p-0"
+          >
+            <X class="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </SidebarHeader>
     
-    <!-- References Content -->
-    <div class="flex flex-col h-full">
+    <SidebarContent>
       <!-- Search Section -->
       <div class="p-3 border-b bg-muted/30">
         <Input 
@@ -170,17 +168,20 @@ const handleCitationSaved = () => {
           />
         </div>
       </ScrollArea>
-    </div>
+    </SidebarContent>
 
-    <!-- Keyboard Shortcut Info -->
-    <template #footer>
-      <KeyboardShortcut 
-        ctrl
-        shift
-        keyName="R" 
-        action="toggle references"
-      />
-    </template>
+    <SidebarFooter class="border-t">
+      <div class="p-2">
+        <div class="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+          <kbd class="px-1.5 py-0.5 text-xs bg-muted border rounded">Ctrl</kbd>
+          <span>+</span>
+          <kbd class="px-1.5 py-0.5 text-xs bg-muted border rounded">Shift</kbd>
+          <span>+</span>
+          <kbd class="px-1.5 py-0.5 text-xs bg-muted border rounded">R</kbd>
+          <span class="ml-2">toggle references</span>
+        </div>
+      </div>
+    </SidebarFooter>
 
     <!-- Add/Edit Citation Dialog -->
     <ReferenceDialog
@@ -192,5 +193,5 @@ const handleCitationSaved = () => {
       @saved="handleCitationSaved"
       @close="closeDialog"
     />
-  </BaseSidebar>
+  </Sidebar>
 </template>

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import AIAssistantSidebarComponent from './components/AIAssistantSidebar.vue'
-import { BrainIcon } from 'lucide-vue-next'
-import { BaseSidebar, KeyboardShortcut } from '@/ui/sidebars'
-import { useAISettingsStore } from '@/features/ai/stores/aiSettingsStore'
+import { BrainIcon, X } from 'lucide-vue-next'
+import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter } from '@/components/ui/sidebar'
+import { Button } from '@/components/ui/button'
 
 const props = defineProps<{
   editor: any
@@ -18,31 +18,48 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <BaseSidebar 
-    id="ai-assistant"
-    title="AI Assistant"
-    :icon="BrainIcon"
-    position="right" 
-    @close="$emit('close')"
-  >
-    <AIAssistantSidebarComponent 
-      :editor="editor" 
-      :notaId="notaId"
-      :hide-header="true"
-      @close="$emit('close')"
-    />
+  <Sidebar side="right" class="w-96">
+    <SidebarHeader class="border-b">
+      <div class="flex items-center justify-between p-3">
+        <div class="flex items-center gap-2">
+          <BrainIcon class="h-5 w-5" />
+          <h2 class="font-semibold">AI Assistant</h2>
+        </div>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          @click="$emit('close')"
+          class="h-8 w-8 p-0"
+        >
+          <X class="h-4 w-4" />
+        </Button>
+      </div>
+    </SidebarHeader>
     
-    <!-- Keyboard Shortcut -->
-    <template #footer>
-      <KeyboardShortcut 
-        :ctrl="true"
-        :shift="true"
-        :alt="true"
-        keyName="I"
-        action="toggle AI Assistant"
+    <SidebarContent>
+      <AIAssistantSidebarComponent 
+        :editor="editor" 
+        :notaId="notaId"
+        :hide-header="true"
+        @close="$emit('close')"
       />
-    </template>
-  </BaseSidebar>
+    </SidebarContent>
+    
+    <SidebarFooter class="border-t">
+      <div class="p-2">
+        <div class="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+          <kbd class="px-1.5 py-0.5 text-xs bg-muted border rounded">Ctrl</kbd>
+          <span>+</span>
+          <kbd class="px-1.5 py-0.5 text-xs bg-muted border rounded">Shift</kbd>
+          <span>+</span>
+          <kbd class="px-1.5 py-0.5 text-xs bg-muted border rounded">Alt</kbd>
+          <span>+</span>
+          <kbd class="px-1.5 py-0.5 text-xs bg-muted border rounded">I</kbd>
+          <span class="ml-2">toggle AI Assistant</span>
+        </div>
+      </div>
+    </SidebarFooter>
+  </Sidebar>
 </template>
 
 <style scoped>

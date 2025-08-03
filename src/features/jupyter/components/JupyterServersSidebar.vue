@@ -1,43 +1,61 @@
 <template>
-  <BaseSidebar 
-    id="jupyter-servers"
-    title="Jupyter Servers"
-    :icon="Server"
-    position="right" 
-    @close="$emit('close')"
+  <Sidebar 
+    side="right"
+    variant="sidebar"
+    collapsible="none"
+    class="w-[400px] border-l"
   >
-    <template #headerActions>
-      <Tooltip content="Refresh All Servers">
-        <Button 
-          size="sm" 
-          variant="ghost" 
-          class="h-7 w-7 p-0" 
-          @click="handleRefreshAll"
-          :disabled="isAnyRefreshing"
-        >
-          <RotateCw class="w-3.5 h-3.5" :class="{ 'animate-spin': isAnyRefreshing }" />
-        </Button>
-      </Tooltip>
-      <Tooltip content="Add Server">
-        <Button 
-          size="sm" 
-          variant="ghost" 
-          class="h-7 w-7 p-0" 
-          @click="showAddServerDialog = true"
-        >
-          <Plus class="w-3.5 h-3.5" />
-        </Button>
-      </Tooltip>
-    </template>
+    <SidebarHeader class="border-b">
+      <div class="flex items-center justify-between p-4">
+        <div class="flex items-center gap-2">
+          <Server class="w-4 h-4" />
+          <h2 class="text-sm font-semibold">Jupyter Servers</h2>
+        </div>
+        
+        <div class="flex items-center gap-1">
+          <Tooltip content="Refresh All Servers">
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              class="h-7 w-7 p-0" 
+              @click="handleRefreshAll"
+              :disabled="isAnyRefreshing"
+            >
+              <RotateCw class="w-3.5 h-3.5" :class="{ 'animate-spin': isAnyRefreshing }" />
+            </Button>
+          </Tooltip>
+          <Tooltip content="Add Server">
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              class="h-7 w-7 p-0" 
+              @click="showAddServerDialog = true"
+            >
+              <Plus class="w-3.5 h-3.5" />
+            </Button>
+          </Tooltip>
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            class="h-7 w-7 p-0" 
+            @click="$emit('close')"
+          >
+            <X class="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      </div>
+      
+      <div v-if="hasServers" class="px-4 pb-2">
+        <p class="text-xs text-muted-foreground">
+          {{ servers.length }} server{{ servers.length !== 1 ? 's' : '' }}
+          <span v-if="totalSessions > 0" class="ml-1">
+            • {{ totalSessions }} session{{ totalSessions !== 1 ? 's' : '' }}
+          </span>
+        </p>
+      </div>
+    </SidebarHeader>
     
-    <template #headerSubtitle>
-      <p v-if="hasServers" class="text-xs text-muted-foreground">
-        {{ servers.length }} server{{ servers.length !== 1 ? 's' : '' }}
-        <span v-if="totalSessions > 0" class="ml-1">
-          • {{ totalSessions }} session{{ totalSessions !== 1 ? 's' : '' }}
-        </span>
-      </p>
-    </template>
+    <SidebarContent>
     
     <!-- No Servers State -->
     <div 
@@ -76,6 +94,21 @@
       </div>
     </ScrollArea>
 
+    </SidebarContent>
+    
+    <SidebarFooter class="border-t">
+      <div class="p-2">
+        <div class="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+          <kbd class="px-1.5 py-0.5 text-xs bg-muted border rounded">Ctrl</kbd>
+          <span>+</span>
+          <kbd class="px-1.5 py-0.5 text-xs bg-muted border rounded">Shift</kbd>
+          <span>+</span>
+          <kbd class="px-1.5 py-0.5 text-xs bg-muted border rounded">J</kbd>
+          <span class="ml-2">toggle Jupyter servers</span>
+        </div>
+      </div>
+    </SidebarFooter>
+
     <!-- Add Server Dialog -->
     <AddServerDialog 
       :open="showAddServerDialog"
@@ -86,15 +119,7 @@
       @parse-url="handleParseUrl"
       v-model:form="serverForm"
     />
-    
-    <!-- Keyboard Shortcut -->
-    <KeyboardShortcut 
-      :ctrl="true"
-      :shift="true"
-      :keyName="'J'" 
-      action="toggle Jupyter servers"
-    />
-  </BaseSidebar>
+  </Sidebar>
 </template>
 
 <script setup lang="ts">
@@ -103,15 +128,20 @@ import {
   Server,
   Plus,
   RotateCw,
+  X,
 } from 'lucide-vue-next'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { Tooltip } from '@/components/ui/tooltip'
+import { 
+  Sidebar, 
+  SidebarContent, 
+  SidebarHeader, 
+  SidebarFooter 
+} from '@/components/ui/sidebar'
 import type { JupyterServer } from '@/features/jupyter/types/jupyter'
-import { BaseSidebar, KeyboardShortcut } from '@/ui/sidebars'
 import ServerItem from '@/features/jupyter/components/ServerItem.vue'
 import AddServerDialog from '@/features/editor/components/jupyter/AddServerDialog.vue'
-import { useSidebarComposable } from '@/composables/useSidebarComposable'
 import { useJupyterServers } from '@/features/jupyter/composables/useJupyterServers'
 import { useJupyterSessions } from '@/features/jupyter/composables/useJupyterSessions'
 import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
@@ -123,16 +153,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
 }>()
-
-// Composables
-const { } = useSidebarComposable({
-  id: 'jupyter-servers',
-  keyboard: {
-    ctrl: true,
-    shift: true,
-    key: 'j'
-  }
-})
 
 const {
   // State

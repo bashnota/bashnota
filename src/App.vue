@@ -6,27 +6,23 @@ import AppTabs from '@/features/nota/components/AppTabs.vue'
 
 import ServerSelectionDialogWrapper from '@/features/editor/components/jupyter/ServerSelectionDialogWrapper.vue'
 import { onMounted, computed } from 'vue'
-import { Button } from '@/components/ui/button'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar'
 
 import { useAuthStore } from '@/features/auth/stores/auth'
 import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
+import { useEditorStore } from '@/features/editor/stores/editorStore'
 
-import { Home, Globe } from 'lucide-vue-next'
 import MenubarSidebars from '@/components/MenubarSidebars.vue'
 import PinnedSidebars from '@/components/PinnedSidebars.vue'
 import { useSidebarManager } from '@/composables/useSidebarManager'
+import RightSidebarContainer from '@/components/RightSidebarContainer.vue'
 
 const authStore = useAuthStore()
 const jupyterStore = useJupyterStore()
-const route = useRoute()
-const router = useRouter()
+const editorStore = useEditorStore()
 const sidebarManager = useSidebarManager()
 
-// Check if we're in BashHub view
-const isInBashHub = computed(() => route.name === 'bashhub')
-const isNotaView = computed(() => route.name === 'nota')
 
 onMounted(async () => {
   // Initialize auth state
@@ -39,14 +35,6 @@ onMounted(async () => {
   sidebarManager.initialize()
 })
 
-// Toggle between main view and BashHub
-const toggleBashHub = () => {
-  if (isInBashHub.value) {
-    router.push('/')
-  } else {
-    router.push('/bashhub')
-  }
-}
 
 </script>
 
@@ -71,27 +59,22 @@ const toggleBashHub = () => {
             <!-- Actions and BashHub Toggle -->
             <div class="flex items-center gap-2">
               
-              <!-- BashHub Toggle Button -->
-              <Button
-                variant="outline"
-                size="sm"
-                @click="toggleBashHub"
-                :class="{'bg-primary/10': isInBashHub}"
-              >
-                <Globe v-if="isInBashHub" class="h-4 w-4 mr-2" />
-                <Home v-else class="h-4 w-4 mr-2" />
-                {{ isInBashHub ? 'Go to My Notas' : 'Go to Hub' }}
-              </Button>
             </div>
           </div>
         </div>
 
         <!-- Global Split Creation Zone (only when dragging) -->
-        <AppTabs v-if="!isInBashHub" />
+        <AppTabs />
 
-        <!-- Content Area: Use RouterView for all routes -->
-        <div class="flex-1 min-h-0 flex flex-col overflow-auto">
-          <RouterView class="flex-1 h-full" />
+        <!-- Main content area with right sidebar -->
+        <div class="flex flex-1 min-h-0 overflow-hidden">
+          <!-- Content Area: Use RouterView for all routes -->
+          <div class="flex-1 min-h-0 flex flex-col overflow-auto">
+            <RouterView class="flex-1 h-full" />
+          </div>
+          
+          <!-- Right Sidebars Container -->
+          <RightSidebarContainer :editor="editorStore.activeEditor as any" />
         </div>
       </SidebarInset>
     </SidebarProvider>

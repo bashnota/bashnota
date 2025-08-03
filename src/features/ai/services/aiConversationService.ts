@@ -17,8 +17,18 @@ export interface ConversationServiceOptions {
 }
 
 export class AIConversationService {
-  private conversationStore = useAIConversationStore()
+  private _conversationStore: ReturnType<typeof useAIConversationStore> | null = null
   private logger = logger.createPrefixedLogger('AIConversationService')
+
+  /**
+   * Lazy getter for the conversation store
+   */
+  private get conversationStore() {
+    if (!this._conversationStore) {
+      this._conversationStore = useAIConversationStore()
+    }
+    return this._conversationStore
+  }
 
   /**
    * Get or create a conversation for a specific AI block

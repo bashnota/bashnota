@@ -25,6 +25,7 @@ const isExecutingAll = ref(false)
 const isReady = ref(false)
 const showConfigModal = ref(false)
 const showShareDialog = ref(false)
+const notaEditorRef = ref()
 
 // Computed properties
 const nota = computed(() => notaStore.getCurrentNota(props.id))
@@ -180,6 +181,7 @@ const handleTagsUpdate = async (tags: string[]) => {
     <main class="flex-1 min-h-0 overflow-hidden">
       <template v-if="isReady && nota">
         <NotaEditor
+          ref="notaEditorRef"
           :nota-id="id"
           :key="id"
           :can-run-all="nota && nota.config?.savedSessions && nota.config?.savedSessions.length > 0"

@@ -102,7 +102,7 @@ const handleImportIpynb = async () => {
 
 const greeting = computed(() => {
   const name = authStore.currentUser?.displayName
-  return name ? `Welcome back, ${name}!` : 'Welcome to BashNota'
+  return name ? `Welcome back, ${name}!` : ''
 })
 
 const formattedStars = computed(() => {

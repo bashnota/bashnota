@@ -5,12 +5,14 @@ import { useNotaStore } from '@/features/nota/stores/nota'
 import type { CitationEntry } from '@/features/nota/types/nota'
 
 export const useCitationStore = defineStore('citation', () => {
-  const notaStore = useNotaStore()
   const publicCitations = ref<CitationEntry[]>([])
+  
+  // Lazy getter for notaStore
+  const getNotaStore = () => useNotaStore()
   
   // Add a new citation
   const addCitation = (notaId: string, citation: Omit<CitationEntry, 'id' | 'createdAt'>) => {
-    const nota = notaStore.getCurrentNota(notaId)
+    const nota = getNotaStore().getCurrentNota(notaId)
     if (!nota) return null
 
     const id = crypto.randomUUID()
@@ -21,13 +23,13 @@ export const useCitationStore = defineStore('citation', () => {
     }
     
     const updatedCitations = [...(nota.citations || []), newCitation]
-    notaStore.updateNota(notaId, { citations: updatedCitations })
+    getNotaStore().updateNota(notaId, { citations: updatedCitations })
     return newCitation
   }
 
   // Update an existing citation
   const updateCitation = (notaId: string, citationId: string, updates: Partial<CitationEntry>) => {
-    const nota = notaStore.getCurrentNota(notaId)
+    const nota = getNotaStore().getCurrentNota(notaId)
     if (!nota) return null
 
     const citations = nota.citations || []
@@ -38,19 +40,19 @@ export const useCitationStore = defineStore('citation', () => {
     const updatedCitations = [...citations]
     updatedCitations[citationIndex] = updatedCitation
 
-    notaStore.updateNota(notaId, { citations: updatedCitations })
+    getNotaStore().updateNota(notaId, { citations: updatedCitations })
     return updatedCitation
   }
 
   // Delete a citation
   const deleteCitation = (notaId: string, citationId: string) => {
-    const nota = notaStore.getCurrentNota(notaId)
+    const nota = getNotaStore().getCurrentNota(notaId)
     if (!nota) return false
 
     const citations = nota.citations || []
     const updatedCitations = citations.filter(c => c.id !== citationId)
     
-    notaStore.updateNota(notaId, { citations: updatedCitations })
+    getNotaStore().updateNota(notaId, { citations: updatedCitations })
     return true
   }
 
@@ -66,7 +68,7 @@ export const useCitationStore = defineStore('citation', () => {
       return publicCitations.value
     }
     // Otherwise get from nota store
-    const nota = notaStore.getCurrentNota(notaId)
+    const nota = getNotaStore().getCurrentNota(notaId)
     return nota?.citations || []
   })
 
@@ -77,7 +79,7 @@ export const useCitationStore = defineStore('citation', () => {
       return publicCitations.value.find(citation => citation.key === key) || null
     }
     // Otherwise get from nota store
-    const nota = notaStore.getCurrentNota(notaId)
+    const nota = getNotaStore().getCurrentNota(notaId)
     return nota?.citations?.find(citation => citation.key === key) || null
   })
 

@@ -7,11 +7,9 @@ import TagsInputItemDelete from '@/components/ui/tags-input/TagsInputItemDelete.
 import TagsInputItemText from '@/components/ui/tags-input/TagsInputItemText.vue'
 import TagsInputInput from '@/components/ui/tags-input/TagsInputInput.vue'
 import { Button } from '@/components/ui/button'
-import { FileText, X } from 'lucide-vue-next'
 import { Editor } from '@tiptap/vue-3'
 import { logger } from '@/services/logger'
 import { toast } from 'vue-sonner'
-import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter } from '@/components/ui/sidebar'
 import { SidebarSection } from '@/ui/sidebars'
 
 // Props definition
@@ -204,117 +202,76 @@ onMounted(() => {
 </script>
 
 <template>
-  <Sidebar side="right" class="w-96">
-    <SidebarHeader class="border-b">
-      <div class="flex items-center justify-between p-3">
-        <div class="flex items-center gap-2">
-          <FileText class="h-5 w-5" />
-          <h2 class="font-semibold">Metadata</h2>
+  <div class="p-4 space-y-4 w-full h-full">
+    <!-- Tags Section -->
+    <SidebarSection v-if="currentNota" title="Tags">
+      <TagsInput 
+        v-model="currentNota.tags" 
+        @update:modelValue="onTagsUpdate"
+        class="relative"
+      >
+        <TagsInputItem v-for="tag in currentNota.tags" :key="tag" :value="tag">
+          <TagsInputItemText />
+          <TagsInputItemDelete />
+        </TagsInputItem>
+        <TagsInputInput :placeholder="currentNota.tags?.length ? '+' : 'Add tags...'" />
+        
+        <!-- Tag suggestions when input is focused -->
+        <div v-if="showSuggestions && filteredSuggestions.length > 0" 
+             class="absolute left-0 right-0 top-full mt-1 bg-background border rounded-md shadow-md z-10 max-h-[150px] overflow-y-auto">
+          <div v-for="tag in filteredSuggestions" 
+               :key="tag" 
+               @click="addTag(tag)"
+               class="px-3 py-1.5 text-sm hover:bg-muted cursor-pointer">
+            {{ tag }}
+          </div>
         </div>
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          @click="$emit('close')"
-          class="h-8 w-8 p-0"
-        >
-          <X class="h-4 w-4" />
-        </Button>
-      </div>
-    </SidebarHeader>
-    
-    <SidebarContent>
-      <div class="p-4 space-y-4 w-full h-full">
-        <!-- Tags Section -->
-        <SidebarSection v-if="currentNota" title="Tags">
-          <TagsInput 
-            v-model="currentNota.tags" 
-            @update:modelValue="onTagsUpdate"
-            class="relative"
+      </TagsInput>
+      
+      <!-- Recently used tags -->
+      <div v-if="recentTags.length > 0" class="mt-2">
+        <div class="text-xs text-muted-foreground mb-1">Recent tags:</div>
+        <div class="flex flex-wrap gap-1">
+          <Button 
+            v-for="tag in recentTags" 
+            :key="tag"
+            variant="outline" 
+            size="sm" 
+            class="text-xs h-6 px-2"
+            @click="addTag(tag)"
           >
-            <TagsInputItem v-for="tag in currentNota.tags" :key="tag" :value="tag">
-              <TagsInputItemText />
-              <TagsInputItemDelete />
-            </TagsInputItem>
-            <TagsInputInput :placeholder="currentNota.tags?.length ? '+' : 'Add tags...'" />
-            
-            <!-- Tag suggestions when input is focused -->
-            <div v-if="showSuggestions && filteredSuggestions.length > 0" 
-                 class="absolute left-0 right-0 top-full mt-1 bg-background border rounded-md shadow-md z-10 max-h-[150px] overflow-y-auto">
-              <div v-for="tag in filteredSuggestions" 
-                   :key="tag" 
-                   @click="addTag(tag)"
-                   class="px-3 py-1.5 text-sm hover:bg-muted cursor-pointer">
-                {{ tag }}
-              </div>
-            </div>
-          </TagsInput>
-          
-          <!-- Recently used tags -->
-          <div v-if="recentTags.length > 0" class="mt-2">
-            <div class="text-xs text-muted-foreground mb-1">Recent tags:</div>
-            <div class="flex flex-wrap gap-1">
-              <Button 
-                v-for="tag in recentTags" 
-                :key="tag"
-                variant="outline" 
-                size="sm" 
-                class="text-xs h-6 px-2"
-                @click="addTag(tag)"
-              >
-                + {{ tag }}
-              </Button>
-            </div>
-          </div>
-        </SidebarSection>
-
-        <!-- Nota Details -->
-        <SidebarSection v-if="currentNota" title="Note Details">
-          <div class="grid grid-cols-2 gap-2 text-sm">
-            <span class="text-muted-foreground">Created:</span>
-            <span>{{ formatDate(currentNota.createdAt) }}</span>
-            
-            <span class="text-muted-foreground">Updated:</span>
-            <span>{{ formatDate(currentNota.updatedAt) }}</span>
-            
-            <span class="text-muted-foreground">ID:</span>
-            <span class="truncate" :title="currentNota.id">{{ currentNota.id }}</span>
-          </div>
-        </SidebarSection>
-
-        <!-- Word Count Stats -->
-        <SidebarSection v-if="editor" title="Statistics">
-          <div class="grid grid-cols-2 gap-2 text-sm">
-            <span class="text-muted-foreground">Words:</span>
-            <span>{{ wordCount }}</span>
-            
-            <span class="text-muted-foreground">Characters:</span>
-            <span>{{ characterCount }}</span>
-            
-            <span class="text-muted-foreground">Blocks:</span>
-            <span>{{ blockCount }}</span>
-          </div>
-        </SidebarSection>
-      </div>
-    </SidebarContent>
-    
-    <SidebarFooter class="border-t">
-      <div class="p-2">
-        <div class="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-          <kbd class="px-1.5 py-0.5 text-xs bg-muted border rounded">Ctrl</kbd>
-          <span>+</span>
-          <kbd class="px-1.5 py-0.5 text-xs bg-muted border rounded">Shift</kbd>
-          <span>+</span>
-          <kbd class="px-1.5 py-0.5 text-xs bg-muted border rounded">M</kbd>
-          <span class="ml-2">toggle metadata</span>
+            + {{ tag }}
+          </Button>
         </div>
       </div>
-    </SidebarFooter>
-  </Sidebar>
+    </SidebarSection>
+
+    <!-- Nota Details -->
+    <SidebarSection v-if="currentNota" title="Note Details">
+      <div class="grid grid-cols-2 gap-2 text-sm">
+        <span class="text-muted-foreground">Created:</span>
+        <span>{{ formatDate(currentNota.createdAt) }}</span>
+        
+        <span class="text-muted-foreground">Updated:</span>
+        <span>{{ formatDate(currentNota.updatedAt) }}</span>
+        
+        <span class="text-muted-foreground">ID:</span>
+        <span class="truncate" :title="currentNota.id">{{ currentNota.id }}</span>
+      </div>
+    </SidebarSection>
+
+    <!-- Word Count Stats -->
+    <SidebarSection v-if="editor" title="Statistics">
+      <div class="grid grid-cols-2 gap-2 text-sm">
+        <span class="text-muted-foreground">Words:</span>
+        <span>{{ wordCount }}</span>
+        
+        <span class="text-muted-foreground">Characters:</span>
+        <span>{{ characterCount }}</span>
+        
+        <span class="text-muted-foreground">Blocks:</span>
+        <span>{{ blockCount }}</span>
+      </div>
+    </SidebarSection>
+  </div>
 </template>
-
-
-
-
-
-
-

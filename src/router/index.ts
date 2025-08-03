@@ -25,11 +25,6 @@ const router = createRouter({
       name: 'settings',
       component: () => import('@/features/settings/views/SettingsView.vue'),
     },
-    {
-      path: '/bashhub',
-      name: 'bashhub',
-      component: () => import('@/features/bashhub/views/BashHubView.vue'),
-    },
     // Code block output route
     {
       path: '/output/:notaId/:blockId',

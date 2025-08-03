@@ -13,8 +13,10 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
   const cells = ref<Map<string, CodeCell>>(new Map())
   const kernelSessions = ref<Map<string, KernelSession>>(new Map())
   const executionService = new CodeExecutionService()
-  const notaStore = useNotaStore()
-  const jupyterStore = useJupyterStore()
+  
+  // Lazy getters for other stores
+  const getNotaStore = () => useNotaStore()
+  const getJupyterStore = () => useJupyterStore()
 
   // Track whether we're using a shared session for all code blocks
   const sharedSessionMode = ref<boolean>(false)
@@ -43,7 +45,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
 
   // Load saved sessions from nota config
   const loadSavedSessions = (notaId: string) => {
-    const nota = notaStore.getCurrentNota(notaId)
+    const nota = getNotaStore().getCurrentNota(notaId)
     if (!nota?.config?.savedSessions) return
 
     // Load shared session mode preference
@@ -85,7 +87,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
       isShared: session.id === sharedSessionId.value,
     }))
 
-    await notaStore.updateNotaConfig(notaId, (config: NotaConfig) => {
+    await getNotaStore().updateNotaConfig(notaId, (config: NotaConfig) => {
       config.savedSessions = savedSessions
       config.sharedSessionMode = sharedSessionMode.value
       config.sharedSessionId = sharedSessionId.value
@@ -225,7 +227,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
       sharedSessionId.value = sessionId
       
       // Look for the first available server and kernel
-      const servers = jupyterStore.jupyterServers || []
+      const servers = getJupyterStore().jupyterServers || []
       if (servers.length > 0) {
         logger.log('Attempting to create shared kernel session with available servers:', servers.length);
         
@@ -251,7 +253,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
             
             // Get kernels for this server
             const kernels = await new Promise<any[]>((resolve) => {
-              jupyterStore.getAvailableKernels(server).then(resolve).catch((error: any) => {
+              getJupyterStore().getAvailableKernels(server).then(resolve).catch((error: any) => {
                 logger.warn(`Failed to get kernels for ${server.ip}:${server.port}:`, error);
                 resolve([]);
               });
@@ -372,7 +374,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
     }
 
     const codeBlocks = findCodeBlocks(content)
-    const servers = jupyterStore.jupyterServers || []
+    const servers = getJupyterStore().jupyterServers || []
     
     logger.log(`[CodeExecStore] Found ${codeBlocks.length} code blocks in nota ${notaId}`)
 
@@ -571,7 +573,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
         sharedSessionId.value = sessionId
         
         // Get available servers
-        const servers = jupyterStore.jupyterServers || [];
+        const servers = getJupyterStore().jupyterServers || [];
         if (servers.length === 0) {
           logger.error('No Jupyter servers available for shared session');
           cell.hasError = true;
@@ -597,7 +599,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
             }
 
             // Get available kernels
-            const availableKernels = await jupyterStore.getAvailableKernels(server);
+            const availableKernels = await getJupyterStore().getAvailableKernels(server);
             if (availableKernels && availableKernels.length > 0) {
               // Prefer Python kernel if available
               selectedKernel = availableKernels.find((k: any) => 

@@ -11,8 +11,8 @@ import { onKeyStroke, useDebounceFn } from '@vueuse/core'
 import type { Editor } from '@tiptap/vue-3'
 import Fuse from 'fuse.js'
 import { logger } from '@/services/logger'
-import { BaseSidebar, SidebarSection, KeyboardShortcut } from '@/ui/sidebars'
-import { useSidebarComposable } from '@/composables/useSidebarComposable'
+import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter } from '@/components/ui/sidebar'
+import { SidebarSection } from '@/ui/sidebars'
 
 const props = defineProps<{
   editor?: Editor | null
@@ -28,20 +28,6 @@ const searchQuery = ref('')
 const selectedTags = ref<string[]>([])
 const expandedBlocks = ref<Set<string>>(new Set())
 const previewContent = ref<Record<string, string>>({})
-
-// Use our sidebar composable
-const { isOpen, width } = useSidebarComposable({
-  id: 'favorite-blocks',
-  defaultWidth: 350,
-  minWidth: 280,
-  maxWidth: 500,
-  keyboard: {
-    ctrl: true,
-    shift: true,
-    alt: true,
-    key: 'v'
-  }
-})
 
 // Configure Fuse.js for fuzzy search
 const fuseOptions = {
@@ -166,117 +152,136 @@ const blocks = computed(() => {
 </script>
 
 <template>
-  <BaseSidebar 
-    id="favorite-blocks"
-    title="Favorite Blocks" 
-    :icon="Star" 
-    position="right" 
-    @close="emit('close')"
-  >
-    <ScrollArea class="flex-1">
-      <div class="p-4 space-y-4">
-        <!-- Search and Filter Section -->
-        <SidebarSection>
-          <div class="space-y-4">
-            <div class="relative">
-              <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                :value="searchQuery"
-                @input="(e: Event) => debouncedSearch((e.target as HTMLInputElement).value)"
-                placeholder="Search blocks... (Ctrl+Shift+Alt+P)"
-                class="pl-9 favorite-blocks-search"
-                aria-autocomplete="list"
-                aria-controls="search-suggestions"
-              />
-            </div>
-
-            <TagsInput v-model="selectedTags" placeholder="Filter by tags...">
-              <TagsInputItem v-for="tag in selectedTags" :key="tag" :value="tag">
-                {{ tag }}
-              </TagsInputItem>
-              <TagsInputInput :placeholder="`Add tag (${availableTags.length} available)...`" />
-            </TagsInput>
-          </div>
-        </SidebarSection>
-
-        <!-- Blocks List -->
-        <div v-for="block in filteredBlocks" :key="block.id" 
-          class="block-item border rounded-lg p-2 hover:bg-muted/50 transition-colors"
-          @click="toggleBlockExpansion(block.id)"
-          :class="{ 'expanded': expandedBlocks.has(block.id) }"
+  <Sidebar side="right" class="w-96">
+    <SidebarHeader class="border-b">
+      <div class="flex items-center justify-between p-3">
+        <div class="flex items-center gap-2">
+          <Star class="h-5 w-5" />
+          <h2 class="font-semibold">Favorite Blocks</h2>
+        </div>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          @click="emit('close')"
+          class="h-8 w-8 p-0"
         >
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2 flex-1">
-              <h4 class="font-medium text-sm truncate">{{ block.name }}</h4>
+          <X class="h-4 w-4" />
+        </Button>
+      </div>
+    </SidebarHeader>
+    
+    <SidebarContent>
+      <ScrollArea class="flex-1">
+        <div class="p-4 space-y-4">
+          <!-- Search and Filter Section -->
+          <SidebarSection>
+            <div class="space-y-4">
+              <div class="relative">
+                <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  :value="searchQuery"
+                  @input="(e: Event) => debouncedSearch((e.target as HTMLInputElement).value)"
+                  placeholder="Search blocks... (Ctrl+Shift+Alt+P)"
+                  class="pl-9 favorite-blocks-search"
+                  aria-autocomplete="list"
+                  aria-controls="search-suggestions"
+                />
+              </div>
+
+              <TagsInput v-model="selectedTags" placeholder="Filter by tags...">
+                <TagsInputItem v-for="tag in selectedTags" :key="tag" :value="tag">
+                  {{ tag }}
+                </TagsInputItem>
+                <TagsInputInput :placeholder="`Add tag (${availableTags.length} available)...`" />
+              </TagsInput>
             </div>
-            <div class="flex items-center gap-1">
-              <Button variant="ghost" size="icon" @click.stop="insertBlock(block.content)">
-                <Plus class="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="icon" @click.stop="removeBlock(block.id)">
-                <X class="h-4 w-4" />
-              </Button>
+          </SidebarSection>
+
+          <!-- Blocks List -->
+          <div v-for="block in filteredBlocks" :key="block.id" 
+            class="block-item border rounded-lg p-2 hover:bg-muted/50 transition-colors"
+            @click="toggleBlockExpansion(block.id)"
+            :class="{ 'expanded': expandedBlocks.has(block.id) }"
+          >
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2 flex-1">
+                <h4 class="font-medium text-sm truncate">{{ block.name }}</h4>
+              </div>
+              <div class="flex items-center gap-1">
+                <Button variant="ghost" size="icon" @click.stop="insertBlock(block.content)">
+                  <Plus class="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" @click.stop="removeBlock(block.id)">
+                  <X class="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            
+            <div v-if="expandedBlocks.has(block.id)" 
+              class="mt-2 space-y-2"
+              @mouseenter="showPreview(block.id, block.content)"
+              @mouseleave="previewContent[block.id] = ''"
+            >
+              <div class="flex flex-wrap gap-1">
+                <span v-for="tag in block.tags" :key="tag" 
+                  class="text-xs bg-muted px-1.5 py-0.5 rounded-full">
+                  {{ tag }}
+                </span>
+              </div>
+              <div v-if="previewContent[block.id]" 
+                class="text-xs text-muted-foreground border-t pt-2">
+                {{ previewContent[block.id] }}
+              </div>
             </div>
           </div>
-          
-          <div v-if="expandedBlocks.has(block.id)" 
-            class="mt-2 space-y-2"
-            @mouseenter="showPreview(block.id, block.content)"
-            @mouseleave="previewContent[block.id] = ''"
-          >
-            <div class="flex flex-wrap gap-1">
-              <span v-for="tag in block.tags" :key="tag" 
-                class="text-xs bg-muted px-1.5 py-0.5 rounded-full">
-                {{ tag }}
-              </span>
-            </div>
-            <div v-if="previewContent[block.id]" 
-              class="text-xs text-muted-foreground border-t pt-2">
-              {{ previewContent[block.id] }}
-            </div>
+
+          <!-- Empty State -->
+          <div v-if="filteredBlocks.length === 0" class="text-center py-8">
+            <Star class="w-12 h-12 text-muted-foreground/20 mx-auto mb-4" />
+            <h4 class="font-medium mb-2">No Blocks Found</h4>
+            <p class="text-sm text-muted-foreground">
+              {{ searchQuery || selectedTags.length > 0 
+                ? 'Try adjusting your search or filters' 
+                : 'Add blocks to your favorites for quick access' }}
+            </p>
           </div>
         </div>
+      </ScrollArea>
+    </SidebarContent>
 
-        <!-- Empty State -->
-        <div v-if="filteredBlocks.length === 0" class="text-center py-8">
-          <Star class="w-12 h-12 text-muted-foreground/20 mx-auto mb-4" />
-          <h4 class="font-medium mb-2">No Blocks Found</h4>
-          <p class="text-sm text-muted-foreground">
-            {{ searchQuery || selectedTags.length > 0 
-              ? 'Try adjusting your search or filters' 
-              : 'Add blocks to your favorites for quick access' }}
-          </p>
+    <SidebarFooter class="border-t">
+      <div class="p-2">
+        <div class="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+          <kbd class="px-1.5 py-0.5 text-xs bg-muted border rounded">Ctrl</kbd>
+          <span>+</span>
+          <kbd class="px-1.5 py-0.5 text-xs bg-muted border rounded">Shift</kbd>
+          <span>+</span>
+          <kbd class="px-1.5 py-0.5 text-xs bg-muted border rounded">Alt</kbd>
+          <span>+</span>
+          <kbd class="px-1.5 py-0.5 text-xs bg-muted border rounded">V</kbd>
+          <span class="ml-2">toggle favorites</span>
         </div>
       </div>
-    </ScrollArea>
-
-    <!-- Keyboard Shortcut Info -->
-    <KeyboardShortcut 
-      ctrl
-      shift
-      alt
-      keyName="V" 
-      action="toggle favorites"
-    />
-  </BaseSidebar>
+    </SidebarFooter>
+  </Sidebar>
 </template>
 
 <style scoped>
 .block-item {
-  @apply cursor-pointer;
+  cursor: pointer;
 }
 
 .block-item:hover {
-  @apply shadow-sm;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
 }
 
 .block-item.expanded {
-  @apply bg-muted/30;
+  background-color: hsl(var(--muted) / 0.3);
 }
 
 /* Transition for expansion */
 .block-item > div:last-child {
-  @apply transition-all duration-200;
+  transition: all 0.2s;
 }
 </style>
 
