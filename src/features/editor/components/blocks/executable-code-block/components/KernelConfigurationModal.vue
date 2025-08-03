@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/ui/button-group'
 import { 
   Dialog,
@@ -8,10 +8,17 @@ import {
   DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogTitle,
-  DialogTrigger
-} from '@/ui/dialog'
-import CustomSelect from '@/ui/CustomSelect.vue'
+  DialogTitle
+} from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select'
 import { 
   Settings, 
   Server, 
@@ -207,6 +214,10 @@ const handleApply = () => {
   }
 }
 
+const handleCancel = () => {
+  emit('update:is-open', false)
+}
+
 const handleToggleSharedSessionMode = () => {
   emit('toggle-shared-session-mode')
 }
@@ -221,16 +232,13 @@ const formatLastActivity = (lastActivity: string) => {
 </script>
 
 <template>
-  <Dialog :open="isOpen" @update:open="emit('update:is-open', $event)">
+  <Dialog :open="props.isOpen" @update:open="(value) => emit('update:is-open', value)" :modal="false">
     <DialogContent class="max-w-2xl max-h-[80vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <Settings class="h-5 w-5" />
           Kernel Configuration
         </DialogTitle>
-        <DialogDescription>
-          Configure the Jupyter server, kernel, and session for code execution.
-        </DialogDescription>
       </DialogHeader>
 
       <div class="space-y-6">
@@ -308,14 +316,27 @@ const formatLastActivity = (lastActivity: string) => {
             </span>
           </div>
           
-          <CustomSelect
-            :options="serverOptions"
+          <Select
             :model-value="localServer"
-            placeholder="Select a Jupyter server..."
-            :searchable="true"
             :disabled="isSharedSessionMode"
-            @select="handleServerChange"
-          />
+            @update:model-value="(value) => handleServerChange(value as string)"
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select a Jupyter server..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectLabel>Available Servers</SelectLabel>
+                <SelectItem
+                  v-for="server in serverOptions"
+                  :key="server.value"
+                  :value="server.value"
+                >
+                  {{ server.label }}
+                </SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
           
           <div
             v-if="availableServers.length === 0"
@@ -338,14 +359,27 @@ const formatLastActivity = (lastActivity: string) => {
             </span>
           </div>
           
-          <CustomSelect
-            :options="kernelOptions"
+          <Select
             :model-value="localKernel"
-            placeholder="Select a kernel..."
-            :searchable="true"
             :disabled="!isServerSelected || isSharedSessionMode"
-            @select="handleKernelChange"
-          />
+            @update:model-value="(value) => handleKernelChange(value as string)"
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select a kernel..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectLabel>Available Kernels</SelectLabel>
+                <SelectItem
+                  v-for="kernel in kernelOptions"
+                  :key="kernel.value"
+                  :value="kernel.value"
+                >
+                  {{ kernel.label }}
+                </SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
           
           <div
             v-if="isServerSelected && availableKernels.length === 0"
@@ -392,14 +426,27 @@ const formatLastActivity = (lastActivity: string) => {
           </div>
 
           <!-- Session Selection -->
-          <CustomSelect
-            :options="sessionOptions"
+          <Select
             :model-value="localSession"
-            placeholder="Select or create a session..."
-            :searchable="true"
             :disabled="!isKernelSelected"
-            @select="handleSessionChange"
-          />
+            @update:model-value="(value) => handleSessionChange(value as string)"
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select or create a session..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectLabel>Available Sessions</SelectLabel>
+                <SelectItem
+                  v-for="session in sessionOptions"
+                  :key="session.value"
+                  :value="session.value"
+                >
+                  {{ session.label }}
+                </SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
 
           <!-- Available Sessions List -->
           <div v-if="availableSessions.length > 0" class="space-y-2">
@@ -506,7 +553,7 @@ const formatLastActivity = (lastActivity: string) => {
       <DialogFooter>
         <Button 
           variant="outline" 
-          @click="emit('update:is-open', false)"
+          @click="handleCancel"
         >
           Cancel
         </Button>
@@ -522,3 +569,7 @@ const formatLastActivity = (lastActivity: string) => {
     </DialogContent>
   </Dialog>
 </template>
+
+<style scoped>
+/* No custom z-index needed - shadcn/ui handles this automatically */
+</style>

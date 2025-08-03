@@ -409,31 +409,31 @@ const handleToggleSharedSessionMode = async () => {
       @update:is-open="(value) => isTemplateDialogOpen = value"
       @template-selected="handleTemplateSelected"
     />
-
-    <!-- Kernel Configuration Modal -->
-    <KernelConfigurationModal
-      :is-open="isConfigurationModalOpen"
-      :is-shared-session-mode="isSharedSessionMode"
-      :is-executing="isExecuting || false"
-      :is-setting-up="isSettingUp"
-      :selected-server="selectedServer"
-      :selected-kernel="selectedKernel"
-      :available-servers="availableServers || []"
-      :available-kernels="availableKernels || []"
-      :selected-session="selectedSession"
-      :available-sessions="availableSessions || []"
-      :running-kernels="runningKernels || []"
-      @update:is-open="isConfigurationModalOpen = $event"
-      @server-change="handleServerChange"
-      @kernel-change="handleKernelChange"
-      @session-change="handleSessionChange"
-      @create-new-session="handleCreateNewSession"
-      @clear-all-kernels="handleClearAllKernels"
-      @refresh-sessions="handleRefreshSessions"
-      @select-running-kernel="handleRunningKernelSelect"
-      @toggle-shared-session-mode="handleToggleSharedSessionMode"
-    />
   </div>
+
+  <!-- Kernel Configuration Modal - moved outside main container to avoid z-index issues -->
+  <KernelConfigurationModal
+    :is-open="isConfigurationModalOpen"
+    :is-shared-session-mode="isSharedSessionMode"
+    :is-executing="isExecuting || false"
+    :is-setting-up="isSettingUp"
+    :selected-server="selectedServer"
+    :selected-kernel="selectedKernel"
+    :available-servers="availableServers || []"
+    :available-kernels="availableKernels || []"
+    :selected-session="selectedSession"
+    :available-sessions="availableSessions || []"
+    :running-kernels="runningKernels || []"
+    @update:is-open="isConfigurationModalOpen = $event"
+    @server-change="handleServerChange"
+    @kernel-change="handleKernelChange"
+    @session-change="handleSessionChange"
+    @create-new-session="handleCreateNewSession"
+    @clear-all-kernels="handleClearAllKernels"
+    @refresh-sessions="handleRefreshSessions"
+    @select-running-kernel="handleRunningKernelSelect"
+    @toggle-shared-session-mode="handleToggleSharedSessionMode"
+  />
 </template>
 
 <style scoped>
