@@ -2,7 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/ui/button-group'
-import { 
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -10,15 +10,6 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select'
 import { 
   Settings, 
   Server, 
@@ -87,28 +78,6 @@ const emit = defineEmits<Emits>()
 const localServer = ref(props.selectedServer || '')
 const localKernel = ref(props.selectedKernel || '')
 const localSession = ref(props.selectedSession || '')
-
-// Computed options
-const serverOptions = computed(() => 
-  props.availableServers.map(server => ({
-    value: `${server.ip}:${server.port}`,
-    label: `${server.ip}:${server.port}`,
-  }))
-)
-
-const kernelOptions = computed(() => 
-  props.availableKernels.map(kernel => ({
-    value: kernel.name,
-    label: kernel.spec.display_name || kernel.name
-  }))
-)
-
-const sessionOptions = computed(() => 
-  props.availableSessions.map(session => ({
-    value: session.id,
-    label: session.name
-  }))
-)
 
 // Validation
 const isServerSelected = computed(() => 
@@ -239,6 +208,9 @@ const formatLastActivity = (lastActivity: string) => {
           <Settings class="h-5 w-5" />
           Kernel Configuration
         </DialogTitle>
+        <DialogDescription>
+          Configure your Jupyter server, kernel, and session settings for code execution.
+        </DialogDescription>
       </DialogHeader>
 
       <div class="space-y-6">
@@ -316,27 +288,27 @@ const formatLastActivity = (lastActivity: string) => {
             </span>
           </div>
           
-          <Select
-            :model-value="localServer"
-            :disabled="isSharedSessionMode"
-            @update:model-value="(value) => handleServerChange(value as string)"
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select a Jupyter server..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectLabel>Available Servers</SelectLabel>
-                <SelectItem
-                  v-for="server in serverOptions"
-                  :key="server.value"
-                  :value="server.value"
-                >
-                  {{ server.label }}
-                </SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
+          <div v-if="availableServers.length > 0" class="space-y-2">
+            <div class="max-h-32 overflow-y-auto space-y-1">
+              <div
+                v-for="server in availableServers"
+                :key="`${server.ip}:${server.port}`"
+                class="flex items-center justify-between p-3 rounded border text-sm cursor-pointer transition-colors"
+                :class="{
+                  'bg-primary/10 border-primary/30': localServer === `${server.ip}:${server.port}`,
+                  'hover:bg-muted/50': localServer !== `${server.ip}:${server.port}` && !isSharedSessionMode,
+                  'opacity-50 cursor-not-allowed': isSharedSessionMode
+                }"
+                @click="!isSharedSessionMode && handleServerChange(`${server.ip}:${server.port}`)"
+              >
+                <div class="flex items-center gap-2">
+                  <Check v-if="localServer === `${server.ip}:${server.port}`" class="h-4 w-4 text-primary" />
+                  <Server v-else class="h-4 w-4" />
+                  <span class="font-medium">{{ server.ip }}:{{ server.port }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
           
           <div
             v-if="availableServers.length === 0"
@@ -359,27 +331,30 @@ const formatLastActivity = (lastActivity: string) => {
             </span>
           </div>
           
-          <Select
-            :model-value="localKernel"
-            :disabled="!isServerSelected || isSharedSessionMode"
-            @update:model-value="(value) => handleKernelChange(value as string)"
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select a kernel..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectLabel>Available Kernels</SelectLabel>
-                <SelectItem
-                  v-for="kernel in kernelOptions"
-                  :key="kernel.value"
-                  :value="kernel.value"
-                >
-                  {{ kernel.label }}
-                </SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
+          <div v-if="availableKernels.length > 0" class="space-y-2">
+            <div class="max-h-32 overflow-y-auto space-y-1">
+              <div
+                v-for="kernel in availableKernels"
+                :key="kernel.name"
+                class="flex items-center justify-between p-3 rounded border text-sm cursor-pointer transition-colors"
+                :class="{
+                  'bg-primary/10 border-primary/30': localKernel === kernel.name,
+                  'hover:bg-muted/50': localKernel !== kernel.name && !isSharedSessionMode && isServerSelected,
+                  'opacity-50 cursor-not-allowed': isSharedSessionMode || !isServerSelected
+                }"
+                @click="!isSharedSessionMode && isServerSelected && handleKernelChange(kernel.name)"
+              >
+                <div class="flex items-center gap-2">
+                  <Check v-if="localKernel === kernel.name" class="h-4 w-4 text-primary" />
+                  <Cpu v-else class="h-4 w-4" />
+                  <div>
+                    <span class="font-medium">{{ kernel.spec.display_name || kernel.name }}</span>
+                    <div class="text-xs text-muted-foreground">{{ kernel.name }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
           
           <div
             v-if="isServerSelected && availableKernels.length === 0"
@@ -426,57 +401,28 @@ const formatLastActivity = (lastActivity: string) => {
           </div>
 
           <!-- Session Selection -->
-          <Select
-            :model-value="localSession"
-            :disabled="!isKernelSelected"
-            @update:model-value="(value) => handleSessionChange(value as string)"
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select or create a session..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectLabel>Available Sessions</SelectLabel>
-                <SelectItem
-                  v-for="session in sessionOptions"
-                  :key="session.value"
-                  :value="session.value"
-                >
-                  {{ session.label }}
-                </SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-
-          <!-- Available Sessions List -->
           <div v-if="availableSessions.length > 0" class="space-y-2">
             <div class="text-xs font-medium text-muted-foreground">Available Sessions</div>
             <div class="max-h-32 overflow-y-auto space-y-1">
               <div
                 v-for="session in availableSessions"
                 :key="session.id"
-                class="flex items-center justify-between p-2 rounded border text-xs"
+                class="flex items-center justify-between p-3 rounded border text-sm cursor-pointer transition-colors"
                 :class="{
-                  'bg-primary/10 border-primary/30': session.id === localSession,
-                  'hover:bg-muted/50': session.id !== localSession
+                  'bg-primary/10 border-primary/30': localSession === session.id,
+                  'hover:bg-muted/50': localSession !== session.id && isKernelSelected,
+                  'opacity-50 cursor-not-allowed': !isKernelSelected
                 }"
+                @click="isKernelSelected && handleSessionChange(session.id)"
               >
                 <div class="flex items-center gap-2">
-                  <Check v-if="session.id === localSession" class="h-3 w-3 text-primary" />
-                  <Layers v-else class="h-3 w-3" />
-                  <span class="font-medium">{{ session.name }}</span>
-                  <span class="text-muted-foreground">{{ session.kernel.name }}</span>
+                  <Check v-if="localSession === session.id" class="h-4 w-4 text-primary" />
+                  <Layers v-else class="h-4 w-4" />
+                  <div>
+                    <span class="font-medium">{{ session.name }}</span>
+                    <div class="text-xs text-muted-foreground">{{ session.kernel.name }}</div>
+                  </div>
                 </div>
-                
-                <Button
-                  v-if="session.id !== localSession"
-                  variant="ghost"
-                  size="sm"
-                  class="h-5 w-5 p-0"
-                  @click="handleSessionChange(session.id)"
-                >
-                  <ExternalLink class="h-3 w-3" />
-                </Button>
               </div>
             </div>
           </div>
@@ -571,5 +517,5 @@ const formatLastActivity = (lastActivity: string) => {
 </template>
 
 <style scoped>
-/* No custom z-index needed - shadcn/ui handles this automatically */
+/* Simple styles for the dialog */
 </style>

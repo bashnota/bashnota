@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import { Card, CardContent } from '@/ui/card'
 import { useCodeExecution } from './composables/core/useCodeExecution'
 import CodeBlockWithExecution from './CodeBlockWithExecution.vue'
 import OutputRenderer from './OutputRenderer.vue'
+import KernelConfigurationModal from './components/KernelConfigurationModal.vue'
 import type { CodeBlockProps } from './types'
 
 const props = defineProps<CodeBlockProps>()
@@ -45,30 +46,36 @@ const updateCode = (newCode: string) => {
 const updateOutput = (newOutput: string) => {
   props.updateAttributes({ output: newOutput })
 }
+
+// Modal state
+const isConfigurationModalOpen = ref(false)
+
+const handleOpenConfiguration = () => {
+  isConfigurationModalOpen.value = true
+}
 </script>
 
 <template>
   <NodeViewWrapper class="my-6">
-    <Card v-if="isExecutable" class="overflow-hidden border-none shadow-md" :class="{ 'published-card': isPublishedView }">
-      <CardContent class="p-0">
-        <CodeBlockWithExecution
-          :id="blockId"
-          :code="code"
-          :language="language"
-          :session-id="sessionId"
-          :nota-id="notaId"
-          :kernel-preference="kernelPreference"
-          :is-read-only="editor.options.editable === false"
-          :is-published="isPublishedView"
-          @update:code="updateCode"
-          @kernel-select="onKernelSelect"
-          @update:output="updateOutput"
-          @update:session-id="onSessionSelect"
-        />
-      </CardContent>
-    </Card>
+    <div v-if="isExecutable" class="border-none shadow-md" :class="{ 'published-card': isPublishedView }">
+      <CodeBlockWithExecution
+        :id="blockId"
+        :code="code"
+        :language="language"
+        :session-id="sessionId"
+        :nota-id="notaId"
+        :kernel-preference="kernelPreference"
+        :is-read-only="editor.options.editable === false"
+        :is-published="isPublishedView"
+        @update:code="updateCode"
+        @kernel-select="onKernelSelect"
+        @update:output="updateOutput"
+        @update:session-id="onSessionSelect"
+        @open-configuration="handleOpenConfiguration"
+      />
+    </div>
 
-    <Card v-else class="overflow-hidden border-none shadow-md" :class="{ 'published-card': isPublishedView }">
+    <Card v-else class="border-none shadow-md" :class="{ 'published-card': isPublishedView }">
       <CardContent class="p-0">
         <OutputRenderer
           :content="code"
@@ -81,7 +88,25 @@ const updateOutput = (newOutput: string) => {
         />
       </CardContent>
     </Card>
+
   </NodeViewWrapper>
+
+  <!-- Modal at this level, outside any problematic containers -->
+  <KernelConfigurationModal
+    v-if="isExecutable"
+    :is-open="isConfigurationModalOpen"
+    :is-shared-session-mode="false"
+    :is-executing="false"
+    :is-setting-up="false"
+    :selected-server="''"
+    :selected-kernel="''"
+    :available-servers="[]"
+    :available-kernels="[]"
+    :selected-session="''"
+    :available-sessions="[]"
+    :running-kernels="[]"
+    @update:is-open="isConfigurationModalOpen = $event"
+  />
 </template>
 
 <style scoped>
@@ -90,13 +115,11 @@ const updateOutput = (newOutput: string) => {
   margin-bottom: 1.5rem;
 }
 
-.overflow-hidden {
-  overflow: hidden;
-}
-
 /* Enhanced styles for published mode */
 .published-card {
-  @apply bg-card border border-border shadow-md;
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
 }
 
 /* Add styles for scrollable code blocks */

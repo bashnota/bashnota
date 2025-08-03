@@ -18,7 +18,6 @@ import FullScreenCodeBlock from './FullScreenCodeBlock.vue'
 import ExecutionStatus from './ExecutionStatus.vue'
 import ErrorDisplay from './ErrorDisplay.vue'
 import TemplateSelector from './TemplateSelector.vue'
-import KernelConfigurationModal from './components/KernelConfigurationModal.vue'
 
 // UI utilities
 import { toast } from '@/ui/toast/use-toast'
@@ -44,6 +43,7 @@ const emit = defineEmits<{
   'update:output': [output: string]
   'update:session-id': [sessionId: string]
   'server-change': [serverId: string]
+  'open-configuration': []
 }>()
 
 // Core state and functionality
@@ -72,9 +72,6 @@ const {
   toggleCodeVisibility,
   showTemplateDialog
 } = useCodeBlockUI()
-
-// Configuration modal state
-const isConfigurationModalOpen = ref(false)
 
 // Execution and session management
 const {
@@ -198,7 +195,7 @@ const handleMouseLeave = () => {
 
 // Configuration modal handler
 const handleOpenConfiguration = () => {
-  isConfigurationModalOpen.value = true
+  emit('open-configuration')
 }
 
 // Handle shared session mode toggle
@@ -216,7 +213,7 @@ const handleToggleSharedSessionMode = async () => {
           description: "Please select a Jupyter server and kernel first before enabling shared session mode.",
           variant: "destructive"
         })
-        isConfigurationModalOpen.value = true
+        emit('open-configuration')
         return
       }
       
@@ -255,7 +252,7 @@ const handleToggleSharedSessionMode = async () => {
 <template>
   <div
     ref="codeBlockRef"
-    class="flex flex-col bg-card text-card-foreground rounded-lg overflow-hidden border shadow-sm transition-all duration-200 group hover:shadow-md relative"
+    class="flex flex-col bg-card text-card-foreground rounded-lg border shadow-sm transition-all duration-200 group hover:shadow-md relative"
     :class="codeBlockClasses"
     @mouseenter="handleMouseEnter"
     @mouseleave="handleMouseLeave"
@@ -410,30 +407,6 @@ const handleToggleSharedSessionMode = async () => {
       @template-selected="handleTemplateSelected"
     />
   </div>
-
-  <!-- Kernel Configuration Modal - moved outside main container to avoid z-index issues -->
-  <KernelConfigurationModal
-    :is-open="isConfigurationModalOpen"
-    :is-shared-session-mode="isSharedSessionMode"
-    :is-executing="isExecuting || false"
-    :is-setting-up="isSettingUp"
-    :selected-server="selectedServer"
-    :selected-kernel="selectedKernel"
-    :available-servers="availableServers || []"
-    :available-kernels="availableKernels || []"
-    :selected-session="selectedSession"
-    :available-sessions="availableSessions || []"
-    :running-kernels="runningKernels || []"
-    @update:is-open="isConfigurationModalOpen = $event"
-    @server-change="handleServerChange"
-    @kernel-change="handleKernelChange"
-    @session-change="handleSessionChange"
-    @create-new-session="handleCreateNewSession"
-    @clear-all-kernels="handleClearAllKernels"
-    @refresh-sessions="handleRefreshSessions"
-    @select-running-kernel="handleRunningKernelSelect"
-    @toggle-shared-session-mode="handleToggleSharedSessionMode"
-  />
 </template>
 
 <style scoped>
