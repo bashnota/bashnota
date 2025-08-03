@@ -753,7 +753,6 @@ const handleAuthNavigation = () => {
   --sidebar-width: 300px;
   --sidebar-width-icon: 60px;
   width: var(--sidebar-width);
-  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 [data-sidebar="sidebar"][data-state="collapsed"] {
@@ -778,26 +777,6 @@ const handleAuthNavigation = () => {
   max-height: 100vh;
 }
 
-/* Enhanced transitions for custom components */
-.transition-colors {
-  transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out;
-}
-
-.transition-all {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Smooth logo scaling animation */
-img[alt="BashNota Logo"] {
-  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1), height 0.5s cubic-bezier(0.4, 0, 0.2, 1), transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-  transform-origin: center;
-}
-
-/* Logo scale enhancement on collapsed state */
-[data-sidebar="sidebar"][data-state="collapsed"] img[alt="BashNota Logo"] {
-  transform: scale(1.1);
-}
-
 /* New Nota Button Enhancement */
 .bg-primary {
   background-color: hsl(var(--primary)) !important;
@@ -811,52 +790,11 @@ img[alt="BashNota Logo"] {
   background-color: hsl(var(--primary) / 0.9) !important;
 }
 
-/* Enhanced button hover effects */
-Button[title*="Create new nota"]:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px hsl(var(--primary) / 0.3);
-}
-
-/* Subtle pulse animation for attention */
-@keyframes pulse-primary {
-  0%, 100% {
-    box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4);
-  }
-  50% {
-    box-shadow: 0 0 0 4px hsl(var(--primary) / 0.1);
-  }
-}
-
-Button[title*="Create new nota"] {
-  animation: pulse-primary 3s ease-in-out infinite;
-}
-
-/* Loading animation */
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.animate-spin {
-  animation: spin 1s linear infinite;
-}
-
 /* Better focus states for accessibility */
 button:focus-visible,
 a:focus-visible {
   outline: 2px solid hsl(var(--primary));
   outline-offset: 2px;
-}
-
-/* Custom hover effects for collapsible triggers */
-.group\/collapsible [data-collapsible="trigger"]:hover {
-  background-color: hsl(var(--sidebar-accent));
-  color: hsl(var(--sidebar-accent-foreground));
-}
-
-/* Smooth transitions for collapsible content */
-.group\/collapsible [data-collapsible="content"] {
-  overflow: hidden;
-  transition: height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Active state styling for navigation items */
@@ -869,12 +807,6 @@ a:focus-visible {
 /* Enhanced sidebar section spacing */
 .group\/collapsible + .group\/collapsible {
   margin-top: 0.5rem;
-}
-
-/* Subtle animation for chevron icons */
-.group-data-\[state\=open\]\/collapsible\:rotate-180 {
-  transform-origin: center;
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Better visual hierarchy for group labels */
@@ -906,17 +838,6 @@ a:focus-visible {
   background-color: hsl(var(--muted-foreground) / 0.5);
 }
 
-/* Smooth transitions for buttons */
-.h-7, .h-8 {
-  transition: all 0.2s ease;
-}
-
-.h-7:hover:not(:disabled),
-.h-8:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px hsl(var(--foreground) / 0.1);
-}
-
 /* Responsive design improvements */
 @media (max-width: 768px) {
   [data-sidebar="sidebar"] {
@@ -927,11 +848,6 @@ a:focus-visible {
 /* Improved button layouts for better UX */
 .w-full.justify-start {
   text-align: left;
-}
-
-/* Enhanced collapsible icon behavior */
-.group-data-\[collapsible\=icon\]\:hidden {
-  transition: opacity 0.2s ease;
 }
 
 /* Collapsed mode specific styles */
@@ -1001,12 +917,6 @@ a:focus-visible {
 /* Hide resize handle on collapsed state */
 [data-sidebar="sidebar"][data-state="collapsed"] {
   resize: none;
-}
-
-/* Enhanced visual feedback for interactive elements */
-.hover\:bg-sidebar-accent:hover {
-  background-color: hsl(var(--sidebar-accent));
-  color: hsl(var(--sidebar-accent-foreground));
 }
 
 /* Improved badge styling */
