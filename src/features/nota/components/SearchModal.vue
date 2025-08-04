@@ -4,16 +4,15 @@ import { useNotaStore } from '@/features/nota/stores/nota'
 import { useRouter } from 'vue-router'
 import { useNotaList } from '@/features/nota/composables/useNotaList'
 import { useNotaActions } from '@/features/nota/composables/useNotaActions'
+import { useNotaBatchActions } from '@/features/nota/composables/useNotaBatchActions'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Checkbox } from '@/components/ui/checkbox'
 import {
   TableCell,
   TableRow,
@@ -22,11 +21,10 @@ import SearchInput from '@/features/nota/components/SearchInput.vue'
 import QuickFilters from '@/features/nota/components/QuickFilters.vue'
 import TagFilter from '@/features/nota/components/TagFilter.vue'
 import NotaTable from '@/features/nota/components/NotaTable.vue'
+import BatchActionsToolbar from '@/features/nota/components/BatchActionsToolbar.vue'
 import {
   Search,
   X,
-  Filter,
-  Hash,
 } from 'lucide-vue-next'
 import type { Nota } from '@/features/nota/types/nota'
 
@@ -44,7 +42,14 @@ const emit = defineEmits<Emits>()
 const notaStore = useNotaStore()
 const router = useRouter()
 const { toggleNotaFavorite } = useNotaActions()
-const searchInput = ref<HTMLInputElement | null>(null)
+const { 
+  isProcessing,
+  batchToggleFavorite,
+  batchDelete,
+  batchAddTags,
+  batchRemoveTags 
+} = useNotaBatchActions()
+const searchInput = ref<{ focus: () => void } | null>(null)
 
 // Use the modular nota list composable
 const {
@@ -58,6 +63,7 @@ const {
   sortDirection,
   filteredAndSortedNotas,
   hasSelection,
+  selectionCount,
   currentPage,
   totalPages,
   paginatedItems: paginatedNotas,
@@ -75,6 +81,9 @@ const {
   handleSort,
   handleSelectNota,
   isNotaSelected,
+  clearSelection,
+  getSelectedIds,
+  getSelectedNotas,
   clearAllFilters,
   formatDate,
   getContentPreview,
@@ -88,7 +97,14 @@ const {
 watch(() => props.open, async (isOpen) => {
   if (isOpen) {
     await nextTick()
-    searchInput.value?.focus()
+    // Add a small delay to ensure the input is fully rendered
+    setTimeout(async () => {
+      try {
+        await searchInput.value?.focus()
+      } catch (error) {
+        console.warn('Failed to focus search input:', error)
+      }
+    }, 100)
   }
 })
 
@@ -126,6 +142,71 @@ const handleTagClick = (tag: string) => {
   toggleTag(tag)
 }
 
+// Batch action handlers
+const handleBatchToggleFavorite = async (selectedIds: string[]) => {
+  const result = await batchToggleFavorite(
+    selectedIds,
+    notaStore.items,
+    async (id: string) => {
+      await toggleNotaFavorite(id)
+    }
+  )
+  
+  if (result.success) {
+    clearSelection()
+  }
+  // You could show a toast notification here
+  console.log(result.message)
+}
+
+const handleBatchDelete = async (selectedIds: string[]) => {
+  console.log('SearchModal: handleBatchDelete called with IDs:', selectedIds)
+  const result = await batchDelete(selectedIds, async (id: string) => {
+    console.log('SearchModal: Deleting nota with ID:', id)
+    await notaStore.deleteItem(id)
+  })
+  
+  if (result.success) {
+    console.log('SearchModal: Delete successful, clearing selection')
+    clearSelection()
+  } else {
+    console.log('SearchModal: Delete failed:', result.message)
+  }
+  console.log(result.message)
+}
+
+const handleBatchAddTags = async (selectedIds: string[], tags: string[]) => {
+  const result = await batchAddTags(selectedIds, tags, async (id: string, tagsToAdd: string[]) => {
+    const nota = notaStore.items.find(n => n.id === id)
+    if (nota) {
+      const existingTags = nota.tags || []
+      const newTags = [...new Set([...existingTags, ...tagsToAdd])]
+      await notaStore.updateNota(id, { tags: newTags })
+    }
+  })
+  
+  if (result.success) {
+    clearSelection()
+  }
+  console.log(result.message)
+}
+
+const handleBatchRemoveTags = async (selectedIds: string[], tags: string[]) => {
+  const result = await batchRemoveTags(selectedIds, tags, async (id: string, tagsToRemove: string[]) => {
+    const nota = notaStore.items.find(n => n.id === id)
+    if (nota) {
+      const existingTags = nota.tags || []
+      const newTags = existingTags.filter(tag => !tagsToRemove.includes(tag))
+      await notaStore.updateNota(id, { tags: newTags })
+    }
+  })
+  
+  if (result.success) {
+    clearSelection()
+  }
+  console.log(result.message)
+}
+
 onMounted(() => {
   // Ensure notas are loaded
   if (notaStore.items.length === 0) {
@@ -143,6 +224,9 @@ onMounted(() => {
           <Search class="h-5 w-5" />
           Search Notas
         </DialogTitle>
+        <DialogDescription>
+          Search through your notas by title, content, or tags. Use filters to refine your results.
+        </DialogDescription>
         
         <!-- Search Input -->
         <SearchInput
@@ -197,9 +281,25 @@ onMounted(() => {
               {{ filteredAndSortedNotas.length }} {{ filteredAndSortedNotas.length === 1 ? 'nota' : 'notas' }} found
             </span>
             <div v-if="hasSelection" class="flex items-center gap-2 text-sm text-muted-foreground">
-              {{ hasSelection }} selected
+              {{ selectionCount }} selected
             </div>
           </div>
+
+          <!-- Batch Actions Toolbar -->
+          <BatchActionsToolbar
+            v-if="hasSelection"
+            :selected-count="selectionCount"
+            :selected-ids="getSelectedIds()"
+            :selected-notas="getSelectedNotas(notaStore.items)"
+            :all-tags="availableTags"
+            :is-processing="isProcessing"
+            @batch-toggle-favorite="handleBatchToggleFavorite"
+            @batch-delete="handleBatchDelete"
+            @batch-add-tags="handleBatchAddTags"
+            @batch-remove-tags="handleBatchRemoveTags"
+            @clear-selection="clearSelection"
+            class="mb-4"
+          />
 
           <!-- Data Table -->
           <div class="rounded-md border overflow-auto max-h-[380px]">

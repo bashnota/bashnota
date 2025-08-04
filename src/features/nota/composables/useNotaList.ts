@@ -41,6 +41,7 @@ export function useNotaList(options: UseNotaListOptions) {
   const {
     selectedNotas,
     hasSelection,
+    selectionCount,
     createSelectionForPage,
     handleSelectNota,
     isNotaSelected,
@@ -194,6 +195,7 @@ export function useNotaList(options: UseNotaListOptions) {
     currentSortOption,
     filteredAndSortedNotas,
     hasSelection,
+    selectionCount,
     
     // Pagination
     currentPage,

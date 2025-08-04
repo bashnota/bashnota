@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref, nextTick } from 'vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -23,6 +24,8 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const emit = defineEmits<Emits>()
+
+const inputRef = ref<HTMLInputElement | null>(null)
 
 const sizeClasses = {
   sm: 'h-8 pl-8 pr-8 text-sm',
@@ -58,6 +61,22 @@ const handleClear = () => {
   emit('update:modelValue', '')
   emit('clear')
 }
+
+// Expose focus method
+const focus = async () => {
+  try {
+    await nextTick()
+    if (inputRef.value && typeof inputRef.value.focus === 'function') {
+      inputRef.value.focus()
+    }
+  } catch (error) {
+    console.warn('Failed to focus input:', error)
+  }
+}
+
+defineExpose({
+  focus
+})
 </script>
 
 <template>
@@ -68,6 +87,7 @@ const handleClear = () => {
       iconPositions[size]
     ]" />
     <Input
+      ref="inputRef"
       :model-value="modelValue"
       :placeholder="placeholder"
       :disabled="disabled"

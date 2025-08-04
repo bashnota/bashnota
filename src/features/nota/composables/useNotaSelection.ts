@@ -6,6 +6,7 @@ export function useNotaSelection() {
 
   // Selection state computeds
   const hasSelection = computed(() => selectedNotas.value.size > 0)
+  const selectionCount = computed(() => selectedNotas.value.size)
   
   const createSelectionForPage = (pageItems: Nota[]) => {
     const isAllSelected = computed(() => 
@@ -19,17 +20,19 @@ export function useNotaSelection() {
     })
 
     const handleSelectAll = () => {
+      const newSelection = new Set(selectedNotas.value)
       if (isAllSelected.value) {
         // Deselect all on current page
         pageItems.forEach(nota => {
-          selectedNotas.value.delete(nota.id)
+          newSelection.delete(nota.id)
         })
       } else {
         // Select all on current page
         pageItems.forEach(nota => {
-          selectedNotas.value.add(nota.id)
+          newSelection.add(nota.id)
         })
       }
+      selectedNotas.value = newSelection
     }
 
     return {
@@ -41,32 +44,39 @@ export function useNotaSelection() {
 
   // Individual selection methods
   const handleSelectNota = (id: string, selected: boolean) => {
+    // Create a new Set to trigger reactivity
+    const newSelection = new Set(selectedNotas.value)
     if (selected) {
-      selectedNotas.value.add(id)
+      newSelection.add(id)
     } else {
-      selectedNotas.value.delete(id)
+      newSelection.delete(id)
     }
+    selectedNotas.value = newSelection
   }
 
   const isNotaSelected = (id: string) => selectedNotas.value.has(id)
 
   const toggleNotaSelection = (id: string) => {
-    if (selectedNotas.value.has(id)) {
-      selectedNotas.value.delete(id)
+    const newSelection = new Set(selectedNotas.value)
+    if (newSelection.has(id)) {
+      newSelection.delete(id)
     } else {
-      selectedNotas.value.add(id)
+      newSelection.add(id)
     }
+    selectedNotas.value = newSelection
   }
 
   // Bulk operations
   const clearSelection = () => {
-    selectedNotas.value.clear()
+    selectedNotas.value = new Set()
   }
 
   const selectAll = (notas: Nota[]) => {
+    const newSelection = new Set(selectedNotas.value)
     notas.forEach(nota => {
-      selectedNotas.value.add(nota.id)
+      newSelection.add(nota.id)
     })
+    selectedNotas.value = newSelection
   }
 
   const getSelectedIds = () => Array.from(selectedNotas.value)
@@ -80,6 +90,7 @@ export function useNotaSelection() {
     
     // Computed
     hasSelection,
+    selectionCount,
     
     // Methods
     createSelectionForPage,

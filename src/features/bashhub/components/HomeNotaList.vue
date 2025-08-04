@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   TableEmpty
@@ -25,19 +24,20 @@ import {
 import { 
   Filter, 
   X, 
-  Star, 
   Clock, 
   FileText,
   ChevronDown,
-  Hash,
   Settings2
 } from 'lucide-vue-next'
 import { useNotaActions } from '@/features/nota/composables/useNotaActions'
+import { useNotaStore } from '@/features/nota/stores/nota'
 import { useNotaList } from '@/features/nota/composables/useNotaList'
+import { useNotaBatchActions } from '@/features/nota/composables/useNotaBatchActions'
 import SearchInput from '@/features/nota/components/SearchInput.vue'
 import QuickFilters from '@/features/nota/components/QuickFilters.vue'
 import TagFilter from '@/features/nota/components/TagFilter.vue'
 import NotaTable from '@/features/nota/components/NotaTable.vue'
+import BatchActionsToolbar from '@/features/nota/components/BatchActionsToolbar.vue'
 import type { Nota } from '@/features/nota/types/nota'
 
 interface Props {
@@ -61,7 +61,15 @@ interface Emits {
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 const router = useRouter()
+const notaStore = useNotaStore()
 const { toggleNotaFavorite, navigateToNotaSettings } = useNotaActions()
+const { 
+  isProcessing,
+  batchToggleFavorite,
+  batchDelete,
+  batchAddTags,
+  batchRemoveTags 
+} = useNotaBatchActions()
 
 // Use the unified nota list composable
 const {
@@ -76,6 +84,7 @@ const {
   sortDirection,
   filteredAndSortedNotas,
   hasSelection,
+  selectionCount,
   currentPage,
   totalPages,
   paginatedItems: paginatedNotas,
@@ -93,6 +102,9 @@ const {
   handleSort,
   handleSelectNota,
   isNotaSelected,
+  clearSelection,
+  getSelectedIds,
+  getSelectedNotas,
   clearAllFilters: clearFiltersComposable,
   formatDate,
   getContentPreview,
@@ -114,6 +126,7 @@ const showFilters = ref(false)
 // Override the composable's clearAllFilters to include emit calls
 const clearAllFiltersLocal = () => {
   clearFiltersComposable()
+  clearSelection()
   emit('clear-filters')
   emit('update:selectedTag', '')
   emit('update:showFavorites', false)
@@ -127,6 +140,65 @@ const handleQuickPreview = (nota: Nota) => {
 
 const handleNotaClick = (nota: Nota) => {
   router.push(`/nota/${nota.id}`)
+}
+
+const handleBatchToggleFavorite = async (selectedIds: string[]) => {
+  const result = await batchToggleFavorite(
+    selectedIds,
+    props.notas,
+    async (id: string) => {
+      await toggleNotaFavorite(id)
+    }
+  )
+  
+  if (result.success) {
+    clearSelection()
+  }
+  // You could show a toast notification here
+  console.log(result.message)
+}
+
+const handleBatchDelete = async (selectedIds: string[]) => {
+  const result = await batchDelete(selectedIds, async (id: string) => {
+    await notaStore.deleteItem(id)
+  })
+  
+  if (result.success) {
+    clearSelection()
+  }
+  console.log(result.message)
+}
+
+const handleBatchAddTags = async (selectedIds: string[], tags: string[]) => {
+  const result = await batchAddTags(selectedIds, tags, async (id: string, tagsToAdd: string[]) => {
+    const nota = props.notas.find(n => n.id === id)
+    if (nota) {
+      const existingTags = nota.tags || []
+      const newTags = [...new Set([...existingTags, ...tagsToAdd])]
+      await notaStore.updateNota(id, { tags: newTags })
+    }
+  })
+  
+  if (result.success) {
+    clearSelection()
+  }
+  console.log(result.message)
+}
+
+const handleBatchRemoveTags = async (selectedIds: string[], tags: string[]) => {
+  const result = await batchRemoveTags(selectedIds, tags, async (id: string, tagsToRemove: string[]) => {
+    const nota = props.notas.find(n => n.id === id)
+    if (nota) {
+      const existingTags = nota.tags || []
+      const newTags = existingTags.filter(tag => !tagsToRemove.includes(tag))
+      await notaStore.updateNota(id, { tags: newTags })
+    }
+  })
+  
+  if (result.success) {
+    clearSelection()
+  }
+  console.log(result.message)
 }
 
 // Computed property for active filters to include external props
@@ -294,7 +366,7 @@ watch(() => props.showFavorites, (newValue) => {
             <!-- Selection and New Button -->
             <div class="flex items-center gap-3">
               <div v-if="hasSelection" class="flex items-center gap-2">
-                <span class="text-xs text-muted-foreground">{{ hasSelection }} selected</span>
+                <span class="text-xs text-muted-foreground">{{ selectionCount }} selected</span>
               </div>
               
               <Button
@@ -309,6 +381,21 @@ watch(() => props.showFavorites, (newValue) => {
             </div>
           </div>
         </div>
+
+        <!-- Batch Actions Toolbar -->
+        <BatchActionsToolbar
+          v-if="hasSelection"
+          :selected-count="selectionCount"
+          :selected-ids="getSelectedIds()"
+          :selected-notas="getSelectedNotas(props.notas)"
+          :all-tags="availableTags"
+          :is-processing="isProcessing"
+          @batch-toggle-favorite="handleBatchToggleFavorite"
+          @batch-delete="handleBatchDelete"
+          @batch-add-tags="handleBatchAddTags"
+          @batch-remove-tags="handleBatchRemoveTags"
+          @clear-selection="clearSelection"
+        />
 
         <!-- Table -->
         <div v-if="isLoading" class="p-8">
@@ -337,7 +424,7 @@ watch(() => props.showFavorites, (newValue) => {
             @nota-click="handleNotaClick"
             @preview-nota="handleQuickPreview"
             @toggle-favorite="toggleNotaFavorite"
-            @delete-nota="(id) => {/* Add delete handler */}"
+            @delete-nota="(id) => notaStore.deleteItem(id)"
             @tag-click="(tag) => emit('update:selectedTag', tag)"
           />
         </div>
