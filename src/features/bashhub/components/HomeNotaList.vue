@@ -7,12 +7,6 @@ import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
   TableEmpty
 } from '@/components/ui/table'
 import {
@@ -33,13 +27,7 @@ import {
   X, 
   Star, 
   Clock, 
-  SortAsc,
-  SortDesc,
-  Eye,
-  Download,
-  Trash2,
   FileText,
-  Calendar,
   ChevronDown,
   Hash,
   Settings2
@@ -49,6 +37,7 @@ import { useNotaList } from '@/features/nota/composables/useNotaList'
 import SearchInput from '@/features/nota/components/SearchInput.vue'
 import QuickFilters from '@/features/nota/components/QuickFilters.vue'
 import TagFilter from '@/features/nota/components/TagFilter.vue'
+import NotaTable from '@/features/nota/components/NotaTable.vue'
 import type { Nota } from '@/features/nota/types/nota'
 
 interface Props {
@@ -333,117 +322,24 @@ watch(() => props.showFavorites, (newValue) => {
         </div>
 
         <div v-else-if="paginatedNotas.length > 0" class="max-h-[600px] overflow-y-auto">
-          <Table>
-            <TableHeader class="sticky top-0 bg-background border-b z-10">
-              <TableRow>
-                <TableHead class="w-12">
-                  <Checkbox
-                    :checked="isAllSelected"
-                    :indeterminate="isIndeterminate"
-                    @update:checked="handleSelectAll"
-                  />
-                </TableHead>
-                <TableHead class="cursor-pointer" @click="handleSort('title')">
-                  <div class="flex items-center gap-2">
-                    Title
-                    <SortAsc v-if="currentSortOption?.key === 'title' && sortDirection === 'asc'" class="h-3 w-3" />
-                    <SortDesc v-else-if="currentSortOption?.key === 'title'" class="h-3 w-3" />
-                  </div>
-                </TableHead>
-                <TableHead>Tags</TableHead>
-                <TableHead class="cursor-pointer" @click="handleSort('updated')">
-                  <div class="flex items-center gap-2">
-                    Updated
-                    <SortAsc v-if="currentSortOption?.key === 'updated' && sortDirection === 'asc'" class="h-3 w-3" />
-                    <SortDesc v-else-if="currentSortOption?.key === 'updated'" class="h-3 w-3" />
-                  </div>
-                </TableHead>
-                <TableHead class="w-32">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow
-                v-for="nota in paginatedNotas"
-                :key="nota.id"
-                class="cursor-pointer hover:bg-muted/50 group"
-                @click="handleNotaClick(nota)"
-              >
-                <TableCell @click.stop>
-                  <Checkbox
-                    :checked="isNotaSelected(nota.id)"
-                    @update:checked="(checked: boolean) => handleSelectNota(nota.id, checked)"
-                    class="transition-opacity duration-200"
-                    :class="isNotaSelected(nota.id) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'"
-                  />
-                </TableCell>
-                <TableCell class="font-medium">
-                  <div class="flex items-center gap-2">
-                    <Star 
-                      v-if="nota.favorite"
-                      class="h-4 w-4 text-yellow-500 fill-current"
-                    />
-                    {{ nota.title }}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div class="flex flex-wrap gap-1">
-                    <Badge
-                      v-for="tag in nota.tags?.slice(0, 2)"
-                      :key="tag"
-                      variant="secondary"
-                      class="text-xs cursor-pointer"
-                      @click.stop="emit('update:selectedTag', tag)"
-                    >
-                      {{ tag }}
-                    </Badge>
-                    <Badge
-                      v-if="nota.tags && nota.tags.length > 2"
-                      variant="outline"
-                      class="text-xs"
-                    >
-                      +{{ nota.tags.length - 2 }}
-                    </Badge>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div class="flex items-center gap-1 text-sm text-muted-foreground">
-                    <Calendar class="h-3 w-3" />
-                    {{ formatDate(nota.updatedAt) }}
-                  </div>
-                </TableCell>
-                <TableCell @click.stop>
-                  <div class="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      class="h-8 w-8"
-                      @click="handleQuickPreview(nota)"
-                      title="Preview"
-                    >
-                      <Eye class="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      class="h-8 w-8"
-                      @click="() => toggleNotaFavorite(nota.id)"
-                      title="Toggle Favorite"
-                    >
-                      <Star class="h-4 w-4" :class="nota.favorite ? 'text-yellow-500 fill-current' : 'text-muted-foreground'" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      class="h-8 w-8 text-destructive hover:text-destructive"
-                      title="Delete"
-                    >
-                      <Trash2 class="h-4 w-4" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
+          <NotaTable
+            :notas="paginatedNotas"
+            :current-sort-option="currentSortOption"
+            :sort-direction="sortDirection"
+            :is-all-selected="isAllSelected"
+            :is-indeterminate="isIndeterminate"
+            :format-date="formatDate"
+            :is-nota-selected="isNotaSelected"
+            mode="list"
+            @sort="handleSort"
+            @select-all="handleSelectAll"
+            @select-nota="handleSelectNota"
+            @nota-click="handleNotaClick"
+            @preview-nota="handleQuickPreview"
+            @toggle-favorite="toggleNotaFavorite"
+            @delete-nota="(id) => {/* Add delete handler */}"
+            @tag-click="(tag) => emit('update:selectedTag', tag)"
+          />
         </div>
 
         <TableEmpty v-else>
