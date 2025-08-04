@@ -18,9 +18,6 @@ import { useEquationCounter, EQUATION_COUNTER_KEY } from '@/features/editor/comp
 import { useCitationStore } from '@/features/editor/stores/citationStore'
 import { logger } from '@/services/logger'
 import { useDebounceFn } from '@vueuse/core'
-import BlockCommandMenu from "./ui/BlockCommandMenu.vue";
-import type { Nota } from "@/features/nota/types/nota";
-import type { Editor } from "@tiptap/vue-3";
 import type { CitationEntry } from "@/features/nota/types/nota";
 
 // Import shared CSS
@@ -383,7 +380,6 @@ const handleKeyboardShortcuts = (event: KeyboardEvent) => {
         editor.value!.chain().focus().insertNotaTable(currentNota.value.id).run();
       }
     },
-    a: () => editor.value!.chain().focus().insertInlineAIGeneration().run(),
     x: () => {
       if (editor.value) {
         editor.value.chain()

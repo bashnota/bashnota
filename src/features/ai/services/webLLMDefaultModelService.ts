@@ -8,7 +8,6 @@ export interface DefaultModelConfig {
   autoLoadOnRequest: boolean
   preferSmallModels: boolean
   fallbackStrategy: 'smallest' | 'fastest' | 'balanced' | 'none'
-  // 🔥 NEW: Enhanced user preference tracking
   userSelectedModel?: string // Last model manually selected by user
   lastSetAt?: string // When the default was last set
   autoLoadStrategy: 'user-selected' | 'smallest' | 'fastest' | 'balanced' | 'none'
@@ -22,7 +21,6 @@ export interface ModelSelectionCriteria {
   excludeExperimental: boolean
 }
 
-// 🔥 NEW: Quick setup preset configurations
 export interface QuickSetupPreset {
   id: 'fastest' | 'balanced' | 'quality'
   name: string
@@ -391,7 +389,6 @@ export class WebLLMDefaultModelService {
       return false
     }
 
-    // 🔥 ENHANCED: Auto-load if no model is loaded, even without a configured modelId
     // The provider will auto-select a suitable model if none is configured
     return true
   }
