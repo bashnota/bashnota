@@ -317,78 +317,88 @@ function createBasicCommands(): CommandItem[] {
   return [
     {
       title: 'Text',
-      category: 'Basic Blocks',
+      category: 'Text & Formatting',
       icon: TextIcon,
       keywords: ['text', 'paragraph', 'p'],
+      description: 'Regular paragraph text',
       command: createSimpleCommand('Paragraph'),
     },
     {
       title: 'Heading 1',
-      category: 'Basic Blocks',
+      category: 'Text & Formatting',
       icon: Heading1,
       keywords: ['h1', 'heading', 'title', 'large'],
+      description: 'Large heading for document titles',
       command: ({ editor, range }: CommandArgs) => {
         editor.chain().focus().deleteRange(range).setHeading({ level: 1 }).run();
       },
     },
     {
       title: 'Heading 2',
-      category: 'Basic Blocks',
+      category: 'Text & Formatting',
       icon: Heading2,
       keywords: ['h2', 'heading', 'subtitle'],
+      description: 'Medium heading for sections',
       command: ({ editor, range }: CommandArgs) => {
         editor.chain().focus().deleteRange(range).setHeading({ level: 2 }).run();
       },
     },
     {
       title: 'Heading 3',
-      category: 'Basic Blocks',
+      category: 'Text & Formatting',
       icon: Heading3,
       keywords: ['h3', 'heading', 'subsection'],
+      description: 'Small heading for subsections',
       command: ({ editor, range }: CommandArgs) => {
         editor.chain().focus().deleteRange(range).setHeading({ level: 3 }).run();
       },
     },
     {
       title: 'Bullet List',
-      category: 'Basic Blocks',
+      category: 'Lists',
       icon: List,
       keywords: ['bullet', 'list', 'unordered', 'ul'],
+      description: 'Unordered list with bullet points',
       command: createSimpleCommand('BulletList'),
     },
     {
       title: 'Ordered List',
-      category: 'Basic Blocks',
+      category: 'Lists',
       icon: ListOrdered,
       keywords: ['ordered', 'list', 'numbered', 'ol'],
+      description: 'Numbered list for sequential items',
       command: createSimpleCommand('OrderedList'),
     },
     {
       title: 'Task List',
-      category: 'Basic Blocks',
+      category: 'Lists',
       icon: SquareCheck,
       keywords: ['task', 'list', 'todo', 'checkbox', 'checklist'],
+      description: 'Interactive checklist for tasks',
       command: createSimpleCommand('TaskList'),
     },
     {
       title: 'Code Block',
-      category: 'Basic Blocks',
+      category: 'Code & Development',
       icon: FileCode,
       keywords: ['code', 'pre', 'codeblock', 'syntax'],
+      description: 'Syntax-highlighted code block',
       command: createSimpleCommand('CodeBlock'),
     },
     {
       title: 'Blockquote',
-      category: 'Basic Blocks',
+      category: 'Text & Formatting',
       icon: Quote,
       keywords: ['quote', 'blockquote', 'citation'],
+      description: 'Highlighted quote or excerpt',
       command: createSimpleCommand('Blockquote'),
     },
     {
       title: 'Horizontal Rule',
-      category: 'Basic Blocks',
+      category: 'Text & Formatting',
       icon: Minus,
       keywords: ['hr', 'rule', 'line', 'divider', 'separator'],
+      description: 'Visual divider line',
       command: ({ editor, range }: CommandArgs) => {
         editor.chain().focus().deleteRange(range).setHorizontalRule().run();
       },
@@ -401,21 +411,13 @@ function createBasicCommands(): CommandItem[] {
  */
 function createAdvancedCommands(): CommandItem[] {
   return [
-    {
-      title: 'Figure with Subfigures',
-      category: 'Images',
-      icon: ImagesIcon,
-      keywords: ['subfig', 'figures', 'multiple', 'images', 'imgs'],
-      command: ({ editor, range }: CommandArgs) => {
-        editor.chain().focus().deleteRange(range).setSubfigure().run();
-      },
-    },
+    // Math & Academic Content
     {
       title: 'Math Block',
-      category: 'Basic Blocks',
+      category: 'Math & Academic',
       icon: FunctionSquare,
       keywords: ['math', 'equation', 'latex', 'formula', '$', '$$'],
-      description: 'Embed mathematical equations using LaTeX.',
+      description: 'Embed mathematical equations using LaTeX syntax',
       command: ({ editor, range }: CommandArgs) => {
         editor
           .chain()
@@ -429,9 +431,10 @@ function createAdvancedCommands(): CommandItem[] {
     },
     {
       title: 'Theorem',
-      category: 'Math',
+      category: 'Math & Academic',
       icon: FunctionSquare,
       keywords: ['theorem', 'lemma', 'proposition', 'corollary', 'definition', 'proof', 'math'],
+      description: 'Structured theorem with proof section',
       command: ({ editor, range }: CommandArgs) => {
         editor
           .chain()
@@ -447,120 +450,11 @@ function createAdvancedCommands(): CommandItem[] {
       },
     },
     {
-      title: 'YouTube Video',
-      category: 'Media',
-      icon: VideoIcon,
-      keywords: ['yt', 'video', 'youtube', 'embed'],
-      command: ({ editor, range }: CommandArgs) => {
-        const url = prompt('Enter YouTube URL:');
-        if (!url) return;
-
-        editor.chain().focus().deleteRange(range).setYoutube(url).run();
-      },
-    },
-    {
-      title: 'Table',
-      category: 'Advanced',
-      icon: Table2,
-      keywords: ['table', 'grid', 'matrix'],
-      command: ({ editor, range }: CommandArgs) => {
-        editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3 }).run();
-      },
-    },
-    {
-      title: 'Database Table',
-      category: 'Advanced',
-      icon: DatabaseIcon,
-      keywords: ['db', 'database', 'data', 'table'],
-      command: ({ editor, range }: CommandArgs) => {
-        const notaId = router.currentRoute.value.params.id as string;
-        editor.chain().focus().deleteRange(range).insertNotaTable(notaId).run();
-      },
-    },
-    {
-      title: 'Mermaid Diagram',
-      category: 'Advanced',
-      icon: ChartPieIcon,
-      keywords: ['diagram', 'chart', 'mermaid', 'flow'],
-      command: ({ editor, range }: CommandArgs) => {
-        editor
-          .chain()
-          .focus()
-          .deleteRange(range)
-          .run();
-      },
-    },
-    {
-      title: 'Draw.io Diagram',
-      category: 'Advanced',
-      icon: PenTool,
-      keywords: ['draw.io', 'draw', 'diagram', 'chart', 'graph'],
-      command: ({ editor, range }: CommandArgs) => {
-        editor
-          .chain()
-          .focus()
-          .deleteRange(range)
-          .insertDrawIo()
-          .run();
-      },
-    },
-    {
-      title: 'Execution Pipeline',
-      category: 'Advanced',
-      icon: ChartPieIcon,
-      keywords: ['pipeline', 'execution', 'workflow', 'code', 'flow'],
-      description: 'Create a visual execution pipeline for code blocks',
-      command: ({ editor, range }: CommandArgs) => {
-        try {
-          // Validate range before proceeding
-          const { from, to } = range;
-          const docSize = editor.state.doc.content.size;
-          
-          if (from < 0 || to > docSize || from > to) {
-            console.warn('Invalid range for pipeline insertion:', range, 'Document size:', docSize);
-            return;
-          }
-          
-          // Use a safer approach by setting selection first
-          editor
-            .chain()
-            .focus()
-            .setTextSelection(from)
-            .deleteRange(range)
-            .insertPipeline()
-            .run();
-        } catch (error) {
-          console.error('Error inserting pipeline:', error);
-          // Fallback: try to insert at current cursor position
-          try {
-            editor
-              .chain()
-              .focus()
-              .insertPipeline()
-              .run();
-          } catch (fallbackError) {
-            console.error('Fallback pipeline insertion also failed:', fallbackError);
-          }
-        }
-      },
-    },
-    {
-      title: 'AI Assistant',
-      category: 'AI',
-      icon: SparklesIcon,
-      keywords: ['ai', 'assistant', 'generate', 'chat'],
-      description: 'Open the AI assistant sidebar',
-      command: ({ editor, range }: CommandArgs) => {
-        // Emit a custom event to toggle the AI sidebar
-        editor.emit('toggle-ai-sidebar', () => {})
-        editor.chain().focus().deleteRange(range).run()
-      },
-    },
-    {
       title: 'Citation',
-      category: 'Advanced',
+      category: 'Academic & References',
       icon: BookIcon,
       keywords: ['cite', 'citation', 'reference', 'bib', 'bibtex'],
+      description: 'Insert citation reference with interactive picker',
       command: ({ editor, range }: CommandArgs) => {
         // Get current nota ID from router
         const currentRoute = router.currentRoute.value
@@ -610,9 +504,10 @@ function createAdvancedCommands(): CommandItem[] {
     },
     {
       title: 'Bibliography',
-      category: 'References',
+      category: 'Academic & References',
       icon: FileText,
       keywords: ['references', 'bibliography', 'citations', 'works cited'],
+      description: 'Auto-generated bibliography from your citations',
       command: ({ editor, range }: CommandArgs) => {
         safeInsertContent(editor, range, {
           type: 'bibliography',
@@ -623,12 +518,60 @@ function createAdvancedCommands(): CommandItem[] {
         } as any, 'bibliography');
       },
     },
+
+    // Media & Visual Content
+    {
+      title: 'Figure with Subfigures',
+      category: 'Media & Visual',
+      icon: ImagesIcon,
+      keywords: ['subfig', 'figures', 'multiple', 'images', 'imgs'],
+      description: 'Multiple images arranged as subfigures',
+      command: ({ editor, range }: CommandArgs) => {
+        editor.chain().focus().deleteRange(range).setSubfigure().run();
+      },
+    },
+    {
+      title: 'YouTube Video',
+      category: 'Media & Visual',
+      icon: VideoIcon,
+      keywords: ['yt', 'video', 'youtube', 'embed'],
+      description: 'Embed YouTube video with player controls',
+      command: ({ editor, range }: CommandArgs) => {
+        const url = prompt('Enter YouTube URL:');
+        if (!url) return;
+
+        editor.chain().focus().deleteRange(range).setYoutube(url).run();
+      },
+    },
+
+    // Tables & Data
+    {
+      title: 'Table',
+      category: 'Tables & Data',
+      icon: Table2,
+      keywords: ['table', 'grid', 'matrix'],
+      description: 'Standard table with rows and columns',
+      command: ({ editor, range }: CommandArgs) => {
+        editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3 }).run();
+      },
+    },
+    {
+      title: 'Database Table',
+      category: 'Tables & Data',
+      icon: DatabaseIcon,
+      keywords: ['db', 'database', 'data', 'table'],
+      description: 'Dynamic table connected to nota database',
+      command: ({ editor, range }: CommandArgs) => {
+        const notaId = router.currentRoute.value.params.id as string;
+        editor.chain().focus().deleteRange(range).insertNotaTable(notaId).run();
+      },
+    },
     {
       title: 'Confusion Matrix',
       category: 'Data Science',
       icon: ChartScatter,
       keywords: ['confusion', 'matrix', 'classification', 'ml', 'machine learning', 'accuracy', 'precision', 'recall'],
-      description: 'Insert a confusion matrix visualization with CSV upload or Jupyter integration',
+      description: 'Interactive confusion matrix with CSV upload and performance metrics',
       command: ({ editor, range }: CommandArgs) => {
         safeInsertContent(editor, range, {
           type: 'confusionMatrix',
@@ -643,81 +586,164 @@ function createAdvancedCommands(): CommandItem[] {
         } as any, 'confusion matrix');
       },
     },
-    // Sub Nota command defined separately for clarity
-  ];
-}
 
-/**
- * Creates the sub nota command with proper popup management
- */
-function createSubNotaCommand(): CommandItem {
-  return {
-    title: 'New Sub Nota',
-    category: 'Advanced',
-    icon: FilePlus,
-    keywords: ['page', 'new', 'create', 'nota', 'subnota'],
-    command: safeExecuteCommand(({ editor, range }: CommandArgs) => {
-      // Get the current nota ID from the router
-      const currentRoute = router.currentRoute.value;
-      let parentId: string | null = null;
-      
-      if (currentRoute.params.id && typeof currentRoute.params.id === 'string') {
-        parentId = currentRoute.params.id;
-      }
-      
-      // Create popup manager
-      const popupManager = new PopupManager();
-      
-      // Handle sub nota creation success
-      const handleSuccess = (newNotaId: string, title: string) => {
-        // Hide popup first (will trigger cleanup)
-        popupManager.hide();
-        
-        // Wait a tick to ensure cleanup is complete before modifying editor
-        setTimeout(() => {
-          // Insert the page link
+    // Diagrams & Visualization
+    {
+      title: 'Mermaid Diagram',
+      category: 'Diagrams & Visualization',
+      icon: ChartPieIcon,
+      keywords: ['diagram', 'chart', 'mermaid', 'flow'],
+      description: 'Create flowcharts and diagrams with Mermaid syntax',
+      command: ({ editor, range }: CommandArgs) => {
+        editor
+          .chain()
+          .focus()
+          .deleteRange(range)
+          .run();
+      },
+    },
+    {
+      title: 'Draw.io Diagram',
+      category: 'Diagrams & Visualization',
+      icon: PenTool,
+      keywords: ['draw.io', 'draw', 'diagram', 'chart', 'graph'],
+      description: 'Interactive diagram editor with Draw.io integration',
+      command: ({ editor, range }: CommandArgs) => {
+        editor
+          .chain()
+          .focus()
+          .deleteRange(range)
+          .insertDrawIo()
+          .run();
+      },
+    },
+
+    // Code & Development
+    {
+      title: 'Execution Pipeline',
+      category: 'Code & Development',
+      icon: ChartPieIcon,
+      keywords: ['pipeline', 'execution', 'workflow', 'code', 'flow'],
+      description: 'Visual execution pipeline connecting multiple code blocks',
+      command: ({ editor, range }: CommandArgs) => {
+        try {
+          // Validate range before proceeding
+          const { from, to } = range;
+          const docSize = editor.state.doc.content.size;
+          
+          if (from < 0 || to > docSize || from > to) {
+            console.warn('Invalid range for pipeline insertion:', range, 'Document size:', docSize);
+            return;
+          }
+          
+          // Use a safer approach by setting selection first
           editor
             .chain()
             .focus()
+            .setTextSelection(from)
             .deleteRange(range)
-            .insertContent({
-              type: 'pageLink',
-              attrs: {
-                href: `/nota/${newNotaId}`,
-                title,
-              },
-            })
+            .insertPipeline()
             .run();
+        } catch (error) {
+          console.error('Error inserting pipeline:', error);
+          // Fallback: try to insert at current cursor position
+          try {
+            editor
+              .chain()
+              .focus()
+              .insertPipeline()
+              .run();
+          } catch (fallbackError) {
+            console.error('Fallback pipeline insertion also failed:', fallbackError);
+          }
+        }
+      },
+    },
+
+    // AI & Automation
+    {
+      title: 'AI Assistant',
+      category: 'AI & Automation',
+      icon: SparklesIcon,
+      keywords: ['ai', 'assistant', 'generate', 'chat'],
+      description: 'Open AI assistant for content generation and help',
+      command: ({ editor, range }: CommandArgs) => {
+        // Emit a custom event to toggle the AI sidebar
+        editor.emit('toggle-ai-sidebar', () => {})
+        editor.chain().focus().deleteRange(range).run()
+      },
+    },
+
+    // Navigation & Organization
+    {
+      title: 'New Sub Nota',
+      category: 'Navigation & Organization',
+      icon: FilePlus,
+      keywords: ['page', 'new', 'create', 'nota', 'subnota'],
+      description: 'Create a new linked sub-document within current nota',
+      command: safeExecuteCommand(({ editor, range }: CommandArgs) => {
+        // Get the current nota ID from the router
+        const currentRoute = router.currentRoute.value;
+        let parentId: string | null = null;
+        
+        if (currentRoute.params.id && typeof currentRoute.params.id === 'string') {
+          parentId = currentRoute.params.id;
+        }
+        
+        // Create popup manager
+        const popupManager = new PopupManager();
+        
+        // Handle sub nota creation success
+        const handleSuccess = (newNotaId: string, title: string) => {
+          // Hide popup first (will trigger cleanup)
+          popupManager.hide();
           
-          // Trigger content save
-          const transaction = editor.state.tr;
-          editor.view.dispatch(transaction);
-          
-          // Show success message
-          const parentContext = document.querySelector(`#nota-${parentId}`) 
-            ? ` under "${document.querySelector(`#nota-${parentId} .nota-title`)?.textContent?.trim() || ''}"` 
-            : '';
-          
-          toast(`"${title}" created successfully${parentContext}`);
-          
-          // Highlight the newly created link
-          highlightElement(`a[href="/nota/${newNotaId}"]`);
-        }, 20);
-      };
-      
-      // Create the popup with the dialog
-      popupManager.createPopup(
-        SubNotaDialog, 
-        {
-          parentId,
-          onSuccess: handleSuccess,
-          onCancel: () => popupManager.hide()
-        }, 
-        editor,
-        getCursorCoords(editor, range)
-      );
-    }),
-  };
+          // Wait a tick to ensure cleanup is complete before modifying editor
+          setTimeout(() => {
+            // Insert the page link
+            editor
+              .chain()
+              .focus()
+              .deleteRange(range)
+              .insertContent({
+                type: 'pageLink',
+                attrs: {
+                  href: `/nota/${newNotaId}`,
+                  title,
+                },
+              })
+              .run();
+            
+            // Trigger content save
+            const transaction = editor.state.tr;
+            editor.view.dispatch(transaction);
+            
+            // Show success message
+            const parentContext = document.querySelector(`#nota-${parentId}`) 
+              ? ` under "${document.querySelector(`#nota-${parentId} .nota-title`)?.textContent?.trim() || ''}"` 
+              : '';
+            
+            toast(`"${title}" created successfully${parentContext}`);
+            
+            // Highlight the newly created link
+            highlightElement(`a[href="/nota/${newNotaId}"]`);
+          }, 20);
+        };
+        
+        // Create the popup with the dialog
+        popupManager.createPopup(
+          SubNotaDialog, 
+          {
+            parentId,
+            onSuccess: handleSuccess,
+            onCancel: () => popupManager.hide()
+          }, 
+          editor,
+          getCursorCoords(editor, range)
+        );
+      }),
+    },
+  ];
 }
 
 /**
@@ -729,7 +755,6 @@ export default {
     const commands: CommandItem[] = [
       ...createBasicCommands(),
       ...createAdvancedCommands(),
-      createSubNotaCommand(),
     ];
     
     // Return all items if no query
