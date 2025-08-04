@@ -168,8 +168,7 @@ onMounted(() => {
             <Plus class="h-5 w-5" />
           </div>
           <div class="text-left">
-            <div class="font-semibold text-base">Create Your First Nota</div>
-            <div class="text-sm opacity-90">Start building your knowledge base</div>
+            <div class="font-semibold text-base">Create a Nota</div>
           </div>
         </div>
       </Button>
