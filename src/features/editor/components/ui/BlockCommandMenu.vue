@@ -1,18 +1,18 @@
 <script setup lang="ts">
 import {
-  Command,
-  CommandGroup,
-  CommandItem,
-  CommandList,
-  CommandSeparator,
-} from '@/components/ui/command'
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu'
 import { 
   Trash2 as Trash2Icon, 
   Scissors as ScissorsIcon, 
   Copy as CopyIcon, 
   Star as StarIcon
 } from 'lucide-vue-next'
-import { onMounted, onUnmounted, ref, computed, h } from 'vue'
+import { onMounted, onUnmounted, ref, computed, watch } from 'vue'
 import type { EditorView } from '@tiptap/pm/view'
 import { serializeForClipboard } from '@/features/editor/components/extensions/DragHandlePlugin'
 import type { Selection } from '@tiptap/pm/state'
@@ -189,17 +189,35 @@ const handleAIAction = async (actionId: string) => {
   emit('close')
 }
 
-// Handle click outside
+// Handle context menu open/close
+const handleOpenChange = (open: boolean) => {
+  if (!open) {
+    emit('close')
+  }
+}
+
+// Handle click outside to close menu
 const handleClickOutside = (event: MouseEvent) => {
   const target = event.target as HTMLElement
-  // Check if the click is inside the command menu or the modal
-  if (!target.closest('.command-menu') && !target.closest('[role="dialog"]')) {
+  // Check if the click is inside the menu or the modal
+  if (!target.closest('.bg-popover') && !target.closest('[role="dialog"]')) {
     emit('close')
   }
 }
 
 onMounted(() => {
-  document.addEventListener('mousedown', handleClickOutside)
+  if (props.isVisible) {
+    document.addEventListener('mousedown', handleClickOutside)
+  }
+})
+
+// Watch for changes in visibility to add/remove event listener
+watch(() => props.isVisible, (newValue) => {
+  if (newValue) {
+    document.addEventListener('mousedown', handleClickOutside)
+  } else {
+    document.removeEventListener('mousedown', handleClickOutside)
+  }
 })
 
 onUnmounted(() => {
@@ -209,66 +227,73 @@ onUnmounted(() => {
 
 <template>
   <div>
-    <Command
+    <div
       v-if="isVisible && position"
-      class="fixed z-50 rounded-lg border shadow-md w-64 h-auto command-menu bg-popover"
+      class="fixed z-50 rounded-lg border border-gray-200 shadow-lg w-64 bg-white"
       :style="{
         left: `${position.x}px`,
         top: `${position.y}px`,
       }"
     >
-      <CommandList>
+      <div class="py-1">
         <!-- Standard Actions -->
-        <CommandGroup>
-          <CommandItem value="cut" @select="cut">
+        <div class="flex flex-col">
+          <button
+            @click="cut"
+            class="flex items-center px-3 py-2 text-sm hover:bg-gray-100 w-full text-left transition-colors"
+          >
             <ScissorsIcon class="mr-2 h-4 w-4" />
             <span>Cut</span>
-          </CommandItem>
-          <CommandItem value="copy" @select="copy">
+          </button>
+          <button
+            @click="copy"
+            class="flex items-center px-3 py-2 text-sm hover:bg-gray-100 w-full text-left transition-colors"
+          >
             <CopyIcon class="mr-2 h-4 w-4" />
             <span>Copy</span>
-          </CommandItem>
-          <CommandItem value="favorite" @select="addToFavorites">
+          </button>
+          <button
+            @click="addToFavorites"
+            class="flex items-center px-3 py-2 text-sm hover:bg-gray-100 w-full text-left transition-colors"
+          >
             <StarIcon class="mr-2 h-4 w-4" />
             <span>Add to Favorites</span>
-          </CommandItem>
-        </CommandGroup>
+          </button>
+        </div>
 
-        <CommandSeparator v-if="aiActionsStore.isLoaded && enabledAIActions.length > 0" />
+        <div v-if="aiActionsStore.isLoaded && enabledAIActions.length > 0" class="border-t border-gray-200 my-1"></div>
 
         <!-- AI-Powered Actions -->
-        <CommandGroup v-if="aiActionsStore.isLoaded && enabledAIActions.length > 0">
-          <CommandItem 
+        <div v-if="aiActionsStore.isLoaded && enabledAIActions.length > 0" class="flex flex-col">
+          <button
             v-for="action in enabledAIActions"
             :key="action.id"
-            :value="action.id" 
-            @select="() => handleAIAction(action.id)"
+            @click="() => handleAIAction(action.id)"
             :disabled="isProcessing"
-            :class="[getColorClasses(action.color || 'blue').text, getColorClasses(action.color || 'blue').hover]"
+            class="flex items-center px-3 py-2 text-sm hover:bg-gray-100 w-full text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <component 
               :is="getIconComponent(action.icon || 'EditIcon')" 
               class="mr-2 h-4 w-4" 
             />
             <span>{{ isProcessing ? 'Processing...' : (action.name || 'AI Action') }}</span>
-          </CommandItem>
-        </CommandGroup>
+          </button>
+        </div>
 
-        <CommandSeparator v-if="aiActionsStore.isLoaded && enabledAIActions.length > 0" />
+        <div v-if="aiActionsStore.isLoaded && enabledAIActions.length > 0" class="border-t border-gray-200 my-1"></div>
 
         <!-- Destructive Actions -->
-        <CommandGroup>
-          <CommandItem
-            class="text-red-600 hover:bg-red-100 hover:text-red-600"
-            value="delete"
-            @select="deleteBlock"
+        <div class="flex flex-col">
+          <button
+            @click="deleteBlock"
+            class="flex items-center px-3 py-2 text-sm text-red-600 hover:bg-red-50 w-full text-left transition-colors"
           >
             <Trash2Icon class="mr-2 h-4 w-4" />
             <span>Delete</span>
-          </CommandItem>
-        </CommandGroup>
-      </CommandList>
-    </Command>
+          </button>
+        </div>
+      </div>
+    </div>
 
     <AddToFavoritesModal
       v-model:open="showAddToFavoritesModal"
@@ -282,8 +307,9 @@ onUnmounted(() => {
   position: fixed;
 }
 
-.command-menu .lucide {
-  flex-shrink: 0;
+/* Ensure menu appears above other elements */
+.z-50 {
+  z-index: 50;
 }
 </style>
 

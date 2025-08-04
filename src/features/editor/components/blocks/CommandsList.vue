@@ -19,6 +19,7 @@ interface Props {
   placeholder?: string
   className?: string
   maxHeight?: string
+  minWidth?: string
   emptyMessage?: string
   emptyDescription?: string
 }
@@ -26,6 +27,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   placeholder: 'Type a command or search...',
   maxHeight: '320px',
+  minWidth: '400px',
   emptyMessage: 'No commands found',
   emptyDescription: 'Try a different search term',
 })
@@ -65,7 +67,7 @@ defineExpose({
 <template>
   <Command 
     :class="cn('rounded-lg border shadow-md bg-background', className)"
-    :style="{ maxHeight }"
+    :style="{ maxHeight, minWidth }"
   >
     <CommandInput 
       :placeholder="placeholder"

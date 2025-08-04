@@ -323,6 +323,53 @@ export function DragHandlePlugin(options: GlobalDragHandleOptions & { pluginKey:
       // Add the context menu event listener to drag handle
       dragHandleElement.addEventListener('contextmenu', handleDragHandleContextMenu)
 
+      // Context menu handler for editor content (right-click on any editor element)
+      function handleEditorContextMenu(e: MouseEvent) {
+        e.preventDefault()
+
+        // Clean up any existing menu
+        if (menuApp) {
+          menuApp.unmount()
+          menuContainer?.remove()
+          menuApp = null
+          menuContainer = null
+        }
+
+        // Focus on the current element
+        selectNode(view, { x: e.clientX, y: e.clientY }, options)
+
+        // Create container for menu
+        menuContainer = document.createElement('div')
+        menuContainer.classList.add('block-command-menu-container')
+        document.body.appendChild(menuContainer)
+
+        // Create and mount menu component
+        menuApp = createApp({
+          render() {
+            return h(BlockCommandMenu, {
+              position: { x: e.clientX, y: e.clientY },
+              selection: view.state.selection,
+              isVisible: true,
+              editorView: view,
+              onClose: () => {
+                // Only unmount if we're not showing the add to favorites modal
+                if (!menuApp?._instance?.exposed?.showAddToFavoritesModal?.value) {
+                  menuApp?.unmount()
+                  menuContainer?.remove()
+                  menuApp = null
+                  menuContainer = null
+                }
+              },
+            })
+          },
+        })
+
+        menuApp.mount(menuContainer)
+      }
+
+      // Add context menu listener to the editor DOM
+      view.dom.addEventListener('contextmenu', handleEditorContextMenu)
+
       // Don't forget to clean up in destroy
       return {
         destroy: () => {
@@ -332,6 +379,9 @@ export function DragHandlePlugin(options: GlobalDragHandleOptions & { pluginKey:
           dragHandleElement?.removeEventListener('contextmenu', handleDragHandleContextMenu)
           dragHandleElement?.removeEventListener('drag', onDragHandleDrag)
           dragHandleElement?.removeEventListener('dragstart', onDragHandleDragStart)
+          
+          // Remove editor context menu listener
+          view.dom.removeEventListener('contextmenu', handleEditorContextMenu)
 
           // Clean up menu if it exists
           if (menuApp) {
