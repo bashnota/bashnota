@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import { useEditorStore } from '@/features/editor/stores/editorStore'
+import { useUIStore } from '@/stores/uiStore'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Tooltip } from '@/components/ui/tooltip'
+import { Card } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Toggle } from '@/components/ui/toggle'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import {
   Select,
   SelectContent,
@@ -36,8 +41,10 @@ import {
   Loader2,
   
   // UI controls
-  ChevronUp,
-  ChevronDown,
+  Lock,
+  Unlock,
+  Pin,
+  Type,
 } from 'lucide-vue-next'
 import { computed, ref, onMounted } from 'vue'
 import type { Editor } from '@tiptap/vue-3'
@@ -57,13 +64,7 @@ interface ToolbarAction {
   isActive?: boolean
   isDisabled?: boolean
   variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link'
-}
-
-interface ToolbarGroup {
-  id: string
-  label: string
-  actions: ToolbarAction[]
-  priority: number // Lower number = higher priority (shown first)
+  group?: string
 }
 
 // Props and Emits
@@ -85,18 +86,18 @@ const emit = defineEmits<{
   'toggle-sidebar': [id: SidebarId]
 }>()
 
-// Store and computed values
+// Stores
 const editorStore = useEditorStore()
+const uiStore = useUIStore()
 const editor = computed(() => editorStore.activeEditor as Editor | null)
-const isToolbarCollapsed = computed(() => editorStore.isToolbarCollapsed)
 const isRenderingMath = ref(true)
 
 // Heading options for the select dropdown
 const headingOptions = [
-  { value: 'normal', label: 'Normal text' },
-  { value: 'h1', label: 'Heading 1' },
-  { value: 'h2', label: 'Heading 2' },
-  { value: 'h3', label: 'Heading 3' },
+  { value: 'normal', label: 'Normal text', icon: Type },
+  { value: 'h1', label: 'Heading 1', icon: Type },
+  { value: 'h2', label: 'Heading 2', icon: Type },
+  { value: 'h3', label: 'Heading 3', icon: Type },
 ]
 
 // Computed values for editor state
@@ -136,131 +137,128 @@ onMounted(() => {
   }
 })
 
-// Toolbar groups configuration
-const toolbarGroups = computed<ToolbarGroup[]>(() => {
+// Toolbar actions configuration
+const historyActions = computed(() => {
   if (!editor.value) return []
-
+  
   return [
-    // History group
     {
-      id: 'history',
-      label: 'History',
-      priority: 1,
-      actions: [
-        {
-          id: 'undo',
-          icon: Undo,
-          label: 'Undo',
-          tooltip: 'Undo (Ctrl+Z)',
-          action: () => editor.value?.chain().focus().undo().run(),
-          isDisabled: !editor.value.can().undo(),
-        },
-        {
-          id: 'redo',
-          icon: Redo,
-          label: 'Redo',
-          tooltip: 'Redo (Ctrl+Y)',
-          action: () => editor.value?.chain().focus().redo().run(),
-          isDisabled: !editor.value.can().redo(),
-        },
-      ],
+      id: 'undo',
+      icon: Undo,
+      label: 'Undo',
+      tooltip: 'Undo (Ctrl+Z)',
+      action: () => editor.value?.chain().focus().undo().run(),
+      isDisabled: !editor.value.can().undo(),
+      group: 'history'
     },
-    
-    // Text formatting group
     {
-      id: 'formatting',
-      label: 'Text Formatting',
-      priority: 2,
-      actions: [
-        {
-          id: 'bold',
-          icon: Bold,
-          label: 'Bold',
-          tooltip: 'Bold (Ctrl+B)',
-          action: () => editor.value?.chain().focus().toggleBold().run(),
-          isActive: editor.value.isActive('bold'),
-        },
-        {
-          id: 'italic',
-          icon: Italic,
-          label: 'Italic',
-          tooltip: 'Italic (Ctrl+I)',
-          action: () => editor.value?.chain().focus().toggleItalic().run(),
-          isActive: editor.value.isActive('italic'),
-        },
-        {
-          id: 'code',
-          icon: Code,
-          label: 'Inline Code',
-          tooltip: 'Inline code (Ctrl+`)',
-          action: () => editor.value?.chain().focus().toggleCode().run(),
-          isActive: editor.value.isActive('code'),
-        },
-      ],
+      id: 'redo',
+      icon: Redo,
+      label: 'Redo',
+      tooltip: 'Redo (Ctrl+Y)',
+      action: () => editor.value?.chain().focus().redo().run(),
+      isDisabled: !editor.value.can().redo(),
+      group: 'history'
     },
-    
-    // Lists group
+  ]
+})
+
+const formattingActions = computed(() => {
+  if (!editor.value) return []
+  
+  return [
     {
-      id: 'lists',
-      label: 'Lists',
-      priority: 3,
-      actions: [
-        {
-          id: 'bulletList',
-          icon: List,
-          label: 'Bullet List',
-          tooltip: 'Bullet list',
-          action: () => editor.value?.chain().focus().toggleBulletList().run(),
-          isActive: editor.value.isActive('bulletList'),
-        },
-        {
-          id: 'orderedList',
-          icon: ListOrdered,
-          label: 'Numbered List',
-          tooltip: 'Numbered list',
-          action: () => editor.value?.chain().focus().toggleOrderedList().run(),
-          isActive: editor.value.isActive('orderedList'),
-        },
-      ],
+      id: 'bold',
+      icon: Bold,
+      label: 'Bold',
+      tooltip: 'Bold (Ctrl+B)',
+      action: () => editor.value?.chain().focus().toggleBold().run(),
+      isActive: editor.value.isActive('bold'),
+      group: 'formatting'
     },
-    
-    // Insert group
     {
-      id: 'insert',
-      label: 'Insert',
-      priority: 4,
-      actions: [
-        {
-          id: 'table',
-          icon: Table,
-          label: 'Table',
-          tooltip: 'Insert table',
-          action: () => editor.value?.chain().focus().insertTable().run(),
-        },
-        {
-          id: 'codeBlock',
-          icon: FileCode,
-          label: 'Code Block',
-          tooltip: 'Code block',
-          action: () => editor.value?.chain().focus().toggleCodeBlock().run(),
-          isActive: editor.value.isActive('codeBlock'),
-        },
-        {
-          id: 'blockquote',
-          icon: Quote,
-          label: 'Quote',
-          tooltip: 'Block quote',
-          action: () => editor.value?.chain().focus().toggleBlockquote().run(),
-          isActive: editor.value.isActive('blockquote'),
-        },
-        {
-          id: 'horizontalRule',
-          icon: MinusSquare,
-          label: 'Horizontal Rule',
-          tooltip: 'Horizontal rule',
-          action: () => editor.value?.chain().focus().setHorizontalRule().run(),
-        },
-      ],
+      id: 'italic',
+      icon: Italic,
+      label: 'Italic',
+      tooltip: 'Italic (Ctrl+I)',
+      action: () => editor.value?.chain().focus().toggleItalic().run(),
+      isActive: editor.value.isActive('italic'),
+      group: 'formatting'
+    },
+    {
+      id: 'code',
+      icon: Code,
+      label: 'Inline Code',
+      tooltip: 'Inline code (Ctrl+`)',
+      action: () => editor.value?.chain().focus().toggleCode().run(),
+      isActive: editor.value.isActive('code'),
+      group: 'formatting'
+    },
+  ]
+})
+
+const listActions = computed(() => {
+  if (!editor.value) return []
+  
+  return [
+    {
+      id: 'bulletList',
+      icon: List,
+      label: 'Bullet List',
+      tooltip: 'Bullet list',
+      action: () => editor.value?.chain().focus().toggleBulletList().run(),
+      isActive: editor.value.isActive('bulletList'),
+      group: 'lists'
+    },
+    {
+      id: 'orderedList',
+      icon: ListOrdered,
+      label: 'Numbered List',
+      tooltip: 'Numbered list',
+      action: () => editor.value?.chain().focus().toggleOrderedList().run(),
+      isActive: editor.value.isActive('orderedList'),
+      group: 'lists'
+    },
+  ]
+})
+
+const insertActions = computed(() => {
+  if (!editor.value) return []
+  
+  return [
+    {
+      id: 'table',
+      icon: Table,
+      label: 'Table',
+      tooltip: 'Insert table',
+      action: () => editor.value?.chain().focus().insertTable().run(),
+      group: 'insert'
+    },
+    {
+      id: 'codeBlock',
+      icon: FileCode,
+      label: 'Code Block',
+      tooltip: 'Code block',
+      action: () => editor.value?.chain().focus().toggleCodeBlock().run(),
+      isActive: editor.value.isActive('codeBlock'),
+      group: 'insert'
+    },
+    {
+      id: 'blockquote',
+      icon: Quote,
+      label: 'Quote',
+      tooltip: 'Block quote',
+      action: () => editor.value?.chain().focus().toggleBlockquote().run(),
+      isActive: editor.value.isActive('blockquote'),
+      group: 'insert'
+    },
+    {
+      id: 'horizontalRule',
+      icon: MinusSquare,
+      label: 'Horizontal Rule',
+      tooltip: 'Horizontal rule',
+      action: () => editor.value?.chain().focus().setHorizontalRule().run(),
+      group: 'insert'
     },
   ]
 })
@@ -314,165 +312,235 @@ const documentActions = computed(() => [
   },
 ])
 
-// Utility functions
-const getButtonClasses = (action: ToolbarAction) => {
-  const baseClasses = 'h-8 w-8 p-0'
-  const activeClasses = action.isActive ? 'bg-muted' : ''
-  const animationClasses = action.id === 'run-all' && props.isExecutingAll ? 'animate-spin' : ''
-  
-  return `${baseClasses} ${activeClasses} ${animationClasses}`.trim()
+// Hover handlers
+const handleMouseEnter = () => {
+  uiStore.showToolbar()
 }
 
+const handleMouseLeave = () => {
+  uiStore.hideToolbar()
+}
+
+// Utility functions
 const getIconClasses = (action: ToolbarAction) => {
   const baseClasses = 'h-4 w-4'
   const favoriteClasses = action.id === 'favorite' && props.isFavorite ? 'text-yellow-400 fill-current' : ''
+  const spinClasses = action.id === 'run-all' && props.isExecutingAll ? 'animate-spin' : ''
   
-  return `${baseClasses} ${favoriteClasses}`.trim()
+  return `${baseClasses} ${favoriteClasses} ${spinClasses}`.trim()
 }
 </script>
 
 <template>
-  <div class="border-b bg-background sticky top-0 z-50 transition-all duration-300">
-    <!-- Collapsed View -->
-    <div v-if="isToolbarCollapsed" class="flex items-center justify-between px-4 py-2">
-      <div class="flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          class="h-6 w-6"
-          @click="editorStore.toggleToolbar"
-          title="Expand toolbar"
-        >
-          <ChevronDown class="h-4 w-4" />
-        </Button>
-        <span class="text-sm text-muted-foreground">{{ props.wordCount || 0 }} words</span>
-      </div>
-      
-      <div class="flex items-center gap-1">
-        <!-- Essential actions only in collapsed mode -->
-        <Tooltip v-for="action in documentActions.slice(0, 3)" :key="action.id" :content="action.tooltip">
-          <Button
-            :variant="action.variant || 'ghost'"
-            size="icon"
-            class="h-6 w-6"
-            @click="action.action"
-            :disabled="action.isDisabled"
-          >
-            <component :is="action.icon" :class="getIconClasses(action)" />
-          </Button>
-        </Tooltip>
-      </div>
-    </div>
-
-    <!-- Expanded View -->
-    <div v-else class="flex flex-wrap items-center gap-1 px-4 py-2">
-      <Button
-        variant="ghost"
-        size="icon"
-        class="h-6 w-6"
-        @click="editorStore.toggleToolbar"
-        title="Collapse toolbar"
+  <!-- Toolbar Container with Hover Detection -->
+  <div 
+    class="fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out"
+    @mouseenter="handleMouseEnter"
+    @mouseleave="handleMouseLeave"
+  >
+    <!-- Invisible hover zone that extends beyond visible toolbar -->
+    <div class="h-16 w-full" />
+    
+    <!-- Toolbar Content -->
+    <Transition
+      enter-active-class="transition-all duration-300 ease-out"
+      enter-from-class="transform -translate-y-full opacity-0"
+      enter-to-class="transform translate-y-0 opacity-100"
+      leave-active-class="transition-all duration-300 ease-in"
+      leave-from-class="transform translate-y-0 opacity-100"
+      leave-to-class="transform -translate-y-full opacity-0"
+    >
+      <Card 
+        v-if="uiStore.isToolbarVisible"
+        class="mx-4 mt-2 shadow-lg border border-border/50 backdrop-blur-sm bg-background/95"
       >
-        <ChevronUp class="h-4 w-4" />
-      </Button>
-      
-      <Separator orientation="vertical" class="mx-2 h-6" />
+        <div class="flex items-center justify-between px-4 py-2">
+          <!-- Left Section: Editor Tools -->
+          <div class="flex items-center gap-1">
+            <!-- Lock/Pin Button -->
+            <Tooltip :content="uiStore.isToolbarLocked ? 'Unlock toolbar (hide on mouse leave)' : 'Pin toolbar (keep visible)'">
+              <Toggle
+                :pressed="uiStore.isToolbarLocked"
+                @update:pressed="uiStore.toggleToolbarLock"
+                size="sm"
+                class="h-8 w-8 p-0"
+                aria-label="Toggle toolbar lock"
+              >
+                <Pin v-if="uiStore.isToolbarLocked" class="h-4 w-4 text-primary" />
+                <Lock v-else class="h-4 w-4" />
+              </Toggle>
+            </Tooltip>
+            
+            <Separator orientation="vertical" class="mx-2 h-6" />
 
-      <!-- History Actions -->
-      <div class="flex items-center gap-0.5">
-        <Tooltip v-for="action in toolbarGroups.find(g => g.id === 'history')?.actions || []" :key="action.id" :content="action.tooltip">
-          <Button
-            variant="ghost"
-            size="sm"
-            :class="getButtonClasses(action)"
-            @click="action.action"
-            :disabled="action.isDisabled"
-          >
-            <component :is="action.icon" class="h-4 w-4" />
-        </Button>
-        </Tooltip>
-      </div>
+            <!-- History Actions -->
+            <div class="flex items-center">
+              <ToggleGroup type="multiple" class="gap-0">
+                <Tooltip v-for="action in historyActions" :key="action.id" :content="action.tooltip">
+                  <ToggleGroupItem
+                    :value="action.id"
+                    size="sm"
+                    class="h-8 w-8 p-0"
+                    @click="action.action"
+                    :disabled="action.isDisabled"
+                    :aria-label="action.label"
+                  >
+                    <component :is="action.icon" class="h-4 w-4" />
+                  </ToggleGroupItem>
+                </Tooltip>
+              </ToggleGroup>
+            </div>
 
-      <Separator orientation="vertical" class="mx-2 h-6" />
+            <Separator orientation="vertical" class="mx-2 h-6" />
 
-      <!-- Text Style Selector -->
-      <div class="flex items-center">
-        <Select :value="currentHeadingLevel" @update:value="setHeadingLevel">
-          <SelectTrigger class="h-8 w-32 text-sm">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem
-              v-for="option in headingOptions"
-              :key="option.value"
-              :value="option.value"
+            <!-- Text Style Selector -->
+            <div class="flex items-center">
+              <Select :value="currentHeadingLevel" @update:value="setHeadingLevel">
+                <SelectTrigger class="h-8 w-32 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem
+                    v-for="option in headingOptions"
+                    :key="option.value"
+                    :value="option.value"
+                    class="flex items-center gap-2"
+                  >
+                    <component :is="option.icon" class="h-4 w-4" />
+                    {{ option.label }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Separator orientation="vertical" class="mx-2 h-6" />
+
+            <!-- Formatting Actions -->
+            <div class="flex items-center">
+              <ToggleGroup type="multiple" class="gap-0">
+                <Tooltip v-for="action in formattingActions" :key="action.id" :content="action.tooltip">
+                  <ToggleGroupItem
+                    :value="action.id"
+                    :pressed="action.isActive"
+                    size="sm"
+                    class="h-8 w-8 p-0"
+                    @click="action.action"
+                    :aria-label="action.label"
+                  >
+                    <component :is="action.icon" class="h-4 w-4" />
+                  </ToggleGroupItem>
+                </Tooltip>
+              </ToggleGroup>
+            </div>
+
+            <Separator orientation="vertical" class="mx-2 h-6" />
+
+            <!-- List Actions -->
+            <div class="flex items-center">
+              <ToggleGroup type="multiple" class="gap-0">
+                <Tooltip v-for="action in listActions" :key="action.id" :content="action.tooltip">
+                  <ToggleGroupItem
+                    :value="action.id"
+                    :pressed="action.isActive"
+                    size="sm"
+                    class="h-8 w-8 p-0"
+                    @click="action.action"
+                    :aria-label="action.label"
+                  >
+                    <component :is="action.icon" class="h-4 w-4" />
+                  </ToggleGroupItem>
+                </Tooltip>
+              </ToggleGroup>
+            </div>
+
+            <Separator orientation="vertical" class="mx-2 h-6" />
+
+            <!-- Insert Actions -->
+            <div class="flex items-center">
+              <ToggleGroup type="multiple" class="gap-0">
+                <Tooltip v-for="action in insertActions" :key="action.id" :content="action.tooltip">
+                  <ToggleGroupItem
+                    :value="action.id"
+                    :pressed="action.isActive"
+                    size="sm"
+                    class="h-8 w-8 p-0"
+                    @click="action.action"
+                    :aria-label="action.label"
+                  >
+                    <component :is="action.icon" class="h-4 w-4" />
+                  </ToggleGroupItem>
+                </Tooltip>
+              </ToggleGroup>
+            </div>
+
+            <Separator orientation="vertical" class="mx-2 h-6" />
+
+            <!-- Math Toggle -->
+            <div class="flex items-center">
+              <Tooltip :content="isRenderingMath ? 'Show LaTeX source code' : 'Show rendered math'">
+                <Toggle
+                  :pressed="!isRenderingMath"
+                  @update:pressed="toggleMathRendering"
+                  size="sm"
+                  class="h-8 px-3 text-xs"
+                  aria-label="Toggle math rendering"
+                >
+                  <Eye v-if="isRenderingMath" class="h-4 w-4" />
+                  <EyeOff v-else class="h-4 w-4" />
+                  <span class="ml-1.5 hidden sm:inline">
+                    {{ isRenderingMath ? 'Math' : 'Source' }}
+                  </span>
+                </Toggle>
+              </Tooltip>
+            </div>
+          </div>
+
+          <!-- Right Section: Document Actions & Status -->
+          <div class="flex items-center gap-2">
+            <!-- Document Actions -->
+            <div class="flex items-center gap-1">
+              <Tooltip v-for="action in documentActions" :key="action.id" :content="action.tooltip">
+                <Button
+                  :variant="action.variant || 'ghost'"
+                  size="icon"
+                  @click="action.action"
+                  :disabled="action.isDisabled"
+                  class="h-8 w-8 p-0"
+                  :class="{ 'bg-muted': action.isActive }"
+                  :aria-label="action.label"
+                >
+                  <component :is="action.icon" :class="getIconClasses(action)" />
+                </Button>
+              </Tooltip>
+            </div>
+
+            <Separator orientation="vertical" class="mx-2 h-6" />
+
+            <!-- Word Count Badge -->
+            <Badge variant="secondary" class="text-xs px-2 py-1">
+              {{ props.wordCount || 0 }} words
+            </Badge>
+
+            <!-- Save Status Indicator -->
+            <Transition
+              enter-active-class="transition-all duration-200"
+              enter-from-class="opacity-0 scale-95"
+              enter-to-class="opacity-100 scale-100"
+              leave-active-class="transition-all duration-200"
+              leave-from-class="opacity-100 scale-100"
+              leave-to-class="opacity-0 scale-95"
             >
-              {{ option.label }}
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <Separator orientation="vertical" class="mx-2 h-6" />
-
-      <!-- Formatting, Lists, and Insert Groups -->
-      <template v-for="group in toolbarGroups.filter(g => ['formatting', 'lists', 'insert'].includes(g.id))" :key="group.id">
-        <div class="flex items-center gap-0.5">
-          <Tooltip v-for="action in group.actions" :key="action.id" :content="action.tooltip">
-            <Button
-              variant="ghost"
-              size="sm"
-              :class="getButtonClasses(action)"
-              @click="action.action"
-              :disabled="action.isDisabled"
-            >
-              <component :is="action.icon" class="h-4 w-4" />
-        </Button>
-          </Tooltip>
+              <Badge v-if="uiStore.showSaved" variant="default" class="text-xs px-2 py-1 bg-green-500 text-white">
+                Saved
+              </Badge>
+              <Badge v-else-if="uiStore.isSaving" variant="outline" class="text-xs px-2 py-1">
+                <Loader2 class="h-3 w-3 mr-1 animate-spin" />
+                Saving...
+              </Badge>
+            </Transition>
+          </div>
         </div>
-        <Separator orientation="vertical" class="mx-2 h-6" />
-      </template>
-
-      <!-- Math Toggle -->
-      <div class="flex items-center">
-        <Tooltip :content="isRenderingMath ? 'Show LaTeX source code' : 'Show rendered math'">
-          <Button
-            variant="ghost"
-            size="sm"
-            @click="toggleMathRendering"
-            :class="{ 'bg-muted': !isRenderingMath }"
-            class="h-8 px-3 text-xs"
-          >
-            <Eye v-if="isRenderingMath" class="h-4 w-4" />
-            <EyeOff v-else class="h-4 w-4" />
-            <span class="ml-1.5 hidden sm:inline">
-              {{ isRenderingMath ? 'Math' : 'Source' }}
-            </span>
-        </Button>
-        </Tooltip>
-      </div>
-      
-      <div class="flex-grow" />
-
-      <!-- Document Actions -->
-      <div class="flex items-center gap-1">
-        <Tooltip v-for="action in documentActions" :key="action.id" :content="action.tooltip">
-          <Button
-            :variant="action.variant || 'ghost'"
-            size="icon"
-            @click="action.action"
-            :disabled="action.isDisabled"
-            :class="getButtonClasses(action)"
-          >
-            <component :is="action.icon" :class="getIconClasses(action)" />
-          </Button>
-        </Tooltip>
-      </div>
-
-      <Separator orientation="vertical" class="mx-2 h-6" />
-
-      <!-- Word Count -->
-      <span class="text-xs text-muted-foreground/80">{{ props.wordCount || 0 }} words</span>
-    </div>
+      </Card>
+    </Transition>
   </div>
 </template> 

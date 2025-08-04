@@ -125,13 +125,26 @@ const isActive = computed(() => props.pane.isActive)
 watch(isActive, (active) => {
   if (active) {
     editorStore.setActiveEditor(notaEditorRef.value?.editor || null)
+    editorStore.setActiveEditorComponent(notaEditorRef.value || null)
   } else {
     // When pane is inactive, check if it was the active one
     if (editorStore.activeEditor === notaEditorRef.value?.editor) {
       editorStore.setActiveEditor(null)
+      editorStore.setActiveEditorComponent(null)
     }
   }
 })
+
+// Watch for when the editor becomes available and set it as active if this pane is active
+watch(
+  () => notaEditorRef.value?.editor,
+  (newEditor) => {
+    if (newEditor && isActive.value) {
+      editorStore.setActiveEditor(newEditor)
+      editorStore.setActiveEditorComponent(notaEditorRef.value)
+    }
+  }
+)
 
 const loadNota = async (notaId: string) => {
   try {

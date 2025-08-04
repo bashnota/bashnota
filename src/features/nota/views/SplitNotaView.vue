@@ -25,19 +25,6 @@
     
     <!-- Main Content Area -->
     <div class="h-full w-full flex flex-col bg-background flex-1">
-      <UnifiedToolbar 
-        @toggle-sidebar="toggleSidebar"
-        @run-all="activePaneComponent?.executeAllCells"
-        @toggle-favorite="activePaneComponent?.toggleFavorite"
-        @open-config="activePaneComponent?.toggleConfigModal"
-        @share="activePaneComponent?.toggleShareDialog"
-        @export-nota="activePaneComponent?.exportNota"
-        @save-version="activePaneComponent?.saveVersion"
-        @open-history="activePaneComponent?.openHistory"
-        :is-favorite="activeNota?.favorite || false"
-        :can-run-all="!!(activeNota && activeNota.config?.savedSessions && activeNota.config?.savedSessions.length > 0)"
-        :word-count="wordCount"
-      />
       <SplitViewContainer class="flex-1" ref="splitViewContainerRef" />
     </div>
   </div>
@@ -45,7 +32,6 @@
 
 <script setup lang="ts">
 import SplitViewContainer from '@/features/nota/components/SplitViewContainer.vue'
-import UnifiedToolbar from '@/features/editor/components/ui/UnifiedToolbar.vue'
 import { useLayoutStore } from '@/stores/layoutStore'
 import { useRoute } from 'vue-router'
 import { watch, onMounted, computed, ref } from 'vue'
