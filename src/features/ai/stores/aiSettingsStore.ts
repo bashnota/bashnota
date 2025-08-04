@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { aiService } from '@/features/ai/services'
 import type { ProviderConfig as LLMProvider } from '@/features/ai/services'
+import { webLLMDefaultModelService } from '@/features/ai/services/webLLMDefaultModelService'
 import { toast } from 'vue-sonner'
 import { logger } from '@/services/logger'
 
@@ -67,9 +68,7 @@ export const useAISettingsStore = defineStore('aiSettings', () => {
     
     // Update the AI service's default provider to match
     try {
-      import('@/features/ai/services').then(({ aiService }) => {
-        aiService.setDefaultProviderId(providerId)
-      })
+      aiService.setDefaultProviderId(providerId)
     } catch (error) {
       logger.error('Failed to update AI service provider', error)
     }
@@ -108,11 +107,11 @@ export const useAISettingsStore = defineStore('aiSettings', () => {
     logger.info(`WebLLM default model set to: ${modelId}`)
     
     // 🔥 NEW: Also update the WebLLM default model service
-    import('@/features/ai/services/webLLMDefaultModelService').then(({ webLLMDefaultModelService }) => {
+    try {
       webLLMDefaultModelService.setUserDefaultModel(modelId)
-    }).catch(error => {
+    } catch (error) {
       logger.error('Failed to update WebLLM default model service:', error)
-    })
+    }
   }
 
   const setWebLLMAutoLoad = (enabled: boolean) => {
@@ -121,13 +120,13 @@ export const useAISettingsStore = defineStore('aiSettings', () => {
     logger.info(`WebLLM auto-load ${enabled ? 'enabled' : 'disabled'}`)
     
     // 🔥 NEW: Sync with WebLLM default model service
-    import('@/features/ai/services/webLLMDefaultModelService').then(({ webLLMDefaultModelService }) => {
+    try {
       webLLMDefaultModelService.saveDefaultModelConfig({
         autoLoadOnRequest: enabled
       })
-    }).catch(error => {
+    } catch (error) {
       logger.error('Failed to update WebLLM auto-load setting:', error)
-    })
+    }
   }
 
   const setWebLLMAutoLoadStrategy = (strategy: 'default' | 'smallest' | 'fastest' | 'balanced' | 'none') => {
@@ -136,13 +135,13 @@ export const useAISettingsStore = defineStore('aiSettings', () => {
     logger.info(`WebLLM auto-load strategy set to: ${strategy}`)
     
     // 🔥 NEW: Sync with WebLLM default model service
-    import('@/features/ai/services/webLLMDefaultModelService').then(({ webLLMDefaultModelService }) => {
+    try {
       webLLMDefaultModelService.saveDefaultModelConfig({
         autoLoadStrategy: strategy === 'default' ? 'balanced' : strategy as any
       })
-    }).catch(error => {
+    } catch (error) {
       logger.error('Failed to update WebLLM auto-load strategy:', error)
-    })
+    }
   }
 
   const getWebLLMSettings = () => ({
@@ -155,7 +154,6 @@ export const useAISettingsStore = defineStore('aiSettings', () => {
   // 🔥 NEW: Sync settings with WebLLM default model service
   const syncWebLLMSettings = async () => {
     try {
-      const { webLLMDefaultModelService } = await import('@/features/ai/services/webLLMDefaultModelService')
       const config = webLLMDefaultModelService.getDefaultModelConfig()
       
       // Sync from WebLLM service to store

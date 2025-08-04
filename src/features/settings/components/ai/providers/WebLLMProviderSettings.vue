@@ -11,7 +11,6 @@
   >
     <template #content>
       <div class="space-y-4">
-        <!-- 🔥 NEW: Compact Status Header -->
         <div class="p-4 border rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950">
           <div class="flex items-center justify-between">
             <!-- Status Summary -->
@@ -85,7 +84,6 @@
           </div>
         </div>
 
-        <!-- 🔥 NEW: Tabbed Interface -->
         <div class="border rounded-lg">
           <!-- Tab Headers -->
           <div class="flex border-b bg-muted/30">
@@ -547,7 +545,6 @@ const getModelName = (modelId: string): string => {
   return (model as any)?.name || (model as any)?.model_id || modelId
 }
 
-// 🔥 NEW: Check if a model is set as default
 const isDefaultModel = (modelId: string): boolean => {
   // Import and check WebLLM default model service
   try {
@@ -785,7 +782,6 @@ const handleRefresh = async () => {
   await checkDownloadedModels()
 }
 
-// 🔥 NEW: Event handlers for WebLLMDefaultModelManager
 const handleModelSelected = (modelId: string) => {
   selectedModelId.value = modelId
   
