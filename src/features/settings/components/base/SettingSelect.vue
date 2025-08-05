@@ -25,7 +25,7 @@ withDefaults(defineProps<Props>(), {
 })
 
 defineEmits<{
-  'update:modelValue': [value: string]
+  'update:modelValue': [value: string | number]
 }>()
 </script>
 
@@ -40,7 +40,15 @@ defineEmits<{
     <Select 
       :model-value="modelValue"
       :disabled="disabled"
-      @update:model-value="$emit('update:modelValue', $event)"
+      @update:model-value="val => {
+        // Try to cast to number if the option value is a number
+        const opt = options.find(o => o.value == val)
+        if (opt && typeof opt.value === 'number') {
+          $emit('update:modelValue', Number(val))
+        } else {
+          $emit('update:modelValue', typeof val === 'string' ? val : String(val ?? ''))
+        }
+      }"
     >
       <SelectTrigger class="w-[200px]">
         <SelectValue :placeholder="placeholder" />

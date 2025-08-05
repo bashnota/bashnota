@@ -67,17 +67,17 @@ const handleResetToDefaults = () => {
         <SettingInput
           label="Text Color (Dark Mode)"
           description="Text color when using dark theme"
-          :model-value="settings.textColor"
+          :model-value="String(settings.textColor)"
           type="color"
-          @update:model-value="(value) => updateSetting('textColor', value)"
+          @update:model-value="(value) => updateSetting('textColor', String(value))"
         />
         
         <SettingInput
           label="Text Color (Light Mode)"
           description="Text color when using light theme"
-          :model-value="settings.lightModeTextColor"
+          :model-value="String(settings.lightModeTextColor)"
           type="color"
-          @update:model-value="(value) => updateSetting('lightModeTextColor', value)"
+          @update:model-value="(value) => updateSetting('lightModeTextColor', String(value))"
         />
       </SettingGroup>
       

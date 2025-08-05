@@ -2,13 +2,14 @@
 import { Input } from '@/components/ui/input'
 import SettingItem from './SettingItem.vue'
 
+
 interface Props {
   label: string
   description?: string
   help?: string
-  modelValue: string
+  modelValue: string | number
   placeholder?: string
-  type?: 'text' | 'password' | 'email' | 'url' | 'number'
+  type?: 'text' | 'password' | 'email' | 'url' | 'number' | 'color'
   disabled?: boolean
   layout?: 'horizontal' | 'vertical'
 }
@@ -19,7 +20,7 @@ withDefaults(defineProps<Props>(), {
 })
 
 defineEmits<{
-  'update:modelValue': [value: string]
+  'update:modelValue': [value: string | number]
 }>()
 </script>
 
@@ -37,7 +38,7 @@ defineEmits<{
       :placeholder="placeholder"
       :disabled="disabled"
       class="w-[200px]"
-      @update:model-value="$emit('update:modelValue', $event)"
+      @update:model-value="val => $emit('update:modelValue', type === 'number' ? (val === '' ? '' : Number(val)) : val)"
     />
   </SettingItem>
 </template>
