@@ -4,34 +4,15 @@
       <label class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
         LaTeX Expression
       </label>
-      <div class="relative mt-2">
-        <!-- Syntax highlighting overlay -->
-        <div 
-          class="absolute inset-0 pointer-events-none overflow-hidden rounded-md border border-input bg-background px-3 py-2 text-sm font-mono leading-relaxed whitespace-pre-wrap"
-          style="color: transparent; z-index: 1;"
-          v-html="highlightedLatex"
-        ></div>
-        <!-- Actual textarea -->
-        <Textarea
-          v-model="latexValue"
-          :placeholder="placeholder"
-          class="relative resize-none font-mono min-h-20 bg-transparent"
-          style="z-index: 2; color: rgb(0 0 0 / 0);"
-          :rows="rows"
-          @keydown.enter.prevent="onEnter"
-          @keydown.esc="onEscape"
-          @input="onInput"
-          @scroll="syncScroll"
-          ref="textareaRef"
-        />
-        <!-- Visible text overlay -->
-        <div 
-          class="absolute inset-0 pointer-events-none overflow-hidden rounded-md border-0 px-3 py-2 text-sm font-mono leading-relaxed whitespace-pre-wrap text-foreground"
-          style="z-index: 3;"
-          v-html="highlightedLatex"
-          ref="highlightRef"
-        ></div>
-      </div>
+      <Textarea
+        v-model="latexValue"
+        :placeholder="placeholder"
+        class="resize-none font-mono min-h-20 mt-2"
+        :rows="rows"
+        @keydown.enter.prevent="onEnter"
+        @keydown.esc="onEscape"
+        ref="textareaRef"
+      />
       <p class="text-sm text-muted-foreground mt-2">
         Enter your LaTeX mathematical expression
       </p>
