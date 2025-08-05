@@ -106,7 +106,6 @@ export const useAISettingsStore = defineStore('aiSettings', () => {
     saveSettings()
     logger.info(`WebLLM default model set to: ${modelId}`)
     
-    // 🔥 NEW: Also update the WebLLM default model service
     try {
       webLLMDefaultModelService.setUserDefaultModel(modelId)
     } catch (error) {
@@ -119,7 +118,6 @@ export const useAISettingsStore = defineStore('aiSettings', () => {
     saveSettings()
     logger.info(`WebLLM auto-load ${enabled ? 'enabled' : 'disabled'}`)
     
-    // 🔥 NEW: Sync with WebLLM default model service
     try {
       webLLMDefaultModelService.saveDefaultModelConfig({
         autoLoadOnRequest: enabled
@@ -134,7 +132,6 @@ export const useAISettingsStore = defineStore('aiSettings', () => {
     saveSettings()
     logger.info(`WebLLM auto-load strategy set to: ${strategy}`)
     
-    // 🔥 NEW: Sync with WebLLM default model service
     try {
       webLLMDefaultModelService.saveDefaultModelConfig({
         autoLoadStrategy: strategy === 'default' ? 'balanced' : strategy as any
@@ -151,7 +148,6 @@ export const useAISettingsStore = defineStore('aiSettings', () => {
     autoLoadStrategy: settings.value.webllmAutoLoadStrategy
   })
 
-  // 🔥 NEW: Sync settings with WebLLM default model service
   const syncWebLLMSettings = async () => {
     try {
       const config = webLLMDefaultModelService.getDefaultModelConfig()

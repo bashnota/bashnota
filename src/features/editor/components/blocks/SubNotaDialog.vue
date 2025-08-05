@@ -1,18 +1,17 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick, onBeforeUnmount, watch } from 'vue'
 import { useNotaStore } from '@/features/nota/stores/nota'
+import { useSubNotaDialog } from '@/features/editor/composables/useSubNotaDialog'
 import { toast } from 'vue-sonner'
 import { logger } from '@/services/logger'
 import { CheckIcon, XIcon, LoaderIcon, FileTextIcon, FolderIcon } from 'lucide-vue-next'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { db } from '@/db'
 
-const props = defineProps<{
-  parentId: string
-  onSuccess: (newNotaId: string, title: string) => void
-  onCancel: () => void
-}>()
-
-const emit = defineEmits(['close', 'outside-click'])
+const { state, closeSubNotaDialog, handleSuccess } = useSubNotaDialog()
 
 const notaStore = useNotaStore()
 const title = ref('')
@@ -37,9 +36,9 @@ watch(title, (newValue) => {
 // Get parent note title for context
 const fetchParentTitle = async () => {
   try {
-    if (!props.parentId) return
+    if (!state.value.parentId) return
     
-    const parentNota = await db.notas.get(props.parentId)
+    const parentNota = await db.notas.get(state.value.parentId)
     if (parentNota) {
       parentName.value = parentNota.title
       showParentNote.value = true
@@ -53,12 +52,8 @@ const isValid = computed(() => {
   return title.value.trim().length > 0 && title.value.length <= maxChars
 })
 
-const handleOutsideClick = (event: MouseEvent) => {
-  const dialogElement = document.querySelector('.subnota-dialog')
-  if (dialogElement && !dialogElement.contains(event.target as Node)) {
-    cancel()
-    emit('outside-click')
-  }
+const handleClose = () => {
+  closeSubNotaDialog()
 }
 
 onMounted(async () => {
@@ -67,24 +62,19 @@ onMounted(async () => {
     inputRef.value.focus()
   }
   
-  // Add outside click handler after a small delay to prevent immediate closing
-  setTimeout(() => {
-    document.addEventListener('mousedown', handleOutsideClick)
-  }, 100)
-  
   // Fetch parent nota info
   fetchParentTitle()
 })
 
 // Clean up event listeners
 onBeforeUnmount(() => {
-  document.removeEventListener('mousedown', handleOutsideClick)
+  // No cleanup needed for shadcn dialog
 })
 
 const handleKeyDown = (event: KeyboardEvent) => {
   // Only handle global keyboard events here, not input-specific ones
   if (event.key === 'Escape' && !event.defaultPrevented) {
-    cancel()
+    handleClose()
   }
 }
 
@@ -98,7 +88,7 @@ const createSubNota = async () => {
 
   // Make absolutely sure parentId is a string (not undefined, empty string, etc.)
   // If it's an invalid parentId, explicitly pass null instead of undefined/empty string
-  const parentId = props.parentId && props.parentId.trim() !== '' ? props.parentId : null
+  const parentId = state.value.parentId && state.value.parentId.trim() !== '' ? state.value.parentId : null
   
   try {
     const newNota = await notaStore.createItem(title.value.trim(), parentId)
@@ -135,7 +125,7 @@ const createSubNota = async () => {
       }
     }, 100)
     
-    props.onSuccess(newNota.id, title.value)
+    handleSuccess(newNota.id, title.value)
   } catch (error) {
     logger.error('Failed to create nota:', error)
     errorMessage.value = 'Failed to create sub nota. Please try again.'
@@ -149,160 +139,86 @@ const cancel = () => {
   if (isSubmitted.value) return
   
   isSubmitted.value = true
-  props.onCancel()
-  emit('close')
+  handleClose()
 }
 </script>
 
 <template>
-  <div 
-    class="subnota-dialog bg-popover border border-border rounded-md shadow-lg overflow-hidden transition-all duration-200 animate-in" 
-    @keydown="handleKeyDown"
-    role="dialog"
-    aria-labelledby="subnota-dialog-title"
-  >
-    <div class="px-4 py-3 border-b border-border flex items-center justify-between">
-      <h3 id="subnota-dialog-title" class="text-base font-medium flex items-center">
-        <FileTextIcon class="w-4 h-4 mr-2" />
-        Create Sub Nota
-      </h3>
-      <button 
-        @click="cancel" 
-        class="p-1 rounded-full hover:bg-accent/50 transition-colors"
-        aria-label="Close"
-      >
-        <XIcon class="w-4 h-4" />
-      </button>
-    </div>
-    
-    <div class="p-4">
-      <!-- Parent note information if available -->
-      <div v-if="showParentNote" class="mb-3 p-2 rounded-md bg-muted flex items-center text-sm">
-        <FolderIcon class="w-4 h-4 mr-2 text-muted-foreground" />
-        <span>Creating under: <strong>{{ parentName }}</strong></span>
-      </div>
-      
-      <form @submit.prevent="isValid && !isLoading && createSubNota()">
-        <div class="mb-4">
-          <div class="flex justify-between items-center mb-1">
-            <label for="nota-title" class="block text-sm font-medium">Title</label>
-            <span class="text-xs text-muted-foreground" :class="{ 'text-destructive': charCount >= maxChars }">
-              {{ charCount }}/{{ maxChars }}
-            </span>
+  <Dialog :open="state.isOpen" @update:open="(value) => { if (!value) handleClose() }">
+    <DialogContent class="sm:max-w-[500px] grid-rows-[auto_1fr_auto] p-0 max-h-[90dvh]">
+      <DialogHeader class="p-6 pb-0">
+        <DialogTitle class="flex items-center gap-2">
+          <FileTextIcon class="w-5 h-5" />
+          Create Sub Nota
+        </DialogTitle>
+        <DialogDescription>
+          Create a new nota as a sub-item of the current document.
+        </DialogDescription>
+      </DialogHeader>
+
+      <div class="overflow-y-auto px-6 min-h-0">
+        <!-- Parent note information if available -->
+        <div v-if="showParentNote" class="mb-4 p-3 rounded-lg bg-muted flex items-center text-sm">
+          <FolderIcon class="w-4 h-4 mr-2 text-muted-foreground" />
+          <span>Creating under: <strong>{{ parentName }}</strong></span>
+        </div>
+        
+        <form @submit.prevent="isValid && !isLoading && createSubNota()" class="space-y-4">
+          <div class="space-y-2">
+            <div class="flex justify-between items-center">
+              <Label for="nota-title">Title</Label>
+              <span class="text-xs text-muted-foreground" :class="{ 'text-destructive': charCount >= maxChars }">
+                {{ charCount }}/{{ maxChars }}
+              </span>
+            </div>
+            
+            <Input
+              id="nota-title"
+              ref="inputRef"
+              v-model="title"
+              type="text"
+              placeholder="Enter title for your new nota"
+              :class="{ 'border-destructive': errorMessage }"
+              :disabled="isLoading"
+              @keydown.esc.prevent="cancel()"
+              maxlength="50"
+              autocomplete="off"
+              required
+            />
+            
+            <p v-if="errorMessage" class="text-sm text-destructive flex items-center">
+              <XIcon class="w-3.5 h-3.5 mr-1" />
+              {{ errorMessage }}
+            </p>
+            
+            <p v-else class="text-xs text-muted-foreground">
+              Press Enter to create, Esc to cancel
+            </p>
           </div>
-          
-          <input
-            id="nota-title"
-            ref="inputRef"
-            v-model="title"
-            type="text"
-            placeholder="Enter title for your new nota"
-            class="w-full px-3 py-2 bg-input rounded-md border border-border focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-shadow"
-            :class="{ 'border-destructive': errorMessage }"
-            :disabled="isLoading"
-            @keydown.esc.prevent="cancel()"
-            maxlength="50"
-            autocomplete="off"
-            required
-          />
-          
-          <p v-if="errorMessage" class="mt-1 text-sm text-destructive flex items-center">
-            <XIcon class="w-3.5 h-3.5 mr-1" />
-            {{ errorMessage }}
-          </p>
-          
-          <p v-else class="mt-1 text-xs text-muted-foreground">
-            Press Enter to create, Esc to cancel
-          </p>
-        </div>
+        </form>
+      </div>
 
-        <div class="flex justify-end space-x-2">
-          <button 
-            type="button" 
-            class="px-3 py-1.5 rounded-md border border-border hover:bg-accent text-sm font-medium flex items-center transition-colors"
-            @click="cancel"
-            :disabled="isLoading"
-          >
-            <XIcon class="w-4 h-4 mr-1" />
-            Cancel
-          </button>
-          <button 
-            type="submit" 
-            class="px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-medium flex items-center transition-colors"
-            :disabled="!isValid || isLoading"
-          >
-            <LoaderIcon v-if="isLoading" class="w-4 h-4 mr-1 animate-spin" />
-            <CheckIcon v-else class="w-4 h-4 mr-1" />
-            Create
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
+      <DialogFooter class="p-6 pt-0">
+        <Button 
+          variant="outline" 
+          @click="cancel"
+          :disabled="isLoading"
+        >
+          <XIcon class="w-4 h-4 mr-2" />
+          Cancel
+        </Button>
+        <Button 
+          @click="createSubNota"
+          :disabled="!isValid || isLoading"
+        >
+          <LoaderIcon v-if="isLoading" class="w-4 h-4 mr-2 animate-spin" />
+          <CheckIcon v-else class="w-4 h-4 mr-2" />
+          Create
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
-
-<style scoped>
-.subnota-dialog {
-  min-width: 400px;
-  max-width: 95vw;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-}
-
-.animate-in {
-  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: scale(0.95) translateY(5px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-
-/* Input focus styles */
-input:focus {
-  box-shadow: 0 0 0 2px var(--primary-color, rgba(59, 130, 246, 0.5));
-}
-
-/* Button hover effect */
-button {
-  position: relative;
-  overflow: hidden;
-}
-
-button::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 5px;
-  height: 5px;
-  background: rgba(255, 255, 255, 0.3);
-  opacity: 0;
-  border-radius: 100%;
-  transform: scale(1, 1) translate(-50%, -50%);
-  transform-origin: 50% 50%;
-}
-
-button:focus:not(:disabled)::after {
-  animation: ripple 0.6s ease-out;
-}
-
-@keyframes ripple {
-  0% {
-    transform: scale(0, 0);
-    opacity: 0.5;
-  }
-  100% {
-    transform: scale(30, 30);
-    opacity: 0;
-  }
-}
-</style>
 
 <style>
 /* Global styles for highlighting newly created items */

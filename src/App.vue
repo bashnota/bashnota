@@ -2,10 +2,12 @@
 import { RouterView, useRouter, useRoute } from 'vue-router'
 import AppSidebar from '@/features/nota/components/AppSidebar.vue'
 import AppTabs from '@/features/nota/components/AppTabs.vue'
+import CitationPicker from '@/features/editor/components/blocks/citation-block/CitationPicker.vue'
+import SubNotaDialog from '@/features/editor/components/blocks/SubNotaDialog.vue'
 
 
 import ServerSelectionDialogWrapper from '@/features/editor/components/jupyter/ServerSelectionDialogWrapper.vue'
-import { onMounted, computed } from 'vue'
+import { onMounted, computed, ref } from 'vue'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar'
 
@@ -19,6 +21,7 @@ import PinnedSidebars from '@/components/PinnedSidebars.vue'
 import { useSidebarManager } from '@/composables/useSidebarManager'
 import RightSidebarContainer from '@/components/RightSidebarContainer.vue'
 import EditorToolbar from '@/features/editor/components/ui/EditorToolbar.vue'
+import ExportDialog from '@/features/editor/components/dialogs/ExportDialog.vue'
 import { toast } from 'vue-sonner'
 
 import { useLayoutStore } from '@/stores/layoutStore'
@@ -29,6 +32,10 @@ const editorStore = useEditorStore()
 const notaStore = useNotaStore()
 const layoutStore = useLayoutStore()
 const sidebarManager = useSidebarManager()
+
+// Export dialog state
+const showExportDialog = ref(false)
+const exportTargetNota = ref<any>(null)
 
 // Computed properties for toolbar
 const activeNota = computed(() => {
@@ -62,14 +69,56 @@ const handleRunAll = () => {
 }
 
 const handleToggleFavorite = async () => {
-  if (activeNota.value) {
-    await notaStore.toggleFavorite(activeNota.value.id)
+  // Get the active nota from either the active editor component or the layout store
+  let targetNota: any = null
+  
+  if (editorStore.activeEditorComponent && editorStore.activeEditorComponent.currentNota) {
+    // Use the nota from the active editor component (split view)
+    targetNota = editorStore.activeEditorComponent.currentNota
+  } else if (activeNota.value) {
+    // Fallback to the nota from layout store
+    targetNota = activeNota.value
+  }
+
+  if (targetNota) {
+    await notaStore.toggleFavorite(targetNota.id)
+    toast(targetNota.favorite ? 'Removed from favorites' : 'Added to favorites', {
+      description: `"${targetNota.title || 'Untitled'}" ${targetNota.favorite ? 'removed from' : 'added to'} your favorites`,
+      duration: 3000
+    })
+  } else {
+    toast('Unable to toggle favorite', {
+      description: 'No document is currently active.',
+      duration: 3000
+    })
   }
 }
 
 const handleShare = () => {
-  // Implement share logic
-  console.log('Share triggered')
+  // Get the active nota from either the active editor component or the layout store
+  let targetNota: any = null
+  
+  if (editorStore.activeEditorComponent && editorStore.activeEditorComponent.currentNota) {
+    // Use the nota from the active editor component (split view)
+    targetNota = editorStore.activeEditorComponent.currentNota
+  } else if (activeNota.value) {
+    // Fallback to the nota from layout store
+    targetNota = activeNota.value
+  }
+
+  if (targetNota) {
+    // Implement share logic for the specific nota
+    console.log('Share triggered for nota:', targetNota.id, targetNota.title)
+    toast('Share feature coming soon', {
+      description: `Sharing "${targetNota.title || 'Untitled'}"`,
+      duration: 3000
+    })
+  } else {
+    toast('Unable to share', {
+      description: 'No document is currently active.',
+      duration: 3000
+    })
+  }
 }
 
 const handleOpenConfig = () => {
@@ -78,8 +127,27 @@ const handleOpenConfig = () => {
 }
 
 const handleExportNota = () => {
-  // Implement export logic
-  console.log('Export triggered')
+  // Get the active nota from either the active editor component or the layout store
+  let targetNota: any = null
+  
+  if (editorStore.activeEditorComponent && editorStore.activeEditorComponent.currentNota) {
+    // Use the nota from the active editor component (split view)
+    targetNota = editorStore.activeEditorComponent.currentNota
+  } else if (activeNota.value) {
+    // Fallback to the nota from layout store
+    targetNota = activeNota.value
+  }
+
+  if (targetNota) {
+    // Set the target nota and show the export dialog
+    exportTargetNota.value = targetNota
+    showExportDialog.value = true
+  } else {
+    toast('Unable to export', {
+      description: 'No document is currently active.',
+      duration: 3000
+    })
+  }
 }
 
 const handleSaveVersion = async () => {
@@ -210,6 +278,11 @@ onMounted(async () => {
     
     <!-- Global components that need to be available anywhere -->
     <ServerSelectionDialogWrapper />
+    <CitationPicker />
+    <SubNotaDialog />
+    
+    <!-- Export Dialog -->
+    <ExportDialog v-model:open="showExportDialog" :nota="exportTargetNota" />
   </TooltipProvider>
 </template>
 

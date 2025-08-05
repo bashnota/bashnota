@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import NotaEditor from '@/features/editor/components/NotaEditor.vue'
+import BlockCommandMenu from '@/features/editor/components/ui/BlockCommandMenu.vue'
 import NotaConfigModal from '@/features/editor/components/blocks/nota-config/NotaConfigModal.vue'
 import { ref, onMounted, watch, computed } from 'vue'
 import { useNotaStore } from '@/features/nota/stores/nota'
@@ -180,22 +181,24 @@ const handleTagsUpdate = async (tags: string[]) => {
     <!-- Main content area -->
     <main class="flex-1 min-h-0 overflow-hidden">
       <template v-if="isReady && nota">
-        <NotaEditor
-          ref="notaEditorRef"
-          :nota-id="id"
-          :key="id"
-          :can-run-all="nota && nota.config?.savedSessions && nota.config?.savedSessions.length > 0"
-          :is-executing-all="isExecutingAll"
-          @run-all="executeAllCells"
-          :is-favorite="nota?.favorite"
-          @update:favorite="toggleFavorite"
-          @update:tags="handleTagsUpdate"
-          @share="toggleShareDialog"
-          @open-config="toggleConfigModal"
-          @export-nota="exportNota"
-        >
-          <!-- We no longer need to pass NotaMetadata as a slot since the editor handles it internally -->
-        </NotaEditor>
+        <BlockCommandMenu :selection="notaEditorRef?.editor?.state.selection || null" :editor-view="notaEditorRef?.editor?.view">
+          <NotaEditor
+            ref="notaEditorRef"
+            :nota-id="id"
+            :key="id"
+            :can-run-all="nota && nota.config?.savedSessions && nota.config?.savedSessions.length > 0"
+            :is-executing-all="isExecutingAll"
+            @run-all="executeAllCells"
+            :is-favorite="nota?.favorite"
+            @update:favorite="toggleFavorite"
+            @update:tags="handleTagsUpdate"
+            @share="toggleShareDialog"
+            @open-config="toggleConfigModal"
+            @export-nota="exportNota"
+          >
+            <!-- We no longer need to pass NotaMetadata as a slot since the editor handles it internally -->
+          </NotaEditor>
+        </BlockCommandMenu>
       </template>
       
       <div v-else class="flex items-center justify-center h-full">

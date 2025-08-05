@@ -4,6 +4,8 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
+  ContextMenuLabel,
+  ContextMenuShortcut,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
 import { 
@@ -12,9 +14,9 @@ import {
   Copy as CopyIcon, 
   Star as StarIcon
 } from 'lucide-vue-next'
-import { onMounted, onUnmounted, ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import type { EditorView } from '@tiptap/pm/view'
-import { serializeForClipboard } from '@/features/editor/components/extensions/DragHandlePlugin'
+import { serializeForClipboard } from '@/features/editor/components/extensions/DragHandle'
 import type { Selection } from '@tiptap/pm/state'
 import { useFavoriteBlocksStore } from '@/features/nota/stores/favoriteBlocksStore'
 import AddToFavoritesModal from '@/features/editor/components/dialogs/AddToFavoritesModal.vue'
@@ -25,9 +27,7 @@ import { useAIActions } from '@/features/ai/components/composables/useAIActions'
 import { getIconComponent, getColorClasses } from '@/features/ai/utils/iconResolver'
 
 const props = defineProps<{
-  position: { x: number; y: number } | null
   selection: Selection | null
-  isVisible: boolean
   editorView?: EditorView
 }>()
 
@@ -188,129 +188,69 @@ const handleAIAction = async (actionId: string) => {
   
   emit('close')
 }
-
-// Handle context menu open/close
-const handleOpenChange = (open: boolean) => {
-  if (!open) {
-    emit('close')
-  }
-}
-
-// Handle click outside to close menu
-const handleClickOutside = (event: MouseEvent) => {
-  const target = event.target as HTMLElement
-  // Check if the click is inside the menu or the modal
-  if (!target.closest('.bg-popover') && !target.closest('[role="dialog"]')) {
-    emit('close')
-  }
-}
-
-onMounted(() => {
-  if (props.isVisible) {
-    document.addEventListener('mousedown', handleClickOutside)
-  }
-})
-
-// Watch for changes in visibility to add/remove event listener
-watch(() => props.isVisible, (newValue) => {
-  if (newValue) {
-    document.addEventListener('mousedown', handleClickOutside)
-  } else {
-    document.removeEventListener('mousedown', handleClickOutside)
-  }
-})
-
-onUnmounted(() => {
-  document.removeEventListener('mousedown', handleClickOutside)
-})
 </script>
 
 <template>
-  <div>
-    <div
-      v-if="isVisible && position"
-      class="fixed z-50 rounded-lg border border-gray-200 shadow-lg w-64 bg-white"
-      :style="{
-        left: `${position.x}px`,
-        top: `${position.y}px`,
-      }"
-    >
-      <div class="py-1">
-        <!-- Standard Actions -->
-        <div class="flex flex-col">
-          <button
-            @click="cut"
-            class="flex items-center px-3 py-2 text-sm hover:bg-gray-100 w-full text-left transition-colors"
-          >
-            <ScissorsIcon class="mr-2 h-4 w-4" />
-            <span>Cut</span>
-          </button>
-          <button
-            @click="copy"
-            class="flex items-center px-3 py-2 text-sm hover:bg-gray-100 w-full text-left transition-colors"
-          >
-            <CopyIcon class="mr-2 h-4 w-4" />
-            <span>Copy</span>
-          </button>
-          <button
-            @click="addToFavorites"
-            class="flex items-center px-3 py-2 text-sm hover:bg-gray-100 w-full text-left transition-colors"
-          >
-            <StarIcon class="mr-2 h-4 w-4" />
-            <span>Add to Favorites</span>
-          </button>
-        </div>
+  <ContextMenu>
+    <ContextMenuTrigger as-child>
+      <slot />
+    </ContextMenuTrigger>
+    <ContextMenuContent class="w-64">
+      <ContextMenuLabel>Block Actions</ContextMenuLabel>
+      <ContextMenuSeparator />
+      
+      <!-- Standard Actions -->
+      <ContextMenuItem @click="cut">
+        <ScissorsIcon class="mr-2 h-4 w-4" />
+        <span>Cut</span>
+        <ContextMenuShortcut>⌘X</ContextMenuShortcut>
+      </ContextMenuItem>
+      <ContextMenuItem @click="copy">
+        <CopyIcon class="mr-2 h-4 w-4" />
+        <span>Copy</span>
+        <ContextMenuShortcut>⌘C</ContextMenuShortcut>
+      </ContextMenuItem>
+      <ContextMenuItem @click="addToFavorites">
+        <StarIcon class="mr-2 h-4 w-4" />
+        <span>Add to Favorites</span>
+      </ContextMenuItem>
 
-        <div v-if="aiActionsStore.isLoaded && enabledAIActions.length > 0" class="border-t border-gray-200 my-1"></div>
+      <!-- AI-Powered Actions -->
+      <template v-if="aiActionsStore.isLoaded && enabledAIActions.length > 0">
+        <ContextMenuSeparator />
+        <ContextMenuLabel class="text-xs text-muted-foreground">AI Actions</ContextMenuLabel>
+        <ContextMenuItem
+          v-for="action in enabledAIActions"
+          :key="action.id"
+          @click="() => handleAIAction(action.id)"
+          :disabled="isProcessing"
+        >
+          <component 
+            :is="getIconComponent(action.icon || 'EditIcon')" 
+            class="mr-2 h-4 w-4" 
+          />
+          <span>{{ isProcessing ? 'Processing...' : (action.name || 'AI Action') }}</span>
+        </ContextMenuItem>
+      </template>
 
-        <!-- AI-Powered Actions -->
-        <div v-if="aiActionsStore.isLoaded && enabledAIActions.length > 0" class="flex flex-col">
-          <button
-            v-for="action in enabledAIActions"
-            :key="action.id"
-            @click="() => handleAIAction(action.id)"
-            :disabled="isProcessing"
-            class="flex items-center px-3 py-2 text-sm hover:bg-gray-100 w-full text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <component 
-              :is="getIconComponent(action.icon || 'EditIcon')" 
-              class="mr-2 h-4 w-4" 
-            />
-            <span>{{ isProcessing ? 'Processing...' : (action.name || 'AI Action') }}</span>
-          </button>
-        </div>
+      <!-- Destructive Actions -->
+      <ContextMenuSeparator />
+      <ContextMenuItem @click="deleteBlock" class="text-destructive focus:text-destructive">
+        <Trash2Icon class="mr-2 h-4 w-4" />
+        <span>Delete</span>
+        <ContextMenuShortcut>Del</ContextMenuShortcut>
+      </ContextMenuItem>
+    </ContextMenuContent>
+  </ContextMenu>
 
-        <div v-if="aiActionsStore.isLoaded && enabledAIActions.length > 0" class="border-t border-gray-200 my-1"></div>
-
-        <!-- Destructive Actions -->
-        <div class="flex flex-col">
-          <button
-            @click="deleteBlock"
-            class="flex items-center px-3 py-2 text-sm text-red-600 hover:bg-red-50 w-full text-left transition-colors"
-          >
-            <Trash2Icon class="mr-2 h-4 w-4" />
-            <span>Delete</span>
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <AddToFavoritesModal
-      v-model:open="showAddToFavoritesModal"
-      @submit="handleAddToFavorites"
-    />
-  </div>
+  <AddToFavoritesModal
+    v-model:open="showAddToFavoritesModal"
+    @submit="handleAddToFavorites"
+  />
 </template>
 
 <style scoped>
-.fixed {
-  position: fixed;
-}
-
-/* Ensure menu appears above other elements */
-.z-50 {
-  z-index: 50;
-}
+/* Custom styles for the block command menu */
 </style>
 
 

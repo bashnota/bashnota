@@ -1,8 +1,8 @@
 import { Editor, VueRenderer, type Range } from '@tiptap/vue-3'
+import { useCitationPicker } from '@/features/editor/composables/useCitationPicker'
+import { useSubNotaDialog } from '@/features/editor/composables/useSubNotaDialog'
 import tippy, { type Instance, type Props } from 'tippy.js'
 import CommandsList from '@/features/editor/components/blocks/CommandsList.vue'
-import SubNotaDialog from '@/features/editor/components/blocks/SubNotaDialog.vue'
-import CitationPicker from '@/features/editor/components/blocks/citation-block/CitationPicker.vue'
 import type { CitationEntry } from '@/features/nota/types/nota'
 import 'tippy.js/dist/tippy.css'
 import router from '@/router'
@@ -460,44 +460,28 @@ function createAdvancedCommands(): CommandItem[] {
         const currentRoute = router.currentRoute.value
         const notaId = currentRoute.params.id as string
         
-        // Create popup manager
-        const popupManager = new PopupManager()
+        // Use the citation picker composable
+        const { openCitationPicker } = useCitationPicker()
         
-        // Create the citation picker UI
-        popupManager.createPopup(
-          CitationPicker,
-          {
-            notaId,
-            onSelect: (citation: CitationEntry, index: number) => {
-              // Insert the citation
-              editor
-                .chain()
-                .focus()
-                .deleteRange(range)
-                .insertContent({
-                  type: 'citation',
-                  attrs: {
-                    citationKey: citation.key,
-                    citationNumber: index + 1
-                  }
-                })
-                .run()
-              
-              // Hide the popup
-              popupManager.hide()
-            },
-            onClose: () => {
-              // Only hide the popup, don't insert anything
-              popupManager.hide()
-            }
+        openCitationPicker(
+          notaId,
+          (citation: CitationEntry, index: number) => {
+            // Insert the citation
+            editor
+              .chain()
+              .focus()
+              .deleteRange(range)
+              .insertContent({
+                type: 'citation',
+                attrs: {
+                  citationKey: citation.key,
+                  citationNumber: index + 1
+                }
+              })
+              .run()
           },
-          editor,
-          getCursorCoords(editor, range),
-          {
-            // Add these options to prevent automatic selection
-            trigger: 'manual',
-            interactive: true,
-            hideOnClick: false
+          () => {
+            // Cleanup callback - nothing needed since dialog handles itself
           }
         )
       },
@@ -730,17 +714,18 @@ function createAdvancedCommands(): CommandItem[] {
           }, 20);
         };
         
-        // Create the popup with the dialog
-        popupManager.createPopup(
-          SubNotaDialog, 
-          {
+        // Use the subnota dialog composable
+        const { openSubNotaDialog } = useSubNotaDialog()
+        
+        if (parentId) {
+          openSubNotaDialog(
             parentId,
-            onSuccess: handleSuccess,
-            onCancel: () => popupManager.hide()
-          }, 
-          editor,
-          getCursorCoords(editor, range)
-        );
+            handleSuccess,
+            () => {
+              // Cleanup callback - nothing needed since dialog handles itself
+            }
+          )
+        };
       }),
     },
   ];
@@ -848,42 +833,26 @@ export default {
     },
     
     render: () => {
-      let popup: PopupManager | null = null
-
       return {
         onStart: (props: any) => {
-          popup = new PopupManager()
-          popup.createPopup(
-            CitationPicker,
-            {
-              isSuggestion: true,
-              searchQuery: props.item.searchQuery,
-              notaId: props.item.notaId, // Pass notaId to the component
-              onSelect: (citation: CitationEntry) => {
-                props.command({ id: citation.id, label: citation.id })
-                popup?.hide()
-              },
-              onClose: () => {
-                popup?.hide()
-              },
+          const { openCitationPicker } = useCitationPicker()
+          openCitationPicker(
+            props.item.notaId,
+            (citation: CitationEntry) => {
+              props.command({ id: citation.id, label: citation.id })
             },
-            props.editor,
-            () => props.clientRect()
+            () => {
+              // Close callback - nothing needed
+            }
           )
         },
 
         onUpdate(props: any) {
-          if (!popup) return
-
-          // Update the search query
-          popup.updateProps({
-            searchQuery: props.item.searchQuery,
-          })
+          // Update handled by reactive state in composable
         },
 
         onExit() {
-          popup?.hide()
-          popup = null
+          // Exit handled by dialog state
         },
       }
     },

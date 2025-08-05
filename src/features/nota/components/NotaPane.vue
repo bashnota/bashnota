@@ -34,21 +34,23 @@
     <!-- Nota Content -->
     <div v-else class="flex-1 min-h-0 w-full overflow-hidden">
       <template v-if="isReady && nota">
-        <NotaEditor
-          :nota-id="pane.notaId"
-          :key="pane.notaId"
-          :can-run-all="nota && nota.config?.savedSessions && nota.config?.savedSessions.length > 0"
-          :is-executing-all="isExecutingAll"
-          @run-all="executeAllCells"
-          :is-favorite="nota?.favorite"
-          @update:favorite="toggleFavorite"
-          @update:tags="handleTagsUpdate"
-          @share="toggleShareDialog"
-          @open-config="toggleConfigModal"
-          @export-nota="exportNota"
-          class="h-full w-full"
-          ref="notaEditorRef"
-        />
+        <BlockCommandMenu :selection="notaEditorRef?.editor?.state.selection || null" :editor-view="notaEditorRef?.editor?.view">
+          <NotaEditor
+            :nota-id="pane.notaId"
+            :key="pane.notaId"
+            :can-run-all="nota && nota.config?.savedSessions && nota.config?.savedSessions.length > 0"
+            :is-executing-all="isExecutingAll"
+            @run-all="executeAllCells"
+            :is-favorite="nota?.favorite"
+            @update:favorite="toggleFavorite"
+            @update:tags="handleTagsUpdate"
+            @share="toggleShareDialog"
+            @open-config="toggleConfigModal"
+            @export-nota="exportNota"
+            class="h-full w-full"
+            ref="notaEditorRef"
+          />
+        </BlockCommandMenu>
       </template>
       
       <div v-else class="flex items-center justify-center h-full">
@@ -83,6 +85,7 @@ import { useCodeExecutionStore } from '@/features/editor/stores/codeExecutionSto
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
 import NotaEditor from '@/features/editor/components/NotaEditor.vue'
+import BlockCommandMenu from '@/features/editor/components/ui/BlockCommandMenu.vue'
 import { useEditorStore } from '@/features/editor/stores/editorStore'
 import NotaConfigModal from '@/features/editor/components/blocks/nota-config/NotaConfigModal.vue'
 import PublishNotaModal from '@/features/editor/components/dialogs/PublishNotaModal.vue'
