@@ -24,6 +24,18 @@ const router = createRouter({
       path: '/settings',
       name: 'settings',
       component: () => import('@/features/settings/views/SettingsView.vue'),
+      children: [
+        {
+          path: '',
+          redirect: { name: 'settings-detail', params: { section: 'ai-providers' } }
+        },
+        {
+          path: ':section',
+          name: 'settings-detail',
+          component: () => import('@/features/settings/views/SettingsView.vue'),
+          props: true
+        }
+      ]
     },
     // Code block output route
     {

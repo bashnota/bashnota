@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Search, ChevronRight, ChevronDown, FileText, Palette, SparklesIcon, Plug, Keyboard, Settings } from 'lucide-vue-next'
 import { Input } from '@/components/ui/input'
 import SettingsPanel from '@/features/settings/components/SettingsPanel.vue'
 
 const route = useRoute()
+const router = useRouter()
 
 // Search functionality
 const searchQuery = ref('')
@@ -79,8 +80,10 @@ const settingsCategories = ref([
   }
 ])
 
-// Currently selected setting
-const selectedSetting = ref('ai-providers')
+// Currently selected setting - get from route params
+const selectedSetting = computed(() => {
+  return (route.params.section as string) || 'ai-providers'
+})
 
 // Filtered categories based on search
 const filteredCategories = computed(() => {
@@ -108,7 +111,8 @@ const toggleCategory = (categoryId: string) => {
 
 // Select a setting
 const selectSetting = (settingId: string) => {
-  selectedSetting.value = settingId
+  // Navigate to the settings route with the section parameter
+  router.push({ name: 'settings-detail', params: { section: settingId } })
   
   // Find and expand the parent category
   for (const category of settingsCategories.value) {
@@ -120,28 +124,29 @@ const selectSetting = (settingId: string) => {
   }
 }
 
-// Handle query parameters for direct navigation
-const handleQueryNavigation = () => {
-  const section = route.query.section as string
+// Handle route parameters for direct navigation
+const handleRouteNavigation = () => {
+  const section = route.params.section as string
   if (section) {
-    // Check if the section exists
-    const exists = settingsCategories.value.some(category => 
-      category.subcategories.some(sub => sub.id === section)
-    )
-    if (exists) {
-      selectSetting(section)
+    // Check if the section exists and expand its parent category
+    for (const category of settingsCategories.value) {
+      const hasSubcategory = category.subcategories.some(sub => sub.id === section)
+      if (hasSubcategory) {
+        category.expanded = true
+        break
+      }
     }
   }
 }
 
 // Initialize
 onMounted(() => {
-  handleQueryNavigation()
+  handleRouteNavigation()
 })
 
 // Watch for route changes
-watch(() => route.query.section, () => {
-  handleQueryNavigation()
+watch(() => route.params.section, () => {
+  handleRouteNavigation()
 })
 
 // Get the current setting title

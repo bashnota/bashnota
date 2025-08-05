@@ -144,14 +144,24 @@ const documentationItems = [
 // Settings menu items
 const settingsItems = [
   {
-    title: "General",
+    title: "AI Providers",
     icon: Settings,
-    url: "/settings"
+    url: "/settings/ai-providers"
   },
   {
     title: "Appearance",
     icon: Palette,
-    url: "/settings/appearance"
+    url: "/settings/theme"
+  },
+  {
+    title: "Editor",
+    icon: FileText,
+    url: "/settings/text-editing"
+  },
+  {
+    title: "Keyboard Shortcuts",
+    icon: Keyboard,
+    url: "/settings/editor-shortcuts"
   },
   {
     title: "Account",
@@ -159,14 +169,14 @@ const settingsItems = [
     action: () => handleAuthNavigation()
   },
   {
-    title: "Data & Storage",
+    title: "System Info",
     icon: Database,
-    url: "/settings/data"
+    url: "/settings/system-info"
   },
   {
-    title: "Developer",
+    title: "Performance",
     icon: Terminal,
-    url: "/settings/developer"
+    url: "/settings/performance"
   }
 ]
 
@@ -654,81 +664,15 @@ const handleAuthNavigation = () => {
           <!-- Theme Toggle -->
           <DarkModeToggle class="group-data-[collapsible=icon]:mb-1" />
           
-          <!-- Settings/Shortcuts -->
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            @click="showShortcutsDialog = true"
-            class="h-8 w-8 p-0 group-data-[collapsible=icon]:mb-1"
-            title="Keyboard Shortcuts (Shift + ?)"
-          >
-            <Settings2 class="h-4 w-4" />
-          </Button>
           
           <!-- Version Info (hidden when collapsed) -->
           <div class="group-data-[collapsible=icon]:hidden ml-auto">
-            <span class="text-xs text-muted-foreground">v1.0</span>
+            <span class="text-xs text-muted-foreground">v0.1</span>
           </div>
         </div>
       </div>
     </SidebarFooter>
 
-    <!-- Keyboard Shortcuts Dialog -->
-    <Dialog :open="showShortcutsDialog" @update:open="showShortcutsDialog = $event">
-      <DialogContent class="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Keyboard Shortcuts</DialogTitle>
-        </DialogHeader>
-        <div class="space-y-4">
-          <div class="space-y-2">
-            <h4 class="text-sm font-medium">Navigation</h4>
-            <div class="space-y-1 text-sm">
-              <div class="flex justify-between">
-                <span>New nota</span>
-                <Badge variant="outline" class="text-xs">Ctrl/⌘ + N</Badge>
-              </div>
-              <div class="flex justify-between">
-                <span>All notas</span>
-                <Badge variant="outline" class="text-xs">Ctrl/⌘ + 1</Badge>
-              </div>
-              <div class="flex justify-between">
-                <span>Favorites</span>
-                <Badge variant="outline" class="text-xs">Ctrl/⌘ + 2</Badge>
-              </div>
-              <div class="flex justify-between">
-                <span>Recent</span>
-                <Badge variant="outline" class="text-xs">Ctrl/⌘ + 3</Badge>
-              </div>
-            </div>
-          </div>
-          
-          <div class="space-y-2">
-            <h4 class="text-sm font-medium">Search</h4>
-            <div class="space-y-1 text-sm">
-              <div class="flex justify-between">
-                <span>Open search</span>
-                <Badge variant="outline" class="text-xs">Ctrl/⌘ + F</Badge>
-              </div>
-              <div class="flex justify-between">
-                <span>Clear search</span>
-                <Badge variant="outline" class="text-xs">Escape</Badge>
-              </div>
-            </div>
-          </div>
-          
-          <div class="space-y-2">
-            <h4 class="text-sm font-medium">Help</h4>
-            <div class="space-y-1 text-sm">
-              <div class="flex justify-between">
-                <span>Show shortcuts</span>
-                <Badge variant="outline" class="text-xs">Shift + ?</Badge>
-              </div>
-            </div>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-    
     <!-- New Nota Modal -->
     <NewNotaModal
       :open="showNewNotaModal"
