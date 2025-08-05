@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent } from 'vue'
+import { computed, defineAsyncComponent, onMounted } from 'vue'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertCircle } from 'lucide-vue-next'
+import { useSettingsStore } from '@/stores/settingsStore'
 
 interface Props {
   settingId: string
@@ -9,10 +10,17 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+const settingsStore = useSettingsStore()
+
+// Load settings when component mounts
+onMounted(() => {
+  settingsStore.loadSettings()
+})
 
 // Dynamically import components
 const componentMap = {
   // Editor Settings
+  'UnifiedEditorSettings': defineAsyncComponent(() => import('@/features/settings/components/editor/UnifiedEditorSettings.vue')),
   'TextEditingSettings': defineAsyncComponent(() => import('@/features/settings/components/editor/TextEditingSettings.vue')),
   'CodeEditingSettings': defineAsyncComponent(() => import('@/features/settings/components/editor/CodeEditingSettings.vue')),
   'FormattingSettings': defineAsyncComponent(() => import('@/features/settings/components/editor/FormattingSettings.vue')),
@@ -50,9 +58,15 @@ const currentComponent = computed(() => {
 
 <template>
   <div class="p-6">
-    <div v-if="currentComponent">
+    <!-- Loading State -->
+    <div v-if="settingsStore.isLoading" class="flex items-center justify-center h-32">
+      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+    </div>
+    
+    <!-- Settings Component -->
+    <div v-else-if="currentComponent">
       <Suspense>
-        <component :is="currentComponent" />
+        <component :is="currentComponent" :setting-id="settingId" />
         <template #fallback>
           <div class="flex items-center justify-center py-12">
             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -61,6 +75,7 @@ const currentComponent = computed(() => {
       </Suspense>
     </div>
     
+    <!-- Error State -->
     <div v-else>
       <Alert>
         <AlertCircle class="h-4 w-4" />
@@ -68,6 +83,14 @@ const currentComponent = computed(() => {
           Settings component "{{ component }}" not found. This section is under development.
         </AlertDescription>
       </Alert>
+    </div>
+    
+    <!-- Unsaved Changes Indicator -->
+    <div 
+      v-if="settingsStore.hasUnsavedChanges" 
+      class="fixed bottom-6 right-6 bg-primary text-primary-foreground px-4 py-2 rounded-md shadow-lg animate-in slide-in-from-bottom-2"
+    >
+      Changes will be saved automatically
     </div>
   </div>
 </template> 

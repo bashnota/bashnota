@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Search, ChevronRight, ChevronDown, FileText, Palette, SparklesIcon, Plug, Keyboard, Settings } from 'lucide-vue-next'
 import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
 import SettingsPanel from '@/features/settings/components/SettingsPanel.vue'
 
 const route = useRoute()
@@ -19,6 +20,7 @@ const settingsCategories = ref([
     icon: FileText,
     expanded: true,
     subcategories: [
+      { id: 'unified-editor', title: 'All Settings', component: 'UnifiedEditorSettings', badge: 'New' },
       { id: 'text-editing', title: 'Text Editing', component: 'TextEditingSettings' },
       { id: 'code-editing', title: 'Code Editing', component: 'CodeEditingSettings' },
       { id: 'formatting', title: 'Formatting', component: 'FormattingSettings' }
@@ -82,7 +84,7 @@ const settingsCategories = ref([
 
 // Currently selected setting - get from route params
 const selectedSetting = computed(() => {
-  return (route.params.section as string) || 'ai-providers'
+  return (route.params.section as string) || 'unified-editor'
 })
 
 // Filtered categories based on search
@@ -225,13 +227,16 @@ const currentSettingComponent = computed(() => {
               :key="subcategory.id"
               @click="selectSetting(subcategory.id)"
               :class="[
-                'w-full text-left p-2 rounded-md text-sm transition-colors',
+                'w-full text-left p-2 rounded-md text-sm transition-colors flex items-center justify-between',
                 selectedSetting === subcategory.id
                   ? 'bg-primary text-primary-foreground'
                   : 'hover:bg-muted/50'
               ]"
             >
-              {{ subcategory.title }}
+              <span>{{ subcategory.title }}</span>
+              <Badge v-if="subcategory.badge" variant="secondary" class="text-xs">
+                {{ subcategory.badge }}
+              </Badge>
             </button>
           </div>
         </div>
