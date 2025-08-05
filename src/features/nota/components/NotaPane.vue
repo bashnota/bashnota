@@ -34,7 +34,7 @@
     <!-- Nota Content -->
     <div v-else class="flex-1 min-h-0 w-full overflow-hidden">
       <template v-if="isReady && nota">
-        <BlockCommandMenu :selection="notaEditorRef?.editor?.state.selection || null" :editor-view="notaEditorRef?.editor?.view">
+        <BlockCommandMenu :editor-view="notaEditorRef?.editor?.view">
           <NotaEditor
             :nota-id="pane.notaId"
             :key="pane.notaId"

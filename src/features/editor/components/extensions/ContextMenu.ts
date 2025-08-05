@@ -18,9 +18,24 @@ export function ContextMenuPlugin(options: ContextMenuOptions & { pluginKey: str
       function handleEditorContextMenu(e: MouseEvent) {
         if (!options.enableContextMenu) return
         
-        // Don't prevent default - let the ContextMenu component handle it
-        // Just ensure the right node is selected
-        selectNode(view, { x: e.clientX, y: e.clientY }, options)
+        // Don't prevent default immediately - let the context menu component handle it
+        // But ensure the right node is selected BEFORE the menu opens
+        const selectedNode = selectNode(view, { x: e.clientX, y: e.clientY }, options)
+        
+        if (selectedNode) {
+          // Dispatch a custom event with the updated selection
+          // This ensures the BlockCommandMenu can capture the correct selection
+          setTimeout(() => {
+            const contextMenuEvent = new CustomEvent('editor-selection-updated', {
+              detail: {
+                selection: view.state.selection,
+                editorView: view,
+                position: { x: e.clientX, y: e.clientY }
+              }
+            })
+            document.dispatchEvent(contextMenuEvent)
+          }, 0)
+        }
       }
 
       // Add context menu listener to the editor DOM

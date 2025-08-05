@@ -181,7 +181,7 @@ const handleTagsUpdate = async (tags: string[]) => {
     <!-- Main content area -->
     <main class="flex-1 min-h-0 overflow-hidden">
       <template v-if="isReady && nota">
-        <BlockCommandMenu :selection="notaEditorRef?.editor?.state.selection || null" :editor-view="notaEditorRef?.editor?.view">
+        <BlockCommandMenu :editor-view="notaEditorRef?.editor?.view">
           <NotaEditor
             ref="notaEditorRef"
             :nota-id="id"

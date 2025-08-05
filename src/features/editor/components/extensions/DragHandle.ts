@@ -33,6 +33,55 @@ export function serializeForClipboard(view: EditorView, slice: Slice) {
   throw new Error('No supported clipboard serialization method found.')
 }
 
+// Safe serialization for drag operations that handles leaf nodes
+function serializeForDrag(view: EditorView, slice: Slice) {
+  try {
+    // First try the normal serialization
+    return serializeForClipboard(view, slice)
+  } catch (error) {
+    logger.warn('Standard serialization failed for drag operation, using fallback:', error)
+    
+    // If it fails (likely due to leaf nodes), create a safe fallback
+    const div = document.createElement('div')
+    
+    // Check if we're dealing with a leaf node
+    if (slice.content && slice.content.size === 1) {
+      const node = slice.content.firstChild
+      if (node && node.isLeaf) {
+        // For leaf nodes, create a simple representation
+        const nodeElement = document.createElement('div')
+        nodeElement.setAttribute('data-type', node.type.name)
+        
+        // Add basic attributes for identification
+        if (node.attrs) {
+          Object.keys(node.attrs).forEach(key => {
+            if (node.attrs[key] !== null && node.attrs[key] !== undefined) {
+              nodeElement.setAttribute(`data-${key}`, String(node.attrs[key]))
+            }
+          })
+        }
+        
+        // Add a visual representation
+        nodeElement.textContent = `[${node.type.name}]`
+        nodeElement.className = 'tiptap-leaf-node'
+        
+        div.appendChild(nodeElement)
+        return {
+          dom: div,
+          text: `[${node.type.name}]`
+        }
+      }
+    }
+    
+    // Fallback for other cases
+    div.textContent = '[Content]'
+    return {
+      dom: div,
+      text: '[Content]'
+    }
+  }
+}
+
 export interface DragHandleOptions {
   /**
    * The width of the drag handle
@@ -83,6 +132,7 @@ function absoluteRect(node: Element) {
 
 function nodeDOMAtCoords(coords: { x: number; y: number }, options: DragHandleOptions) {
   const selectors = [
+    // Basic block elements
     'li',
     'p:not(:first-child)',
     'pre',
@@ -93,6 +143,33 @@ function nodeDOMAtCoords(coords: { x: number; y: number }, options: DragHandleOp
     'h4',
     'h5',
     'h6',
+    // Custom TipTap blocks with data-type attributes
+    '[data-type="citation"]',
+    '[data-type="bibliography"]',
+    '[data-type="confusionMatrix"]',
+    '[data-type="drawio"]',
+    '[data-type="data-table"]',
+    '[data-type="page-link"]',
+    '[data-type="theorem"]',
+    '[data-type="math"]',
+    '[data-type="subfigure"]',
+    '[data-type="youtube"]',
+    '[data-type="executableCodeBlock"]',
+    '[data-type="pipeline"]',
+    '[data-type="mermaid"]',
+    '[data-type="horizontalRule"]',
+    '[data-type="table"]',
+    // Custom blocks with other attribute selectors
+    '[data-youtube-video]',
+    'confusion-matrix',
+    // Code blocks (including executable ones)
+    '.ProseMirror pre[class*="language-"]',
+    '.executable-code-block',
+    '.code-block-wrapper',
+    // Block-level elements that might be custom
+    '.ProseMirror > div[class*="block"]',
+    '.ProseMirror > div[data-node-type]',
+    // Custom nodes from options
     ...options.customNodes.map((node) => `[data-type=${node}]`),
   ].join(', ')
   return document
@@ -164,9 +241,12 @@ export function selectNode(
 
     // if inline node is selected, e.g mention -> go to the parent node to select the whole node
     // if table row is selected, go to the parent node to select the whole node
+    // Also handle custom blocks that might be inline or need parent selection
     if (
       (selection as NodeSelection).node.type.isInline ||
-      (selection as NodeSelection).node.type.name === 'tableRow'
+      (selection as NodeSelection).node.type.name === 'tableRow' ||
+      // Handle custom blocks that might need parent selection
+      ['citation', 'pageLink'].includes((selection as NodeSelection).node.type.name)
     ) {
       const $pos = view.state.doc.resolve(selection.from)
       selection = NodeSelection.create(view.state.doc, $pos.before())
@@ -196,7 +276,7 @@ export function DragHandlePlugin(options: DragHandleOptions & { pluginKey: strin
     }
 
     const slice = view.state.selection.content()
-    const { dom, text } = serializeForClipboard(view, slice)
+    const { dom, text } = serializeForDrag(view, slice)
 
     event.dataTransfer.clearData()
     event.dataTransfer.setData('text/html', dom.innerHTML)
