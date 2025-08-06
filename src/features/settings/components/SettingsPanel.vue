@@ -19,20 +19,30 @@ onMounted(() => {
 
 // Dynamically import components
 const componentMap = {
-  // Editor Settings
+  // Editor Settings - New Unified Components
   'UnifiedEditorSettings': defineAsyncComponent(() => import('@/features/settings/components/editor/UnifiedEditorSettings.vue')),
+  
+  // Editor Settings - Legacy Components
   'TextEditingSettings': defineAsyncComponent(() => import('@/features/settings/components/editor/TextEditingSettings.vue')),
   'CodeEditingSettings': defineAsyncComponent(() => import('@/features/settings/components/editor/CodeEditingSettings.vue')),
   'FormattingSettings': defineAsyncComponent(() => import('@/features/settings/components/editor/FormattingSettings.vue')),
   
-  // Appearance Settings
+  // Appearance Settings - New Unified Components  
+  'UnifiedAppearanceSettings': defineAsyncComponent(() => import('@/features/settings/components/appearance/UnifiedAppearanceSettings.vue')),
+  
+  // Appearance Settings - Legacy Components
   'ThemeSettings': defineAsyncComponent(() => import('@/features/settings/components/appearance/ThemeSettings.vue')),
   'InterfaceSettings': defineAsyncComponent(() => import('@/features/settings/components/appearance/InterfaceSettings.vue')),
   
-  // AI Settings
+  // AI Settings - New Unified Components
+  'UnifiedAISettings': defineAsyncComponent(() => import('@/features/settings/components/ai/UnifiedAISettings.vue')),
+  
+  // AI Settings - Core Components
+  'AIActionsSettings': defineAsyncComponent(() => import('@/features/settings/components/ai/ImprovedAIActionsSettings.vue')),
+  'AICodeActionsSettings': defineAsyncComponent(() => import('@/features/settings/components/ai/ImprovedAICodeActionsSettings.vue')),
+  
+  // AI Settings - Legacy Components
   'AIProvidersSettings': defineAsyncComponent(() => import('@/features/settings/components/ai/AIProvidersSettings.vue')),
-  'AIActionsSettings': defineAsyncComponent(() => import('@/features/settings/components/ai/AIActionsSettings.vue')),
-  'AICodeActionsSettings': defineAsyncComponent(() => import('@/features/settings/components/ai/AICodeActionsSettings.vue')),
   'AIGenerationSettings': defineAsyncComponent(() => import('@/features/settings/components/ai/AIGenerationSettings.vue')),
   
   // Integration Settings

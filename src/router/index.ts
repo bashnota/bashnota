@@ -22,12 +22,12 @@ const router = createRouter({
     },
     {
       path: '/settings',
-      name: 'settings',
       component: () => import('@/features/settings/views/SettingsView.vue'),
       children: [
         {
           path: '',
-          redirect: { name: 'settings-detail', params: { section: 'ai-providers' } }
+          name: 'settings',
+          redirect: { name: 'settings-detail', params: { section: 'unified-editor' } }
         },
         {
           path: ':section',
