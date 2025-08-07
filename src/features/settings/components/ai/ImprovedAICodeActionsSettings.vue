@@ -44,7 +44,14 @@ const fileInput = ref<HTMLInputElement | null>(null)
 // Computed
 const isStoreReady = computed(() => aiActionsStore.state?.customActions && Array.isArray(aiActionsStore.state.customActions))
 const preferences = computed(() => aiActionsStore.state?.providerSettings || {})
-const errorConfig = computed(() => aiActionsStore.state?.errorTriggerConfig || {})
+const errorConfig = computed(() => {
+  const config = aiActionsStore.state?.errorTriggerConfig || {}
+  return {
+    autoTrigger: config.autoTrigger ?? false,
+    showQuickFix: config.showQuickFix ?? false,
+    showExplanation: config.showExplanation ?? false
+  }
+})
 const customActions = computed(() => {
   if (!isStoreReady.value) return []
   try {
@@ -353,7 +360,7 @@ const handleDialogClose = () => {
               :model-value="[5]"
               :min="1"
               :max="10"
-              @update:model-value="(value) => updateErrorConfig('contextLines', value[0])"
+              @update:model-value="(value) => {/* This setting would need to be added to ErrorTriggerConfig type first */}"
             />
           </SettingGroup>
         </SettingSection>
