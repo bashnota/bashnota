@@ -1,8 +1,18 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { toTypedSchema } from "@vee-validate/zod"
+import { useForm } from "vee-validate"
+import * as z from "zod"
 import { Button } from '@/components/ui/button'
+import {
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 
@@ -16,24 +26,45 @@ const emit = defineEmits<{
   (e: 'cancel'): void
 }>()
 
-// Form state
-const title = ref('')
-const description = ref('')
-const startDate = ref<Date>(new Date())
-const endDate = ref<Date>(new Date())
-const status = ref('Not Started')
-const priority = ref('Medium')
-const category = ref('Meeting')
+// Form schema
+const formSchema = toTypedSchema(z.object({
+  title: z.string()
+    .min(1, "Title is required")
+    .max(200, "Title must be less than 200 characters"),
+  description: z.string()
+    .max(1000, "Description must be less than 1000 characters")
+    .optional(),
+  startDate: z.date({
+    required_error: "Start date is required",
+    invalid_type_error: "Invalid start date",
+  }),
+  endDate: z.date({
+    required_error: "End date is required", 
+    invalid_type_error: "Invalid end date",
+  }),
+  status: z.enum(['Not Started', 'In Progress', 'Completed']),
+  priority: z.enum(['Low', 'Medium', 'High']),
+  category: z.enum(['Meeting', 'Task', 'Event', 'Reminder'])
+}).refine((data) => data.endDate >= data.startDate, {
+  message: "End date must be after start date",
+  path: ["endDate"]
+}))
 
-// Computed properties for form validation
-const isFormValid = computed(() => {
-  return title.value.trim() !== '' &&
-    startDate.value instanceof Date &&
-    endDate.value instanceof Date &&
-    endDate.value >= startDate.value
+// Form setup
+const { handleSubmit, resetForm, setValues, values } = useForm({
+  validationSchema: formSchema,
+  initialValues: {
+    title: '',
+    description: '',
+    startDate: new Date(),
+    endDate: new Date(),
+    status: 'Not Started' as const,
+    priority: 'Medium' as const,
+    category: 'Meeting' as const
+  }
 })
 
-// Add this helper function
+// Add helper function
 const parseDateFromTable = (dateString: string) => {
   const [year, month, day] = dateString.split('-').map(Number)
   return new Date(year, month - 1, day)
@@ -42,41 +73,46 @@ const parseDateFromTable = (dateString: string) => {
 // Initialize form with event data or selected date
 watch(() => props.event, (newEvent) => {
   if (newEvent) {
-    title.value = newEvent.cells.title || ''
-    description.value = newEvent.cells.description || ''
-    startDate.value = parseDateFromTable(newEvent.cells.startDate)
-    endDate.value = parseDateFromTable(newEvent.cells.endDate)
-    status.value = newEvent.cells.status || 'Not Started'
-    priority.value = newEvent.cells.priority || 'Medium'
-    category.value = newEvent.cells.category || 'Meeting'
+    setValues({
+      title: newEvent.cells.title || '',
+      description: newEvent.cells.description || '',
+      startDate: parseDateFromTable(newEvent.cells.startDate),
+      endDate: parseDateFromTable(newEvent.cells.endDate),
+      status: newEvent.cells.status || 'Not Started',
+      priority: newEvent.cells.priority || 'Medium',
+      category: newEvent.cells.category || 'Meeting'
+    })
   }
 }, { immediate: true })
 
 // Initialize with selected date if creating new event
 watch(() => props.selectedDate, (newDate) => {
   if (newDate && !props.event) {
-    startDate.value = new Date(newDate)
-    endDate.value = new Date(newDate)
-    endDate.value.setHours(endDate.value.getHours() + 1)
+    const endDate = new Date(newDate)
+    endDate.setHours(endDate.getHours() + 1)
+    
+    setValues({
+      ...values,
+      startDate: new Date(newDate),
+      endDate: endDate
+    })
   }
 }, { immediate: true })
 
 // Form submission handler
-const handleSubmit = () => {
-  if (!isFormValid.value) return
-
+const onSubmit = handleSubmit((formValues) => {
   const eventData = {
-    title: title.value.trim(),
-    description: description.value.trim(),
-    startDate: startDate.value,
-    endDate: endDate.value,
-    status: status.value,
-    priority: priority.value,
-    category: category.value
+    title: formValues.title.trim(),
+    description: formValues.description?.trim() || '',
+    startDate: formValues.startDate,
+    endDate: formValues.endDate,
+    status: formValues.status,
+    priority: formValues.priority,
+    category: formValues.category
   }
 
   emit('save', eventData)
-}
+})
 
 // Options
 const statusOptions = ['Not Started', 'In Progress', 'Completed']
@@ -100,136 +136,173 @@ const parseDateFromInput = (value: string) => {
 
 // Computed properties for date inputs
 const startDateInput = computed({
-  get: () => formatDateForInput(startDate.value),
+  get: () => values.startDate ? formatDateForInput(values.startDate) : '',
   set: (value: string) => {
-    startDate.value = parseDateFromInput(value)
-    // Update end date if it's before start date
-    if (endDate.value < startDate.value) {
-      endDate.value = new Date(startDate.value.getTime() + 3600000)
-    }
+    const newStartDate = parseDateFromInput(value)
+    setValues({
+      ...values,
+      startDate: newStartDate,
+      // Update end date if it's before start date
+      endDate: values.endDate && values.endDate < newStartDate 
+        ? new Date(newStartDate.getTime() + 3600000) 
+        : values.endDate
+    })
   }
 })
 
 const endDateInput = computed({
-  get: () => formatDateForInput(endDate.value),
+  get: () => values.endDate ? formatDateForInput(values.endDate) : '',
   set: (value: string) => {
-    endDate.value = parseDateFromInput(value)
+    setValues({
+      ...values,
+      endDate: parseDateFromInput(value)
+    })
   }
 })
 
-// Validation
-const isValid = computed(() => {
-  return title.value.trim() && startDate.value && endDate.value && endDate.value > startDate.value
-})
+// Handle cancel
+const handleCancel = () => {
+  resetForm()
+  emit('cancel')
+}
 </script>
 
 <template>
-  <form @submit.prevent="handleSubmit" class="space-y-4">
-    <div class="space-y-2">
-      <Label for="title">Title</Label>
-      <Input
-        id="title"
-        :value="title"
-        @input="(e: Event) => title = (e.target as HTMLInputElement).value"
-        placeholder="Enter event title"
-        required
-      />
-    </div>
+  <form @submit="onSubmit" class="space-y-4">
+    <FormField v-slot="{ componentField }" name="title">
+      <FormItem>
+        <FormLabel>Title</FormLabel>
+        <FormControl>
+          <Input
+            placeholder="Enter event title"
+            v-bind="componentField"
+          />
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    </FormField>
 
-    <div class="space-y-2">
-      <Label for="description">Description</Label>
-      <Textarea
-        id="description"
-        :value="description"
-        @input="(e: Event) => description = (e.target as HTMLTextAreaElement).value"
-        placeholder="Enter event description"
-      />
-    </div>
+    <FormField v-slot="{ componentField }" name="description">
+      <FormItem>
+        <FormLabel>Description</FormLabel>
+        <FormControl>
+          <Textarea
+            placeholder="Enter event description"
+            v-bind="componentField"
+          />
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    </FormField>
 
     <div class="grid grid-cols-2 gap-4">
-      <div class="space-y-2">
-        <Label for="startDate">Start Date</Label>
-        <Input
-          id="startDate"
-          type="datetime-local"
-          :value="startDateInput"
-          @input="(e: Event) => startDateInput = (e.target as HTMLInputElement).value"
-          required
-        />
-      </div>
+      <FormField name="startDate">
+        <FormItem>
+          <FormLabel>Start Date</FormLabel>
+          <FormControl>
+            <Input
+              type="datetime-local"
+              :value="startDateInput"
+              @input="(e: Event) => startDateInput = (e.target as HTMLInputElement).value"
+            />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
 
-      <div class="space-y-2">
-        <Label for="endDate">End Date</Label>
-        <Input
-          id="endDate"
-          type="datetime-local"
-          :value="endDateInput"
-          @input="(e: Event) => endDateInput = (e.target as HTMLInputElement).value"
-          required
-        />
-      </div>
+      <FormField name="endDate">
+        <FormItem>
+          <FormLabel>End Date</FormLabel>
+          <FormControl>
+            <Input
+              type="datetime-local"
+              :value="endDateInput"
+              @input="(e: Event) => endDateInput = (e.target as HTMLInputElement).value"
+            />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
     </div>
 
     <div class="grid grid-cols-3 gap-4">
-      <div class="space-y-2">
-        <Label for="status">Status</Label>
-        <Select :value="status" @update:value="(value: string) => status = value">
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Not Started">Not Started</SelectItem>
-            <SelectItem value="In Progress">In Progress</SelectItem>
-            <SelectItem value="Completed">Completed</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <FormField v-slot="{ componentField }" name="status">
+        <FormItem>
+          <FormLabel>Status</FormLabel>
+          <FormControl>
+            <Select v-bind="componentField">
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem 
+                  v-for="status in statusOptions"
+                  :key="status"
+                  :value="status"
+                >
+                  {{ status }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
 
-      <div class="space-y-2">
-        <Label for="priority">Priority</Label>
-        <Select :value="priority" @update:value="(value: string) => priority = value">
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Low">Low</SelectItem>
-            <SelectItem value="Medium">Medium</SelectItem>
-            <SelectItem value="High">High</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <FormField v-slot="{ componentField }" name="priority">
+        <FormItem>
+          <FormLabel>Priority</FormLabel>
+          <FormControl>
+            <Select v-bind="componentField">
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem 
+                  v-for="priority in priorityOptions"
+                  :key="priority"
+                  :value="priority"
+                >
+                  {{ priority }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
 
-      <div class="space-y-2">
-        <Label for="category">Category</Label>
-        <Select :value="category" @update:value="(value: string) => category = value">
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Meeting">Meeting</SelectItem>
-            <SelectItem value="Task">Task</SelectItem>
-            <SelectItem value="Event">Event</SelectItem>
-            <SelectItem value="Reminder">Reminder</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <FormField v-slot="{ componentField }" name="category">
+        <FormItem>
+          <FormLabel>Category</FormLabel>
+          <FormControl>
+            <Select v-bind="componentField">
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem 
+                  v-for="category in categoryOptions"
+                  :key="category"
+                  :value="category"
+                >
+                  {{ category }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
     </div>
 
     <div class="flex justify-end gap-2">
-      <Button type="button" variant="outline" @click="emit('cancel')">
+      <Button type="button" variant="outline" @click="handleCancel">
         Cancel
       </Button>
-      <Button type="submit" :disabled="!isFormValid">
+      <Button type="submit">
         {{ props.event ? 'Update' : 'Create' }}
       </Button>
     </div>
   </form>
-</template> 
-
-
-
-
-
-
-
-
+</template>

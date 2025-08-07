@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick, onBeforeUnmount, watch } from 'vue'
+import { toTypedSchema } from "@vee-validate/zod"
+import { useForm } from "vee-validate"
+import * as z from "zod"
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useSubNotaDialog } from '@/features/editor/composables/useSubNotaDialog'
 import { toast } from 'vue-sonner'
@@ -7,29 +10,38 @@ import { logger } from '@/services/logger'
 import { CheckIcon, XIcon, LoaderIcon, FileTextIcon, FolderIcon } from 'lucide-vue-next'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import {
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { db } from '@/db'
 
 const { state, closeSubNotaDialog, handleSuccess } = useSubNotaDialog()
 
 const notaStore = useNotaStore()
-const title = ref('')
 const isLoading = ref(false)
-const inputRef = ref<HTMLInputElement | null>(null)
-const errorMessage = ref('')
 const parentName = ref('')
-const charCount = ref(0)
-const maxChars = 50
 const showParentNote = ref(false)
 const isSubmitted = ref(false)
 
-// Character count tracking
-watch(title, (newValue) => {
-  charCount.value = newValue.length
-  if (charCount.value > maxChars) {
-    title.value = title.value.slice(0, maxChars)
-    charCount.value = maxChars
+// Form schema
+const formSchema = toTypedSchema(z.object({
+  title: z.string()
+    .min(1, "Title is required")
+    .max(50, "Title must be 50 characters or less")
+    .refine((val) => val.trim().length > 0, "Title cannot be empty")
+}))
+
+// Form setup
+const { handleSubmit, resetForm, setValues } = useForm({
+  validationSchema: formSchema,
+  initialValues: {
+    title: ''
   }
 })
 
@@ -48,20 +60,13 @@ const fetchParentTitle = async () => {
   }
 }
 
-const isValid = computed(() => {
-  return title.value.trim().length > 0 && title.value.length <= maxChars
-})
-
 const handleClose = () => {
   closeSubNotaDialog()
+  resetForm()
 }
 
 onMounted(async () => {
   await nextTick()
-  if (inputRef.value) {
-    inputRef.value.focus()
-  }
-  
   // Fetch parent nota info
   fetchParentTitle()
 })
@@ -78,11 +83,10 @@ const handleKeyDown = (event: KeyboardEvent) => {
   }
 }
 
-const createSubNota = async () => {
+const onSubmit = handleSubmit(async (values) => {
   // Prevent multiple submissions
-  if (!isValid.value || isLoading.value || isSubmitted.value) return
+  if (isLoading.value || isSubmitted.value) return
 
-  errorMessage.value = ''
   isLoading.value = true
   isSubmitted.value = true
 
@@ -91,7 +95,7 @@ const createSubNota = async () => {
   const parentId = state.value.parentId && state.value.parentId.trim() !== '' ? state.value.parentId : null
   
   try {
-    const newNota = await notaStore.createItem(title.value.trim(), parentId)
+    const newNota = await notaStore.createItem(values.title.trim(), parentId)
     
     // Verify in database that parentId was set correctly
     setTimeout(async () => {
@@ -111,7 +115,7 @@ const createSubNota = async () => {
     
     // Show success message with better description
     const parentContext = parentName.value ? ` under "${parentName.value}"` : ''
-    toast(`"${title.value}" created successfully${parentContext}`)
+    toast(`"${values.title}" created successfully${parentContext}`)
     
     // Add a visual highlight to the created link
     setTimeout(() => {
@@ -125,14 +129,14 @@ const createSubNota = async () => {
       }
     }, 100)
     
-    handleSuccess(newNota.id, title.value)
+    handleSuccess(newNota.id, values.title)
   } catch (error) {
     logger.error('Failed to create nota:', error)
-    errorMessage.value = 'Failed to create sub nota. Please try again.'
+    toast('Failed to create sub nota. Please try again.')
     isSubmitted.value = false
     isLoading.value = false
   } 
-}
+})
 
 const cancel = () => {
   // Prevent multiple cancellations
@@ -163,38 +167,26 @@ const cancel = () => {
           <span>Creating under: <strong>{{ parentName }}</strong></span>
         </div>
         
-        <form @submit.prevent="isValid && !isLoading && createSubNota()" class="space-y-4">
-          <div class="space-y-2">
-            <div class="flex justify-between items-center">
-              <Label for="nota-title">Title</Label>
-              <span class="text-xs text-muted-foreground" :class="{ 'text-destructive': charCount >= maxChars }">
-                {{ charCount }}/{{ maxChars }}
-              </span>
-            </div>
-            
-            <Input
-              id="nota-title"
-              ref="inputRef"
-              v-model="title"
-              type="text"
-              placeholder="Enter title for your new nota"
-              :class="{ 'border-destructive': errorMessage }"
-              :disabled="isLoading"
-              @keydown.esc.prevent="cancel()"
-              maxlength="50"
-              autocomplete="off"
-              required
-            />
-            
-            <p v-if="errorMessage" class="text-sm text-destructive flex items-center">
-              <XIcon class="w-3.5 h-3.5 mr-1" />
-              {{ errorMessage }}
-            </p>
-            
-            <p v-else class="text-xs text-muted-foreground">
-              Press Enter to create, Esc to cancel
-            </p>
-          </div>
+        <form @submit="onSubmit" class="space-y-4">
+          <FormField v-slot="{ componentField }" name="title">
+            <FormItem>
+              <FormLabel>Title</FormLabel>
+              <FormControl>
+                <Input
+                  placeholder="Enter title for your new nota"
+                  :disabled="isLoading"
+                  @keydown.esc.prevent="cancel()"
+                  autocomplete="off"
+                  autofocus
+                  v-bind="componentField"
+                />
+              </FormControl>
+              <FormDescription>
+                Press Enter to create, Esc to cancel
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          </FormField>
         </form>
       </div>
 
@@ -203,13 +195,15 @@ const cancel = () => {
           variant="outline" 
           @click="cancel"
           :disabled="isLoading"
+          type="button"
         >
           <XIcon class="w-4 h-4 mr-2" />
           Cancel
         </Button>
         <Button 
-          @click="createSubNota"
-          :disabled="!isValid || isLoading"
+          @click="onSubmit"
+          :disabled="isLoading"
+          type="submit"
         >
           <LoaderIcon v-if="isLoading" class="w-4 h-4 mr-2 animate-spin" />
           <CheckIcon v-else class="w-4 h-4 mr-2" />

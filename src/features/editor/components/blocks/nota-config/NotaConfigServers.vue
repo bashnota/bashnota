@@ -1,11 +1,22 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { toTypedSchema } from "@vee-validate/zod"
+import { useForm } from "vee-validate"
+import * as z from "zod"
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
 import { JupyterService } from '@/features/jupyter/services/jupyterService'
 import type { JupyterServer, KernelConfig } from '@/features/jupyter/types/jupyter'
 import { Server, Plus, Link } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
+import {
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import ServerListItem from './ServerListItem.vue'
@@ -24,22 +35,39 @@ const store = useNotaStore()
 const jupyterStore = useJupyterStore()
 const jupyterService = new JupyterService()
 
-// Form states
-const serverForm = ref<{
-  ip: string
-  port: string
-  token: string
-  url: string
-}>({
-  ip: '',
-  port: '',
-  token: '',
-  url: '',
-})
-
 const isTestingConnection = ref(false)
 const testResults = ref<Record<string, { success: boolean; message: string }>>({})
 const showServerForm = ref(false)
+
+// Form schema
+const serverFormSchema = toTypedSchema(z.object({
+  ip: z.string()
+    .min(1, "IP address is required")
+    .refine((val) => {
+      // Basic IP validation or hostname
+      return val.includes('.') || val === 'localhost'
+    }, "Please enter a valid IP address or hostname"),
+  port: z.string()
+    .min(1, "Port is required")
+    .regex(/^\d+$/, "Port must be a number")
+    .refine((val) => {
+      const port = parseInt(val)
+      return port > 0 && port <= 65535
+    }, "Port must be between 1 and 65535"),
+  token: z.string().optional(),
+  url: z.string().optional()
+}))
+
+// Form setup
+const { handleSubmit, resetForm, setValues, values } = useForm({
+  validationSchema: serverFormSchema,
+  initialValues: {
+    ip: '',
+    port: '',
+    token: '',
+    url: ''
+  }
+})
 
 // Test server connection
 const testConnection = async (server: JupyterServer) => {
@@ -74,17 +102,11 @@ const refreshKernels = async (server: JupyterServer) => {
 }
 
 // Add new server
-const addServer = async () => {
-  // Validate form values
-  if (!serverForm.value.ip || !serverForm.value.port) {
-    toast('Please fill in both IP and Port fields')
-    return
-  }
-
+const onSubmitServer = handleSubmit(async (formValues) => {
   const server: JupyterServer = {
-    ip: serverForm.value.ip.trim(),
-    port: serverForm.value.port.trim(),
-    token: serverForm.value.token.trim(),
+    ip: formValues.ip.trim(),
+    port: formValues.port.trim(),
+    token: formValues.token?.trim() || '',
   }
 
   // Check if server with same IP and port already exists
@@ -107,7 +129,7 @@ const addServer = async () => {
   if (testResult?.success) {
     jupyterStore.addServer(server)
     // Reset form and hide it
-    serverForm.value = { ip: '', port: '', token: '', url: '' }
+    resetForm()
     showServerForm.value = false
     toast('Server added successfully')
   } else {
@@ -116,7 +138,7 @@ const addServer = async () => {
     toast(`Failed to add server: ${errorMessage}`)
     // Keep the form open so user can fix the issues
   }
-}
+})
 
 // Remove server
 const removeServer = async (serverToRemove: JupyterServer) => {
@@ -127,16 +149,19 @@ const removeServer = async (serverToRemove: JupyterServer) => {
 
 // Parse Jupyter URL
 const parseJupyterUrl = () => {
-  if (!serverForm.value.url) {
+  if (!values.url) {
     toast('Please enter a Jupyter URL')
     return
   }
 
-  const parsedServer = jupyterService.parseJupyterUrl(serverForm.value.url)
+  const parsedServer = jupyterService.parseJupyterUrl(values.url)
   if (parsedServer) {
-    serverForm.value.ip = parsedServer.ip
-    serverForm.value.port = parsedServer.port
-    serverForm.value.token = parsedServer.token
+    setValues({
+      ...values,
+      ip: parsedServer.ip,
+      port: parsedServer.port,
+      token: parsedServer.token
+    })
     toast('URL parsed successfully')
   } else {
     toast('Failed to parse Jupyter URL')
@@ -165,76 +190,87 @@ const parseJupyterUrl = () => {
     <CardContent>
       <!-- New Server Form -->
       <div v-if="showServerForm" class="mb-6 border rounded-lg p-4 bg-muted/50">
-        <form @submit.prevent="addServer" class="space-y-4">
+        <form @submit="onSubmitServer" class="space-y-4">
           <!-- URL Input -->
-          <div class="space-y-2">
-            <label class="text-sm font-medium">Jupyter URL (Optional)</label>
-            <div class="flex gap-2">
-              <Input
-                :value="serverForm.url"
-                @input="(e: Event) => serverForm.url = (e.target as HTMLInputElement).value"
-                type="text"
-                placeholder="https://jupyter-server.example.com:8888/?token=abc123"
-                class="flex-1"
-              />
-              <Button 
-                type="button" 
-                variant="outline" 
-                @click="parseJupyterUrl"
-                class="flex items-center gap-2"
-              >
-                <Link class="w-4 h-4" />
-                Parse URL
-              </Button>
-            </div>
-            <p class="text-xs text-muted-foreground">
-              Paste a Jupyter URL (including Kaggle URLs) to automatically fill the fields below
-            </p>
-          </div>
+          <FormField v-slot="{ componentField }" name="url">
+            <FormItem>
+              <FormLabel>Jupyter URL (Optional)</FormLabel>
+              <div class="flex gap-2">
+                <FormControl>
+                  <Input
+                    placeholder="https://jupyter-server.example.com:8888/?token=abc123"
+                    class="flex-1"
+                    v-bind="componentField"
+                  />
+                </FormControl>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  @click="parseJupyterUrl"
+                  class="flex items-center gap-2"
+                >
+                  <Link class="w-4 h-4" />
+                  Parse URL
+                </Button>
+              </div>
+              <FormDescription>
+                Paste a Jupyter URL (including Kaggle URLs) to automatically fill the fields below
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          </FormField>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="space-y-2">
-              <label class="text-sm font-medium">Server IP</label>
-              <Input
-                :value="serverForm.ip"
-                @input="(e: Event) => serverForm.ip = (e.target as HTMLInputElement).value"
-                type="text"
-                placeholder="localhost"
-                required
-              />
-            </div>
-            <div class="space-y-2">
-              <label class="text-sm font-medium">Port</label>
-              <Input
-                :value="serverForm.port"
-                @input="(e: Event) => serverForm.port = (e.target as HTMLInputElement).value"
-                type="text"
-                inputmode="numeric"
-                pattern="[0-9]*"
-                placeholder="8888"
-                required
-              />
-            </div>
+            <FormField v-slot="{ componentField }" name="ip">
+              <FormItem>
+                <FormLabel>Server IP</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="localhost"
+                    v-bind="componentField"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            </FormField>
+
+            <FormField v-slot="{ componentField }" name="port">
+              <FormItem>
+                <FormLabel>Port</FormLabel>
+                <FormControl>
+                  <Input
+                    inputmode="numeric"
+                    pattern="[0-9]*"
+                    placeholder="8888"
+                    v-bind="componentField"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            </FormField>
           </div>
-          <div class="space-y-2">
-            <label class="text-sm font-medium">Token</label>
-            <Input
-              :value="serverForm.token"
-              @input="(e: Event) => serverForm.token = (e.target as HTMLInputElement).value"
-              type="password"
-              placeholder="Jupyter token"
-            />
-          </div>
+
+          <FormField v-slot="{ componentField }" name="token">
+            <FormItem>
+              <FormLabel>Token</FormLabel>
+              <FormControl>
+                <Input
+                  type="password"
+                  placeholder="Jupyter token (optional)"
+                  v-bind="componentField"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+
           <div class="flex items-center gap-2 justify-end">
             <Button
               type="button"
               variant="ghost"
               @click="() => {
                 showServerForm = false
-                serverForm.ip = ''
-                serverForm.port = ''
-                serverForm.token = ''
-                serverForm.url = ''
+                resetForm()
               }"
               :disabled="isTestingConnection"
             >

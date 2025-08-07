@@ -28,8 +28,8 @@
               }">
                 {{ capitalizeType }}{{ number ? ' ' + number : '' }}
               </Badge>
-              <div v-if="title" class="text-sm font-medium text-muted-foreground">
-                {{ title }}
+              <div v-if="currentTitle" class="text-sm font-medium text-muted-foreground">
+                {{ currentTitle }}
               </div>
             </div>
           </div>
@@ -90,12 +90,12 @@
           <!-- Theorem content with LaTeX rendering -->
           <div class="theorem-content mb-4 text-sm leading-relaxed">
             <MixedContentDisplay 
-              :content="content" 
+              :content="currentContent" 
             />
           </div>
           
           <!-- Collapsible proof section with better styling -->
-          <Collapsible v-if="proof" v-model:open="isProofOpen" @click.stop>
+          <Collapsible v-if="currentProof" v-model:open="isProofOpen" @click.stop>
             <CollapsibleTrigger asChild>
               <Button 
                 variant="ghost" 
@@ -119,7 +119,7 @@
               }">
                 <div class="theorem-proof text-sm leading-relaxed text-muted-foreground">
                   <MixedContentDisplay 
-                    :content="proof" 
+                    :content="currentProof" 
                   />
                 </div>
                 <div class="flex justify-end mt-3">
@@ -138,53 +138,66 @@
         
         <!-- Edit mode with improved UX -->
         <div v-else class="space-y-6" @click.stop>
-          <form ref="formRef" @submit.prevent="saveChanges" class="space-y-6" @click.stop>
+          <form ref="formRef" @submit="onSubmit" class="space-y-6" @click.stop>
             <!-- Header section with type and title -->
             <div class="p-3 bg-muted/30 rounded-lg border" @click.stop>
               <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
                 <div class="lg:col-span-2">
-                  <Label class="text-sm font-medium mb-2 block">Type</Label>
-                  <ToggleGroup 
-                    type="single" 
-                    :value="type" 
-                    @update:value="updateType"
-                    class="justify-start flex-wrap gap-1"
-                  >
-                    <ToggleGroupItem value="theorem" aria-label="Theorem" class="flex items-center space-x-1.5 h-8 px-3 text-sm">
-                      <div class="w-2.5 h-2.5 rounded-full bg-primary"></div>
-                      <span>Theorem</span>
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="lemma" aria-label="Lemma" class="flex items-center space-x-1.5 h-8 px-3 text-sm">
-                      <div class="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
-                      <span>Lemma</span>
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="proposition" aria-label="Proposition" class="flex items-center space-x-1.5 h-8 px-3 text-sm">
-                      <div class="w-2.5 h-2.5 rounded-full bg-amber-500"></div>
-                      <span>Proposition</span>
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="corollary" aria-label="Corollary" class="flex items-center space-x-1.5 h-8 px-3 text-sm">
-                      <div class="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
-                      <span>Corollary</span>
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="definition" aria-label="Definition" class="flex items-center space-x-1.5 h-8 px-3 text-sm">
-                      <div class="w-2.5 h-2.5 rounded-full bg-violet-500"></div>
-                      <span>Definition</span>
-                    </ToggleGroupItem>
-                  </ToggleGroup>
+                  <FormField v-slot="{ componentField }" name="type">
+                    <FormItem>
+                      <FormLabel>Type</FormLabel>
+                      <FormControl>
+                        <ToggleGroup 
+                          type="single" 
+                          @update:value="updateType"
+                          class="justify-start flex-wrap gap-1"
+                          v-bind="componentField"
+                        >
+                          <ToggleGroupItem value="theorem" aria-label="Theorem" class="flex items-center space-x-1.5 h-8 px-3 text-sm">
+                            <div class="w-2.5 h-2.5 rounded-full bg-primary"></div>
+                            <span>Theorem</span>
+                          </ToggleGroupItem>
+                          <ToggleGroupItem value="lemma" aria-label="Lemma" class="flex items-center space-x-1.5 h-8 px-3 text-sm">
+                            <div class="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
+                            <span>Lemma</span>
+                          </ToggleGroupItem>
+                          <ToggleGroupItem value="proposition" aria-label="Proposition" class="flex items-center space-x-1.5 h-8 px-3 text-sm">
+                            <div class="w-2.5 h-2.5 rounded-full bg-amber-500"></div>
+                            <span>Proposition</span>
+                          </ToggleGroupItem>
+                          <ToggleGroupItem value="corollary" aria-label="Corollary" class="flex items-center space-x-1.5 h-8 px-3 text-sm">
+                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
+                            <span>Corollary</span>
+                          </ToggleGroupItem>
+                          <ToggleGroupItem value="definition" aria-label="Definition" class="flex items-center space-x-1.5 h-8 px-3 text-sm">
+                            <div class="w-2.5 h-2.5 rounded-full bg-violet-500"></div>
+                            <span>Definition</span>
+                          </ToggleGroupItem>
+                        </ToggleGroup>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  </FormField>
                 </div>
                 
                 <div>
-                  <Label for="theorem-title" class="text-sm font-medium mb-2 block">
-                    Title 
-                    <span class="text-xs text-muted-foreground font-normal">(optional)</span>
-                  </Label>
-                  <Input
-                    id="theorem-title"
-                    v-model="title"
-                    placeholder="e.g., Fundamental Theorem"
-                    class="w-full h-8"
-                    @click.stop
-                  />
+                  <FormField v-slot="{ componentField }" name="title">
+                    <FormItem>
+                      <FormLabel>
+                        Title 
+                        <span class="text-xs text-muted-foreground font-normal">(optional)</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g., Fundamental Theorem"
+                          class="w-full h-8"
+                          @click.stop
+                          v-bind="componentField"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  </FormField>
                 </div>
               </div>
             </div>
@@ -213,15 +226,22 @@
                       <span>Ctrl+Enter to save</span>
                     </div>
                   </div>
-                  <Textarea
-                    id="theorem-content"
-                    v-model="content"
-                    placeholder="Enter theorem content... e.g., Let $f: \mathbb{R} \to \mathbb{R}$ be a continuous function..."
-                    rows="8"
-                    class="font-mono text-sm resize-y min-h-[200px] focus:ring-2"
-                    ref="contentTextareaRef"
-                    @click.stop
-                  />
+                  <FormField v-slot="{ componentField }" name="content">
+                    <FormItem>
+                      <FormControl>
+                        <Textarea
+                          id="theorem-content"
+                          placeholder="Enter theorem content... e.g., Let $f: \mathbb{R} \to \mathbb{R}$ be a continuous function..."
+                          rows="8"
+                          class="font-mono text-sm resize-y min-h-[200px] focus:ring-2"
+                          ref="contentTextareaRef"
+                          @click.stop
+                          v-bind="componentField"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  </FormField>
                   <p class="text-xs text-muted-foreground">
                     Use LaTeX syntax for mathematical expressions. Wrap inline math with $...$ and display math with $$...$$.
                   </p>
@@ -240,14 +260,21 @@
                       <span>LaTeX supported</span>
                     </div>
                   </div>
-                  <Textarea
-                    id="theorem-proof"
-                    v-model="proof"
-                    placeholder="Enter proof... e.g., Suppose $x \in X$. Then by definition..."
-                    rows="10"
-                    class="font-mono text-sm resize-y min-h-[250px] focus:ring-2"
-                    @click.stop
-                  />
+                  <FormField v-slot="{ componentField }" name="proof">
+                    <FormItem>
+                      <FormControl>
+                        <Textarea
+                          id="theorem-proof"
+                          placeholder="Enter proof... e.g., Suppose $x \in X$. Then by definition..."
+                          rows="10"
+                          class="font-mono text-sm resize-y min-h-[250px] focus:ring-2"
+                          @click.stop
+                          v-bind="componentField"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  </FormField>
                   <div class="bg-muted/50 p-3 rounded-md border">
                     <p class="text-xs text-muted-foreground">
                       <strong>Tip:</strong> Leave empty for definitions or axioms. A proof end symbol (■) will be automatically added for non-empty proofs.
@@ -266,7 +293,7 @@
                 <Button type="button" variant="outline" @click.stop="cancelEditing" class="w-24">
                   Cancel
                 </Button>
-                <Button type="submit" class="w-24" :disabled="!content.trim()">
+                <Button type="submit" class="w-24">
                   <Check class="h-4 w-4 mr-2" />
                   Save
                 </Button>
@@ -281,6 +308,9 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { toTypedSchema } from "@vee-validate/zod"
+import { useForm } from "vee-validate"
+import * as z from "zod"
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import type { NodeViewProps } from '@tiptap/vue-3'
 import { 
@@ -297,9 +327,16 @@ import {
 } from 'lucide-vue-next'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import {
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { 
@@ -343,31 +380,53 @@ const theoremLogger = logger.createPrefixedLogger('TheoremBlock')
 // State
 const isEditing = ref(false)
 const isProofOpen = ref(false)
-const title = ref(props.node.attrs.title || '')
-const content = ref(props.node.attrs.content || '')
-const proof = ref(props.node.attrs.proof || '')
-const type = ref(props.node.attrs.type || 'theorem')
 const number = ref(props.node.attrs.number || null)
 
 // Track active tab to properly initialize fields
 const activeTab = ref('content')
 
+// Form schema
+const theoremFormSchema = toTypedSchema(z.object({
+  title: z.string().optional(),
+  content: z.string()
+    .min(1, "Content is required")
+    .max(5000, "Content must be less than 5000 characters"),
+  proof: z.string().optional(),
+  type: z.enum(['theorem', 'lemma', 'proposition', 'corollary', 'definition'])
+}))
+
+// Form setup
+const { handleSubmit, resetForm, setValues, values } = useForm({
+  validationSchema: theoremFormSchema,
+  initialValues: {
+    title: props.node.attrs.title || '',
+    content: props.node.attrs.content || '',
+    proof: props.node.attrs.proof || '',
+    type: (props.node.attrs.type || 'theorem') as 'theorem' | 'lemma' | 'proposition' | 'corollary' | 'definition'
+  }
+})
+
 // Computed properties
 const isReadOnly = computed(() => !props.editor.isEditable)
+const currentType = computed(() => isEditing.value ? values.type : props.node.attrs.type || 'theorem')
+const currentTitle = computed(() => isEditing.value ? values.title : props.node.attrs.title || '')
+const currentContent = computed(() => isEditing.value ? values.content : props.node.attrs.content || '')
+const currentProof = computed(() => isEditing.value ? values.proof : props.node.attrs.proof || '')
+
 const capitalizeType = computed(() => {
-  return type.value.charAt(0).toUpperCase() + type.value.slice(1)
+  return currentType.value.charAt(0).toUpperCase() + currentType.value.slice(1)
 })
 
 // Type-specific computed properties for styling
-const isTheorem = computed(() => type.value === 'theorem')
-const isLemma = computed(() => type.value === 'lemma')
-const isProposition = computed(() => type.value === 'proposition')
-const isCorollary = computed(() => type.value === 'corollary')
-const isDefinition = computed(() => type.value === 'definition')
+const isTheorem = computed(() => currentType.value === 'theorem')
+const isLemma = computed(() => currentType.value === 'lemma')
+const isProposition = computed(() => currentType.value === 'proposition')
+const isCorollary = computed(() => currentType.value === 'corollary')
+const isDefinition = computed(() => currentType.value === 'definition')
 
 // Automatically open proof when editing
 watch(isEditing, (newValue) => {
-  if (newValue && proof.value) {
+  if (newValue && currentProof.value) {
     isProofOpen.value = true
   }
 })
@@ -376,7 +435,7 @@ watch(isEditing, (newValue) => {
 const updateType = (value: string | undefined) => {
   // ToggleGroup can emit undefined when deselecting, so we need to handle it
   if (value) {
-    type.value = value
+    setValues({ ...values, type: value as any })
   }
 }
 
@@ -384,11 +443,13 @@ const updateType = (value: string | undefined) => {
 const startEditing = () => {
   if (isReadOnly.value) return
   
-  // Ensure values are correctly set from node attributes before editing
-  title.value = props.node.attrs.title || ''
-  content.value = props.node.attrs.content || ''
-  proof.value = props.node.attrs.proof || ''
-  type.value = props.node.attrs.type || 'theorem'
+  // Set form values from node attributes before editing
+  setValues({
+    title: props.node.attrs.title || '',
+    content: props.node.attrs.content || '',
+    proof: props.node.attrs.proof || '',
+    type: props.node.attrs.type || 'theorem'
+  })
   
   isEditing.value = true
   focusContentTextarea()
@@ -396,44 +457,21 @@ const startEditing = () => {
 
 const cancelEditing = () => {
   isEditing.value = false
-  // Reset to the original values
-  title.value = props.node.attrs.title || ''
-  content.value = props.node.attrs.content || ''
-  proof.value = props.node.attrs.proof || ''
-  type.value = props.node.attrs.type || 'theorem'
+  resetForm()
 }
 
-const saveChanges = () => {
+const onSubmit = handleSubmit((formValues) => {
   try {
-    theoremLogger.debug('Starting save process with current values:', {
-      title: title.value,
-      content: content.value,
-      proof: proof.value,
-      type: type.value
-    })
-    
-    if (!content.value.trim()) {
-      theoremLogger.warn('Empty content detected, showing error toast')
-      toast('Please add content to your theorem before saving.', { description: 'Content Required' })
-      return
-    }
+    theoremLogger.debug('Starting save process with form values:', formValues)
     
     isEditing.value = false
     
-    // Log the values being sent to updateAttributes
-    theoremLogger.debug('Calling updateAttributes with:', {
-      title: title.value,
-      content: content.value,
-      proof: proof.value,
-      type: type.value
-    })
-    
     // Update the node attributes
     props.updateAttributes({
-      title: title.value,
-      content: content.value,
-      proof: proof.value,
-      type: type.value,
+      title: formValues.title || '',
+      content: formValues.content,
+      proof: formValues.proof || '',
+      type: formValues.type,
     })
     
     // Verify that the update was applied
@@ -443,9 +481,9 @@ const saveChanges = () => {
     savedSuccessfully()
   } catch (err) {
     theoremLogger.error('Error saving theorem:', err)
-    toast('Error saving theorem', { description: 'Save Error' })
+    toast('Error saving theorem')
   }
-}
+})
 
 // Vue lifecycle hooks
 onMounted(() => {
@@ -458,11 +496,15 @@ watch(
   (newAttrs) => {
     theoremLogger.debug('Node attrs changed:', newAttrs)
     
-    // Update the local state with the new values from node attributes
-    title.value = newAttrs.title || ''
-    content.value = newAttrs.content || ''
-    proof.value = newAttrs.proof || ''
-    type.value = newAttrs.type || 'theorem'
+    // Update form values when not editing
+    if (!isEditing.value) {
+      setValues({
+        title: newAttrs.title || '',
+        content: newAttrs.content || '',
+        proof: newAttrs.proof || '',
+        type: newAttrs.type || 'theorem'
+      })
+    }
     number.value = newAttrs.number || null
   },
   { deep: true, immediate: true } // Immediate ensures it runs on component creation
@@ -472,7 +514,7 @@ watch(
 watch(isReadOnly, (newValue) => {
   // Force stop editing when switched to read-only
   if (newValue && isEditing.value) {
-    saveChanges()
+    onSubmit()
   }
 })
 
@@ -503,7 +545,7 @@ const handleKeyDown = (event: KeyboardEvent) => {
   // Save on Ctrl+Enter or Cmd+Enter
   if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
     event.preventDefault()
-    saveChanges()
+    onSubmit()
     return
   }
   
@@ -527,10 +569,10 @@ const duplicateTheorem = () => {
     const newTheorem = {
       type: 'theorem',
       attrs: {
-        title: title.value,
-        content: content.value,
-        proof: proof.value,
-        type: type.value,
+        title: currentTitle.value,
+        content: currentContent.value,
+        proof: currentProof.value,
+        type: currentType.value,
         number: null // Let the system assign a new number
       }
     }
@@ -542,20 +584,20 @@ const duplicateTheorem = () => {
     toast('Theorem duplicated successfully')
   } catch (err) {
     theoremLogger.error('Error duplicating theorem:', err)
-    toast('Error duplicating theorem', { description: 'Duplication Error' })
+    toast('Error duplicating theorem')
   }
 }
 
 // Delete theorem function
 const deleteTheorem = () => {
   try {
-    if (confirm(`Are you sure you want to delete this ${type.value}?`)) {
+    if (confirm(`Are you sure you want to delete this ${currentType.value}?`)) {
       props.deleteNode()
       toast(`${capitalizeType.value} deleted`)
     }
   } catch (err) {
     theoremLogger.error('Error deleting theorem:', err)
-    toast('Error deleting theorem', { description: 'Deletion Error' })
+    toast('Error deleting theorem')
   }
 }
 </script>

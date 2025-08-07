@@ -6,6 +6,7 @@ import * as z from "zod"
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
   FormControl,
@@ -63,7 +64,7 @@ const formSchema = toTypedSchema(z.object({
   shortcut: z.string().optional()
 }).refine((data) => {
   // Check for duplicate names
-  const existingActions = aiActionsStore.enabledCustomActions
+  const existingActions = aiActionsStore.enabledCustomActions || []
   const duplicateName = existingActions.some(action => 
     action.name === data.name && 
     action.id !== props.editingAction?.id
