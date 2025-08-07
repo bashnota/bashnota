@@ -59,9 +59,9 @@ const settingsCategories = ref([
     expanded: true,
     subcategories: [
       { id: 'unified-editor', title: 'All Settings', component: 'UnifiedEditorSettings', badge: 'Recommended' as const },
-      { id: 'text-editing', title: 'Text Editing (Connected)', component: 'TextEditingSettings', badge: undefined },
-      { id: 'code-editing', title: 'Code Editing (Legacy)', component: 'CodeEditingSettings', badge: 'Legacy' as const },
-      { id: 'formatting', title: 'Formatting (Legacy)', component: 'FormattingSettings', badge: 'Legacy' as const }
+      // { id: 'text-editing', title: 'Text Editing', component: 'TextEditingSettings', badge: undefined },
+      // { id: 'code-editing', title: 'Code Editing (Legacy)', component: 'CodeEditingSettings', badge: 'Legacy' as const },
+      // { id: 'formatting', title: 'Formatting (Legacy)', component: 'FormattingSettings', badge: 'Legacy' as const }
     ]
   },
   {
@@ -71,8 +71,8 @@ const settingsCategories = ref([
     expanded: false,
     subcategories: [
       { id: 'unified-appearance', title: 'All Settings (New)', component: 'UnifiedAppearanceSettings', badge: 'Recommended' as const },
-      { id: 'theme', title: 'Theme (Legacy)', component: 'ThemeSettings', badge: 'Legacy' as const },
-      { id: 'interface', title: 'Interface (Legacy)', component: 'InterfaceSettings', badge: 'Legacy' as const }
+      // { id: 'theme', title: 'Theme (Legacy)', component: 'ThemeSettings', badge: 'Legacy' as const },
+      // { id: 'interface', title: 'Interface (Legacy)', component: 'InterfaceSettings', badge: 'Legacy' as const }
     ]
   },
   {
@@ -84,8 +84,8 @@ const settingsCategories = ref([
       { id: 'unified-ai', title: 'Provider Settings', component: 'UnifiedAISettings', badge: 'Recommended' as const },
       { id: 'ai-actions', title: 'AI Actions', component: 'AIActionsSettings', badge: undefined },
       { id: 'ai-code-actions', title: 'Code Actions', component: 'AICodeActionsSettings', badge: undefined },
-      { id: 'ai-providers', title: 'Providers (Legacy)', component: 'AIProvidersSettings', badge: 'Legacy' as const },
-      { id: 'ai-generation', title: 'Generation (Legacy)', component: 'AIGenerationSettings', badge: 'Legacy' as const }
+      // { id: 'ai-providers', title: 'Providers (Legacy)', component: 'AIProvidersSettings', badge: 'Legacy' as const },
+      // { id: 'ai-generation', title: 'Generation (Legacy)', component: 'AIGenerationSettings', badge: 'Legacy' as const }
     ]
   },
   {

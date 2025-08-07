@@ -183,205 +183,205 @@ onMounted(() => {
           :icon="Type"
         >
           <SettingGroup title="Typography" description="Text appearance and readability">
-            <SettingSlider
-              label="Font Size"
+        <SettingSlider
+          label="Font Size"
               :description="`Current size: ${settings.fontSize[0]}px`"
               help="Adjust the font size for better readability"
-              :model-value="settings.fontSize"
+          :model-value="settings.fontSize"
               :min="12"
-              :max="24"
+          :max="24"
               @update:model-value="(value) => { updateSetting('fontSize', value); handleSettingChange() }"
-            />
-
-            <SettingSlider
-              label="Line Height"
+        />
+        
+        <SettingSlider
+          label="Line Height"
               :description="`Current height: ${settings.lineHeight[0]}`"
               help="Control spacing between lines of text"
-              :model-value="settings.lineHeight"
+          :model-value="settings.lineHeight"
               :min="1.2"
               :max="2.5"
-              :step="0.1"
+          :step="0.1"
               @update:model-value="(value) => { updateSetting('lineHeight', value); handleSettingChange() }"
-            />
-          </SettingGroup>
-
+        />
+      </SettingGroup>
+      
           <SettingGroup title="Editing Behavior" description="How the editor behaves during editing">
-            <SettingSwitch
-              label="Auto Save"
+        <SettingSwitch
+          label="Auto Save"
               description="Automatically save changes as you type"
               help="Reduces risk of losing work"
-              :model-value="settings.autoSave"
+          :model-value="settings.autoSave"
               @update:model-value="(value) => { updateSetting('autoSave', value); handleSettingChange() }"
-            />
-
-            <SettingSwitch
-              label="Spell Check"
+        />
+        
+        <SettingSwitch
+          label="Spell Check"
               description="Enable spell checking while typing"
               help="Helps catch spelling errors in real-time"
-              :model-value="settings.spellCheck"
+          :model-value="settings.spellCheck"
               @update:model-value="(value) => { updateSetting('spellCheck', value); handleSettingChange() }"
-            />
-
-            <SettingSwitch
-              label="Word Wrap"
-              description="Wrap long lines to fit the editor width"
+        />
+        
+        <SettingSwitch
+          label="Word Wrap"
+          description="Wrap long lines to fit the editor width"
               help="Prevents horizontal scrolling"
-              :model-value="settings.wordWrap"
+          :model-value="settings.wordWrap"
               @update:model-value="(value) => { updateSetting('wordWrap', value); handleSettingChange() }"
-            />
-          </SettingGroup>
-        </SettingSection>
+        />
+      </SettingGroup>
+    </SettingSection>
       </TabsContent>
 
       <!-- Code Editing Tab -->
       <TabsContent value="code-editing">
-        <SettingSection
-          title="Code Editing"
+    <SettingSection
+      title="Code Editing"
           description="Specialized settings for code editing and programming"
-          :icon="Code2"
-        >
+      :icon="Code2"
+    >
           <SettingGroup title="Code Appearance" description="Visual settings for code blocks">
-            <SettingSelect
-              label="Code Theme"
-              description="Color theme for code syntax highlighting"
+        <SettingSelect
+          label="Code Theme"
+          description="Color theme for code syntax highlighting"
               help="Different themes provide various color schemes for better code readability"
-              :model-value="settings.codeTheme"
+          :model-value="settings.codeTheme"
               :options="themeOptions"
               @update:model-value="(value) => { updateSetting('codeTheme', value); handleSettingChange() }"
-            />
-
-            <SettingSlider
-              label="Code Font Size"
+        />
+        
+        <SettingSlider
+          label="Code Font Size"
               :description="`Current size: ${settings.codeFontSize[0]}px`"
               help="Font size specifically for code blocks"
-              :model-value="settings.codeFontSize"
+          :model-value="settings.codeFontSize"
               :min="10"
-              :max="20"
+          :max="20"
               @update:model-value="(value) => { updateSetting('codeFontSize', value); handleSettingChange() }"
-            />
-
-            <SettingSlider
-              label="Code Line Height"
+        />
+        
+        <SettingSlider
+          label="Code Line Height"
               :description="`Current height: ${settings.codeLineHeight[0]}`"
               help="Line spacing for code blocks"
-              :model-value="settings.codeLineHeight"
+          :model-value="settings.codeLineHeight"
               :min="1.2"
-              :max="2.0"
-              :step="0.1"
+          :max="2.0"
+          :step="0.1"
               @update:model-value="(value) => { updateSetting('codeLineHeight', value); handleSettingChange() }"
-            />
-          </SettingGroup>
-
+        />
+      </SettingGroup>
+      
           <SettingGroup title="Code Features" description="Programming assistance and visual aids">
-            <SettingSwitch
-              label="Show Line Numbers"
-              description="Display line numbers in code blocks"
+        <SettingSwitch
+          label="Show Line Numbers"
+          description="Display line numbers in code blocks"
               help="Helps with debugging and code navigation"
-              :model-value="settings.showLineNumbers"
+          :model-value="settings.showLineNumbers"
               @update:model-value="(value) => { updateSetting('showLineNumbers', value); handleSettingChange() }"
-            />
-
-            <SettingSwitch
-              label="Highlight Active Line"
+        />
+        
+        <SettingSwitch
+          label="Highlight Active Line"
               description="Highlight the line where the cursor is located"
               help="Makes it easier to track cursor position"
-              :model-value="settings.highlightActiveLine"
+          :model-value="settings.highlightActiveLine"
               @update:model-value="(value) => { updateSetting('highlightActiveLine', value); handleSettingChange() }"
-            />
-
-            <SettingSwitch
-              label="Auto Close Brackets"
-              description="Automatically close brackets, quotes, and parentheses"
+        />
+        
+        <SettingSwitch
+          label="Auto Close Brackets"
+          description="Automatically close brackets, quotes, and parentheses"
               help="Speeds up coding and reduces syntax errors"
-              :model-value="settings.autoCloseBrackets"
+          :model-value="settings.autoCloseBrackets"
               @update:model-value="(value) => { updateSetting('autoCloseBrackets', value); handleSettingChange() }"
-            />
-
-            <SettingSwitch
-              label="Auto Indent"
-              description="Automatically indent new lines based on context"
+        />
+        
+        <SettingSwitch
+          label="Auto Indent"
+          description="Automatically indent new lines based on context"
               help="Maintains consistent code structure"
-              :model-value="settings.autoIndent"
+          :model-value="settings.autoIndent"
               @update:model-value="(value) => { updateSetting('autoIndent', value); handleSettingChange() }"
-            />
-          </SettingGroup>
-
+        />
+      </SettingGroup>
+      
           <SettingGroup title="Indentation" description="Configure how indentation works">
-            <SettingSelect
-              label="Indent Type"
-              description="Use spaces or tabs for indentation"
+        <SettingSelect
+          label="Indent Type"
+          description="Use spaces or tabs for indentation"
               help="Choose based on your project's coding standards"
-              :model-value="settings.indentType"
-              :options="indentTypeOptions"
+          :model-value="settings.indentType"
+          :options="indentTypeOptions"
               @update:model-value="(value) => { updateSetting('indentType', value); handleSettingChange() }"
-            />
-
-            <SettingSlider
-              label="Tab Size"
+        />
+        
+        <SettingSlider
+          label="Tab Size"
               :description="`Current size: ${settings.tabSize[0]} ${settings.indentType}`"
               help="Number of spaces or width of tab character"
-              :model-value="settings.tabSize"
+          :model-value="settings.tabSize"
               :min="2"
-              :max="8"
+          :max="8"
               @update:model-value="(value) => { updateSetting('tabSize', value); handleSettingChange() }"
-            />
-
-            <SettingSlider
-              label="Indent Size"
+        />
+        
+        <SettingSlider
+          label="Indent Size"
               :description="`Current size: ${settings.indentSize[0]} spaces`"
               help="Number of spaces for each indentation level"
-              :model-value="settings.indentSize"
+          :model-value="settings.indentSize"
               :min="2"
-              :max="8"
+          :max="8"
               @update:model-value="(value) => { updateSetting('indentSize', value); handleSettingChange() }"
-            />
-          </SettingGroup>
-        </SettingSection>
+        />
+      </SettingGroup>
+    </SettingSection>
       </TabsContent>
 
       <!-- Formatting Tab -->
       <TabsContent value="formatting">
-        <SettingSection
-          title="Formatting"
+    <SettingSection
+      title="Formatting"
           description="Automatic formatting and cleanup settings"
           :icon="SettingsIcon"
-        >
+    >
           <SettingGroup title="Auto Formatting" description="Automatic code and text formatting">
-            <SettingSwitch
-              label="Auto Format"
+        <SettingSwitch
+          label="Auto Format"
               description="Automatically format code while typing"
               help="Maintains consistent code style as you write"
-              :model-value="settings.autoFormat"
+          :model-value="settings.autoFormat"
               @update:model-value="(value) => { updateSetting('autoFormat', value); handleSettingChange() }"
-            />
-
-            <SettingSwitch
+        />
+        
+        <SettingSwitch
               label="Format on Save"
               description="Automatically format code when saving"
               help="Ensures consistent formatting before saving"
-              :model-value="settings.formatOnSave"
+          :model-value="settings.formatOnSave"
               @update:model-value="(value) => { updateSetting('formatOnSave', value); handleSettingChange() }"
-            />
-          </SettingGroup>
-
+        />
+      </SettingGroup>
+      
           <SettingGroup title="Cleanup" description="Automatic cleanup of whitespace and formatting">
-            <SettingSwitch
-              label="Trim Trailing Whitespace"
+        <SettingSwitch
+          label="Trim Trailing Whitespace"
               description="Remove extra spaces at the end of lines"
               help="Keeps files clean and reduces diff noise"
-              :model-value="settings.trimTrailingWhitespace"
+          :model-value="settings.trimTrailingWhitespace"
               @update:model-value="(value) => { updateSetting('trimTrailingWhitespace', value); handleSettingChange() }"
-            />
-
-            <SettingSwitch
-              label="Insert Final Newline"
-              description="Ensure files end with a newline character"
+        />
+        
+        <SettingSwitch
+          label="Insert Final Newline"
+          description="Ensure files end with a newline character"
               help="Follows POSIX standard and Git best practices"
-              :model-value="settings.insertFinalNewline"
+          :model-value="settings.insertFinalNewline"
               @update:model-value="(value) => { updateSetting('insertFinalNewline', value); handleSettingChange() }"
-            />
-          </SettingGroup>
-        </SettingSection>
+        />
+      </SettingGroup>
+    </SettingSection>
       </TabsContent>
 
       <!-- Appearance Tab -->
@@ -508,8 +508,8 @@ onMounted(() => {
           <Button variant="outline" @click="handleResetToDefaults" class="gap-2">
             <RotateCcw class="h-4 w-4" />
             Reset to Defaults
-          </Button>
-        </div>
+      </Button>
+    </div>
       </SettingGroup>
     </SettingSection>
   </div>
