@@ -8,6 +8,10 @@ import { useCodeBlockUI } from '@/features/editor/components/blocks/executable-c
 import { useCodeBlockExecutionSimplified } from '@/features/editor/components/blocks/executable-code-block/composables/useCodeBlockExecutionSimplified'
 import { useRobustExecution } from '@/features/editor/composables/useRobustExecution'
 import { useCodeExecutionStore } from '@/features/editor/stores/codeExecutionStore'
+import { useEnhancedOutputManagement } from '@/features/editor/composables/useEnhancedOutputManagement'
+
+// Get code execution store instance
+const codeExecutionStore = useCodeExecutionStore()
 
 // Components
 import CodeBlockToolbar from './components/CodeBlockToolbar.vue'
@@ -35,6 +39,7 @@ interface Props {
   isReadOnly?: boolean
   isExecuting?: boolean
   isPublished?: boolean
+  initialOutput?: string // CRITICAL: Add initial output prop
 }
 
 const props = defineProps<Props>()
@@ -95,10 +100,22 @@ const {
   isReadyToExecute
 })
 
-// Use our own server/kernel selection logic instead of the composable's
-const selectedServer = computed(() => '')
-const selectedKernel = computed(() => '')
-const selectedSession = computed(() => '')
+// Server/kernel selection - get from store or use robust execution
+const selectedServer = computed(() => {
+  const cell = codeExecutionStore.getCellById(props.id)
+  return cell?.serverConfig ? `${cell.serverConfig.ip}:${cell.serverConfig.port}` : ''
+})
+
+const selectedKernel = computed(() => {
+  const cell = codeExecutionStore.getCellById(props.id)
+  return cell?.kernelName || ''
+})
+
+const selectedSession = computed(() => {
+  const cell = codeExecutionStore.getCellById(props.id)
+  return cell?.sessionId || ''
+})
+
 const availableServers = computed(() => [])
 const availableKernels = computed(() => [])
 const availableSessions = computed(() => [])
@@ -123,9 +140,55 @@ const isMounted = ref(false)
 // Robust execution handling
 const { executeCell: robustExecuteCell, getExecutionStatus } = useRobustExecution()
 
+// Enhanced output persistence system
+const outputPersistence = useEnhancedOutputManagement({
+  cellId: props.id,
+  autoSave: true,
+  updateAttributes: (attrs) => {
+    // CRITICAL: Emit to parent wrapper for nota saving
+    console.log(`[CodeBlockWithExecution] Emitting output update for cell ${props.id}:`, attrs.output || '')
+    emit('update:output', attrs.output || '')
+  },
+  onOutputUpdate: (output) => {
+    // Additional handling when output updates
+    console.log(`[CodeBlockWithExecution] Output updated for cell ${props.id}:`, { length: output.length })
+  }
+})
+
+// Create a wrapper function for nota updates
+const updateOutputToNota = (attrs: any) => {
+  console.log(`[CodeBlockWithExecution] Direct nota update for cell ${props.id}:`, attrs.output || '')
+  emit('update:output', attrs.output || '')
+}
+
 // Focus management and initialization
 onMounted(() => {
   isMounted.value = true
+  
+  // CRITICAL: Initialize output from props if provided
+  if (props.initialOutput) {
+    console.log(`[CodeBlockWithExecution] Loading initial output for cell ${props.id}:`, props.initialOutput)
+    try {
+      // Update the store with initial output
+      const cell = codeExecutionStore.getCellById(props.id)
+      if (cell) {
+        cell.output = props.initialOutput
+        console.log(`[CodeBlockWithExecution] Initialized cell output from props`)
+      } else {
+        // Create cell if it doesn't exist
+        codeExecutionStore.addCell({
+          id: props.id,
+          code: codeValue.value,
+          kernelName: '',
+          sessionId: props.sessionId || 'default',
+          output: props.initialOutput
+        })
+        console.log(`[CodeBlockWithExecution] Created cell with initial output`)
+      }
+    } catch (error) {
+      console.error('Error initializing output:', error)
+    }
+  }
   
   // Initialize Jupyter servers and component
   try {
@@ -161,21 +224,49 @@ const safeExecuteCode = async () => {
   }
   
   try {
-    console.log('Executing code with robust configuration...')
+    console.log(`[CodeBlockWithExecution] Executing code for cell ${props.id}...`)
     
-    // Use the robust execution system
-    const success = await robustExecuteCell(props.id, codeValue.value)
-    
-    if (!success) {
-      console.error('Code execution failed')
-      return
+    // Check if we have server/kernel configuration
+    if (!selectedServer.value || !selectedKernel.value) {
+      console.log(`[CodeBlockWithExecution] No server/kernel configured, using robust execution for cell ${props.id}`)
+      
+      // Use the robust execution system which handles server discovery automatically
+      const success = await robustExecuteCell(props.id, codeValue.value)
+      
+      if (success) {
+        console.log(`[CodeBlockWithExecution] Robust execution completed for cell ${props.id}`)
+        
+        // Get the result and emit
+        nextTick(() => {
+          const cell = codeExecutionStore.getCellById(props.id)
+          if (cell) {
+            console.log(`[CodeBlockWithExecution] Emitting robust execution result:`, cell.output)
+            emit('update:output', cell.output || '')
+          }
+        })
+      } else {
+        console.error(`[CodeBlockWithExecution] Robust execution failed for cell ${props.id}`)
+        emit('update:output', 'Error: Code execution failed. Please check your server configuration.')
+      }
+    } else {
+      // Use the execution composable which will emit the output
+      await executeCode()
+      
+      console.log(`[CodeBlockWithExecution] Standard execution completed for cell ${props.id}`)
+      
+      // Additional safety: ensure output is emitted after execution
+      nextTick(() => {
+        const cell = codeExecutionStore.getCellById(props.id)
+        if (cell && cell.output) {
+          console.log(`[CodeBlockWithExecution] Safety emit for cell ${props.id}:`, cell.output)
+          emit('update:output', cell.output)
+        }
+      })
     }
-    
-    // The robust execution system handles output updates automatically
-    console.log('Code execution completed successfully')
     
   } catch (error) {
     console.error('Error executing code:', error)
+    emit('update:output', `Error: ${error instanceof Error ? error.message : 'Unknown execution error'}`)
   }
 }
 
@@ -278,6 +369,35 @@ const handleToggleSharedSessionMode = async () => {
   }
 }
 
+// Clear output handler
+const handleClearOutput = async () => {
+  try {
+    console.log(`[CodeBlockWithExecution] Clearing output for cell ${props.id}`)
+    
+    // Clear the output in the store
+    const cell = codeExecutionStore.getCellById(props.id)
+    if (cell) {
+      cell.output = ''
+      cell.hasError = false
+      cell.error = null
+    }
+    
+    // CRITICAL: Emit to parent for nota saving
+    console.log(`[CodeBlockWithExecution] Emitting clear output for cell ${props.id}`)
+    emit('update:output', '')
+    
+    // Also use the enhanced output management
+    const success = await outputPersistence.clearOutput()
+    if (success) {
+      console.log(`[CodeBlockWithExecution] Output cleared successfully for cell ${props.id}`)
+    } else {
+      console.error('Enhanced output management clear failed')
+    }
+  } catch (error) {
+    console.error('Error clearing output:', error)
+  }
+}
+
 // AI Assistant handler
 // AI Assistant functionality removed for focused output experience
 const handleShowAIAssistant = () => {
@@ -314,6 +434,7 @@ const handleShowAIAssistant = () => {
       :is-configuration-incomplete="!selectedServer || !selectedKernel"
       :selected-server="selectedServer"
       :selected-kernel="selectedKernel"
+      :has-output="hasOutput"
       @execute-code="safeExecuteCode"
       @toggle-code-visibility="toggleCodeVisibility"
       @toggle-fullscreen="isFullScreen = true"
@@ -321,6 +442,7 @@ const handleShowAIAssistant = () => {
       @save-changes="saveChanges"
       @open-configuration="handleOpenConfiguration"
       @show-ai-assistant="handleShowAIAssistant"
+      @clear-output="handleClearOutput"
     />
 
     <!-- Warning Banners -->
@@ -356,6 +478,7 @@ const handleShowAIAssistant = () => {
       :is-read-only="isReadOnly || false"
       :is-published="isPublished || false"
       :is-executing="isExecuting || false"
+      :update-attributes="updateOutputToNota"
     />
 
     <!-- Fullscreen Modal -->

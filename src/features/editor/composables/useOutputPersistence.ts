@@ -1,4 +1,4 @@
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, nextTick, inject } from 'vue'
 import { useCodeExecutionStore } from '@/features/editor/stores/codeExecutionStore'
 import { logger } from '@/services/logger'
 
@@ -10,6 +10,7 @@ interface PersistenceConfig {
   notaId?: string
   autoSave?: boolean
   saveDelay?: number // Debounce delay in milliseconds
+  updateAttributes?: (attrs: any) => void // Function to update nota attributes
 }
 
 /**
@@ -58,16 +59,23 @@ export function useOutputPersistence(config: PersistenceConfig) {
       cell.hasError = output.hasError
       cell.error = output.hasError ? new Error(output.content) : null
       
-      // The output persistence to database should be handled by the EditorView
-      // when it detects changes in the document structure
-      // For now, we save to localStorage as the primary persistence mechanism
+      // CRITICAL: Update the nota via updateAttributes to persist to database
+      if (config.updateAttributes) {
+        config.updateAttributes({ output: output.content })
+        logger.log(`[OutputPersistence] Updated nota attributes for cell ${config.cellId}`)
+      } else {
+        logger.warn(`[OutputPersistence] No updateAttributes function provided for cell ${config.cellId}`)
+      }
+      
+      // Save to localStorage as backup
       await saveToLocalStorage(output)
       
       lastSaved.value = new Date().toISOString()
       
       logger.log(`[OutputPersistence] Saved output for cell ${config.cellId}`, {
         length: output.content.length,
-        hasError: output.hasError
+        hasError: output.hasError,
+        persistedToNota: !!config.updateAttributes
       })
       
       return true
@@ -177,13 +185,23 @@ export function useOutputPersistence(config: PersistenceConfig) {
         cell.error = null
       }
       
+      // CRITICAL: Clear from nota via updateAttributes to persist to database
+      if (config.updateAttributes) {
+        config.updateAttributes({ output: '' })
+        logger.log(`[OutputPersistence] Cleared nota attributes for cell ${config.cellId}`)
+      } else {
+        logger.warn(`[OutputPersistence] No updateAttributes function provided for clearing cell ${config.cellId}`)
+      }
+      
       // Clear from localStorage
       const key = `output_${config.cellId}`
       localStorage.removeItem(key)
       
       lastSaved.value = new Date().toISOString()
       
-      logger.log(`[OutputPersistence] Cleared output for cell ${config.cellId}`)
+      logger.log(`[OutputPersistence] Cleared output for cell ${config.cellId}`, {
+        clearedFromNota: !!config.updateAttributes
+      })
       return true
     } catch (error) {
       logger.error(`[OutputPersistence] Failed to clear output:`, error)

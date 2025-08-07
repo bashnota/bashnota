@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { 
   Copy, 
   Trash2, 
@@ -16,7 +16,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { useOutputManagement } from '@/features/editor/composables/useOutputManagement'
+import { useEnhancedOutputManagement } from '@/features/editor/composables/useEnhancedOutputManagement'
 import { toast } from 'vue-sonner'
 import OutputRenderer from '../OutputRenderer.vue'
 import ErrorRenderer from './ErrorRenderer.vue'
@@ -27,6 +27,7 @@ interface Props {
   isReadOnly?: boolean
   isPublished?: boolean
   isExecuting?: boolean
+  updateAttributes?: (attrs: any) => void // Function to update nota attributes
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -35,46 +36,94 @@ const props = withDefaults(defineProps<Props>(), {
   isExecuting: false
 })
 
-// Use output management composable
+// Use enhanced output management composable
 const {
   outputInfo,
   formatOutput,
   outputStats,
-  preferences,
   isLoading,
   error,
-  toggleCollapse,
-  toggleMetadata,
-  toggleWordWrap,
   clearOutput,
   copyOutput
-} = useOutputManagement({ 
+} = useEnhancedOutputManagement({ 
   cellId: props.cellId,
   autoSave: true,
-  persistOutput: true
+  updateAttributes: props.updateAttributes
 })
 
-// Computed properties for UI state
+// UI preferences (simplified for now)
+const preferences = ref({
+  isCollapsed: false,
+  showMetadata: true,
+  wordWrap: true
+})
+
+// UI preference actions
+const toggleCollapse = () => {
+  preferences.value.isCollapsed = !preferences.value.isCollapsed
+}
+
+const toggleMetadata = () => {
+  preferences.value.showMetadata = !preferences.value.showMetadata
+}
+
+const toggleWordWrap = () => {
+  preferences.value.wordWrap = !preferences.value.wordWrap
+}
+
+// Safe computed properties for template access
+const safeOutputInfo = computed(() => ({
+  hasOutput: outputInfo.value?.hasOutput || false,
+  hasError: outputInfo.value?.hasError || false,
+  content: outputInfo.value?.content || '',
+  type: outputInfo.value?.type || 'text',
+  isEmpty: outputInfo.value?.isEmpty ?? true,
+  isExecuting: outputInfo.value?.isExecuting || false
+}))
+
+const safeOutputStats = computed(() => ({
+  lines: outputStats.value?.lines || 0,
+  characters: outputStats.value?.characters || 0,
+  words: outputStats.value?.words || 0,
+  size: outputStats.value?.size || '0 B'
+}))
+
+// Computed properties for UI state with safe access
 const shouldShowOutput = computed(() => {
-  return outputInfo.value.hasOutput || outputInfo.value.hasError
+  try {
+    return outputInfo.value?.hasOutput || outputInfo.value?.hasError || false
+  } catch (error) {
+    console.warn('Error accessing output info in shouldShowOutput:', error)
+    return false
+  }
 })
 
 const outputTypeDisplay = computed(() => {
-  const type = outputInfo.value.type
-  switch (type) {
-    case 'error': return { label: 'Error', class: 'bg-destructive/10 text-destructive' }
-    case 'json': return { label: 'JSON', class: 'bg-blue-500/10 text-blue-700' }
-    case 'html': return { label: 'HTML', class: 'bg-orange-500/10 text-orange-700' }
-    case 'table': return { label: 'Table', class: 'bg-green-500/10 text-green-700' }
-    default: return { label: 'Text', class: 'bg-muted text-muted-foreground' }
+  try {
+    const type = outputInfo.value?.type || 'text'
+    switch (type) {
+      case 'error': return { label: 'Error', class: 'bg-destructive/10 text-destructive' }
+      case 'json': return { label: 'JSON', class: 'bg-blue-500/10 text-blue-700' }
+      case 'html': return { label: 'HTML', class: 'bg-orange-500/10 text-orange-700' }
+      case 'table': return { label: 'Table', class: 'bg-green-500/10 text-green-700' }
+      default: return { label: 'Text', class: 'bg-muted text-muted-foreground' }
+    }
+  } catch (error) {
+    console.warn('Error accessing output type:', error)
+    return { label: 'Text', class: 'bg-muted text-muted-foreground' }
   }
 })
 
 const statusIcon = computed(() => {
-  if (props.isExecuting) return { icon: 'loading', class: 'text-blue-500' }
-  if (outputInfo.value.hasError) return { icon: AlertCircle, class: 'text-destructive' }
-  if (outputInfo.value.hasOutput) return { icon: CheckCircle, class: 'text-green-600' }
-  return { icon: FileText, class: 'text-muted-foreground' }
+  try {
+    if (props.isExecuting) return { icon: 'loading', class: 'text-blue-500' }
+    if (outputInfo.value?.hasError) return { icon: AlertCircle, class: 'text-destructive' }
+    if (outputInfo.value?.hasOutput) return { icon: CheckCircle, class: 'text-green-600' }
+    return { icon: FileText, class: 'text-muted-foreground' }
+  } catch (error) {
+    console.warn('Error accessing status icon:', error)
+    return { icon: FileText, class: 'text-muted-foreground' }
+  }
 })
 
 // Action handlers
@@ -127,12 +176,12 @@ const handleClearOutput = async () => {
         
         <!-- Metadata -->
         <div 
-          v-if="preferences.showMetadata && outputInfo.hasOutput" 
+          v-if="preferences.showMetadata && safeOutputInfo.hasOutput" 
           class="hidden sm:flex items-center gap-2 text-xs text-muted-foreground"
         >
-          <span>{{ outputStats.lines }} lines</span>
+          <span>{{ safeOutputStats.lines }} lines</span>
           <Separator orientation="vertical" class="h-3" />
-          <span>{{ outputStats.size }}</span>
+          <span>{{ safeOutputStats.size }}</span>
         </div>
       </div>
       
@@ -140,7 +189,7 @@ const handleClearOutput = async () => {
       <div class="flex items-center gap-1">
         <!-- Metadata Toggle -->
         <Button
-          v-if="outputInfo.hasOutput"
+          v-if="safeOutputInfo.hasOutput"
           variant="ghost"
           size="sm"
           @click="toggleMetadata"
@@ -155,7 +204,7 @@ const handleClearOutput = async () => {
         
         <!-- Word Wrap Toggle -->
         <Button
-          v-if="outputInfo.hasOutput && outputInfo.type === 'text'"
+          v-if="safeOutputInfo.hasOutput && safeOutputInfo.type === 'text'"
           variant="ghost"
           size="sm"
           @click="toggleWordWrap"
@@ -170,7 +219,7 @@ const handleClearOutput = async () => {
         
         <!-- Copy Output -->
         <Button
-          v-if="outputInfo.hasOutput && !isReadOnly"
+          v-if="safeOutputInfo.hasOutput && !isReadOnly"
           variant="ghost"
           size="sm"
           @click="handleCopyOutput"
@@ -183,7 +232,7 @@ const handleClearOutput = async () => {
         
         <!-- Clear Output -->
         <Button
-          v-if="outputInfo.hasOutput && !isReadOnly && !isPublished"
+          v-if="safeOutputInfo.hasOutput && !isReadOnly && !isPublished"
           variant="ghost"
           size="sm"
           @click="handleClearOutput"
@@ -212,17 +261,17 @@ const handleClearOutput = async () => {
     
     <!-- Metadata Bar (Mobile) -->
     <div 
-      v-if="preferences.showMetadata && outputInfo.hasOutput" 
+      v-if="preferences.showMetadata && safeOutputInfo.hasOutput" 
       class="sm:hidden px-4 py-2 bg-muted/10 border-b text-xs text-muted-foreground"
     >
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <span>{{ outputStats.lines }} lines</span>
-          <span>{{ outputStats.characters }} characters</span>
-          <span>{{ outputStats.size }}</span>
+          <span>{{ safeOutputStats.lines }} lines</span>
+          <span>{{ safeOutputStats.characters }} characters</span>
+          <span>{{ safeOutputStats.size }}</span>
         </div>
-        <div v-if="outputStats.words > 0">
-          {{ outputStats.words }} words
+        <div v-if="safeOutputStats.words > 0">
+          {{ safeOutputStats.words }} words
         </div>
       </div>
     </div>
@@ -255,12 +304,12 @@ const handleClearOutput = async () => {
       
       <!-- Output Content -->
       <div 
-        v-else-if="outputInfo.hasOutput" 
+        v-else-if="safeOutputInfo.hasOutput" 
         class="relative"
       >
         <!-- Enhanced Error Display for Jupyter Errors -->
         <ErrorRenderer 
-          v-if="outputInfo.hasError && isJupyterError(formatOutput)"
+          v-if="safeOutputInfo.hasError && isJupyterError(formatOutput)"
           :error="formatOutput"
           :show-full-error="true"
         />
@@ -268,16 +317,16 @@ const handleClearOutput = async () => {
         <!-- Regular Output Display -->
         <div 
           v-else
-          :class="{ 'font-mono': outputInfo.type === 'text' || outputInfo.type === 'error' }"
+          :class="{ 'font-mono': safeOutputInfo.type === 'text' || safeOutputInfo.type === 'error' }"
         >
           <OutputRenderer
             :content="formatOutput"
-            :type="outputInfo.hasError ? 'error' : undefined"
+            :type="safeOutputInfo.hasError ? 'error' : undefined"
             :show-controls="false"
             :is-collapsible="false"
             :class="{
-              'whitespace-pre-wrap': preferences.wordWrap && (outputInfo.type === 'text' || outputInfo.type === 'error'),
-              'whitespace-pre': !preferences.wordWrap && (outputInfo.type === 'text' || outputInfo.type === 'error')
+              'whitespace-pre-wrap': preferences.wordWrap && (safeOutputInfo.type === 'text' || safeOutputInfo.type === 'error'),
+              'whitespace-pre': !preferences.wordWrap && (safeOutputInfo.type === 'text' || safeOutputInfo.type === 'error')
             }"
           />
         </div>
@@ -295,7 +344,7 @@ const handleClearOutput = async () => {
     
     <!-- Collapsed State Info -->
     <div 
-      v-if="preferences.isCollapsed && outputInfo.hasOutput" 
+      v-if="preferences.isCollapsed && safeOutputInfo.hasOutput" 
       class="px-4 py-2 text-xs text-muted-foreground bg-muted/10"
     >
       Output collapsed ({{ outputStats.lines }} lines, {{ outputStats.size }})

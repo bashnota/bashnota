@@ -1,544 +1,228 @@
-# Executable Code Block Components
+# Executable Code Block System
 
-This directory contains the components and composables for the AI-enhanced executable code block system. The implementation follows modular design principles with a unified AI assistant interface.
+## 🏗️ Architecture Overview
 
-## Core Components
+The executable code block system consists of two main components with different purposes:
 
-### `CodeBlockWithExecution.vue`
-The main executable code block component that orchestrates code execution, AI assistance, and user interactions.
+### 🎯 Main Components
 
-**Key Features:**
-- Code editing with syntax highlighting
-- Multiple execution environments (Jupyter, local, shared sessions)
-- Integrated AI assistance
-- Output rendering with interactive elements
-- Template system for code snippets
+#### 1. `ExecutableCodeBlock.vue` (TipTap Node View)
+- **Purpose**: Official TipTap node view wrapper that handles nota persistence  
+- **Key Features**:
+  - Receives `updateAttributes` prop from TipTap editor
+  - Handles loading/saving output from/to nota database
+  - Manages configuration modal and server/kernel setup
+  - Wraps the modular `CodeBlockWithExecution.vue`
+- **Critical**: This is the ONLY component that can save to nota
 
-### `AICodeAssistant.vue`
-Unified AI interface that consolidates all AI-powered features into a single, cohesive component.
+#### 2. `CodeBlockWithExecution.vue` (Modular Component)
+- **Purpose**: Reusable, standalone executable code block
+- **Key Features**:
+  - Modular design with composables
+  - Rich UI with toolbars and controls
+  - Enhanced output management
+  - Can be used independently of TipTap
+- **Limitation**: Cannot save to nota directly (needs parent wrapper)
 
-**Key Features:**
-- Tabbed interface (Quick Actions, Custom Actions, Error Assistance)
-- Integration with AI actions store
-- Context-aware assistance
-- Auto-triggered error analysis
-- One-click code application
+## 📁 Component Structure
 
-## Supporting Components
-
-# Executable Code Block Components
-
-This directory contains a **modular, component-based architecture** for the AI-enhanced executable code block system. The implementation follows Vue 3 best practices with focused, reusable components and composables.
-
-## 🚀 Quick Start
-
-```vue
-<script setup>
-import { CodeBlockWithExecution } from '@/features/editor/components/blocks/executable-code-block'
-
-const props = {
-  code: 'print("Hello, World!")',
-  language: 'python',
-  id: 'block-123',
-  notaId: 'nota-456'
-}
-</script>
-
-<template>
-  <CodeBlockWithExecution v-bind="props" />
-</template>
+```
+executable-code-block/
+├── ExecutableCodeBlock.vue          # TipTap wrapper (saves to nota)
+├── CodeBlockWithExecution.vue       # Modular component
+├── ExecutableCodeBlockExtension.ts  # TipTap extension definition
+├── components/                      # UI components
+│   ├── CodeBlockToolbar.vue        # Main toolbar
+│   ├── SideToolbar.vue             # Sidebar controls
+│   ├── StatusIndicator.vue         # Execution status
+│   ├── WarningBanners.vue          # Configuration warnings
+│   ├── CodeEditor.vue              # Code editing interface
+│   ├── OutputDisplay.vue           # Output rendering
+│   ├── ServerKernelSelector.vue    # Server/kernel selection
+│   └── SessionSelector.vue         # Session management
+├── composables/                     # Business logic
+│   ├── core/
+│   │   └── useCodeExecution.ts     # Core execution logic
+│   ├── ui/
+│   │   └── useCodeBlockUI.ts       # UI state management
+│   └── useCodeBlockExecutionSimplified.ts
+├── ai/                             # AI integration
+│   └── components/
+│       └── AICodeAssistantContainer.vue
+├── types/
+│   └── index.ts                    # TypeScript definitions
+├── OutputRenderer.vue              # Rich output display
+├── ErrorDisplay.vue               # Error handling
+├── ExecutionStatus.vue            # Status feedback
+├── CodeMirror.vue                 # Code editor
+├── FullScreenCodeBlock.vue        # Fullscreen mode
+├── TemplateSelector.vue           # Code templates
+└── IframeOutputRenderer.vue       # Isolated output rendering
 ```
 
-## 🏗️ Architecture
+## 🔄 Data Flow
 
-The component system is built with a modular approach:
+### Current Flow (BROKEN for nota saving):
+```
+CodeBlockWithExecution → Enhanced Output Management → ❌ NO NOTA SAVING
+```
+
+### Fixed Flow (What we need):
+```
+CodeBlockWithExecution → emit('update:output') → ExecutableCodeBlock.updateOutput() → nota saved
+```
+
+## 🚨 Critical Issues Identified
+
+### 1. **Output Not Saving to Nota**
+- **Problem**: `CodeBlockWithExecution.vue` doesn't emit `update:output` properly
+- **Root Cause**: Enhanced output management bypasses the event emission
+- **Fix**: Ensure all output updates emit the event to parent wrapper
+
+### 2. **Missing Output on Reload**
+- **Problem**: Saved output not loaded from nota attributes
+- **Root Cause**: Modular component doesn't initialize output from props
+- **Fix**: Load initial output from nota in `CodeBlockWithExecution.vue`
+
+### 3. **HTML Errors on Reload**
+- **Problem**: Output contains HTML that breaks on reload
+- **Root Cause**: Output not properly sanitized/validated
+- **Fix**: Add output validation and sanitization
+
+## 🔧 Component Details
 
 ### Core Components
 
-- **`CodeBlockWithExecution.vue`** - Main orchestrator component
-- **`CodeBlockToolbar.vue`** - Execution controls and utilities  
-- **`ServerKernelSelector.vue`** - Server and kernel selection
-- **`SessionSelector.vue`** - Session management interface
-- **`CodeEditor.vue`** - Code editing with syntax highlighting
-- **`OutputSection.vue`** - Tabbed output and AI assistance
-- **`StatusIndicator.vue`** - Execution status display
-- **`WarningBanners.vue`** - Configuration warnings
-
-### Supporting Components
-
-- **`AICodeAssistant.vue`** - Unified AI interface for code assistance
-- **`OutputRenderer.vue`** - Rich output rendering with interactive elements
-- **`TemplateSelector.vue`** - Code template selection and insertion
-- **`ExecutionStatus.vue`** - Real-time execution feedback
-- **`ErrorDisplay.vue`** - Error handling and retry mechanisms
-- **`FullScreenCodeBlock.vue`** - Fullscreen editing experience
-
-### Composables
-
-- **`useCodeBlockState.ts`** - Central state management
-- **`useSessionManagement.ts`** - Session and kernel operations
-- **`useCodeBlockExecution.ts`** - Execution logic and AI integration
-- **`usePreferencesManagement.ts`** - User preferences handling
-- **`useCodeBlockToolbar.ts`** - Toolbar state and interactions
-- **`useOutputStreaming.ts`** - Real-time output streaming
-- **`useAICodeAssistant.ts`** - AI assistance integration
-
-## ✨ Key Features
-
-### 🎯 Modular Design
-- **Single Responsibility**: Each component has a focused purpose
-- **Composable Logic**: Reusable business logic in composables
-- **Type Safety**: Full TypeScript support throughout
-- **Clean Interfaces**: Clear prop and event definitions
-
-### 🚀 Performance Optimized
-- **Tree Shaking**: Only import what you use
-- **Lazy Loading**: Heavy components load on demand
-- **Efficient State**: Optimized reactivity and watchers
-- **Memory Management**: Proper cleanup and disposal
-
-### 🧪 Testable Architecture
-- **Unit Testable**: Small, focused components
-- **Mockable Dependencies**: Clean dependency injection
-- **Isolated Logic**: Business logic in testable composables
-- **Component Testing**: Easy UI component testing
-
-### 🎨 Developer Experience
-- **IntelliSense**: Full IDE support with TypeScript
-- **Hot Reload**: Fast development iteration
-- **Clear Structure**: Easy to navigate and understand
-- **Documentation**: Comprehensive guides and examples
-
-## 📁 Component Details
-
-### CodeBlockToolbar
-Main toolbar with all execution controls and utilities.
-
-**Props:**
-```typescript
-interface Props {
-  isHovered: boolean
-  showToolbar: boolean
-  isReadOnly: boolean
-  isExecuting: boolean
-  isReadyToExecute: boolean
-  // ... more props
-}
-```
-
-**Events:**
-- `execute-code` - Triggers code execution
-- `toggle-toolbar` - Pins/unpins toolbar
-- `toggle-fullscreen` - Enters fullscreen mode
-- `format-code` - Formats the code
-- `copy-code` - Copies code to clipboard
-
-### ServerKernelSelector
-Dropdown interface for server and kernel selection.
-
-**Features:**
-- Server discovery and connection testing
-- Kernel listing with language matching
-- Configuration status indicators
-- Shared session mode support
-
-### SessionSelector
-Comprehensive session management interface.
-
-**Capabilities:**
-- Active session listing and selection
-- Running kernel display with status
-- New session creation
-- Kernel cleanup operations
-- Real-time refresh functionality
-
-### OutputSection
-Tabbed interface combining output rendering and AI assistance.
-
-**Tabs:**
-- **Output**: Execution results with rich rendering
-- **AI Assistant**: Code analysis and error fixing
-- **Auto-switching**: Switches to AI tab on errors
-
-## 🔧 Usage Examples
-
-### Basic Implementation
-```vue
-<script setup>
-import { CodeBlockWithExecution } from './index'
-
-const code = ref('print("Hello")')
-const language = 'python'
-</script>
-
-<template>
-  <CodeBlockWithExecution
-    :code="code"
-    :language="language"
-    :id="generateId()"
-    :nota-id="notaId"
-    @update:code="code = $event"
-  />
-</template>
-```
-
-### Custom Toolbar
-```vue
-<script setup>
-import { CodeBlockToolbar, CodeEditor } from './index'
-</script>
-
-<template>
-  <div>
-    <CodeBlockToolbar 
-      :is-executing="executing"
-      @execute-code="runCode"
-    />
-    <CodeEditor 
-      :code="code" 
-      @update:code="updateCode" 
-    />
-  </div>
-</template>
-```
-
-### Using Composables
-```vue
-<script setup>
-import { useCodeBlockState, useSessionManagement } from './index'
-
-const { selectedServer, selectedKernel } = useCodeBlockState(props, emit)
-const { createNewSession, availableSessions } = useSessionManagement(config)
-
-// Create session programmatically
-const handleCreateSession = async () => {
-  const sessionId = await createNewSession()
-  console.log('Created session:', sessionId)
-}
-</script>
-```
-
-## 🧪 Testing
-
-### Component Testing
-```typescript
-import { mount } from '@vue/test-utils'
-import { CodeBlockToolbar } from './index'
-
-describe('CodeBlockToolbar', () => {
-  it('enables execute button when ready', () => {
-    const wrapper = mount(CodeBlockToolbar, {
-      props: { isReadyToExecute: true }
-    })
-    
-    const executeBtn = wrapper.find('[data-testid="execute-btn"]')
-    expect(executeBtn.attributes('disabled')).toBeUndefined()
-  })
-})
-```
-
-### Composable Testing
-```typescript
-import { useSessionManagement } from './index'
-
-describe('useSessionManagement', () => {
-  it('creates session with correct config', async () => {
-    const { createNewSession } = useSessionManagement(mockConfig)
-    const result = await createNewSession()
-    expect(result).toBeDefined()
-  })
-})
-```
-
-## 🚀 Performance Benefits
-
-The modular architecture provides significant performance improvements:
-
-- **50% smaller bundle size** with tree-shaking
-- **30% faster initial load** with lazy loading
-- **2x faster development** with focused components
-- **90% better test coverage** with isolated testing
-
-## 🔄 Migration from Monolithic
-
-The modular version maintains the same API as the original:
-
-```typescript
-// Works with both versions
-import CodeBlockWithExecution from './CodeBlockWithExecution.vue'
-
-// Or use the explicit modular version
-import { CodeBlockWithExecution } from './index'
-```
-
-## 📚 Advanced Usage
-
-### Custom AI Integration
-```vue
-<script setup>
-import { AICodeAssistant } from './index'
-
-const handleAIUpdate = (newCode) => {
-  // Custom AI code processing
-  processAICode(newCode)
-}
-</script>
-
-<template>
-  <AICodeAssistant
-    :code="code"
-    :language="language"
-    @code-updated="handleAIUpdate"
-  />
-</template>
-```
-
-### Server Management
-```vue
-<script setup>
-import { ServerKernelSelector } from './index'
-
-const servers = ref([
-  { ip: 'localhost', port: 8888 },
-  { ip: 'remote.server.com', port: 8889 }
-])
-</script>
-
-<template>
-  <ServerKernelSelector
-    :available-servers="servers"
-    @server-change="handleServerChange"
-  />
-</template>
-```
-
-## 🔧 Configuration
-
-### Environment Variables
-```bash
-# Jupyter server discovery
-VITE_JUPYTER_AUTO_DISCOVER=true
-VITE_JUPYTER_DEFAULT_PORT=8888
-
-# AI features
-VITE_AI_ERROR_ANALYSIS=true
-VITE_AI_AUTO_SUGGESTIONS=true
-```
-
-### Component Defaults
-```typescript
-// Configure default behavior
-import { configureDefaults } from './index'
-
-configureDefaults({
-  autoSavePreferences: true,
-  defaultLanguage: 'python',
-  aiAssistanceEnabled: true
-})
-```
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-**Server Connection Failed**
-```typescript
-// Check server configuration
-const { testConnection } = useSessionManagement()
-const result = await testConnection(server)
-if (!result.success) {
-  console.error('Connection failed:', result.message)
-}
-```
-
-**Kernel Not Found**
-```typescript
-// Refresh available kernels
-const { refreshKernels } = useSessionManagement()
-await refreshKernels(selectedServer)
-```
-
-**AI Features Not Working**
-```typescript
-// Check AI store configuration
-import { useAIActionsStore } from '@/stores/aiActionsStore'
-const aiStore = useAIActionsStore()
-console.log('AI enabled:', aiStore.state.enabled)
-```
-
-## 📈 Roadmap
-
-### Upcoming Features
-- **Plugin System**: Extensible architecture for custom functionality
-- **Collaborative Editing**: Real-time multi-user code editing
-- **Advanced Caching**: Intelligent state persistence
-- **Mobile Support**: Touch-optimized interfaces
-- **Theme Customization**: Comprehensive styling options
-
-### Performance Optimizations
-- **Virtual Scrolling**: For large output handling
-- **Web Workers**: Background code analysis
-- **Service Workers**: Offline functionality
-- **Progressive Loading**: Incremental feature loading
-
-## 🤝 Contributing
-
-### Development Setup
-```bash
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-
-# Run tests
-npm run test
-
-# Build for production
-npm run build
-```
-
-### Code Standards
-- Use TypeScript for all new code
-- Follow Vue 3 Composition API patterns
-- Write tests for all new components
-- Update documentation for API changes
-
-### Pull Request Guidelines
-1. Create feature branch from `main`
-2. Write tests for new functionality
-3. Update documentation
-4. Ensure all tests pass
-5. Request review from maintainers
-
-## 📄 License
-
-This project is licensed under the MIT License. See [LICENSE](./LICENSE) for details.
-
-### `CodeMirror.vue`
-Code editor component with:
-- Syntax highlighting for multiple languages
-- Auto-completion and formatting
+#### `ExecutableCodeBlock.vue`
+**Props**: 
+- `node` - TipTap node with attributes
+- `updateAttributes` - Function to save to nota
+- `editor` - TipTap editor instance
+- `getPos` - Position function
+
+**Key Methods**:
+- `updateOutput(newOutput)` - Saves output to nota via `updateAttributes`
+- `updateCode(newCode)` - Updates code content
+- `handleOpenConfiguration()` - Opens kernel config modal
+
+#### `CodeBlockWithExecution.vue`
+**Props**:
+- `code` - Code content string  
+- `language` - Programming language
+- `id` - Block identifier
+- `sessionId` - Execution session
+- `notaId` - Parent nota ID
+
+**Events**:
+- `update:code` - Code changed
+- `update:output` - Output changed (CRITICAL for nota saving)
+- `update:session-id` - Session changed
+- `open-configuration` - Configuration requested
+
+### UI Components
+
+#### `SideToolbar.vue`
+- Execute button
+- Configuration button
+- Code visibility toggle
+- Fullscreen toggle
+- Copy code button
+- Clear output button (NEW)
+
+#### `OutputDisplay.vue`
+- Output rendering with type detection
+- Metadata display (lines, size, etc.)
+- Copy/clear controls
+- Collapsible interface
+- Error handling
+
+#### `CodeEditor.vue`
+- Syntax highlighting (CodeMirror)
+- Auto-completion
+- Format code
 - Template insertion
 - Keyboard shortcuts
 
-### `TemplateSelector.vue`
-Template management system for:
-- Language-specific code templates
-- Custom template creation
-- Quick code insertion
+### Composables
 
-### `AICodePreferences.vue`
-Simplified settings interface that links to the main AI configuration panel.
+#### `useEnhancedOutputManagement.ts`
+- Central output state management
+- Store and nota synchronization
+- Clear/copy functionality
+- Type-safe interfaces
 
-## Composables
-
-### `useAICodeAssistant.ts`
-**Unified AI composable** that replaces previous redundant AI composables. Provides:
-- Integration with AI actions store
-- Caching for performance
-- Error handling and retries
-- Result formatting utilities
-
-### `useCodeExecution.ts`
-Manages code execution lifecycle:
-- Execution state management
-- Output streaming
+#### `useCodeBlockExecutionSimplified.ts`
+- Code execution logic
+- Session management
 - Error handling
+- Progress tracking
 
-### `useCodeBlockToolbar.ts`
-Toolbar state and interactions:
-- Server/kernel selection
-- Execution controls
-- Visibility toggles
+#### `useCodeBlockCore.ts`
+- Core state management
+- Code editing functionality
+- Save/copy operations
 
-### `useOutputStreaming.ts`
-Real-time output streaming for long-running executions.
+#### `useCodeBlockUI.ts`
+- UI state (hover, toolbar visibility)
+- Fullscreen mode
+- Template dialogs
 
-### `useCodeFormatting.ts`
-Code formatting utilities for different languages.
+## 🐛 Bug Analysis
 
-### `useCodeTemplates.ts`
-Template management and insertion logic.
+### Issue 1: Output Not Persisting
+**Location**: `CodeBlockWithExecution.vue` line 130-140
+**Problem**: Enhanced output management calls `config.updateAttributes` but this function just emits an event, it doesn't directly save to nota.
+**Solution**: Ensure emission chain works properly.
 
-## Architecture Improvements
+### Issue 2: Output Not Loading  
+**Location**: `CodeBlockWithExecution.vue` initialization
+**Problem**: Component doesn't load initial output from props.
+**Solution**: Initialize output from passed props.
 
-### ✅ Eliminated Redundancies
-- **Removed:** `AICodeActions.vue`, `CustomAIActions.vue`, `ErrorAssistance.vue`
-- **Replaced with:** Single `AICodeAssistant.vue` component
-- **Removed:** `useCodeAnalysis.ts`, `useErrorTrigger.ts` 
-- **Replaced with:** Unified `useAICodeAssistant.ts` composable
+### Issue 3: Clear Output Not Working
+**Location**: `OutputDisplay.vue` clear functionality  
+**Problem**: Clear operation doesn't properly emit to parent.
+**Solution**: Ensure clear emits `update:output` with empty string.
 
-### ✅ Centralized AI Management
-- All AI functionality routes through the `aiActionsStore`
-- Consistent API for custom and built-in actions
-- Unified configuration and settings
+## 🚀 Implementation Plan
 
-### ✅ Modular Design
-- Clear separation of concerns
-- Reusable composables
-- Consistent interfaces between components
+### Phase 1: Fix Event Emission Chain
+1. Ensure `CodeBlockWithExecution.vue` properly emits `update:output`
+2. Fix enhanced output management to trigger emissions
+3. Validate event flow from execution to nota saving
 
-### ✅ Performance Optimizations
-- Result caching to avoid re-analysis
-- Lazy loading of AI components
-- Efficient state management
+### Phase 2: Fix Output Loading
+1. Add proper initialization from props
+2. Handle output attribute loading on component mount
+3. Sync store with nota attributes
 
-## Usage Examples
+### Phase 3: Fix Clear Functionality  
+1. Ensure clear operation emits proper events
+2. Update both store and nota
+3. Test persistence across page reloads
 
-### Basic Code Block
-```vue
-<CodeBlockWithExecution
-  :code="pythonCode"
-  language="python"
-  :id="blockId"
-  :session-id="sessionId"
-  :nota-id="notaId"
-  @update:code="handleCodeUpdate"
-/>
-```
+### Phase 4: Add Validation
+1. Sanitize HTML output before saving
+2. Add output size limits
+3. Handle malformed output gracefully
 
-### AI Assistant Integration
-The AI assistant is automatically integrated and can be toggled via the toolbar. It provides:
+## 🧪 Testing Checklist
 
-1. **Quick Actions** - Common AI operations (explain, optimize, fix)
-2. **Custom Actions** - User-defined AI workflows
-3. **Error Assistance** - Automatic error analysis and fixes
+- [ ] Execute code → output appears
+- [ ] Execute code → refresh page → output persists  
+- [ ] Clear output → refresh page → output stays cleared
+- [ ] Error output → refresh page → error persists
+- [ ] HTML output → refresh page → no HTML errors
+- [ ] Large output → proper handling
+- [ ] Malformed output → graceful degradation
 
-### Custom AI Actions
-Custom actions are managed through the settings panel and executed via the unified AI interface:
+## 🔮 Future Improvements
 
-```typescript
-// Example custom action execution
-const result = await aiCodeAssistant.executeAction(
-  'custom-action-id',
-  code,
-  language,
-  error
-)
-```
+1. **Performance**: Virtual scrolling for large outputs
+2. **Collaboration**: Real-time multi-user execution
+3. **Caching**: Intelligent output caching
+4. **Export**: Output export functionality
+5. **Templates**: More code templates
+6. **Plugins**: Extensible plugin system
 
-## Integration with AI Actions Store
-
-The components integrate seamlessly with the centralized AI actions store:
-
-- **Provider Management:** AI provider selection and configuration
-- **Action Execution:** Unified execution pipeline for all AI actions
-- **Settings:** Centralized configuration for all AI features
-- **Caching:** Intelligent caching to improve performance
-
-## Best Practices
-
-1. **Single Responsibility:** Each component has a clear, focused purpose
-2. **Composable Logic:** Reusable logic extracted into composables
-3. **Type Safety:** Full TypeScript support throughout
-4. **Error Handling:** Graceful degradation and user feedback
-5. **Performance:** Efficient state management and lazy loading
-6. **Accessibility:** Proper ARIA labels and keyboard navigation
-
-## Future Enhancements
-
-- **Plugin System:** Extensible architecture for custom AI providers
-- **Collaborative AI:** Real-time collaborative AI assistance
-- **Advanced Caching:** More sophisticated caching strategies
-- **AI Model Selection:** Per-action AI model configuration 
+This modular architecture provides flexibility while maintaining the critical nota persistence through the TipTap wrapper pattern.

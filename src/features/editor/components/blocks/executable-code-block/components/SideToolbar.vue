@@ -9,7 +9,8 @@ import {
   Maximize2,
   Copy,
   Save,
-  Sparkles
+  Sparkles,
+  Trash2
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -26,6 +27,7 @@ interface Props {
   isConfigurationIncomplete: boolean
   selectedServer?: string
   selectedKernel?: string
+  hasOutput?: boolean
 }
 
 interface Emits {
@@ -36,6 +38,7 @@ interface Emits {
   'save-changes': []
   'open-configuration': []
   'show-ai-assistant': []
+  'clear-output': []
 }
 
 const props = defineProps<Props>()
@@ -171,6 +174,24 @@ const configurationStatus = computed(() => {
       </TooltipTrigger>
       <TooltipContent side="left">
         Copy Code
+      </TooltipContent>
+    </Tooltip>
+
+    <!-- Clear Output Button -->
+    <Tooltip v-if="hasOutput && !isReadOnly && !isPublished">
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          @click="emit('clear-output')"
+          class="h-8 w-8 p-0 text-destructive hover:text-destructive"
+          :disabled="isExecuting"
+        >
+          <Trash2 class="w-4 h-4" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="left">
+        Clear Output
       </TooltipContent>
     </Tooltip>
 

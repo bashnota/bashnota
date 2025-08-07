@@ -10,6 +10,7 @@ interface OutputConfig {
   cellId: string
   autoSave?: boolean
   persistOutput?: boolean
+  updateAttributes?: (attrs: any) => void // Function to update nota attributes
 }
 
 /**
@@ -47,7 +48,8 @@ export function useOutputManagement(config: OutputConfig) {
   } = useOutputPersistence({
     cellId: config.cellId,
     autoSave: config.autoSave || true,
-    saveDelay: 500
+    saveDelay: 500,
+    updateAttributes: config.updateAttributes
   })
   
   // Output state
@@ -153,15 +155,14 @@ export function useOutputManagement(config: OutputConfig) {
       isLoading.value = true
       error.value = null
       
-      // Clear output in the store
-      const cell = codeExecutionStore.getCellById(config.cellId)
-      if (cell) {
-        cell.output = ''
-        cell.hasError = false
-        cell.error = null
-      }
+      // Use the persistence system to clear output properly
+      const success = await persistOutput('', false)
       
-      logger.log(`[OutputManagement] Cleared output for cell ${config.cellId}`)
+      if (success) {
+        logger.log(`[OutputManagement] Successfully cleared output for cell ${config.cellId}`)
+      } else {
+        throw new Error('Failed to persist cleared output')
+      }
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to clear output'
       logger.error(`[OutputManagement] Failed to clear output:`, err)

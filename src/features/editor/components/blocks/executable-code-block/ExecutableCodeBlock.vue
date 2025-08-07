@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, nextTick } from 'vue'
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import { Card, CardContent } from '@/components/ui/card'
 import { useCodeExecution } from './composables/core/useCodeExecution'
@@ -77,14 +77,147 @@ const updateCode = (newCode: string) => {
 }
 
 const updateOutput = (newOutput: string) => {
-  // Update the node attributes to persist to database
-  props.updateAttributes({ output: newOutput })
-  
-  // Also update the cell in the code execution store for immediate UI updates
-  const cell = codeExecutionStore.getCellById(blockId.value)
-  if (cell) {
-    cell.output = newOutput
+  try {
+    // Sanitize output to prevent HTML errors
+    const sanitizedOutput = sanitizeOutput(newOutput)
+    
+    console.log(`[ExecutableCodeBlock] Updating output for block ${blockId.value}:`, {
+      originalLength: newOutput.length,
+      sanitizedLength: sanitizedOutput.length,
+      hasHTML: newOutput.includes('<')
+    })
+    
+    // Use nextTick to ensure DOM is stable before updating TipTap attributes
+    nextTick(() => {
+      try {
+        // Update the node attributes to persist to database
+        props.updateAttributes({ output: sanitizedOutput })
+        
+        console.log(`[ExecutableCodeBlock] TipTap attributes updated successfully`)
+      } catch (tiptapError) {
+        console.error('Error updating TipTap attributes:', tiptapError)
+        
+        // Emergency fallback - try with escaped text
+        try {
+          const escapedOutput = escapeHtmlForTipTap(newOutput)
+          props.updateAttributes({ output: escapedOutput })
+          console.log(`[ExecutableCodeBlock] Fallback update successful with escaped content`)
+        } catch (fallbackError) {
+          console.error('Even fallback update failed:', fallbackError)
+          // Last resort - empty output
+          try {
+            props.updateAttributes({ output: '' })
+          } catch (lastResortError) {
+            console.error('Critical: Could not update attributes at all:', lastResortError)
+          }
+        }
+      }
+    })
+    
+    // Update the cell in the code execution store for immediate UI updates
+    const cell = codeExecutionStore.getCellById(blockId.value)
+    if (cell) {
+      cell.output = sanitizedOutput
+    }
+    
+    console.log(`[ExecutableCodeBlock] Store output updated successfully`)
+  } catch (error) {
+    console.error('Error in updateOutput function:', error)
+    
+    // Emergency fallback handling
+    nextTick(() => {
+      try {
+        props.updateAttributes({ output: '' })
+      } catch (emergencyError) {
+        console.error('Critical: Emergency fallback failed:', emergencyError)
+      }
+    })
   }
+}
+
+// Sanitize output to prevent HTML errors and ensure safe persistence
+const sanitizeOutput = (output: string): string => {
+  try {
+    if (!output || typeof output !== 'string') {
+      return ''
+    }
+    
+    // Limit output size to prevent database issues
+    const maxOutputSize = 1024 * 1024 // 1MB limit
+    if (output.length > maxOutputSize) {
+      console.warn(`Output too large (${output.length} chars), truncating to ${maxOutputSize}`)
+      return output.substring(0, maxOutputSize) + '\n\n[Output truncated due to size limit]'
+    }
+    
+    // Enhanced sanitization for TipTap compatibility
+    let sanitized = output
+    
+    // Remove null bytes that can break TipTap
+    sanitized = sanitized.replace(/\0/g, '')
+    
+    // Validate and fix HTML structure if present
+    if (sanitized.includes('<')) {
+      sanitized = sanitizeHtmlForTipTap(sanitized)
+    }
+    
+    // Ensure the content doesn't break TipTap's DOM processing
+    if (sanitized.length === 0) {
+      return ''
+    }
+    
+    return sanitized
+  } catch (error) {
+    console.error('Error sanitizing output:', error)
+    return '[Error: Output could not be processed]'
+  }
+}
+
+// Additional HTML sanitization specifically for TipTap compatibility
+const sanitizeHtmlForTipTap = (htmlContent: string): string => {
+  try {
+    // Create a temporary element to validate HTML
+    if (typeof document !== 'undefined') {
+      const tempDiv = document.createElement('div')
+      tempDiv.innerHTML = htmlContent
+      
+      // Check if parsing was successful
+      if (tempDiv.children === undefined || tempDiv.children === null) {
+        console.warn('HTML parsing failed, converting to text')
+        return escapeHtmlForTipTap(htmlContent)
+      }
+      
+      // Validate the structure
+      const serialized = tempDiv.innerHTML
+      
+      // Double-check by trying to parse again
+      const testDiv = document.createElement('div')
+      testDiv.innerHTML = serialized
+      
+      if (testDiv.children === undefined || testDiv.children === null) {
+        console.warn('Serialized HTML still invalid, converting to text')
+        return escapeHtmlForTipTap(htmlContent)
+      }
+      
+      return serialized
+    } else {
+      // Server-side or no DOM - escape everything
+      return escapeHtmlForTipTap(htmlContent)
+    }
+  } catch (error) {
+    console.error('Error in HTML sanitization for TipTap:', error)
+    return escapeHtmlForTipTap(htmlContent)
+  }
+}
+
+// Escape HTML content that's problematic for TipTap
+const escapeHtmlForTipTap = (content: string): string => {
+  return content
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+    .replace(/\n/g, '<br>')
 }
 
 // Modal state
@@ -329,6 +462,7 @@ const handleApplyConfiguration = async (config: { server: string; kernel: string
         :kernel-preference="kernelPreference"
         :is-read-only="editor.options.editable === false"
         :is-published="isPublishedView"
+        :initial-output="output || undefined"
         @update:code="updateCode"
         @kernel-select="onKernelSelect"
         @update:output="updateOutput"
