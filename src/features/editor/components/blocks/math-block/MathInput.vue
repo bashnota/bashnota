@@ -1,19 +1,35 @@
 <template>
-  <div class="math-input w-full">
-    <div class="relative">
-      <textarea
+  <div class="math-input w-full space-y-4">
+    <div>
+      <label class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+        LaTeX Expression
+      </label>
+      <Textarea
         v-model="latexValue"
-        class="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-mono"
         :placeholder="placeholder"
+        class="resize-none font-mono min-h-20 mt-2"
         :rows="rows"
         @keydown.enter.prevent="onEnter"
         @keydown.esc="onEscape"
-        @blur="onBlur"
         ref="textareaRef"
-      ></textarea>
+      />
+      <p class="text-sm text-muted-foreground mt-2">
+        Enter your LaTeX mathematical expression
+      </p>
     </div>
-    <div class="flex justify-end gap-2 mt-2">
+    
+    <!-- LaTeX Preview -->
+    <div v-if="latexValue.trim()" class="border rounded-md p-4 bg-muted/50">
+      <label class="text-sm font-medium leading-none mb-2 block">Preview:</label>
+      <div 
+        class="min-h-8 flex items-center justify-center bg-background rounded border p-3"
+        v-html="renderedLatex"
+      ></div>
+    </div>
+    
+    <div class="flex justify-end gap-2">
       <Button 
+        type="button"
         variant="outline" 
         size="sm"
         @click="onCancel"
@@ -21,6 +37,7 @@
         Cancel
       </Button>
       <Button 
+        type="button"
         variant="default" 
         size="sm"
         @click="onSave"
@@ -32,8 +49,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, defineProps, defineEmits, nextTick } from 'vue'
-import { Button } from '@/ui/button'
+import { ref, onMounted, watch, nextTick, computed } from 'vue'
+import { Button } from '@/components/ui/button'
+import { Textarea } from "@/components/ui/textarea"
+// @ts-ignore
+import katex from 'katex'
+import 'katex/dist/katex.min.css'
 
 const props = defineProps<{
   modelValue: string
@@ -49,6 +70,22 @@ const emit = defineEmits<{
 
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const latexValue = ref(props.modelValue)
+
+// Computed property to render LaTeX
+const renderedLatex = computed(() => {
+  if (!latexValue.value.trim()) return ''
+  
+  try {
+    return katex.renderToString(latexValue.value, {
+      throwOnError: false,
+      displayMode: true,
+      output: 'html'
+    })
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    return `<span class="text-destructive text-sm">Invalid LaTeX: ${errorMessage}</span>`
+  }
+})
 
 const onSave = () => {
   emit('update:modelValue', latexValue.value)
@@ -66,10 +103,6 @@ const onEnter = () => {
 
 const onEscape = () => {
   onCancel()
-}
-
-const onBlur = () => {
-  // Don't trigger save on blur as we have explicit save/cancel buttons
 }
 
 watch(() => props.modelValue, (newValue) => {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Textarea } from '@/ui/textarea'
-import { Button } from '@/ui/button'
-import { Badge } from '@/ui/badge'
+import { Textarea } from '@/components/ui/textarea'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { 
   SendIcon, 
   LoaderIcon, 

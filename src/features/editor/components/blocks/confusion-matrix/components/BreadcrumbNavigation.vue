@@ -17,7 +17,7 @@
 </template>
 
 <script setup lang="ts">
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import { Home } from 'lucide-vue-next'
 
 interface Props {

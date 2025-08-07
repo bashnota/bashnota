@@ -13,9 +13,9 @@ import {
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/features/auth/stores/auth'
 import { useRouter } from 'vue-router'
-import { Button } from '@/ui/button'
-import { Card, CardContent } from '@/ui/card'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useNotaImport } from '@/features/nota/composables/useNotaImport'
 import { FILE_EXTENSIONS } from '@/constants/app'
 import NewsletterModal from './NewsletterModal.vue'
@@ -102,7 +102,7 @@ const handleImportIpynb = async () => {
 
 const greeting = computed(() => {
   const name = authStore.currentUser?.displayName
-  return name ? `Welcome back, ${name}!` : 'Welcome to BashNota'
+  return name ? `Welcome back, ${name}!` : ''
 })
 
 const formattedStars = computed(() => {
@@ -168,8 +168,7 @@ onMounted(() => {
             <Plus class="h-5 w-5" />
           </div>
           <div class="text-left">
-            <div class="font-semibold text-base">Create Your First Nota</div>
-            <div class="text-sm opacity-90">Start building your knowledge base</div>
+            <div class="font-semibold text-base">Create a Nota</div>
           </div>
         </div>
       </Button>

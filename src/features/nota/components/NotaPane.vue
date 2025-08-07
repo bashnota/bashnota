@@ -34,21 +34,23 @@
     <!-- Nota Content -->
     <div v-else class="flex-1 min-h-0 w-full overflow-hidden">
       <template v-if="isReady && nota">
-        <NotaEditor
-          :nota-id="pane.notaId"
-          :key="pane.notaId"
-          :can-run-all="nota && nota.config?.savedSessions && nota.config?.savedSessions.length > 0"
-          :is-executing-all="isExecutingAll"
-          @run-all="executeAllCells"
-          :is-favorite="nota?.favorite"
-          @update:favorite="toggleFavorite"
-          @update:tags="handleTagsUpdate"
-          @share="toggleShareDialog"
-          @open-config="toggleConfigModal"
-          @export-nota="exportNota"
-          class="h-full w-full"
-          ref="notaEditorRef"
-        />
+        <BlockCommandMenu :editor-view="notaEditorRef?.editor?.view">
+          <NotaEditor
+            :nota-id="pane.notaId"
+            :key="pane.notaId"
+            :can-run-all="nota && nota.config?.savedSessions && nota.config?.savedSessions.length > 0"
+            :is-executing-all="isExecutingAll"
+            @run-all="executeAllCells"
+            :is-favorite="nota?.favorite"
+            @update:favorite="toggleFavorite"
+            @update:tags="handleTagsUpdate"
+            @share="toggleShareDialog"
+            @open-config="toggleConfigModal"
+            @export-nota="exportNota"
+            class="h-full w-full"
+            ref="notaEditorRef"
+          />
+        </BlockCommandMenu>
       </template>
       
       <div v-else class="flex items-center justify-center h-full">
@@ -80,9 +82,10 @@ import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
 
 import { useLayoutStore, type Pane } from '@/stores/layoutStore'
 import { useCodeExecutionStore } from '@/features/editor/stores/codeExecutionStore'
-import { toast } from '@/ui/toast'
-import { Button } from '@/ui/button'
+import { toast } from 'vue-sonner'
+import { Button } from '@/components/ui/button'
 import NotaEditor from '@/features/editor/components/NotaEditor.vue'
+import BlockCommandMenu from '@/features/editor/components/ui/BlockCommandMenu.vue'
 import { useEditorStore } from '@/features/editor/stores/editorStore'
 import NotaConfigModal from '@/features/editor/components/blocks/nota-config/NotaConfigModal.vue'
 import PublishNotaModal from '@/features/editor/components/dialogs/PublishNotaModal.vue'
@@ -125,13 +128,26 @@ const isActive = computed(() => props.pane.isActive)
 watch(isActive, (active) => {
   if (active) {
     editorStore.setActiveEditor(notaEditorRef.value?.editor || null)
+    editorStore.setActiveEditorComponent(notaEditorRef.value || null)
   } else {
     // When pane is inactive, check if it was the active one
     if (editorStore.activeEditor === notaEditorRef.value?.editor) {
       editorStore.setActiveEditor(null)
+      editorStore.setActiveEditorComponent(null)
     }
   }
 })
+
+// Watch for when the editor becomes available and set it as active if this pane is active
+watch(
+  () => notaEditorRef.value?.editor,
+  (newEditor) => {
+    if (newEditor && isActive.value) {
+      editorStore.setActiveEditor(newEditor)
+      editorStore.setActiveEditorComponent(notaEditorRef.value)
+    }
+  }
+)
 
 const loadNota = async (notaId: string) => {
   try {

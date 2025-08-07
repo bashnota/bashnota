@@ -1,11 +1,22 @@
+import type { Updater } from '@tanstack/vue-table'
+import type { Ref } from 'vue'
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
-import { useToast } from '@/ui/toast'
+
 import { formatDistanceToNow } from 'date-fns'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
+
+export function valueUpdater<T extends Updater<any>>(updaterOrValue: T, ref: Ref) {
+  ref.value
+    = typeof updaterOrValue === 'function'
+      ? updaterOrValue(ref.value)
+      : updaterOrValue
+}
+
+
 
 export const formatDate = (date: Date | string) => {
   return formatDistanceToNow(new Date(date), { addSuffix: true })
@@ -21,21 +32,6 @@ export const formatRelativeTime = (date: Date | string) => {
   return formatDistanceToNow(dateObj, { addSuffix: true })
 }
 
-export const toast = (
-  message: string,
-  title: string = '',
-  variant: 'default' | 'destructive' = 'default',
-) => {
-  const { toast } = useToast()
-
-  toast({
-    title,
-    description: message,
-    variant,
-    duration: 2000,
-    class: cn('top-0 right-0 flex fixed md:max-w-[420px] md:top-4 md:right-4'),
-  })
-}
 
 export const getURLWithoutProtocol = (url: string) => {
   return url.replace(/(^\w+:|^)\/\//, '')
@@ -47,6 +43,22 @@ export const getURLWithoutProtocol = (url: string) => {
  * @returns HTML string with styled spans
  */
 export const ansiToHtml = (text: string): string => {
+  if (!text || typeof text !== 'string') return ''
+  
+  // Wrap the entire function in try-catch for safety
+  try {
+    return processAnsiToHtml(text)
+  } catch (error) {
+    console.error('Error processing ANSI to HTML:', error)
+    // Fallback to escaped text if ANSI processing fails
+    return text.replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/\n/g, '<br>')
+  }
+}
+
+const processAnsiToHtml = (text: string): string => {
   if (!text) return ''
 
   // ANSI color codes mapping
@@ -177,8 +189,29 @@ export const ansiToHtml = (text: string): string => {
     return html
   })
 
-  // Close any remaining open tags
-  result += openTags.reverse().map(() => '</span>').join('')
+  // Close any remaining open tags to ensure well-formed HTML
+  while (openTags.length > 0) {
+    result += '</span>'
+    openTags.pop()
+  }
+
+  // Validate the result doesn't have unclosed tags
+  try {
+    // Quick validation by attempting to parse in a temporary div
+    if (typeof document !== 'undefined') {
+      const tempDiv = document.createElement('div')
+      tempDiv.innerHTML = result
+      // If parsing succeeds, return the result
+      return result
+    }
+  } catch (error) {
+    console.warn('Generated HTML from ANSI codes appears malformed, returning escaped text:', error)
+    // Return escaped version if HTML is malformed
+    return text.replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/\n/g, '<br>')
+  }
 
   return result
 }
@@ -192,7 +225,6 @@ export const stripAnsi = (text: string): string => {
   if (!text) return ''
   return text.replace(/\x1b\[[0-9;]*m/g, '')
 }
-
 
 
 

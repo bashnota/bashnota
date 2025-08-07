@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { Button } from '@/ui/button'
-import { Input } from '@/ui/input'
-import { TagsInput, TagsInputInput, TagsInputItem } from '@/ui/tags-input'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { TagsInput, TagsInputInput, TagsInputItem } from '@/components/ui/tags-input'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 
 const props = defineProps<{
   open: boolean

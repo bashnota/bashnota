@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useNotaStore } from '@/features/nota/stores/nota'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/ui/dialog'
-import { Button } from '@/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 import { formatDate } from '@/lib/utils'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { Trash2 } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { logger } from '@/services/logger'

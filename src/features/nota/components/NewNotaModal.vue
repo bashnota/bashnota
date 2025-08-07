@@ -22,12 +22,12 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from '@/ui/dialog'
-import { Button } from '@/ui/button'
-import { Input } from '@/ui/input'
-import { Textarea } from '@/ui/textarea'
-import { Badge } from '@/ui/badge'
-import { ScrollArea } from '@/ui/scroll-area'
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Badge } from '@/components/ui/badge'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { logger } from '@/services/logger'
 import type { Nota } from '@/features/nota/types/nota'
 import { markdownToTiptap } from '@/lib/markdownToTiptap'

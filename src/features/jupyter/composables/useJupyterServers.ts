@@ -2,7 +2,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
 import { JupyterService } from '@/features/jupyter/services/jupyterService'
 import type { JupyterServer, KernelSpec } from '@/features/jupyter/types/jupyter'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { logger } from '@/services/logger'
 
 export interface ServerForm {

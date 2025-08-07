@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/ui/card'
-import { Button } from '@/ui/button'
-import { Label } from '@/ui/label'
-import { Input } from '@/ui/input'
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { Database, Download, Upload, Trash2, AlertTriangle, RotateCw } from 'lucide-vue-next'
-import { toast } from '@/ui/toast'
+import { toast } from 'vue-sonner'
 import { useNotaStore } from '@/features/nota/stores/nota'
 
 const notaStore = useNotaStore()

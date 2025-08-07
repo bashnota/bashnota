@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/ui/card'
-import { Label } from '@/ui/label'
-import { Slider } from '@/ui/slider'
-import { Switch } from '@/ui/switch'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/ui/select'
-import { toast } from '@/ui/toast'
-import { Button } from '@/ui/button'
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
+import { Slider } from '@/components/ui/slider'
+import { Switch } from '@/components/ui/switch'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { toast } from 'vue-sonner'
+import { Button } from '@/components/ui/button'
 import { RotateCw, Code } from 'lucide-vue-next'
 
 // Settings state

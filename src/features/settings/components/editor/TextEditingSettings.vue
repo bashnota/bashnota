@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/ui/card'
-import { Label } from '@/ui/label'
-import { Slider } from '@/ui/slider'
-import { Switch } from '@/ui/switch'
-import { toast } from '@/ui/toast'
-import { Button } from '@/ui/button'
-import { Input } from '@/ui/input'
+import { ref, onMounted, computed, watch } from 'vue'
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
+import { Slider } from '@/components/ui/slider'
+import { Switch } from '@/components/ui/switch'
+import { toast } from 'vue-sonner'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { RotateCw, Eye, Palette } from 'lucide-vue-next'
+import { useSettings } from '@/composables/useSettings'
 
 // Apply text color to CSS custom properties
 const applyTextColor = () => {
@@ -54,83 +55,70 @@ const applyTextColor = () => {
   }
 }
 
-// Settings state
-const fontSize = ref([16])
-const lineHeight = ref([1.6])
-const textColor = ref('#ffffff')
-const lightModeTextColor = ref('#000000')
-const autoSave = ref(true)
-const spellCheck = ref(true)
-const wordWrap = ref(true)
+// Use unified settings
+const { settings, updateSetting, resetToDefaults: resetSettings, hasUnsavedChanges } = useSettings('editor')
 
-// Load settings from localStorage
-const loadSettings = () => {
-  try {
-    const savedSettings = localStorage.getItem('editor-settings')
-    if (savedSettings) {
-      const settings = JSON.parse(savedSettings)
-      fontSize.value = [settings.fontSize?.[0] || 16]
-      lineHeight.value = [settings.lineHeight?.[0] || 1.6]
-      textColor.value = settings.textColor || '#e5e5e5'
-      lightModeTextColor.value = settings.lightModeTextColor || '#1f1f1f'
-      autoSave.value = settings.autoSave ?? true
-      spellCheck.value = settings.spellCheck ?? true
-      wordWrap.value = settings.wordWrap ?? true
-    }
-  } catch (error) {
-    console.error('Failed to load editor settings:', error)
-  }
-}
+// Computed refs for easier template usage
+const fontSize = computed({
+  get: () => settings.value.fontSize,
+  set: (value) => updateSetting('fontSize', value)
+})
 
-// Save settings to localStorage
-const saveSettings = () => {
-  const settings = {
-    fontSize: fontSize.value,
-    lineHeight: lineHeight.value,
-    textColor: textColor.value,
-    lightModeTextColor: lightModeTextColor.value,
-    autoSave: autoSave.value,
-    spellCheck: spellCheck.value,
-    wordWrap: wordWrap.value
-  }
-  
-  localStorage.setItem('editor-settings', JSON.stringify(settings))
-  
-  // Apply text color to CSS variables
+const lineHeight = computed({
+  get: () => settings.value.lineHeight,
+  set: (value) => updateSetting('lineHeight', value)
+})
+
+const textColor = computed({
+  get: () => settings.value.textColor,
+  set: (value) => updateSetting('textColor', value)
+})
+
+const lightModeTextColor = computed({
+  get: () => settings.value.lightModeTextColor,
+  set: (value) => updateSetting('lightModeTextColor', value)
+})
+
+const autoSave = computed({
+  get: () => settings.value.autoSave,
+  set: (value) => updateSetting('autoSave', value)
+})
+
+const spellCheck = computed({
+  get: () => settings.value.spellCheck,
+  set: (value) => updateSetting('spellCheck', value)
+})
+
+const wordWrap = computed({
+  get: () => settings.value.wordWrap,
+  set: (value) => updateSetting('wordWrap', value)
+})
+
+// Handle setting changes with automatic saving
+const handleSettingChange = () => {
+  // Settings are automatically saved by the store
   applyTextColor()
   
   // Dispatch event to notify other parts of the app
   if (window.dispatchEvent) {
-    window.dispatchEvent(new CustomEvent('editor-settings-changed', { detail: settings }))
+    window.dispatchEvent(new CustomEvent('editor-settings-changed', { detail: settings.value }))
   }
 }
 
-// Reset to defaults
+// Enhanced reset function
 const resetToDefaults = () => {
-  fontSize.value = [16]
-  lineHeight.value = [1.6]
-  textColor.value = '#e5e5e5'
-  lightModeTextColor.value = '#1f1f1f'
-  autoSave.value = true
-  spellCheck.value = true
-  wordWrap.value = true
-  
-  saveSettings()
-  
-  toast({
-    title: 'Settings Reset',
-    description: 'Text editing settings have been reset to defaults',
-    variant: 'default'
-  })
+  resetSettings()
+  // The store will show a toast, but we can apply text color after reset
+  applyTextColor()
 }
 
-// Watch for changes and auto-save
-const handleSettingChange = () => {
-  saveSettings()
-}
+// Watch for text color changes to apply them immediately
+watch([textColor, lightModeTextColor], () => {
+  applyTextColor()
+}, { immediate: true })
 
 onMounted(() => {
-  loadSettings()
+  // Apply initial text color
   applyTextColor()
   
   // Watch for theme mode changes (light/dark) to reapply text color
@@ -156,7 +144,6 @@ onMounted(() => {
 
 // Expose methods for parent components
 defineExpose({
-  loadSettings,
   resetToDefaults
 })
 </script>
@@ -174,11 +161,11 @@ defineExpose({
           <div class="space-y-2">
             <Label>Font Size ({{ fontSize[0] }}px)</Label>
             <Slider
-              v-model="fontSize"
+              :model-value="fontSize"
               :min="12"
               :max="24"
               :step="1"
-              @update:model-value="handleSettingChange"
+              @update:model-value="(value) => { fontSize = value || [16]; handleSettingChange() }"
             />
             <p class="text-xs text-muted-foreground">
               Adjust the font size for better readability
@@ -188,11 +175,11 @@ defineExpose({
           <div class="space-y-2">
             <Label>Line Height ({{ lineHeight[0] }})</Label>
             <Slider
-              v-model="lineHeight"
+              :model-value="lineHeight"
               :min="1.2"
               :max="2.5"
               :step="0.1"
-              @update:model-value="handleSettingChange"
+              @update:model-value="(value) => { lineHeight = value || [1.6]; handleSettingChange() }"
             />
             <p class="text-xs text-muted-foreground">
               Control spacing between lines of text
@@ -223,11 +210,11 @@ defineExpose({
                 @input="(e: any) => { textColor = e.target.value; handleSettingChange() }"
               />
               <Input
-                v-model="textColor"
+                :value="textColor"
                 type="text"
                 placeholder="#e5e5e5"
                 class="flex-1 font-mono"
-                @input="handleSettingChange"
+                @input="(e: any) => { textColor = e.target.value; handleSettingChange() }"
               />
               <div 
                 class="w-10 h-10 rounded border border-border"
@@ -249,11 +236,11 @@ defineExpose({
                 @input="(e: any) => { lightModeTextColor = e.target.value; handleSettingChange() }"
               />
               <Input
-                v-model="lightModeTextColor"
+                :value="lightModeTextColor"
                 type="text"
                 placeholder="#1f1f1f"
                 class="flex-1 font-mono"
-                @input="handleSettingChange"
+                @input="(e: any) => { lightModeTextColor = e.target.value; handleSettingChange() }"
               />
               <div 
                 class="w-10 h-10 rounded border border-border"
@@ -327,8 +314,8 @@ defineExpose({
               </p>
             </div>
             <Switch
-              v-model:checked="autoSave"
-              @update:checked="handleSettingChange"
+              :checked="autoSave"
+              @update:checked="(value) => { autoSave = value; handleSettingChange() }"
             />
           </div>
           
@@ -340,8 +327,8 @@ defineExpose({
               </p>
             </div>
             <Switch
-              v-model:checked="spellCheck"
-              @update:checked="handleSettingChange"
+              :checked="spellCheck"
+              @update:checked="(value) => { spellCheck = value; handleSettingChange() }"
             />
           </div>
           
@@ -353,8 +340,8 @@ defineExpose({
               </p>
             </div>
             <Switch
-              v-model:checked="wordWrap"
-              @update:checked="handleSettingChange"
+              :checked="wordWrap"
+              @update:checked="(value) => { wordWrap = value; handleSettingChange() }"
             />
           </div>
         </div>

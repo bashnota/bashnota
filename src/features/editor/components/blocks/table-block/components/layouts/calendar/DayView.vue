@@ -38,7 +38,7 @@ const events = computed(() => {
 
 // Generate time slots
 const timeSlots = computed(() => {
-  const slots = []
+  const slots: number[] = []
   for (let hour = 0; hour < 24; hour++) {
     slots.push(hour)
   }

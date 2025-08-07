@@ -68,12 +68,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle
-} from '@/ui/dialog'
-import { Button } from '@/ui/button'
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 import { ServerIcon, CheckIcon, Loader2 } from 'lucide-vue-next'
 import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
 import { JupyterService } from '@/features/jupyter/services/jupyterService'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { logger } from '@/services/logger'
 import type { JupyterServer } from '@/features/jupyter/types/jupyter'
 
@@ -118,11 +118,11 @@ const confirm = async () => {
       emit('select', selectedServer.value)
       emit('update:open', false)
     } else {
-      toast('Connection Failed',`Could not connect to server: ${result.message}`,'destructive')
+      toast('Connection Failed', { description: `Could not connect to server: ${result.message}` })
     }
   } catch (error) {
     logger.error('Error testing server connection:', error)
-    toast('Connection Error', 'Failed to connect to the server. Please check your connection.','destructive')
+    toast('Connection Error', { description: 'Failed to connect to the server. Please check your connection.' })
   } finally {
     testing.value = false
   }

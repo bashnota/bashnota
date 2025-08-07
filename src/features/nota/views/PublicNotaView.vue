@@ -3,10 +3,11 @@ import { ref, onMounted, computed, onBeforeMount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useAuthStore } from '@/features/auth/stores/auth'
-import { Button } from '@/ui/button'
-import { formatDate, toast } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { formatDate } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { Share2, ChevronLeft, ChevronUp, ChevronDown, FileText, FileCode } from 'lucide-vue-next'
-import LoadingSpinner from '@/ui/LoadingSpinner.vue'
+import { Skeleton } from '@/components/ui/skeleton'
 import NotaContentViewer from '@/features/editor/components/NotaContentViewer.vue'
 import { type PublishedNota } from '@/features/nota/types/nota'
 import { logger } from '@/services/logger'
@@ -388,8 +389,8 @@ const loadVotingData = async () => {
 const handleVote = async (voteType: 'like' | 'dislike') => {
   // Must be logged in to vote
   if (!authStore.isAuthenticated || !authStore.currentUser?.uid) {
-    toast('Please log in to vote', '', 'destructive');
-    return;
+    toast('Please log in to vote')
+    return
   }
   
   // Must have a valid nota
@@ -418,7 +419,7 @@ const handleVote = async (voteType: 'like' | 'dislike') => {
     }
   } catch (error) {
     logger.error('Failed to record vote:', error);
-    toast('Failed to record your vote', '', 'destructive');
+    toast('Failed to record your vote')
   } finally {
     isVoting.value = false;
   }
@@ -449,7 +450,7 @@ const openCitationDialog = () => {
   <main class="container mx-auto py-8 px-4">
     <!-- Loading state -->
     <div v-if="isLoading" class="flex justify-center items-center h-64" aria-live="polite">
-      <LoadingSpinner class="w-10 h-10" />
+      <Skeleton class="w-10 h-10 rounded-full" />
       <span class="sr-only">Loading note content</span>
     </div>
 
@@ -585,7 +586,7 @@ const openCitationDialog = () => {
                 size="sm"
                 :disabled="isVoting"
                 @click="authStore.isAuthenticated ? handleVote('like') : null"
-                @mouseenter="!authStore.isAuthenticated ? toast('Please login to vote', '', 'default') : null"
+                @mouseenter="!authStore.isAuthenticated ? toast('Please login to vote') : null"
               >
                 <ChevronUp 
                   class="h-5 w-5 transition-transform duration-200" 
@@ -610,7 +611,7 @@ const openCitationDialog = () => {
                 size="sm"
                 :disabled="isVoting"
                 @click="authStore.isAuthenticated ? handleVote('dislike') : null"
-                @mouseenter="!authStore.isAuthenticated ? toast('Please login to vote', '', 'default') : null"
+                @mouseenter="!authStore.isAuthenticated ? toast('Please login to vote') : null"
               >
                 <ChevronDown 
                   class="h-5 w-5 transition-transform duration-200" 

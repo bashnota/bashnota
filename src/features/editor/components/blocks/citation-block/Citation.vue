@@ -3,12 +3,12 @@ import { NodeViewWrapper } from '@tiptap/vue-3'
 import { useCitationStore } from '@/features/editor/stores/citationStore'
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import { Link, ExternalLink, Edit, Copy, ClipboardCheck, X, Search, Loader2 } from 'lucide-vue-next'
 import type { CitationEntry } from '@/features/nota/types/nota'
-import { Input } from '@/ui/input'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/ui/tabs'
-import { toast } from '@/lib/utils'
+import { Input } from '@/components/ui/input'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { toast } from 'vue-sonner'
 
 const props = defineProps({
   node: {
@@ -341,7 +341,7 @@ const importCitation = async (citation: CitationEntry) => {
     toast('Citation imported successfully')
   } catch (error) {
     console.error('Error importing citation:', error)
-    toast('Failed to import citation', 'Error', 'destructive')
+    toast('Failed to import citation', { description: 'Error' })
   }
 }
 </script>

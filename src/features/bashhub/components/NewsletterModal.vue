@@ -6,11 +6,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/ui/dialog'
-import { Button } from '@/ui/button'
-import { Badge } from '@/ui/badge'
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { useNewsletter } from '../composables/useNewsletter'
-import LoadingSpinner from '@/ui/LoadingSpinner.vue'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Mail, Zap, Shield, Coffee } from 'lucide-vue-next'
 
 defineProps<{
@@ -84,7 +84,7 @@ const handleSignupClick = async () => {
           class="w-full h-12 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02]" 
           :disabled="isSubscribing"
         >
-          <LoadingSpinner v-if="isSubscribing" class="mr-2 h-4 w-4" />
+          <Skeleton v-if="isSubscribing" class="mr-2 h-4 w-4 rounded-full" />
           <Mail v-else class="mr-2 h-4 w-4" />
           <span class="font-semibold">{{ isSubscribing ? 'Joining the Resistance...' : 'Join the Resistance' }}</span>
         </Button>

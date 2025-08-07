@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import NotaEditor from '@/features/editor/components/NotaEditor.vue'
+import BlockCommandMenu from '@/features/editor/components/ui/BlockCommandMenu.vue'
 import NotaConfigModal from '@/features/editor/components/blocks/nota-config/NotaConfigModal.vue'
 import { ref, onMounted, watch, computed } from 'vue'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
 import { useTabsStore } from '@/stores/tabsStore'
 import { useCodeExecutionStore } from '@/features/editor/stores/codeExecutionStore'
-import { toast } from '@/ui/toast'
+import { toast } from 'vue-sonner'
 import PublishNotaModal from '@/features/editor/components/dialogs/PublishNotaModal.vue'
 import { logger } from '@/services/logger'
 
@@ -25,6 +26,7 @@ const isExecutingAll = ref(false)
 const isReady = ref(false)
 const showConfigModal = ref(false)
 const showShareDialog = ref(false)
+const notaEditorRef = ref()
 
 // Computed properties
 const nota = computed(() => notaStore.getCurrentNota(props.id))
@@ -179,21 +181,24 @@ const handleTagsUpdate = async (tags: string[]) => {
     <!-- Main content area -->
     <main class="flex-1 min-h-0 overflow-hidden">
       <template v-if="isReady && nota">
-        <NotaEditor
-          :nota-id="id"
-          :key="id"
-          :can-run-all="nota && nota.config?.savedSessions && nota.config?.savedSessions.length > 0"
-          :is-executing-all="isExecutingAll"
-          @run-all="executeAllCells"
-          :is-favorite="nota?.favorite"
-          @update:favorite="toggleFavorite"
-          @update:tags="handleTagsUpdate"
-          @share="toggleShareDialog"
-          @open-config="toggleConfigModal"
-          @export-nota="exportNota"
-        >
-          <!-- We no longer need to pass NotaMetadata as a slot since the editor handles it internally -->
-        </NotaEditor>
+        <BlockCommandMenu :editor-view="notaEditorRef?.editor?.view">
+          <NotaEditor
+            ref="notaEditorRef"
+            :nota-id="id"
+            :key="id"
+            :can-run-all="nota && nota.config?.savedSessions && nota.config?.savedSessions.length > 0"
+            :is-executing-all="isExecutingAll"
+            @run-all="executeAllCells"
+            :is-favorite="nota?.favorite"
+            @update:favorite="toggleFavorite"
+            @update:tags="handleTagsUpdate"
+            @share="toggleShareDialog"
+            @open-config="toggleConfigModal"
+            @export-nota="exportNota"
+          >
+            <!-- We no longer need to pass NotaMetadata as a slot since the editor handles it internally -->
+          </NotaEditor>
+        </BlockCommandMenu>
       </template>
       
       <div v-else class="flex items-center justify-center h-full">

@@ -3,7 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { logger } from '@/services/logger'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 
 export interface Tab {
   id: string       // Unique ID for the tab (same as nota ID)
@@ -19,7 +19,9 @@ export const useTabsStore = defineStore('tabs', () => {
   const tabs = ref<Tab[]>([])
   const activeTabId = ref<string | null>(null)
   const router = useRouter()
-  const notaStore = useNotaStore()
+  
+  // Lazy getter for notaStore
+  const getNotaStore = () => useNotaStore()
   
   // Initialize from localStorage if available
   const initializeFromStorage = () => {
@@ -81,7 +83,7 @@ export const useTabsStore = defineStore('tabs', () => {
     // Fetch title from nota store if not provided
     let tabTitle = tab.title
     if (!tabTitle && tab.route.name === 'nota') {
-      const nota = notaStore.getItem(tab.id)
+      const nota = getNotaStore().getItem(tab.id)
       tabTitle = nota?.title || 'Untitled'
     }
     

@@ -2,37 +2,210 @@
 import { RouterView, useRouter, useRoute } from 'vue-router'
 import AppSidebar from '@/features/nota/components/AppSidebar.vue'
 import AppTabs from '@/features/nota/components/AppTabs.vue'
+import CitationPicker from '@/features/editor/components/blocks/citation-block/CitationPicker.vue'
+import SubNotaDialog from '@/features/editor/components/blocks/SubNotaDialog.vue'
 
 
 import ServerSelectionDialogWrapper from '@/features/editor/components/jupyter/ServerSelectionDialogWrapper.vue'
-import { ref, onMounted, watch, onUnmounted, computed } from 'vue'
-import { Button } from '@/ui/button'
-import { cn } from '@/lib/utils'
-import Toaster from '@/ui/toast/Toaster.vue'
-import { useAuthStore } from '@/features/auth/stores/auth'
-import { useEditorStore } from '@/features/editor/stores/editorStore'
-import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
+import { onMounted, computed, ref } from 'vue'
+import { TooltipProvider } from '@/components/ui/tooltip'
+import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar'
 
-import { Menu, Home, Globe, PanelTopClose } from 'lucide-vue-next'
-import { logger } from '@/services/logger'
-import { useNotaImport } from '@/features/nota/composables/useNotaImport'
-import SidebarPanel from '@/components/SidebarPanel.vue'
+import { useAuthStore } from '@/features/auth/stores/auth'
+import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
+import { useEditorStore } from '@/features/editor/stores/editorStore'
+import { useNotaStore } from '@/features/nota/stores/nota'
+
+import MenubarSidebars from '@/components/MenubarSidebars.vue'
 import PinnedSidebars from '@/components/PinnedSidebars.vue'
 import { useSidebarManager } from '@/composables/useSidebarManager'
+import RightSidebarContainer from '@/components/RightSidebarContainer.vue'
+import EditorToolbar from '@/features/editor/components/ui/EditorToolbar.vue'
+import ExportDialog from '@/features/editor/components/dialogs/ExportDialog.vue'
+import { toast } from 'vue-sonner'
 
-const isSidebarOpen = ref(false)
-const sidebarWidth = ref(300)
-const isResizing = ref(false)
+import { useLayoutStore } from '@/stores/layoutStore'
+
 const authStore = useAuthStore()
-const editorStore = useEditorStore()
 const jupyterStore = useJupyterStore()
-const route = useRoute()
-const router = useRouter()
+const editorStore = useEditorStore()
+const notaStore = useNotaStore()
+const layoutStore = useLayoutStore()
 const sidebarManager = useSidebarManager()
 
-// Check if we're in BashHub view
-const isInBashHub = computed(() => route.name === 'bashhub')
-const isNotaView = computed(() => route.name === 'nota')
+// Export dialog state
+const showExportDialog = ref(false)
+const exportTargetNota = ref<any>(null)
+
+// Computed properties for toolbar
+const activeNota = computed(() => {
+  const activePane = layoutStore.activePaneObj
+  if (activePane && activePane.notaId) {
+    return notaStore.getItem(activePane.notaId)
+  }
+  return null
+})
+
+const wordCount = computed(() => {
+  if (!activeNota.value?.content) return 0
+  
+  // Remove HTML tags and count words
+  const textContent = activeNota.value.content
+    .replace(/<[^>]*>/g, '') // Remove HTML tags
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim()
+  
+  return textContent ? textContent.split(' ').length : 0
+})
+
+const canRunAll = computed(() => {
+  return !!(activeNota.value && activeNota.value.config?.savedSessions && activeNota.value.config?.savedSessions.length > 0)
+})
+
+// Toolbar event handlers
+const handleRunAll = () => {
+  // Implement run all logic
+  console.log('Run all triggered')
+}
+
+const handleToggleFavorite = async () => {
+  // Get the active nota from either the active editor component or the layout store
+  let targetNota: any = null
+  
+  if (editorStore.activeEditorComponent && editorStore.activeEditorComponent.currentNota) {
+    // Use the nota from the active editor component (split view)
+    targetNota = editorStore.activeEditorComponent.currentNota
+  } else if (activeNota.value) {
+    // Fallback to the nota from layout store
+    targetNota = activeNota.value
+  }
+
+  if (targetNota) {
+    await notaStore.toggleFavorite(targetNota.id)
+    toast(targetNota.favorite ? 'Removed from favorites' : 'Added to favorites', {
+      description: `"${targetNota.title || 'Untitled'}" ${targetNota.favorite ? 'removed from' : 'added to'} your favorites`,
+      duration: 3000
+    })
+  } else {
+    toast('Unable to toggle favorite', {
+      description: 'No document is currently active.',
+      duration: 3000
+    })
+  }
+}
+
+const handleShare = () => {
+  // Get the active nota from either the active editor component or the layout store
+  let targetNota: any = null
+  
+  if (editorStore.activeEditorComponent && editorStore.activeEditorComponent.currentNota) {
+    // Use the nota from the active editor component (split view)
+    targetNota = editorStore.activeEditorComponent.currentNota
+  } else if (activeNota.value) {
+    // Fallback to the nota from layout store
+    targetNota = activeNota.value
+  }
+
+  if (targetNota) {
+    // Implement share logic for the specific nota
+    console.log('Share triggered for nota:', targetNota.id, targetNota.title)
+    toast('Share feature coming soon', {
+      description: `Sharing "${targetNota.title || 'Untitled'}"`,
+      duration: 3000
+    })
+  } else {
+    toast('Unable to share', {
+      description: 'No document is currently active.',
+      duration: 3000
+    })
+  }
+}
+
+const handleOpenConfig = () => {
+  // Implement config modal logic
+  console.log('Config triggered')
+}
+
+const handleExportNota = () => {
+  // Get the active nota from either the active editor component or the layout store
+  let targetNota: any = null
+  
+  if (editorStore.activeEditorComponent && editorStore.activeEditorComponent.currentNota) {
+    // Use the nota from the active editor component (split view)
+    targetNota = editorStore.activeEditorComponent.currentNota
+  } else if (activeNota.value) {
+    // Fallback to the nota from layout store
+    targetNota = activeNota.value
+  }
+
+  if (targetNota) {
+    // Set the target nota and show the export dialog
+    exportTargetNota.value = targetNota
+    showExportDialog.value = true
+  } else {
+    toast('Unable to export', {
+      description: 'No document is currently active.',
+      duration: 3000
+    })
+  }
+}
+
+const handleSaveVersion = async () => {
+  try {
+    // Try to use the active editor component first (for split view)
+    if (editorStore.activeEditorComponent) {
+      await editorStore.saveVersion()
+    } else if (activeNota.value) {
+      // Fallback for cases where no active editor component is available
+      await notaStore.saveNotaVersion({
+        id: activeNota.value.id,
+        content: activeNota.value.content || '',
+        versionName: `Version ${new Date().toLocaleString()}`,
+        createdAt: new Date()
+      })
+      toast('Version saved successfully', {
+        description: 'A new version of your document has been created.',
+        duration: 3000
+      })
+    } else {
+      toast('Unable to save version', {
+        description: 'No document is currently active.',
+        duration: 3000
+      })
+    }
+  } catch (error) {
+    console.error('Error saving version:', error)
+    toast('Failed to save version', {
+      description: 'An error occurred while saving the document version.',
+      duration: 3000
+    })
+  }
+}
+
+const handleOpenHistory = () => {
+  try {
+    // Use the editor store to open history for the active editor component
+    if (editorStore.activeEditorComponent) {
+      editorStore.openHistory()
+    } else {
+      toast('Unable to open history', {
+        description: 'No document is currently active.',
+        duration: 3000
+      })
+    }
+  } catch (error) {
+    console.error('Error opening history:', error)
+    toast('Failed to open version history', {
+      description: 'An error occurred while opening the version history.',
+      duration: 3000
+    })
+  }
+}
+
+const handleToggleSidebar = (sidebarId: any) => {
+  sidebarManager.toggleSidebar(sidebarId)
+}
+
 
 onMounted(async () => {
   // Initialize auth state
@@ -43,173 +216,74 @@ onMounted(async () => {
   
   // Initialize sidebar manager
   sidebarManager.initialize()
-  
-  const savedState = localStorage.getItem('sidebar-state')
-  if (savedState) {
-    isSidebarOpen.value = JSON.parse(savedState)
-  }
-  
-  // Load sidebar width from interface settings
-  const savedInterfaceSettings = localStorage.getItem('interface-settings')
-  if (savedInterfaceSettings) {
-    try {
-      const settings = JSON.parse(savedInterfaceSettings)
-      if (settings.sidebarWidth && settings.sidebarWidth[0]) {
-        sidebarWidth.value = settings.sidebarWidth[0]
-      }
-    } catch (e) {
-      logger.error('Failed to parse saved interface settings', e)
-    }
-  } else {
-    const savedWidth = localStorage.getItem('sidebar-width')
-    if (savedWidth) {
-      sidebarWidth.value = parseInt(savedWidth)
-    }
-  }
-
-  // Listen for settings changes
-  window.addEventListener('interface-settings-changed', ((event: CustomEvent) => {
-    if (event.detail?.sidebarWidth && event.detail.sidebarWidth[0]) {
-      sidebarWidth.value = event.detail.sidebarWidth[0]
-    }
-  }) as EventListener)
-
-  // Setup resize handling
-  document.addEventListener('mousemove', handleMouseMove)
-  document.addEventListener('mouseup', stopResize)
 })
 
-// Clean up event listeners on unmount
-onUnmounted(() => {
-  document.removeEventListener('mousemove', handleMouseMove)
-  document.removeEventListener('mouseup', stopResize)
-})
-
-watch(isSidebarOpen, (newState) => {
-  localStorage.setItem('sidebar-state', JSON.stringify(newState))
-})
-
-// Resize functionality
-const startResize = () => {
-  isResizing.value = true
-  document.body.classList.add('select-none')
-  document.body.classList.add('cursor-col-resize')
-}
-
-const stopResize = () => {
-  isResizing.value = false
-  document.body.classList.remove('select-none')
-  document.body.classList.remove('cursor-col-resize')
-}
-
-const handleMouseMove = (event: MouseEvent) => {
-  if (!isResizing.value) return
-
-  const newWidth = Math.max(200, Math.min(400, event.clientX))
-  sidebarWidth.value = newWidth
-  localStorage.setItem('sidebar-width', newWidth.toString())
-}
-
-// Toggle between main view and BashHub
-const toggleBashHub = () => {
-  if (isInBashHub.value) {
-    router.push('/')
-  } else {
-    router.push('/bashhub')
-  }
-}
 
 </script>
 
 <template>
-  <div class="flex h-screen w-screen overflow-hidden bg-background">
-    <!-- Sidebar -->
-    <div
-      :style="{ width: `${sidebarWidth}px` }"
-      :class="
-        cn(
-          'transition-transform duration-300 ease-in-out relative shrink-0',
-          !isSidebarOpen && '-translate-x-full',
-        )
-      "
-    >
+  <TooltipProvider>
+    <SidebarProvider>
       <AppSidebar />
-
-      <!-- Resize Handle -->
-      <div
-        class="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/50 transition-colors"
-        @mousedown="startResize"
-      ></div>
-    </div>
-
-    <!-- Main Content -->
-    <div
-      class="flex-1 flex flex-col overflow-hidden transition-all duration-300 ease-in-out max-h-[100vh]"
-      :style="{ marginLeft: !isSidebarOpen ? `-${sidebarWidth}px` : '0' }"
-    >
-      <!-- Top Bar -->
-      <div class="sticky top-0 z-10 border-b bg-background text-foreground backdrop-blur-sm">
-        <div class="flex items-center justify-between px-4 h-14">
-          <div class="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              @click="isSidebarOpen = !isSidebarOpen"
-              :title="isSidebarOpen ? 'Hide sidebar' : 'Show sidebar'"
-            >
-              <Menu class="h-5 w-5" />
-            </Button>
-            <Button
-              v-if="isNotaView"
-              variant="ghost"
-              size="icon"
-              @click="editorStore.toggleToolbar"
-              title="Toggle toolbar"
-            >
-              <PanelTopClose class="h-5 w-5" />
-            </Button>
+      <SidebarInset>
+        <!-- Top Bar -->
+        <div class="sticky top-0 z-10 border-b bg-background text-foreground backdrop-blur-sm">
+          <div class="flex items-center justify-between px-4 h-14">
+            <div class="flex items-center gap-4">
+              <SidebarTrigger />
+              
+              <!-- Pinned Sidebars -->
+              <PinnedSidebars />
+              
+              <!-- Sidebar Menubar -->
+              <MenubarSidebars />
+            </div>
             
-            <!-- Pinned Sidebars -->
-            <PinnedSidebars />
-            
-            <!-- Sidebar Panel -->
-            <SidebarPanel />
-          </div>
-          
-          <!-- Actions and BashHub Toggle -->
-          <div class="flex items-center gap-2">
-            
-            <!-- BashHub Toggle Button -->
-            <Button
-              variant="outline"
-              size="sm"
-              @click="toggleBashHub"
-              :class="{'bg-primary/10': isInBashHub}"
-            >
-              <Globe v-if="isInBashHub" class="h-4 w-4 mr-2" />
-              <Home v-else class="h-4 w-4 mr-2" />
-              {{ isInBashHub ? 'Go to My Notas' : 'Go to Hub' }}
-            </Button>
+            <!-- Actions and Editor Toolbar -->
+            <div class="flex items-center gap-2">
+              <!-- Editor Toolbar Navigation Menu -->
+              <EditorToolbar
+                :can-run-all="canRunAll"
+                :is-executing-all="false"
+                :is-favorite="activeNota?.favorite || false"
+                :word-count="wordCount"
+                @run-all="handleRunAll"
+                @toggle-favorite="handleToggleFavorite"
+                @share="handleShare"
+                @open-config="handleOpenConfig"
+                @export-nota="handleExportNota"
+                @save-version="handleSaveVersion"
+                @open-history="handleOpenHistory"
+                @toggle-sidebar="handleToggleSidebar"
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- Global Split Creation Zone (only when dragging) -->
-      <AppTabs v-if="!isInBashHub" />
+        <!-- Global Split Creation Zone (only when dragging) -->
+        <AppTabs />
 
-      <!-- Content Area: Use RouterView for all routes -->
-      <div class="flex-1 min-h-0 flex flex-col overflow-auto">
-        <RouterView class="flex-1 h-full" />
-      </div>
-    </div>
-  </div>
-  
-  <!-- Toast notifications -->
-  <Toaster />
-  
-  <!-- Global components that need to be available anywhere -->
-  <ServerSelectionDialogWrapper />
-  
+        <!-- Main content area with right sidebar -->
+        <div class="flex flex-1 min-h-0 overflow-hidden">
+          <!-- Content Area: Use RouterView for all routes -->
+          <div class="flex-1 min-h-0 flex flex-col overflow-auto">
+            <RouterView class="flex-1 h-full" />
+          </div>
+          
+          <!-- Right Sidebars Container -->
+          <RightSidebarContainer :editor="editorStore.activeEditor as any" />
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
+    
+    <!-- Global components that need to be available anywhere -->
+    <ServerSelectionDialogWrapper />
+    <CitationPicker />
+    <SubNotaDialog />
+    
+    <!-- Export Dialog -->
+    <ExportDialog v-model:open="showExportDialog" :nota="exportTargetNota" />
+  </TooltipProvider>
 </template>
 
 <style>

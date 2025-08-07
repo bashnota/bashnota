@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { JupyterServer, KernelSpec } from '@/features/jupyter/types/jupyter'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { logger } from '@/services/logger'
 import { JupyterService } from '@/features/jupyter/services/jupyterService'
 

@@ -129,7 +129,6 @@ export const useAIActionsStore = defineStore('aiActions', () => {
     return categories
   })
 
-  // 🔥 NEW: Separate code-focused actions from text-focused actions
   const codeActions = computed(() => 
     enabledCustomActions.value.filter(action => 
       // Include actions that work with {{code}} template or are code-specific
@@ -302,7 +301,6 @@ export const useAIActionsStore = defineStore('aiActions', () => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     },
-    // 🔥 NEW: Essential code-specific actions
     {
       id: 'refactor-code',
       name: 'Refactor Code',
@@ -493,7 +491,6 @@ export const useAIActionsStore = defineStore('aiActions', () => {
       language?: string; 
       error?: string; 
       text?: string;
-      // 🔥 NEW: Enhanced execution context
       executionTime?: number;
       sessionId?: string;
       kernelName?: string;
@@ -521,7 +518,6 @@ export const useAIActionsStore = defineStore('aiActions', () => {
       throw new Error(`API key is required for ${provider} provider. Please configure your API key in Settings > AI Assistant > AI Providers.`)
     }
 
-    // 🔥 NEW: Enhanced WebLLM validation and auto-loading
     if (provider === 'webllm') {
       const webllmAutoLoad = state.providerSettings.webllmAutoLoad ?? true
       if (!webllmAutoLoad) {
@@ -533,7 +529,6 @@ export const useAIActionsStore = defineStore('aiActions', () => {
     state.lastError = null
 
     try {
-      // 🔥 NEW: Enhanced context building for more intelligent AI responses
       const executionMetadata = context.executionTime ? `\n\nExecution Metadata:
 - Execution Time: ${context.executionTime}ms
 - Session: ${context.sessionId || 'None'}
@@ -550,7 +545,6 @@ export const useAIActionsStore = defineStore('aiActions', () => {
         .replace(/\{\{text\}\}/g, context.text || '')
         .replace(/\{\{chatContext\}\}/g, context.chatContext || '')
       
-      // 🔥 NEW: Add execution context to error-related actions
       if ((action.id === 'fix-error' || action.category === 'debugging') && (executionMetadata || outputContext)) {
         prompt += executionMetadata + outputContext
       }
@@ -570,7 +564,6 @@ export const useAIActionsStore = defineStore('aiActions', () => {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       state.lastError = errorMessage
       
-      // 🔥 NEW: Enhanced error handling for WebLLM
       if (provider === 'webllm' && errorMessage.includes('not initialized')) {
         logger.error(`WebLLM initialization failed for action ${actionId}:`, error)
         throw new Error(`WebLLM model not initialized. Please go to Settings > AI Assistant > AI Providers and load a WebLLM model, or select a different AI provider.`)
@@ -601,7 +594,6 @@ export const useAIActionsStore = defineStore('aiActions', () => {
       case 'openai':
         return !!apiKey
       case 'webllm':
-        // 🔥 ENHANCED: Check WebLLM auto-loading configuration
         const webllmAutoLoad = state.providerSettings.webllmAutoLoad ?? true
         return webllmAutoLoad // WebLLM is configured if auto-loading is enabled
       case 'ollama':

@@ -1,16 +1,16 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
-import { ScrollArea } from '@/ui/scroll-area'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Table,
   TableBody,
   TableHead,
   TableHeader,
   TableRow,
-} from '@/ui/table'
+} from '@/components/ui/table'
 import {
   DropdownMenu,
-} from '@/ui/dropdown-menu'
+} from '@/components/ui/dropdown-menu'
 import type { TableData } from '@/features/editor/components/blocks/table-block/TableExtension'
 import type { ColumnType } from '@/features/editor/components/blocks/table-block/composables/useTableOperations'
 

@@ -1,6 +1,6 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useAISettingsStore } from '@/features/ai/stores/aiSettingsStore'
-import { toast } from '@/ui/toast'
+import { toast } from 'vue-sonner'
 import { logger } from '@/services/logger'
 
 export interface ModelInfo {

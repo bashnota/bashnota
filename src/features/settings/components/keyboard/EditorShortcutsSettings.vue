@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/ui/card'
-import { Button } from '@/ui/button'
-import { Input } from '@/ui/input'
-import { Label } from '@/ui/label'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/ui/table'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/ui/dialog'
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { RotateCw, Pencil, Keyboard } from 'lucide-vue-next'
-import { toast } from '@/ui/toast'
+import { toast } from 'vue-sonner'
 import { useShortcutsStore } from '@/stores/shortcutsStore'
 
 const shortcutsStore = useShortcutsStore()

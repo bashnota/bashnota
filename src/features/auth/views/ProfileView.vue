@@ -2,9 +2,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/features/auth/stores/auth'
 import { useRouter } from 'vue-router'
-import { Button } from '@/ui/button'
-import { Input } from '@/ui/input'
-import { Label } from '@/ui/label'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import UserTagEditor from '@/features/auth/components/UserTagEditor.vue'
 import {
   Card,
@@ -13,9 +13,9 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from '@/ui/card'
+} from '@/components/ui/card'
 import { Mail, User, ShieldCheck, Calendar, Clock, AtSign } from 'lucide-vue-next'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { formatDate } from '@/lib/utils'
 import { logger } from '@/services/logger'
 
@@ -61,7 +61,7 @@ const handleResetPassword = async () => {
 // Handle account deletion (in a real app, this would need server-side implementation)
 const handleDeleteAccount = async () => {
   if (deleteConfirmationText.value !== 'DELETE') {
-    toast('Please type DELETE to confirm account deletion', 'Confirmation Required', 'destructive')
+    toast('Please type DELETE to confirm account deletion', { description: 'Confirmation Required' })
     return
   }
 
@@ -69,7 +69,7 @@ const handleDeleteAccount = async () => {
 
   try {
     // In a real app, you would call a server-side function to delete the user's account
-    toast('Account deletion is not implemented in this demo', 'Demo Limitation')
+    toast('Account deletion is not implemented in this demo', { description: 'Demo Limitation' })
     showDeleteConfirmation.value = false
     deleteConfirmationText.value = ''
   } catch (error) {

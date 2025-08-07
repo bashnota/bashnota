@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import { Bot, Sparkles as SparklesIcon } from 'lucide-vue-next'
 
 const emit = defineEmits(['create-session'])

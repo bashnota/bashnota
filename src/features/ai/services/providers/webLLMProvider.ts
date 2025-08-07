@@ -58,7 +58,6 @@ export class WebLLMProvider implements AIProvider {
     if (!this.engine && webLLMDefaultModelService.shouldAutoLoad(this.currentModel)) {
       let autoLoadModelId = webLLMDefaultModelService.getAutoLoadModelId();
       
-      // 🔥 ENHANCED: Smart model selection based on user preferences and auto-load strategy
       if (!autoLoadModelId) {
         logger.info('No WebLLM model configured, attempting intelligent model selection...');
         try {
@@ -166,7 +165,6 @@ export class WebLLMProvider implements AIProvider {
     if (!this.engine && webLLMDefaultModelService.shouldAutoLoad(this.currentModel)) {
       let autoLoadModelId = webLLMDefaultModelService.getAutoLoadModelId();
       
-              // 🔥 ENHANCED: Smart model selection for streaming (reuse main logic)
         if (!autoLoadModelId) {
           logger.info('No WebLLM model configured for streaming, attempting intelligent model selection...');
           try {

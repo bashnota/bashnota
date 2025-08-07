@@ -34,7 +34,7 @@
 </template>
 
 <script setup lang="ts">
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import type { JupyterServer, KernelSpec } from '@/features/jupyter/types/jupyter'
 import KernelLanguageBadge from './KernelLanguageBadge.vue'
 

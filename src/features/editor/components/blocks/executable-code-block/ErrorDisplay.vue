@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { AlertCircle, ChevronDown, ChevronUp, RefreshCw } from 'lucide-vue-next'
-import { Button } from '@/ui/button'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/ui/collapsible'
+import { Button } from '@/components/ui/button'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 
 const props = defineProps<{
   error: string

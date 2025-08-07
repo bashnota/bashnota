@@ -6,22 +6,27 @@ import type { KernelConfig } from '@/features/jupyter/types/jupyter'
 import { useCodeBlockCore } from '@/features/editor/components/blocks/executable-code-block/composables/useCodeBlockCore'
 import { useCodeBlockUI } from '@/features/editor/components/blocks/executable-code-block/composables/ui/useCodeBlockUI'
 import { useCodeBlockExecutionSimplified } from '@/features/editor/components/blocks/executable-code-block/composables/useCodeBlockExecutionSimplified'
+import { useRobustExecution } from '@/features/editor/composables/useRobustExecution'
 import { useCodeExecutionStore } from '@/features/editor/stores/codeExecutionStore'
+import { useEnhancedOutputManagement } from '@/features/editor/composables/useEnhancedOutputManagement'
+
+// Get code execution store instance
+const codeExecutionStore = useCodeExecutionStore()
 
 // Components
 import CodeBlockToolbar from './components/CodeBlockToolbar.vue'
+import SideToolbar from './components/SideToolbar.vue'
 import StatusIndicator from './components/StatusIndicator.vue'
 import WarningBanners from './components/WarningBanners.vue'
 import CodeEditor from './components/CodeEditor.vue'
-import OutputSection from './components/OutputSection.vue'
+import OutputDisplay from './components/OutputDisplay.vue'
 import FullScreenCodeBlock from './FullScreenCodeBlock.vue'
 import ExecutionStatus from './ExecutionStatus.vue'
 import ErrorDisplay from './ErrorDisplay.vue'
 import TemplateSelector from './TemplateSelector.vue'
-import KernelConfigurationModal from './components/KernelConfigurationModal.vue'
 
 // UI utilities
-import { toast } from '@/ui/toast/use-toast'
+import { toast } from 'vue-sonner'
 
 // Types
 interface Props {
@@ -34,6 +39,7 @@ interface Props {
   isReadOnly?: boolean
   isExecuting?: boolean
   isPublished?: boolean
+  initialOutput?: string // CRITICAL: Add initial output prop
 }
 
 const props = defineProps<Props>()
@@ -44,6 +50,7 @@ const emit = defineEmits<{
   'update:output': [output: string]
   'update:session-id': [sessionId: string]
   'server-change': [serverId: string]
+  'open-configuration': []
 }>()
 
 // Core state and functionality
@@ -73,9 +80,6 @@ const {
   showTemplateDialog
 } = useCodeBlockUI()
 
-// Configuration modal state
-const isConfigurationModalOpen = ref(false)
-
 // Execution and session management
 const {
   isExecuting,
@@ -86,40 +90,105 @@ const {
   currentExecutionTime,
   errorMessage,
   cell,
-  selectedServer,
-  selectedKernel,
-  selectedSession,
-  availableServers,
-  availableKernels,
-  availableSessions,
-  runningKernels,
-  isServerOpen,
-  isKernelOpen,
-  isSessionOpen,
-  isSharedSessionMode,
   executeCode,
   initializeComponent,
-  handleServerChange,
-  handleKernelChange,
-  handleSessionChange,
-  handleCreateNewSession,
-  handleClearAllKernels,
-  handleRefreshSessions,
-  handleRunningKernelSelect,
   handleErrorDismissed,
   handleAICodeUpdate,
   handleCustomActionExecuted
 } = useCodeBlockExecutionSimplified(props, emit, {
   codeValue,
   isReadyToExecute
-}) 
+})
+
+// Server/kernel selection - get from store or use robust execution
+const selectedServer = computed(() => {
+  const cell = codeExecutionStore.getCellById(props.id)
+  return cell?.serverConfig ? `${cell.serverConfig.ip}:${cell.serverConfig.port}` : ''
+})
+
+const selectedKernel = computed(() => {
+  const cell = codeExecutionStore.getCellById(props.id)
+  return cell?.kernelName || ''
+})
+
+const selectedSession = computed(() => {
+  const cell = codeExecutionStore.getCellById(props.id)
+  return cell?.sessionId || ''
+})
+
+const availableServers = computed(() => [])
+const availableKernels = computed(() => [])
+const availableSessions = computed(() => [])
+const runningKernels = computed(() => [])
+const isServerOpen = ref(false)
+const isKernelOpen = ref(false)
+const isSessionOpen = ref(false)
+const isSharedSessionMode = computed(() => false)
+
+// Dummy handlers that won't be used since we have our own toolbar
+const handleServerChange = () => {}
+const handleKernelChange = () => {}
+const handleSessionChange = () => {}
+const handleCreateNewSession = () => {}
+const handleClearAllKernels = () => {}
+const handleRefreshSessions = () => {}
+const handleRunningKernelSelect = () => {} 
 
 // Component state
 const isMounted = ref(false)
 
+// Robust execution handling
+const { executeCell: robustExecuteCell, getExecutionStatus } = useRobustExecution()
+
+// Enhanced output persistence system
+const outputPersistence = useEnhancedOutputManagement({
+  cellId: props.id,
+  autoSave: true,
+  updateAttributes: (attrs) => {
+    // CRITICAL: Emit to parent wrapper for nota saving
+    console.log(`[CodeBlockWithExecution] Emitting output update for cell ${props.id}:`, attrs.output || '')
+    emit('update:output', attrs.output || '')
+  },
+  onOutputUpdate: (output) => {
+    // Additional handling when output updates
+    console.log(`[CodeBlockWithExecution] Output updated for cell ${props.id}:`, { length: output.length })
+  }
+})
+
+// Create a wrapper function for nota updates
+const updateOutputToNota = (attrs: any) => {
+  console.log(`[CodeBlockWithExecution] Direct nota update for cell ${props.id}:`, attrs.output || '')
+  emit('update:output', attrs.output || '')
+}
+
 // Focus management and initialization
 onMounted(() => {
   isMounted.value = true
+  
+  // CRITICAL: Initialize output from props if provided
+  if (props.initialOutput) {
+    console.log(`[CodeBlockWithExecution] Loading initial output for cell ${props.id}:`, props.initialOutput)
+    try {
+      // Update the store with initial output
+      const cell = codeExecutionStore.getCellById(props.id)
+      if (cell) {
+        cell.output = props.initialOutput
+        console.log(`[CodeBlockWithExecution] Initialized cell output from props`)
+      } else {
+        // Create cell if it doesn't exist
+        codeExecutionStore.addCell({
+          id: props.id,
+          code: codeValue.value,
+          kernelName: '',
+          sessionId: props.sessionId || 'default',
+          output: props.initialOutput
+        })
+        console.log(`[CodeBlockWithExecution] Created cell with initial output`)
+      }
+    } catch (error) {
+      console.error('Error initializing output:', error)
+    }
+  }
   
   // Initialize Jupyter servers and component
   try {
@@ -147,7 +216,7 @@ onBeforeUnmount(() => {
   isMounted.value = false
 })
 
-// Wrapped execution function with additional safety checks
+// Enhanced execution function with robust configuration
 const safeExecuteCode = async () => {
   if (!isMounted.value) {
     console.warn('Component not mounted, skipping execution')
@@ -155,13 +224,54 @@ const safeExecuteCode = async () => {
   }
   
   try {
-    await executeCode()
+    console.log(`[CodeBlockWithExecution] Executing code for cell ${props.id}...`)
+    
+    // Check if we have server/kernel configuration
+    if (!selectedServer.value || !selectedKernel.value) {
+      console.log(`[CodeBlockWithExecution] No server/kernel configured, using robust execution for cell ${props.id}`)
+      
+      // Use the robust execution system which handles server discovery automatically
+      const success = await robustExecuteCell(props.id, codeValue.value)
+      
+      if (success) {
+        console.log(`[CodeBlockWithExecution] Robust execution completed for cell ${props.id}`)
+        
+        // Get the result and emit
+        nextTick(() => {
+          const cell = codeExecutionStore.getCellById(props.id)
+          if (cell) {
+            console.log(`[CodeBlockWithExecution] Emitting robust execution result:`, cell.output)
+            emit('update:output', cell.output || '')
+          }
+        })
+      } else {
+        console.error(`[CodeBlockWithExecution] Robust execution failed for cell ${props.id}`)
+        emit('update:output', 'Error: Code execution failed. Please check your server configuration.')
+      }
+    } else {
+      // Use the execution composable which will emit the output
+      await executeCode()
+      
+      console.log(`[CodeBlockWithExecution] Standard execution completed for cell ${props.id}`)
+      
+      // Additional safety: ensure output is emitted after execution
+      nextTick(() => {
+        const cell = codeExecutionStore.getCellById(props.id)
+        if (cell && cell.output) {
+          console.log(`[CodeBlockWithExecution] Safety emit for cell ${props.id}:`, cell.output)
+          emit('update:output', cell.output)
+        }
+      })
+    }
+    
   } catch (error) {
     console.error('Error executing code:', error)
+    emit('update:output', `Error: ${error instanceof Error ? error.message : 'Unknown execution error'}`)
   }
 }
 
-// Computed properties for output handling
+// Output handling is now managed by the OutputDisplay component
+// These computed properties are kept for backward compatibility with other components
 const hasOutput = computed(() => {
   const currentCell = cell.value
   const output = currentCell?.output
@@ -177,7 +287,9 @@ const outputContent = computed(() => {
 const hasError = computed(() => {
   const currentCell = cell.value
   return currentCell?.hasError || false
-})// Mouse event handlers
+})
+
+// Mouse event handlers
 const handleMouseEnter = () => {
   if (!isMounted.value) return
   try {
@@ -189,16 +301,22 @@ const handleMouseEnter = () => {
 
 const handleMouseLeave = () => {
   if (!isMounted.value) return
-  try {
-    isHovered.value = false
-  } catch (error) {
-    console.warn('Error in mouse leave handler:', error)
-  }
+  
+  // Use nextTick to ensure component state is stable
+  nextTick(() => {
+    try {
+      if (isMounted.value) {
+        isHovered.value = false
+      }
+    } catch (error) {
+      console.warn('Error in mouse leave handler:', error)
+    }
+  })
 }
 
 // Configuration modal handler
 const handleOpenConfiguration = () => {
-  isConfigurationModalOpen.value = true
+  emit('open-configuration')
 }
 
 // Handle shared session mode toggle
@@ -216,7 +334,7 @@ const handleToggleSharedSessionMode = async () => {
           description: "Please select a Jupyter server and kernel first before enabling shared session mode.",
           variant: "destructive"
         })
-        isConfigurationModalOpen.value = true
+        emit('open-configuration')
         return
       }
       
@@ -250,12 +368,48 @@ const handleToggleSharedSessionMode = async () => {
     })
   }
 }
+
+// Clear output handler
+const handleClearOutput = async () => {
+  try {
+    console.log(`[CodeBlockWithExecution] Clearing output for cell ${props.id}`)
+    
+    // Clear the output in the store
+    const cell = codeExecutionStore.getCellById(props.id)
+    if (cell) {
+      cell.output = ''
+      cell.hasError = false
+      cell.error = null
+    }
+    
+    // CRITICAL: Emit to parent for nota saving
+    console.log(`[CodeBlockWithExecution] Emitting clear output for cell ${props.id}`)
+    emit('update:output', '')
+    
+    // Also use the enhanced output management
+    const success = await outputPersistence.clearOutput()
+    if (success) {
+      console.log(`[CodeBlockWithExecution] Output cleared successfully for cell ${props.id}`)
+    } else {
+      console.error('Enhanced output management clear failed')
+    }
+  } catch (error) {
+    console.error('Error clearing output:', error)
+  }
+}
+
+// AI Assistant handler
+// AI Assistant functionality removed for focused output experience
+const handleShowAIAssistant = () => {
+  // AI Assistant functionality has been removed
+  console.log('AI Assistant feature has been removed for a more focused output experience')
+}
 </script>
 
 <template>
   <div
     ref="codeBlockRef"
-    class="flex flex-col bg-card text-card-foreground rounded-lg overflow-hidden border shadow-sm transition-all duration-200 group hover:shadow-md relative"
+    class="flex flex-col bg-card text-card-foreground rounded-lg border shadow-sm transition-all duration-200 group hover:shadow-md relative"
     :class="codeBlockClasses"
     @mouseenter="handleMouseEnter"
     @mouseleave="handleMouseLeave"
@@ -267,18 +421,9 @@ const handleToggleSharedSessionMode = async () => {
       :is-published="isPublished || false"
     />
 
-    <!-- Subtle hover hint -->
-    <div
-      v-if="!isHovered && !showToolbar && !isReadOnly"
-      class="absolute top-2 right-2 opacity-30 hover:opacity-70 transition-opacity duration-200 pointer-events-none"
-    >
-      <div class="w-1 h-1 bg-muted-foreground rounded-full"></div>
-    </div>
-
-    <!-- Main toolbar -->
-    <CodeBlockToolbar
-      :is-hovered="isHovered"
-      :show-toolbar="showToolbar"
+    <!-- Side Toolbar -->
+    <SideToolbar
+      :is-visible="isHovered || showToolbar"
       :is-read-only="isReadOnly || false"
       :is-executing="isExecuting || false"
       :is-published="isPublished || false"
@@ -286,45 +431,27 @@ const handleToggleSharedSessionMode = async () => {
       :is-code-visible="isCodeVisible"
       :has-unsaved-changes="hasUnsavedChanges"
       :is-code-copied="isCodeCopied"
-      :is-shared-session-mode="isSharedSessionMode"
-      :selected-session="selectedSession"
-      :available-sessions="availableSessions"
-      :running-kernels="runningKernels"
-      :is-session-open="isSessionOpen"
-      :is-setting-up="isSettingUp"
+      :is-configuration-incomplete="!selectedServer || !selectedKernel"
       :selected-server="selectedServer"
       :selected-kernel="selectedKernel"
-      :available-servers="availableServers"
-      :available-kernels="availableKernels"
-      :is-server-open="isServerOpen"
-      :is-kernel-open="isKernelOpen"
+      :has-output="hasOutput"
       @execute-code="safeExecuteCode"
-      @toggle-toolbar="showToolbar = !showToolbar"
       @toggle-code-visibility="toggleCodeVisibility"
       @toggle-fullscreen="isFullScreen = true"
-      @format-code="handleCodeFormatted"
-      @show-templates="showTemplateDialog"
       @copy-code="copyCode"
       @save-changes="saveChanges"
       @open-configuration="handleOpenConfiguration"
-      @update:is-session-open="isSessionOpen = $event"
-      @session-change="handleSessionChange"
-      @create-new-session="handleCreateNewSession"
-      @clear-all-kernels="handleClearAllKernels"
-      @refresh-sessions="handleRefreshSessions"
-      @select-running-kernel="handleRunningKernelSelect"
-      @update:is-server-open="isServerOpen = $event"
-      @update:is-kernel-open="isKernelOpen = $event"
-      @server-change="handleServerChange"
-      @kernel-change="handleKernelChange"
+      @show-ai-assistant="handleShowAIAssistant"
+      @clear-output="handleClearOutput"
     />
 
     <!-- Warning Banners -->
     <WarningBanners
+      :cell-id="props.id"
       :is-read-only="isReadOnly || false"
       :is-published="isPublished || false"
-      :is-shared-session-mode="isSharedSessionMode"
       :is-executing="isExecuting || false"
+      :is-shared-session-mode="isSharedSessionMode"
       :selected-server="selectedServer"
       :selected-kernel="selectedKernel"
       :selected-session="selectedSession"
@@ -345,25 +472,13 @@ const handleToggleSharedSessionMode = async () => {
       @copy-code="copyCode"
     />
 
-    <!-- Output/AI Section -->
-    <OutputSection
-      :has-output="hasOutput"
-      :has-error="hasError"
+    <!-- Output Display Section -->
+    <OutputDisplay
+      :cell-id="props.id"
       :is-read-only="isReadOnly || false"
       :is-published="isPublished || false"
       :is-executing="isExecuting || false"
-      :output="outputContent"
-      :code="codeValue"
-      :language="props.language"
-      :block-id="props.id"
-      :nota-id="props.notaId"
-      :execution-time="executionTime"
-      :selected-session="selectedSession"
-      :selected-kernel="selectedKernel"
-      @copy-output="copyOutput"
-      @code-updated="handleAICodeUpdate"
-      @custom-action-executed="handleCustomActionExecuted"
-      @trigger-execution="safeExecuteCode"
+      :update-attributes="updateOutputToNota"
     />
 
     <!-- Fullscreen Modal -->
@@ -408,30 +523,6 @@ const handleToggleSharedSessionMode = async () => {
       :is-open="isTemplateDialogOpen"
       @update:is-open="(value) => isTemplateDialogOpen = value"
       @template-selected="handleTemplateSelected"
-    />
-
-    <!-- Kernel Configuration Modal -->
-    <KernelConfigurationModal
-      :is-open="isConfigurationModalOpen"
-      :is-shared-session-mode="isSharedSessionMode"
-      :is-executing="isExecuting || false"
-      :is-setting-up="isSettingUp"
-      :selected-server="selectedServer"
-      :selected-kernel="selectedKernel"
-      :available-servers="availableServers || []"
-      :available-kernels="availableKernels || []"
-      :selected-session="selectedSession"
-      :available-sessions="availableSessions || []"
-      :running-kernels="runningKernels || []"
-      @update:is-open="isConfigurationModalOpen = $event"
-      @server-change="handleServerChange"
-      @kernel-change="handleKernelChange"
-      @session-change="handleSessionChange"
-      @create-new-session="handleCreateNewSession"
-      @clear-all-kernels="handleClearAllKernels"
-      @refresh-sessions="handleRefreshSessions"
-      @select-running-kernel="handleRunningKernelSelect"
-      @toggle-shared-session-mode="handleToggleSharedSessionMode"
     />
   </div>
 </template>

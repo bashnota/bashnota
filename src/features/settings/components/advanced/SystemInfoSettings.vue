@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/ui/card'
-import { Button } from '@/ui/button'
-import { Separator } from '@/ui/separator'
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
 import { RotateCw, Info, Monitor } from 'lucide-vue-next'
-import { toast } from '@/ui/toast'
+import { toast } from 'vue-sonner'
 
 // Browser and system information
 const browserInfo = computed(() => {

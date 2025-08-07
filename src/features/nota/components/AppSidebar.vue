@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch, onBeforeUnmount } from 'vue'
+import { ref, onMounted, computed, watch, onBeforeUnmount, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useAuthStore } from '@/features/auth/stores/auth'
@@ -10,50 +10,175 @@ import {
   Settings,
   Plus,
   Search,
-  Settings2
+  Settings2,
+  ChevronDown,
+  BookOpen,
+  Home,
+  Star,
+  Clock,
+  HelpCircle,
+  Keyboard,
+  Palette,
+  User,
+  Database,
+  Code2,
+  Terminal,
+  X
 } from 'lucide-vue-next'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import NotaTree from '@/features/nota/components/NotaTree.vue'
 import { RouterLink } from 'vue-router'
-import { ScrollArea } from '@/ui/scroll-area'
-import ShortcutsDialog from '@/ui/ShortcutsDialog.vue'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Badge } from '@/components/ui/badge'
 import { logger } from '@/services/logger'
-
-// Import our new modular components
-import SidebarSearch from '@/features/nota/components/SidebarSearch.vue'
-import SidebarViewSelector from '@/features/nota/components/SidebarViewSelector.vue'
-import SidebarNewNotaButton from '@/features/nota/components/SidebarNewNotaButton.vue'
-import SidebarPagination from '@/features/nota/components/SidebarPagination.vue'
-import SidebarAuthStatus from '@/features/nota/components/SidebarAuthStatus.vue'
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarSeparator,
+  useSidebar
+} from '@/components/ui/sidebar'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { Input } from '@/components/ui/input'
 import NewNotaModal from '@/features/nota/components/NewNotaModal.vue'
+import SearchModal from '@/features/nota/components/SearchModal.vue'
 import { useQuickNotaCreation } from '@/features/nota/composables/useQuickNotaCreation'
 import { generateRandomTitle } from '@/utils/randomTitleGenerator'
+import SidebarAuthStatus from '@/features/nota/components/SidebarAuthStatus.vue'
 
 const router = useRouter()
 const notaStore = useNotaStore()
 const authStore = useAuthStore()
 const { createQuickNota } = useQuickNotaCreation()
+const { state: sidebarState } = useSidebar()
 const newNotaTitle = ref('')
 const searchQuery = ref('')
 const showNewNotaInput = ref<boolean>(false)
 const expandedItems = ref<Set<string>>(new Set())
-const shortcutsDialog = ref<{ isOpen: boolean }>({ isOpen: false })
+const showShortcutsDialog = ref(false)
 const activeView = ref<'all' | 'favorites' | 'recent'>('all')
-const showSearch = ref(false)
-const debouncedSearchQuery = ref('')
+const showSearchModal = ref(false)
 const showNewNotaModal = ref(false)
-
-// Responsive state
-const isMobile = ref(false)
+const searchInput = ref<HTMLInputElement | null>(null)
 
 // Pagination state
 const currentPage = ref(1)
 const itemsPerPage = ref(15)
 
-// Responsive breakpoint check
-const updateScreenSize = () => {
-  isMobile.value = window.innerWidth < 768
-}
+// Collapsible sections state
+const notasOpen = ref(true)
+const docsOpen = ref(true)
+const settingsOpen = ref(true)
+
+// Watch sidebar state and collapse all sections when sidebar is collapsed
+watch(sidebarState, (newState) => {
+  if (newState === 'collapsed') {
+    // Collapse all sections when sidebar is collapsed
+    notasOpen.value = false
+    docsOpen.value = false
+    settingsOpen.value = false
+  } else if (newState === 'expanded') {
+    // Restore previous states when sidebar is expanded
+    notasOpen.value = localStorage.getItem('sidebar-notas-collapsed') !== 'true'
+    docsOpen.value = localStorage.getItem('sidebar-docs-collapsed') !== 'true'
+    settingsOpen.value = localStorage.getItem('sidebar-settings-collapsed') !== 'true'
+  }
+})
+
+// Navigation menu items
+const navigationItems = [
+  {
+    title: "All Notas",
+    icon: Home,
+    action: () => { activeView.value = 'all' },
+    isActive: computed(() => activeView.value === 'all'),
+    shortcut: "⌘1"
+  },
+  {
+    title: "Favorites",
+    icon: Star,
+    action: () => { activeView.value = 'favorites' },
+    isActive: computed(() => activeView.value === 'favorites'),
+    shortcut: "⌘2"
+  },
+  {
+    title: "Recent",
+    icon: Clock,
+    action: () => { activeView.value = 'recent' },
+    isActive: computed(() => activeView.value === 'recent'),
+    shortcut: "⌘3"
+  }
+]
+
+// Documentation menu items
+const documentationItems = [
+  {
+    title: "Getting Started",
+    icon: BookOpen,
+    url: "/docs/getting-started"
+  },
+  {
+    title: "Keyboard Shortcuts",
+    icon: Keyboard,
+    action: () => { showShortcutsDialog.value = true }
+  },
+  {
+    title: "API Reference",
+    icon: Code2,
+    url: "/docs/api"
+  },
+  {
+    title: "Help & Support",
+    icon: HelpCircle,
+    url: "/help"
+  }
+]
+
+// Settings menu items
+const settingsItems = [
+  {
+    title: "AI Providers",
+    icon: Settings,
+    url: "/settings/ai-providers"
+  },
+  {
+    title: "Appearance",
+    icon: Palette,
+    url: "/settings/theme"
+  },
+  {
+    title: "Editor",
+    icon: FileText,
+    url: "/settings/text-editing"
+  },
+  {
+    title: "Keyboard Shortcuts",
+    icon: Keyboard,
+    url: "/settings/editor-shortcuts"
+  },
+  {
+    title: "Account",
+    icon: User,
+    action: () => handleAuthNavigation()
+  },
+  {
+    title: "System Info",
+    icon: Database,
+    url: "/settings/system-info"
+  },
+  {
+    title: "Performance",
+    icon: Terminal,
+    url: "/settings/performance"
+  }
+]
 
 // Load last used view from localStorage
 onMounted(async () => {
@@ -63,31 +188,43 @@ onMounted(async () => {
     activeView.value = savedView as 'all' | 'favorites' | 'recent'
   }
   
-  // Set up responsive design
-  updateScreenSize()
-  window.addEventListener('resize', updateScreenSize)
+  // Load collapsible states
+  notasOpen.value = localStorage.getItem('sidebar-notas-collapsed') !== 'true'
+  docsOpen.value = localStorage.getItem('sidebar-docs-collapsed') !== 'true'
+  settingsOpen.value = localStorage.getItem('sidebar-settings-collapsed') !== 'true'
 })
+
+// Save collapsible states (only when sidebar is expanded)
+watch(notasOpen, (value) => {
+  if (sidebarState.value === 'expanded') {
+    localStorage.setItem('sidebar-notas-collapsed', (!value).toString())
+  }
+})
+
+watch(docsOpen, (value) => {
+  if (sidebarState.value === 'expanded') {
+    localStorage.setItem('sidebar-docs-collapsed', (!value).toString())
+  }
+})
+
+watch(settingsOpen, (value) => {
+  if (sidebarState.value === 'expanded') {
+    localStorage.setItem('sidebar-settings-collapsed', (!value).toString())
+  }
+})
+
+// Auto-focus search when opened - removed, now handled by SearchModal
 
 onBeforeUnmount(() => {
-  window.removeEventListener('resize', updateScreenSize)
+  // Cleanup if needed
 })
 
-// Debounce search input for better performance
-let searchTimeout: NodeJS.Timeout
-watch(searchQuery, (newQuery) => {
-  clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(() => {
-    debouncedSearchQuery.value = newQuery
-  }, 300)
-})
-
-// Reset pagination when view or search changes
-watch([activeView, debouncedSearchQuery], () => {
+// Reset pagination when view changes
+watch(activeView, () => {
   currentPage.value = 1
 })
 
 const filteredNotas = computed(() => {
-  const query = debouncedSearchQuery.value.toLowerCase()
   let items = notaStore.rootItems
 
   // Filter based on active view
@@ -104,14 +241,6 @@ const filteredNotas = computed(() => {
           return dateB.getTime() - dateA.getTime()
         })
       break
-  }
-
-  // Apply search filter if query exists
-  if (query) {
-    items = items.filter(
-      (nota) =>
-        nota.title.toLowerCase().includes(query) || nota.content?.toLowerCase().includes(query),
-    )
   }
 
   return items
@@ -187,12 +316,26 @@ onKeyStroke('3', (e: KeyboardEvent) => {
   }
 })
 
-// Clear search shortcut
+// Clear search shortcut - no longer needed for inline search
 onKeyStroke('Escape', () => {
-  if (showSearch.value && searchQuery.value) {
-    searchQuery.value = ''
-  } else if (showSearch.value) {
-    showSearch.value = false
+  if (showSearchModal.value) {
+    showSearchModal.value = false
+  }
+})
+
+// Open search shortcut
+onKeyStroke('f', (e: KeyboardEvent) => {
+  if (e.metaKey || e.ctrlKey) {
+    e.preventDefault()
+    showSearchModal.value = true
+  }
+})
+
+// Show shortcuts dialog
+onKeyStroke('?', (e: KeyboardEvent) => {
+  if (e.shiftKey) {
+    e.preventDefault()
+    showShortcutsDialog.value = true
   }
 })
 
@@ -207,132 +350,329 @@ const handleAuthNavigation = () => {
 </script>
 
 <template>
-  <div class="w-full h-full flex flex-col border-e bg-background text-foreground" :class="{ 'mobile-sidebar': isMobile }">
-    <!-- Header -->
-    <div class="p-2 border-b space-y-2">
-      <!-- Logo and User Info -->
-      <div class="flex items-center justify-between">
+  <Sidebar collapsible="icon" class="border-r min-h-screen max-h-screen flex flex-col">
+    <!-- Header - Logo Only -->
+    <SidebarHeader class="flex-shrink-0 border-b">
+      <div class="flex items-center justify-center py-2">
         <RouterLink
           to="/"
-          class="flex items-center gap-2 px-2 py-1 hover:bg-muted/50 rounded-md transition-colors"
+          class="flex items-center gap-2 px-3 py-2 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg transition-all duration-300 ease-in-out group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:gap-0"
         >
-          <img src="@/assets/logo.svg" alt="BashNota Logo" class="h-5 w-auto text-primary" />
-          <span class="font-semibold">BashNota</span>
+          <img 
+            src="@/assets/logo.svg" 
+            alt="BashNota Logo" 
+            class="h-6 w-auto text-primary group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8 transition-all duration-500 ease-out" 
+          />
+          <span class="font-bold text-lg group-data-[collapsible=icon]:hidden transition-opacity duration-300 ease-in-out">BashNota</span>
         </RouterLink>
-
-        <div class="flex items-center gap-1">
-          <!-- User info in header for better visibility -->
-          <SidebarAuthStatus :compact="true" />
-          <DarkModeToggle />
-          
-          <!-- Dedicated Settings Button -->
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            @click="router.push('/settings')"
-            title="Settings"
-          >
-            <Settings class="h-4 w-4" />
-          </Button>
-        </div>
       </div>
+    </SidebarHeader>
 
-      <!-- Search and View Controls -->
-      <div class="space-y-2">
-        <div class="flex items-center gap-1.5">
-          <!-- Search Component -->
-          <SidebarSearch
-            v-model="searchQuery"
-            v-model:showSearch="showSearch"
-          />
+    <!-- Main Content with max height and scrolling -->
+    <SidebarContent class="flex-1 min-h-0 overflow-hidden">
+      <div class="h-full flex flex-col">
+        <!-- Quick Actions Section -->
+        <SidebarGroup class="flex-shrink-0 px-2 py-3 border-b">
+          <div class="space-y-2">
+            <!-- Search Button -->
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              @click="showSearchModal = true"
+              class="w-full h-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 justify-start gap-2"
+              title="Search all notas (Ctrl/⌘ + F)"
+            >
+              <Search class="h-4 w-4 flex-shrink-0" />
+              <span class="group-data-[collapsible=icon]:hidden text-muted-foreground">Search notas...</span>
+            </Button>
 
-          <!-- View Selector Component - now shows condensed when searching -->
-          <SidebarViewSelector
-            v-model="activeView"
-            :condensed="showSearch"
-          />
-
-          <!-- New Nota Button Component -->
-          <SidebarNewNotaButton
-            v-if="!showSearch"
-            @quick-create="handleQuickCreate"
-            @open-modal="showNewNotaModal = true"
-            class="ml-auto"
-          />
-        </div>
-      </div>
-    </div>
-
-    <!-- Tree View with Pagination -->
-    <ScrollArea class="flex-1">
-      <div class="py-1">
-        <NotaTree
-          :items="paginatedNotas"
-          :expanded-items="expandedItems"
-          :show-new-input="null"
-          :new-nota-title="newNotaTitle"
-          @toggle="(id) => (expandedItems.has(id) ? expandedItems.delete(id) : expandedItems.add(id))"
-          @create="createNewNota"
-          @show-new-input="(id) => {
-            showNewNotaInput = true
-            newNotaTitle = ''
-          }"
-          @update:new-nota-title="(value) => (newNotaTitle = value)"
-        />
-
-        <!-- Loading State -->
-        <div
-          v-if="notaStore.loading"
-          class="flex flex-col items-center justify-center h-24 text-sm text-muted-foreground gap-1.5 my-4"
-        >
-          <div class="animate-spin rounded-full bg-muted/50 p-2">
-            <div class="h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
-          </div>
-          <p>Loading notes...</p>
-        </div>
-
-        <!-- Empty State -->
-        <div
-          v-else-if="filteredNotas.length === 0"
-          class="flex flex-col items-center justify-center h-24 text-sm text-muted-foreground gap-1.5 my-4"
-        >
-          <div class="rounded-full bg-muted/50 p-2">
-            <Search v-if="debouncedSearchQuery" class="h-4 w-4" />
-            <FileText v-else class="h-4 w-4" />
-          </div>
-          <p>{{ debouncedSearchQuery ? 'No items found' : 'Create your first nota' }}</p>
-          <div v-if="debouncedSearchQuery" class="text-xs text-center">
-            <p>Try adjusting your search terms</p>
-            <Button @click="searchQuery = ''" variant="link" size="sm" class="text-xs p-0 h-auto">
-              Clear search
+            <!-- New Nota Button -->
+            <Button 
+              variant="default" 
+              size="sm" 
+              @click="showNewNotaModal = true"
+              class="w-full h-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 justify-start gap-2 bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200 shadow-sm hover:shadow-md"
+              title="Create new nota (Ctrl/⌘ + N)"
+            >
+              <Plus class="h-4 w-4 flex-shrink-0" />
+              <span class="group-data-[collapsible=icon]:hidden font-medium">New Nota</span>
             </Button>
           </div>
-          <Button 
-            v-else
-            @click="handleQuickCreate" 
-            variant="outline" 
-            size="sm" 
-            class="mt-1"
-          >
-            <Plus class="h-4 w-4 mr-1" />
-            New Nota
-          </Button>
+        </SidebarGroup>
+        <!-- Navigation Section with Scrollable Content -->
+        <div class="flex-1 min-h-0 overflow-y-auto">
+          <!-- Navigation Section -->
+          <Collapsible v-model:open="notasOpen" class="group/collapsible">
+            <SidebarGroup>
+              <SidebarGroupLabel asChild>
+                <CollapsibleTrigger 
+                  class="flex w-full items-center justify-between p-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md px-2 py-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:mx-auto"
+                  :title="sidebarState === 'collapsed' ? 'My Notas' : undefined"
+                >
+                  <span class="flex items-center gap-2">
+                    <FileText class="h-4 w-4" />
+                    <span class="group-data-[collapsible=icon]:hidden">My Notas</span>
+                  </span>
+                  <ChevronDown class="h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180 group-data-[collapsible=icon]:hidden" />
+                </CollapsibleTrigger>
+              </SidebarGroupLabel>
+              <CollapsibleContent>
+                <SidebarGroupContent>
+                  <!-- View Selector Menu - Side by Side with Icons in Collapsed Mode -->
+                  <div class="group-data-[collapsible=icon]:hidden">
+                    <!-- Full Layout - Side by Side Buttons -->
+                    <div class="flex gap-1 mb-3">
+                      <Button
+                        v-for="item in navigationItems"
+                        :key="item.title"
+                        @click="item.action"
+                        :variant="item.isActive.value ? 'default' : 'ghost'"
+                        size="sm"
+                        :class="[
+                          'flex items-center gap-1.5 text-xs transition-all duration-200',
+                          item.isActive.value ? 'flex-1' : 'px-2'
+                        ]"
+                        :title="`${item.title} (${item.shortcut})`"
+                      >
+                        <component :is="item.icon" class="h-3.5 w-3.5 flex-shrink-0" />
+                        <span 
+                          v-if="item.isActive.value" 
+                          class="animate-in fade-in-0 slide-in-from-left-2 duration-200"
+                        >
+                          {{ item.title }}
+                        </span>
+                        <Badge v-if="item.isActive.value" variant="secondary" class="ml-auto text-[10px] px-1">
+                          {{ filteredNotas.length }}
+                        </Badge>
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <!-- Collapsed Mode - Icon Only Buttons -->
+                  <div class="group-data-[collapsible=icon]:block hidden">
+                    <div class="flex flex-col gap-1 mb-3">
+                      <Button
+                        v-for="item in navigationItems"
+                        :key="item.title"
+                        @click="item.action"
+                        :variant="item.isActive.value ? 'default' : 'ghost'"
+                        size="sm"
+                        class="w-8 h-8 p-0 flex items-center justify-center"
+                        :title="`${item.title} (${item.shortcut}) - ${filteredNotas.length} notas`"
+                      >
+                        <component :is="item.icon" class="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <SidebarSeparator class="my-2 group-data-[collapsible=icon]:hidden" />
+
+                  <!-- Nota Tree with improved scrolling -->
+                  <div class="flex flex-col min-h-0">
+                    <!-- Scrollable nota list with max height -->
+                    <div class="flex-1 min-h-0 overflow-y-auto max-h-[400px] space-y-1 pr-1">
+                      <NotaTree
+                        :items="paginatedNotas"
+                        :expanded-items="expandedItems"
+                        :show-new-input="null"
+                        :new-nota-title="newNotaTitle"
+                        @toggle="(id) => (expandedItems.has(id) ? expandedItems.delete(id) : expandedItems.add(id))"
+                        @create="createNewNota"
+                        @show-new-input="(id) => {
+                          showNewNotaInput = true
+                          newNotaTitle = ''
+                        }"
+                        @update:new-nota-title="(value) => (newNotaTitle = value)"
+                      />
+
+                      <!-- Loading State -->
+                      <div
+                        v-if="notaStore.loading"
+                        class="flex flex-col items-center justify-center h-24 text-sm text-muted-foreground gap-1.5"
+                      >
+                        <div class="animate-spin rounded-full bg-muted/50 p-2">
+                          <div class="h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                        </div>
+                        <p class="group-data-[collapsible=icon]:hidden">Loading notes...</p>
+                      </div>
+
+                      <!-- Empty State -->
+                      <div
+                        v-else-if="filteredNotas.length === 0"
+                        class="flex flex-col items-center justify-center h-24 text-sm text-muted-foreground gap-1.5"
+                      >
+                        <div class="rounded-full bg-muted/50 p-2">
+                          <FileText class="h-4 w-4" />
+                        </div>
+                        <p class="group-data-[collapsible=icon]:hidden">Create your first nota</p>
+                        <Button 
+                          @click="handleQuickCreate" 
+                          variant="outline" 
+                          size="sm" 
+                          class="mt-1 group-data-[collapsible=icon]:hidden"
+                        >
+                          <Plus class="h-4 w-4 mr-1" />
+                          New Nota
+                        </Button>
+                      </div>
+                    </div>
+
+                    <!-- Improved Pagination -->
+                    <div v-if="filteredNotas.length > 0 && totalPages > 1" class="mt-3 pt-3 border-t group-data-[collapsible=icon]:hidden">
+                      <div class="flex items-center justify-between gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          @click="currentPage = Math.max(1, currentPage - 1)"
+                          :disabled="currentPage === 1"
+                          class="h-7 px-2 flex-1"
+                        >
+                          <ChevronDown class="h-3 w-3 rotate-90" />
+                          <span class="text-xs ml-1">Prev</span>
+                        </Button>
+
+                        <div class="flex items-center px-2">
+                          <span class="text-xs text-muted-foreground whitespace-nowrap">
+                            {{ currentPage }}/{{ totalPages }}
+                          </span>
+                        </div>
+
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          @click="currentPage = Math.min(totalPages, currentPage + 1)"
+                          :disabled="currentPage === totalPages"
+                          class="h-7 px-2 flex-1"
+                        >
+                          <span class="text-xs mr-1">Next</span>
+                          <ChevronDown class="h-3 w-3 -rotate-90" />
+                        </Button>
+                      </div>
+
+                      <!-- Items count -->
+                      <div class="text-center mt-2">
+                        <span class="text-xs text-muted-foreground">
+                          {{ filteredNotas.length }} {{ filteredNotas.length === 1 ? 'nota' : 'notas' }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </SidebarGroupContent>
+              </CollapsibleContent>
+            </SidebarGroup>
+          </Collapsible>
+
+          <!-- Documentation Section -->
+          <Collapsible v-model:open="docsOpen" class="group/collapsible">
+            <SidebarGroup>
+              <SidebarGroupLabel asChild>
+                <CollapsibleTrigger 
+                  class="flex w-full items-center justify-between p-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md px-2 py-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:mx-auto"
+                  :title="sidebarState === 'collapsed' ? 'Documentation' : undefined"
+                >
+                  <span class="flex items-center gap-2">
+                    <BookOpen class="h-4 w-4" />
+                    <span class="group-data-[collapsible=icon]:hidden">Documentation</span>
+                  </span>
+                  <ChevronDown class="h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180 group-data-[collapsible=icon]:hidden" />
+                </CollapsibleTrigger>
+              </SidebarGroupLabel>
+              <CollapsibleContent>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    <SidebarMenuItem v-for="item in documentationItems" :key="item.title">
+                      <SidebarMenuButton 
+                        v-if="item.url"
+                        asChild
+                        class="w-full group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center"
+                      >
+                        <RouterLink :to="item.url" class="flex items-center gap-2">
+                          <component :is="item.icon" class="h-4 w-4 flex-shrink-0" />
+                          <span class="group-data-[collapsible=icon]:hidden">{{ item.title }}</span>
+                        </RouterLink>
+                      </SidebarMenuButton>
+                      <SidebarMenuButton 
+                        v-else
+                        @click="item.action"
+                        class="flex items-center gap-2 w-full group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center"
+                      >
+                        <component :is="item.icon" class="h-4 w-4 flex-shrink-0" />
+                        <span class="group-data-[collapsible=icon]:hidden">{{ item.title }}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </CollapsibleContent>
+            </SidebarGroup>
+          </Collapsible>
+
+          <!-- Settings Section -->
+          <Collapsible v-model:open="settingsOpen" class="group/collapsible">
+            <SidebarGroup>
+              <SidebarGroupLabel asChild>
+                <CollapsibleTrigger 
+                  class="flex w-full items-center justify-between p-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md px-2 py-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:mx-auto"
+                  :title="sidebarState === 'collapsed' ? 'Settings' : undefined"
+                >
+                  <span class="flex items-center gap-2">
+                    <Settings class="h-4 w-4" />
+                    <span class="group-data-[collapsible=icon]:hidden">Settings</span>
+                  </span>
+                  <ChevronDown class="h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180 group-data-[collapsible=icon]:hidden" />
+                </CollapsibleTrigger>
+              </SidebarGroupLabel>
+              <CollapsibleContent>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    <SidebarMenuItem v-for="item in settingsItems" :key="item.title">
+                      <SidebarMenuButton 
+                        v-if="item.url"
+                        asChild
+                        class="w-full group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center"
+                      >
+                        <RouterLink :to="item.url" class="flex items-center gap-2">
+                          <component :is="item.icon" class="h-4 w-4 flex-shrink-0" />
+                          <span class="group-data-[collapsible=icon]:hidden">{{ item.title }}</span>
+                        </RouterLink>
+                      </SidebarMenuButton>
+                      <SidebarMenuButton 
+                        v-else
+                        @click="item.action"
+                        class="flex items-center gap-2 w-full group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center"
+                      >
+                        <component :is="item.icon" class="h-4 w-4 flex-shrink-0" />
+                        <span class="group-data-[collapsible=icon]:hidden">{{ item.title }}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </CollapsibleContent>
+            </SidebarGroup>
+          </Collapsible>
         </div>
-
-        <!-- Pagination Component -->
-        <SidebarPagination
-          v-if="filteredNotas.length > 0"
-          :current-page="currentPage"
-          @update:page="currentPage = $event"
-          :total-pages="totalPages"
-          :items-per-page="itemsPerPage"
-          :total-items="filteredNotas.length"
-        />
       </div>
-    </ScrollArea>
+    </SidebarContent>
 
-    <ShortcutsDialog ref="shortcutsDialog" />
-    
+    <!-- Enhanced Footer with User Controls and Actions -->
+    <SidebarFooter class="flex-shrink-0 border-t">
+      <!-- User Authentication Status -->
+      <SidebarAuthStatus />
+      
+      <!-- Action Buttons Row -->
+      <div class="px-2 py-2 border-t">
+        <div class="flex items-center gap-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:flex-col">
+          <!-- Theme Toggle -->
+          <DarkModeToggle class="group-data-[collapsible=icon]:mb-1" />
+          
+          
+          <!-- Version Info (hidden when collapsed) -->
+          <div class="group-data-[collapsible=icon]:hidden ml-auto">
+            <span class="text-xs text-muted-foreground">v0.1</span>
+          </div>
+        </div>
+      </div>
+    </SidebarFooter>
+
     <!-- New Nota Modal -->
     <NewNotaModal
       :open="showNewNotaModal"
@@ -342,73 +682,196 @@ const handleAuthNavigation = () => {
         newNotaTitle = ''
       }"
     />
-  </div>
+
+    <!-- Search Modal -->
+    <SearchModal
+      :open="showSearchModal"
+      @update:open="showSearchModal = $event"
+    />
+  </Sidebar>
 </template>
 
 <style scoped>
-/* Mobile optimizations */
-.mobile-sidebar {
-  @apply text-sm;
+/* Sidebar Layout Improvements */
+[data-sidebar="sidebar"] {
+  --sidebar-width: 300px;
+  --sidebar-width-icon: 60px;
+  width: var(--sidebar-width);
 }
 
-.mobile-sidebar .h-7 {
-  @apply h-8;
+[data-sidebar="sidebar"][data-state="collapsed"] {
+  width: var(--sidebar-width-icon);
 }
 
-.mobile-sidebar .text-xs {
-  @apply text-sm;
+/* Ensure proper centering in collapsed mode */
+[data-sidebar="sidebar"][data-state="collapsed"] .group-data-\[collapsible\=icon\]\:justify-center {
+  justify-content: center !important;
 }
 
-/* Enhanced transitions */
-.transition-colors {
-  transition: background-color 0.2s ease, color 0.2s ease;
+[data-sidebar="sidebar"][data-state="collapsed"] .group-data-\[collapsible\=icon\]\:flex-col {
+  flex-direction: column !important;
 }
 
-/* Loading animation */
-@keyframes spin {
-  to { transform: rotate(360deg); }
+/* Ensure sidebar takes full height */
+.min-h-screen {
+  min-height: 100vh;
 }
 
-.animate-spin {
-  animation: spin 1s linear infinite;
+.max-h-screen {
+  max-height: 100vh;
 }
 
-/* Smooth layout transitions */
-.space-y-2 > * + * {
-  transition: margin-top 0.2s ease;
+/* New Nota Button Enhancement */
+.bg-primary {
+  background-color: hsl(var(--primary)) !important;
+}
+
+.text-primary-foreground {
+  color: hsl(var(--primary-foreground)) !important;
+}
+
+.hover\:bg-primary\/90:hover {
+  background-color: hsl(var(--primary) / 0.9) !important;
 }
 
 /* Better focus states for accessibility */
 button:focus-visible,
 a:focus-visible {
-  @apply ring-2 ring-primary ring-offset-2 outline-none;
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
 }
 
-/* Mobile touch targets */
+/* Active state styling for navigation items */
+[data-active="true"] {
+  background-color: hsl(var(--sidebar-accent));
+  color: hsl(var(--sidebar-accent-foreground));
+  font-weight: 500;
+}
+
+/* Enhanced sidebar section spacing */
+.group\/collapsible + .group\/collapsible {
+  margin-top: 0.5rem;
+}
+
+/* Better visual hierarchy for group labels */
+[data-sidebar="group-label"] {
+  font-weight: 600;
+  letter-spacing: 0.025em;
+}
+
+/* Custom scrollbar for nota tree and content */
+.overflow-y-auto {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+}
+
+.overflow-y-auto::-webkit-scrollbar {
+  width: 6px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 3px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* Responsive design improvements */
 @media (max-width: 768px) {
-  button, a {
-    min-height: 44px;
-    min-width: 44px;
-  }
-  
-  .gap-1 {
-    @apply gap-1.5;
-  }
-  
-  .gap-1\.5 {
-    @apply gap-2;
+  [data-sidebar="sidebar"] {
+    --sidebar-width: 280px;
   }
 }
 
-/* Responsive text scaling */
-@media (max-width: 640px) {
-  .text-sm {
-    @apply text-base;
-  }
-  
-  .text-xs {
-    @apply text-sm;
-  }
+/* Improved button layouts for better UX */
+.w-full.justify-start {
+  text-align: left;
+}
+
+/* Collapsed mode specific styles */
+[data-sidebar="sidebar"][data-state="collapsed"] .group-data-\[collapsible\=icon\]\:block {
+  display: block !important;
+}
+
+[data-sidebar="sidebar"][data-state="collapsed"] .group-data-\[collapsible\=icon\]\:hidden {
+  display: none !important;
+}
+
+[data-sidebar="sidebar"][data-state="collapsed"] .group-data-\[collapsible\=icon\]\:w-8 {
+  width: 2rem !important;
+}
+
+[data-sidebar="sidebar"][data-state="collapsed"] .group-data-\[collapsible\=icon\]\:h-8 {
+  height: 2rem !important;
+}
+
+[data-sidebar="sidebar"][data-state="collapsed"] .group-data-\[collapsible\=icon\]\:p-0 {
+  padding: 0 !important;
+}
+
+[data-sidebar="sidebar"][data-state="collapsed"] .group-data-\[collapsible\=icon\]\:px-0 {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+[data-sidebar="sidebar"][data-state="collapsed"] .group-data-\[collapsible\=icon\]\:mb-1 {
+  margin-bottom: 0.25rem !important;
+}
+
+/* Hide collapsible content when sidebar is collapsed */
+[data-sidebar="sidebar"][data-state="collapsed"] .group\/collapsible [data-collapsible="content"] {
+  display: none !important;
+}
+
+/* Show only trigger icons in collapsed mode */
+[data-sidebar="sidebar"][data-state="collapsed"] .group\/collapsible [data-collapsible="trigger"] {
+  justify-content: center !important;
+  padding: 0.5rem !important;
+  width: 2rem !important;
+  height: 2rem !important;
+  margin: 0.25rem auto !important;
+}
+
+/* Additional collapsed mode refinements */
+[data-sidebar="sidebar"][data-state="collapsed"] .group-data-\[collapsible\=icon\]\:mx-auto {
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+/* Better spacing for footer sections */
+.border-t + .border-t {
+  border-top-width: 1px;
+  border-top-color: hsl(var(--border));
+}
+
+/* Smooth resizing for adjustable width */
+[data-sidebar="sidebar"] {
+  resize: horizontal;
+  min-width: 240px;
+  max-width: 480px;
+  overflow: hidden;
+}
+
+/* Hide resize handle on collapsed state */
+[data-sidebar="sidebar"][data-state="collapsed"] {
+  resize: none;
+}
+
+/* Improved badge styling */
+.ml-auto {
+  margin-left: auto;
+}
+
+/* Better layout for auth status */
+.flex.items-center.justify-between {
+  align-items: center;
+  justify-content: space-between;
 }
 </style>
 

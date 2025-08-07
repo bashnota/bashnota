@@ -20,16 +20,9 @@ export { default as OutputRenderer } from './OutputRenderer.vue'
 export { default as TemplateSelector } from './TemplateSelector.vue'
 
 // Composables  
-export { useCodeBlockState } from './composables/core/useCodeBlockState'
-export { useSessionManagement } from './composables/core/useSessionManagement'
 export { useCodeExecution } from './composables/core/useCodeExecution'
-export { usePreferencesManagement } from './composables/core/usePreferencesManagement'
-export { useCodeBlockExecution } from './composables/useCodeBlockExecution'
-export { useCodeBlockToolbar } from './composables/ui/useCodeBlockToolbar'
 export { useCodeBlockShortcuts } from './composables/ui/useCodeBlockShortcuts'
 export { useFullscreenCode } from './composables/ui/useFullscreenCode'
-export { useOutputStreaming } from './composables/features/useOutputStreaming'
-export { useAICodeAssistant } from './composables/features/useAICodeAssistant'
 export { useCodeTemplates } from './composables/features/useCodeTemplates'
 export { useCodeFormatting } from './composables/features/useCodeFormatting'
 

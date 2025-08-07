@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/ui/command'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { FileText, Calendar } from 'lucide-vue-next'
 import { computed, ref, onMounted, onBeforeUnmount, watch } from 'vue'
 

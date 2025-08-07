@@ -58,9 +58,11 @@ export function useCodeBlockExecutionSimplified(props: any, emit: any, dependenc
         return
       }
       
+      // Check if we have explicit server/kernel configuration
+      // If not, the robust execution system will handle it
       if (!selectedServer.value || !selectedKernel.value) {
-        errorMessage.value = 'Please select a server and kernel before executing code'
-        return
+        console.warn(`[ExecutionSimplified] No explicit server/kernel for cell ${props.id}, relying on robust execution`)
+        // Don't return here - let the execution continue and use robust execution
       }
       
       isExecuting.value = true
@@ -76,7 +78,7 @@ export function useCodeBlockExecutionSimplified(props: any, emit: any, dependenc
           codeExecutionStore.addCell({
             id: props.id,
             code: dependencies.codeValue.value,
-            kernelName: selectedKernel.value,
+            kernelName: selectedKernel.value || '', // Allow empty kernel
             sessionId: selectedSession.value || 'default',
             output: '',
             isPublished: props.isPublished || false
@@ -86,22 +88,32 @@ export function useCodeBlockExecutionSimplified(props: any, emit: any, dependenc
         // Execute the cell
         await codeExecutionStore.executeCell(props.id)
         
-        // Get the execution result
+        // Get the execution result with safety checks
         const executedCell = codeExecutionStore.getCellById(props.id)
         logger.log('Cell after execution:', executedCell)
         
         if (executedCell) {
-          if (executedCell.hasError) {
+          // Ensure output is a string
+          const cellOutput = executedCell.output || ''
+          const hasError = executedCell.hasError || false
+          
+          if (hasError) {
             runningStatus.value = 'error'
-            errorMessage.value = executedCell.output
-            logger.log('Execution error:', executedCell.output)
+            errorMessage.value = cellOutput
+            logger.log('Execution error, emitting output:', cellOutput)
           } else {
             runningStatus.value = 'success'
-            emit('update:output', executedCell.output)
-            logger.log('Execution success, output:', executedCell.output)
+            logger.log('Execution success, emitting output:', cellOutput)
           }
+          
+          // CRITICAL: Always emit the output (both success and error)
+          console.log(`[ExecutionSimplified] Emitting output for cell ${props.id}:`, cellOutput)
+          emit('update:output', cellOutput)
         } else {
           logger.warn('No cell found after execution')
+          // Emit empty output to clear any previous output
+          console.log(`[ExecutionSimplified] No cell found, emitting empty output for cell ${props.id}`)
+          emit('update:output', '')
         }
       }
       

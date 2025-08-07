@@ -1,7 +1,7 @@
 <template>
   <div class="youtube-player">
     <div v-if="loading" class="youtube-loading">
-      <Spinner class="h-8 w-8 animate-spin" />
+      <Skeleton class="h-8 w-8 rounded-full" />
       <span class="sr-only">Loading video...</span>
     </div>
     
@@ -27,8 +27,8 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
-import { Alert, AlertTitle, AlertDescription } from '@/ui/alert'
-import Spinner from '@\/ui\/LoadingSpinner.vue'
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+import { Skeleton } from '@/components/ui/skeleton'
 import { logger } from '@/services/logger'
 
 interface Props {

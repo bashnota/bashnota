@@ -5,7 +5,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/ui/select'
+} from '@/components/ui/select'
 
 const props = defineProps<{
   modelValue: string
@@ -22,7 +22,7 @@ const emit = defineEmits<{
   <div class="relative">
     <Select
       :model-value="modelValue"
-      @update:model-value="emit('update:modelValue', $event)"
+      @update:model-value="(value: any) => emit('update:modelValue', value)"
     >
       <SelectTrigger class="w-full">
         <slot name="trigger">

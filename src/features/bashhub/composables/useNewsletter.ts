@@ -2,7 +2,7 @@ import { ref } from 'vue'
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { firestore } from '@/services/firebase'
 import { useAuthStore } from '@/features/auth/stores/auth'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 
 export function useNewsletter() {
   const isSubscribing = ref(false)
@@ -11,7 +11,7 @@ export function useNewsletter() {
   const subscribeToNewsletter = async () => {
     if (isSubscribing.value) return false
     if (!authStore.currentUser) {
-      toast('You must be logged in to subscribe to the newsletter.', 'Authentication Required', 'destructive')
+      toast('You must be logged in to subscribe to the newsletter.', { description: 'Authentication Required' })
       return false
     }
 
@@ -27,11 +27,11 @@ export function useNewsletter() {
         uid: user.uid
       })
 
-      toast('🎉 You have successfully subscribed to the newsletter!', 'Subscription Successful')
+      toast('🎉 You have successfully subscribed to the newsletter!', { description: 'Subscription Successful' })
       return true
     } catch (error) {
       console.error('Error subscribing to newsletter:', error)
-      toast('There was an error subscribing. Please try again.', 'Subscription Failed', 'destructive')
+      toast('There was an error subscribing. Please try again.', { description: 'Subscription Failed' })
       return false
     } finally {
       isSubscribing.value = false

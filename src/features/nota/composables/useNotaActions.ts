@@ -1,6 +1,6 @@
 import { useRouter } from 'vue-router'
 import { useNotaStore } from '@/features/nota/stores/nota'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { ERROR_MESSAGES, SUCCESS_MESSAGES, FILE_EXTENSIONS } from '@/constants/app'
 
 export function useNotaActions() {

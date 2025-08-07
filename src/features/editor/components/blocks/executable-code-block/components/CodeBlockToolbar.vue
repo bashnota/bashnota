@@ -12,10 +12,11 @@ import {
   Copy,
   Check,
   Save,
-  Settings
+  Settings,
+  Zap
 } from 'lucide-vue-next'
-import { Button } from '@/ui/button'
-import { ButtonGroup } from '@/ui/button-group'
+import { Button } from '@/components/ui/button'
+// ButtonGroup functionality will be replaced with flex grouping
 import KernelConfigurationModal from './KernelConfigurationModal.vue'
 import type { JupyterServer, KernelSpec } from '@/features/jupyter/types/jupyter'
 
@@ -70,6 +71,7 @@ interface Emits {
   'save-changes': []
   // Configuration modal events
   'open-configuration': []
+  'quick-connect': []
   // Session management events
   'update:is-session-open': [value: boolean]
   'session-change': [sessionId: string]
@@ -127,13 +129,13 @@ const configurationTitle = computed(() => {
     <!-- Left toolbar group -->
     <div class="flex items-center gap-2 flex-wrap">
       <!-- Primary Action Group -->
-      <ButtonGroup>
+      <div class="flex items-center border rounded-md">
         <Button
           v-if="!isReadOnly"
           variant="default"
           size="sm"
           @click="emit('execute-code')"
-          class="h-7 px-3 text-xs"
+          class="h-7 px-3 text-xs rounded-r-none border-r-0"
           :disabled="!isReadyToExecute"
           :title="isExecuting ? 'Executing...' : 'Run Code'"
         >
@@ -147,13 +149,13 @@ const configurationTitle = computed(() => {
           variant="outline"
           size="sm"
           @click="emit('toggle-toolbar')"
-          class="h-7 w-7 p-0"
+          class="h-7 w-7 p-0 rounded-l-none"
           :class="{ 'bg-muted': showToolbar }"
           title="Pin toolbar"
         >
           <Sparkles class="h-3 w-3" />
         </Button>
-      </ButtonGroup>
+      </div>
 
       <!-- Configuration Button -->
       <template v-if="!isReadOnly">
@@ -175,6 +177,22 @@ const configurationTitle = computed(() => {
             {{ configurationStatusText }}
           </span>
         </Button>
+
+        <!-- Quick Connect Button -->
+        <Button
+          variant="outline"
+          size="sm"
+          class="h-7 text-xs px-3 gap-1"
+          :class="{
+            'opacity-70': isExecuting
+          }"
+          title="Quick Connect - Auto-select available server and kernel"
+          :disabled="isExecuting"
+          @click="emit('quick-connect')"
+        >
+          <Zap class="h-3 w-3" />
+          <span>Quick</span>
+        </Button>
       </template>
     </div>
 
@@ -183,11 +201,11 @@ const configurationTitle = computed(() => {
     <!-- Right side utility buttons -->
     <div class="flex items-center gap-2">
       <!-- View Controls Group -->
-      <ButtonGroup>
+      <div class="flex items-center border rounded-md">
         <Button
           variant="ghost"
           size="sm"
-          class="h-7 w-7 p-0"
+          class="h-7 w-7 p-0 rounded-r-none border-r-0"
           @click="emit('toggle-code-visibility')"
           :title="isCodeVisible ? 'Hide Code' : 'Show Code'"
         >
@@ -198,22 +216,22 @@ const configurationTitle = computed(() => {
         <Button
           variant="ghost"
           size="sm"
-          class="h-7 w-7 p-0"
+          class="h-7 w-7 p-0 rounded-l-none"
           @click="emit('toggle-fullscreen')"
           title="Full Screen Mode"
           :disabled="isExecuting && !isPublished"
         >
           <Maximize2 class="h-3 w-3" />
         </Button>
-      </ButtonGroup>
+      </div>
 
       <!-- Code Tools Group -->
-      <ButtonGroup v-if="!isReadOnly">
+      <div v-if="!isReadOnly" class="flex items-center border rounded-md">
         <Button
           variant="ghost"
           size="sm"
           @click="emit('format-code')"
-          class="h-7 px-2 text-xs"
+          class="h-7 px-2 text-xs rounded-r-none border-r-0"
           title="Format code"
           :disabled="isExecuting"
         >
@@ -225,22 +243,23 @@ const configurationTitle = computed(() => {
           variant="ghost"
           size="sm"
           @click="emit('show-templates')"
-          class="h-7 px-2 text-xs"
+          class="h-7 px-2 text-xs rounded-l-none"
           title="Insert template"
           :disabled="isExecuting"
         >
           <FileText class="h-3 w-3 mr-1" />
           Templates
         </Button>
-      </ButtonGroup>
+      </div>
 
       <!-- Action Controls Group -->
-      <ButtonGroup>
+      <div class="flex items-center border rounded-md">
         <Button
           variant="ghost"
           size="sm"
           @click="emit('copy-code')"
           class="h-7 w-7 p-0"
+          :class="{ 'rounded-r-none border-r-0': !isReadOnly && hasUnsavedChanges && !isExecuting }"
           title="Copy code"
         >
           <Copy v-if="!isCodeCopied" class="h-3 w-3" />
@@ -252,12 +271,12 @@ const configurationTitle = computed(() => {
           variant="ghost"
           size="sm"
           @click="emit('save-changes')"
-          class="h-7 w-7 p-0"
+          class="h-7 w-7 p-0 rounded-l-none"
           title="Save changes"
         >
           <Save class="w-3 h-3" />
         </Button>
-      </ButtonGroup>
+      </div>
     </div>
   </div>
 </template>

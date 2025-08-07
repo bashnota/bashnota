@@ -152,7 +152,7 @@
 </template>
 
 <script setup lang="ts">
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import { RotateCw, Trash2, ChevronDown } from 'lucide-vue-next'
 import type { JupyterServer, KernelSpec } from '@/features/jupyter/types/jupyter'
 

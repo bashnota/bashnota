@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { GripVertical, MoreVertical, Plus, Trash2 } from 'lucide-vue-next'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/ui/dropdown-menu'
+} from '@/components/ui/dropdown-menu'
 import TableCell from './TableCell.vue'
 import type { TableData } from '@/features/editor/components/blocks/table-block/TableExtension'
 

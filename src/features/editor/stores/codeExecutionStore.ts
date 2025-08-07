@@ -3,7 +3,7 @@ import { ref, computed, reactive, readonly } from 'vue'
 import { CodeExecutionService } from '@/services/codeExecutionService'
 import { JupyterService } from '@/features/jupyter/services/jupyterService'
 import type { CodeCell, KernelSession } from '@/features/editor/types/codeExecution'
-import type { JupyterServer, NotaConfig, SavedSession } from '@/features/jupyter/types/jupyter'
+import type { JupyterServer, KernelSpec, NotaConfig, SavedSession } from '@/features/jupyter/types/jupyter'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
 import { getURLWithoutProtocol } from '@/lib/utils'
@@ -13,12 +13,35 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
   const cells = ref<Map<string, CodeCell>>(new Map())
   const kernelSessions = ref<Map<string, KernelSession>>(new Map())
   const executionService = new CodeExecutionService()
-  const notaStore = useNotaStore()
-  const jupyterStore = useJupyterStore()
+  
+  // Lazy getters for other stores
+  const getNotaStore = () => useNotaStore()
+  const getJupyterStore = () => useJupyterStore()
 
   // Track whether we're using a shared session for all code blocks
   const sharedSessionMode = ref<boolean>(false)
   const sharedSessionId = ref<string | null>(null)
+  
+  // Load shared session mode from localStorage on init
+  const loadSharedSessionMode = () => {
+    try {
+      const saved = localStorage.getItem('code-execution-shared-mode')
+      if (saved !== null) {
+        sharedSessionMode.value = JSON.parse(saved)
+      }
+    } catch (error) {
+      logger.warn('Failed to load shared session mode from localStorage:', error)
+    }
+  }
+  
+  // Save shared session mode to localStorage
+  const saveSharedSessionMode = () => {
+    try {
+      localStorage.setItem('code-execution-shared-mode', JSON.stringify(sharedSessionMode.value))
+    } catch (error) {
+      logger.warn('Failed to save shared session mode to localStorage:', error)
+    }
+  }
   
   // Dialog control for server selection
   const serverDialogState = reactive({
@@ -43,7 +66,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
 
   // Load saved sessions from nota config
   const loadSavedSessions = (notaId: string) => {
-    const nota = notaStore.getCurrentNota(notaId)
+    const nota = getNotaStore().getCurrentNota(notaId)
     if (!nota?.config?.savedSessions) return
 
     // Load shared session mode preference
@@ -85,7 +108,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
       isShared: session.id === sharedSessionId.value,
     }))
 
-    await notaStore.updateNotaConfig(notaId, (config: NotaConfig) => {
+    await getNotaStore().updateNotaConfig(notaId, (config: NotaConfig) => {
       config.savedSessions = savedSessions
       config.sharedSessionMode = sharedSessionMode.value
       config.sharedSessionId = sharedSessionId.value
@@ -205,12 +228,14 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
     if (sharedSessionMode.value) {
       sharedSessionMode.value = false;
       sharedSessionId.value = null;
+      saveSharedSessionMode(); // Persist to localStorage
       await saveSessions(notaId);
       return false;
     }
     
     // Turn on shared mode
     sharedSessionMode.value = true;
+    saveSharedSessionMode(); // Persist to localStorage
     
     // Save the mode change
     await saveSessions(notaId);
@@ -225,7 +250,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
       sharedSessionId.value = sessionId
       
       // Look for the first available server and kernel
-      const servers = jupyterStore.jupyterServers || []
+      const servers = getJupyterStore().jupyterServers || []
       if (servers.length > 0) {
         logger.log('Attempting to create shared kernel session with available servers:', servers.length);
         
@@ -251,7 +276,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
             
             // Get kernels for this server
             const kernels = await new Promise<any[]>((resolve) => {
-              jupyterStore.getAvailableKernels(server).then(resolve).catch((error: any) => {
+              getJupyterStore().getAvailableKernels(server).then(resolve).catch((error: any) => {
                 logger.warn(`Failed to get kernels for ${server.ip}:${server.port}:`, error);
                 resolve([]);
               });
@@ -316,10 +341,10 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
       return;
     }
 
-    // If cell has a different session, don't change it
-    if (cell.sessionId && cell.sessionId !== sharedSessionId.value) {
-      logger.log(`[CodeExecStore] Cell ${cellId} has different session ${cell.sessionId}, not changing`);
-      return;
+    // If cell has a different session, update it to use shared session when shared mode is enabled
+    if (cell.sessionId && cell.sessionId !== sharedSessionId.value && sharedSessionMode.value) {
+      logger.log(`[CodeExecStore] Cell ${cellId} has different session ${cell.sessionId}, forcing shared session`);
+      // Continue to force the shared session
     }
 
     // If no shared session exists, create one
@@ -359,7 +384,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
     logger.log(`[CodeExecStore] Registering code cells for nota ${notaId}, isPublished=${isPublished}`);
     
     const findCodeBlocks = (node: any): any[] => {
-      const blocks = []
+      const blocks: any[] = []
       if (node.type === 'executableCodeBlock') {
         blocks.push(node)
       }
@@ -372,7 +397,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
     }
 
     const codeBlocks = findCodeBlocks(content)
-    const servers = jupyterStore.jupyterServers || []
+    const servers = getJupyterStore().jupyterServers || []
     
     logger.log(`[CodeExecStore] Found ${codeBlocks.length} code blocks in nota ${notaId}`)
 
@@ -490,9 +515,9 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
       isPipelineCell: cell.isPipelineCell || false
     })
 
-    // If in shared session mode and cell doesn't have a session, add it to the shared session
+    // If in shared session mode, force the cell to use the shared session
     // Don't add published cells or pipeline cells to the shared session as they have their own session management
-    if (sharedSessionMode.value && !cell.sessionId && !cell.isPublished && !cell.isPipelineCell) {
+    if (sharedSessionMode.value && !cell.isPublished && !cell.isPipelineCell) {
       applySharedSessionToCell(cell.id)
     }
   }
@@ -571,7 +596,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
         sharedSessionId.value = sessionId
         
         // Get available servers
-        const servers = jupyterStore.jupyterServers || [];
+        const servers = getJupyterStore().jupyterServers || [];
         if (servers.length === 0) {
           logger.error('No Jupyter servers available for shared session');
           cell.hasError = true;
@@ -582,8 +607,8 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
         }
 
         // Try each server until we find one that works
-        let selectedServer = null;
-        let selectedKernel = null;
+        let selectedServer: JupyterServer | null = null;
+        let selectedKernel: KernelSpec | null = null;
 
         for (const server of servers) {
           try {
@@ -597,7 +622,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
             }
 
             // Get available kernels
-            const availableKernels = await jupyterStore.getAvailableKernels(server);
+            const availableKernels = await getJupyterStore().getAvailableKernels(server);
             if (availableKernels && availableKernels.length > 0) {
               // Prefer Python kernel if available
               selectedKernel = availableKernels.find((k: any) => 
@@ -845,6 +870,9 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
     kernelSessions.value.clear()
     cells.value.clear()
   }
+
+  // Initialize the store
+  loadSharedSessionMode()
 
   return {
     cells,

@@ -137,15 +137,15 @@ import { ref, computed, onMounted } from 'vue'
 import {
   Card,
   CardContent,
-} from '@/ui/card'
+} from '@/components/ui/card'
 import {
   Button
-} from '@/ui/button'
+} from '@/components/ui/button'
 import {
   Alert,
   AlertDescription,
   AlertTitle,
-} from '@/ui/alert'
+} from '@/components/ui/alert'
 import {
   Server,
   Settings,

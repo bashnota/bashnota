@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/features/auth/stores/auth'
 import { RouterLink } from 'vue-router'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import { 
   LogIn, 
   UserPlus, 
@@ -11,7 +11,8 @@ import {
   AtSign,
   Settings
 } from 'lucide-vue-next'
-import { Tooltip } from '@/ui/tooltip'
+import { Tooltip } from '@/components/ui/tooltip'
+import { useSidebar } from '@/components/ui/sidebar'
 
 const props = defineProps<{
   compact?: boolean
@@ -19,11 +20,15 @@ const props = defineProps<{
 
 const authStore = useAuthStore()
 const router = useRouter()
+const { state: sidebarState } = useSidebar()
 
 // Auth related computed
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 const currentUser = computed(() => authStore.currentUser)
 const userTag = computed(() => currentUser.value?.userTag)
+
+// Check if sidebar is collapsed
+const isCollapsed = computed(() => sidebarState.value === 'collapsed')
 
 // Calculate user initials for avatar (same as AuthHeader)
 const userInitials = computed(() => {
@@ -93,8 +98,8 @@ const handleLogout = () => {
 
   <!-- Full mode for sidebar bottom -->
   <div v-else class="border-t px-2 py-2">
-    <div v-if="isAuthenticated" class="flex items-center justify-between">
-      <div class="flex items-center gap-2 min-w-0">
+    <div v-if="isAuthenticated" class="flex items-center" :class="isCollapsed ? 'justify-center flex-col gap-1' : 'justify-between'">
+      <div class="flex items-center gap-2 min-w-0" :class="isCollapsed ? 'flex-col' : ''">
         <!-- User avatar with initials -->
         <div 
           class="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-[10px] font-medium"
@@ -108,13 +113,13 @@ const handleLogout = () => {
           alt="User avatar" 
           class="w-6 h-6 rounded-full object-cover"
         />
-        <span class="text-xs text-muted-foreground truncate">
+        <span v-if="!isCollapsed" class="text-xs text-muted-foreground truncate">
           {{ currentUser?.displayName || currentUser?.email }}
         </span>
       </div>
       
       <!-- Action buttons with tooltips -->
-      <div class="flex gap-1">
+      <div class="flex gap-1" :class="isCollapsed ? 'flex-col' : ''">
         <Tooltip content="Profile settings">
           <Button 
             variant="ghost" 
@@ -152,19 +157,33 @@ const handleLogout = () => {
       </div>
     </div>
     
-    <div v-else class="flex items-center justify-between">
-      <Button variant="ghost" size="sm" asChild class="h-7 px-2 text-xs">
-        <RouterLink to="/login">
-          <LogIn class="h-3 w-3 mr-1" />
-          Login
-        </RouterLink>
-      </Button>
-      <Button variant="ghost" size="sm" asChild class="h-7 px-2 text-xs">
-        <RouterLink to="/register">
-          <UserPlus class="h-3 w-3 mr-1" />
-          Register
-        </RouterLink>
-      </Button>
+    <div v-else class="flex items-center" :class="isCollapsed ? 'justify-center flex-col gap-1' : 'justify-between'">
+      <Tooltip content="Login">
+        <Button 
+          variant="ghost" 
+          :size="isCollapsed ? 'icon' : 'sm'" 
+          asChild 
+          :class="isCollapsed ? 'h-6 w-6' : 'h-7 px-2 text-xs'"
+        >
+          <RouterLink to="/login">
+            <LogIn :class="isCollapsed ? 'h-3.5 w-3.5' : 'h-3 w-3 mr-1'" />
+            <span v-if="!isCollapsed">Login</span>
+          </RouterLink>
+        </Button>
+      </Tooltip>
+      <Tooltip content="Register">
+        <Button 
+          variant="ghost" 
+          :size="isCollapsed ? 'icon' : 'sm'" 
+          asChild 
+          :class="isCollapsed ? 'h-6 w-6' : 'h-7 px-2 text-xs'"
+        >
+          <RouterLink to="/register">
+            <UserPlus :class="isCollapsed ? 'h-3.5 w-3.5' : 'h-3 w-3 mr-1'" />
+            <span v-if="!isCollapsed">Register</span>
+          </RouterLink>
+        </Button>
+      </Tooltip>
     </div>
   </div>
 </template>

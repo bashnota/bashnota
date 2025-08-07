@@ -10,12 +10,12 @@ import {
   X
 } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
-import { Input } from '@/ui/input'
-import { Button } from '@/ui/button'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { withDefaults } from 'vue'
 import type { Nota } from '@/features/nota/types/nota'
 import { useFavoriteBlocksStore } from '@/features/nota/stores/favoriteBlocksStore'
-import Modal from '@/ui/Modal.vue'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import type { Editor } from '@tiptap/vue-3'
 import { logger } from '@/services/logger'
 
@@ -52,6 +52,7 @@ const itemContextMenu = ref<string | null>(null)
 const contextMenuPosition = ref({ x: 0, y: 0 })
 const editor = ref<Editor | null>(null)
 const isModalOpen = ref(false)
+const blockName = ref('')
 
 const hasChildren = (id: string) => {
   return store.getChildren(id).length > 0
@@ -264,17 +265,29 @@ onUnmounted(() => {
     </div>
   </div>
 
-  <Modal
-    :isOpen="isModalOpen"
-    title="Enter a name for this block"
-    @close="isModalOpen = false"
-    @submit="handleModalSubmit"
-  />
+  <Dialog :open="isModalOpen" @update:open="isModalOpen = $event">
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Enter a name for this block</DialogTitle>
+      </DialogHeader>
+      <div class="space-y-4">
+        <Input
+          v-model="blockName"
+          placeholder="Block name"
+          @keyup.enter="handleModalSubmit(blockName)"
+        />
+        <div class="flex justify-end gap-2">
+          <Button variant="outline" @click="isModalOpen = false">Cancel</Button>
+          <Button @click="handleModalSubmit(blockName)">Submit</Button>
+        </div>
+      </div>
+    </DialogContent>
+  </Dialog>
 </template>
 
 <style scoped>
 .drag-over {
-  @apply bg-accent/20;
+  background-color: hsl(var(--accent) / 0.2);
 }
 </style>
 

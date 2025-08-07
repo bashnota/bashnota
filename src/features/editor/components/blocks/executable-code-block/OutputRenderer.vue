@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, computed } from 'vue'
 import { Copy, Check, Download, Maximize, Minimize, Eye, EyeOff, Loader2, ExternalLink } from 'lucide-vue-next'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import { logger } from '@/services/logger'
 import { ansiToHtml, stripAnsi } from '@/lib/utils'
 import IframeOutputRenderer from './IframeOutputRenderer.vue'
@@ -31,6 +31,47 @@ const jsonTree = ref<any>(null)
 const isOutputCopied = ref(false)
 const isOutputVisible = ref(true)
 const isFullscreen = ref(false)
+
+// Safe computed property for formatted content to prevent HTML parsing errors
+const safeFormattedContent = computed(() => {
+  try {
+    if (!formattedContent.value) return ''
+    
+    // Additional validation for the formatted content
+    if (typeof formattedContent.value !== 'string') {
+      console.warn('Formatted content is not a string:', typeof formattedContent.value)
+      return String(formattedContent.value)
+    }
+    
+    // Check for potential problematic HTML patterns
+    const content = formattedContent.value
+    
+    // If content contains unclosed tags or malformed HTML, escape it
+    const openTags = (content.match(/<[^/][^>]*>/g) || []).length
+    const closeTags = (content.match(/<\/[^>]*>/g) || []).length
+    
+    if (openTags !== closeTags) {
+      console.warn('Mismatched HTML tags detected, escaping content')
+      return escapeHtml(content)
+    }
+    
+    return content
+  } catch (error) {
+    console.error('Error in safeFormattedContent:', error)
+    return escapeHtml(String(formattedContent.value || ''))
+  }
+})
+
+// Safe computed property for highlighted JSON
+const safeHighlightedJson = computed(() => {
+  try {
+    if (!formattedContent.value) return ''
+    return highlightJson(formattedContent.value)
+  } catch (error) {
+    console.error('Error highlighting JSON:', error)
+    return escapeHtml(formattedContent.value)
+  }
+})
 
 // Determine output type based on content if not explicitly provided
 const effectiveOutputType = computed(() => {
@@ -87,27 +128,73 @@ const shouldUseIframe = computed(() => {
          (effectiveOutputType.value === 'text' && containsUnsafeHTML.value)
 })
 
+// Safe HTML processing to prevent parsing errors
+const safeProcessHTML = (htmlContent: string): string => {
+  try {
+    // Create a temporary DOM element to validate HTML structure
+    const tempDiv = document.createElement('div')
+    tempDiv.innerHTML = htmlContent
+    
+    // Check if the HTML was parsed correctly
+    if (tempDiv.children === undefined || tempDiv.children === null) {
+      console.warn('HTML parsing resulted in undefined children, falling back to text')
+      return escapeHtml(htmlContent)
+    }
+    
+    // Return the sanitized HTML
+    return tempDiv.innerHTML
+  } catch (error) {
+    console.error('Error processing HTML content:', error)
+    // Fallback to escaped text content
+    return escapeHtml(htmlContent)
+  }
+}
+
+// Escape HTML to prevent rendering errors
+const escapeHtml = (unsafe: string): string => {
+  return unsafe
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+    .replace(/\n/g, '<br>')
+}
+
 const processContent = () => {
   if (!props.content) return
   
-  switch (effectiveOutputType.value) {
-    case 'json':
-      try {
-        jsonTree.value = JSON.parse(props.content)
-        formattedContent.value = formatJson(props.content)
-      } catch (e) {
-        formattedContent.value = props.content
-      }
-      break
-    case 'table':
-      // Keep HTML table as is
-      formattedContent.value = props.content
-      break
-    case 'text':
-    default:
-      // For text content, convert ANSI escape codes to HTML
-      formattedContent.value = ansiToHtml(props.content)
-      break
+  try {
+    switch (effectiveOutputType.value) {
+      case 'json':
+        try {
+          jsonTree.value = JSON.parse(props.content)
+          formattedContent.value = formatJson(props.content)
+        } catch (e) {
+          formattedContent.value = props.content
+        }
+        break
+      case 'table':
+        // Safely process HTML table content
+        formattedContent.value = safeProcessHTML(props.content)
+        break
+      case 'text':
+      default:
+        // For text content, safely convert ANSI escape codes to HTML
+        try {
+          const ansiHtml = ansiToHtml(props.content)
+          formattedContent.value = safeProcessHTML(ansiHtml)
+        } catch (error) {
+          console.error('Error processing ANSI to HTML:', error)
+          // Fallback to escaped plain text
+          formattedContent.value = escapeHtml(props.content)
+        }
+        break
+    }
+  } catch (error) {
+    console.error('Error in processContent:', error)
+    // Ultimate fallback to escaped text
+    formattedContent.value = escapeHtml(props.content)
   }
 }
 
@@ -124,11 +211,17 @@ const copyOutput = async () => {
       if (effectiveOutputType.value === 'text') {
         await navigator.clipboard.writeText(stripAnsi(props.content))
       } else {
-        // Convert HTML to plain text for copying
-        const tempDiv = document.createElement('div')
-        tempDiv.innerHTML = props.content
-        const textContent = tempDiv.textContent || tempDiv.innerText || ''
-        await navigator.clipboard.writeText(textContent)
+        // Safely convert HTML to plain text for copying
+        try {
+          const tempDiv = document.createElement('div')
+          tempDiv.innerHTML = props.content
+          const textContent = tempDiv.textContent || tempDiv.innerText || props.content
+          await navigator.clipboard.writeText(textContent)
+        } catch (error) {
+          console.error('Error extracting text from HTML:', error)
+          // Fallback to original content
+          await navigator.clipboard.writeText(props.content)
+        }
       }
     }
     
@@ -494,13 +587,13 @@ const executionTime = computed(() => {
           :height="props.maxHeight || '400px'"
         />
         <!-- Safe text output without HTML but with ANSI formatting -->
-        <div v-else class="text-output" v-html="formattedContent"></div>
+        <div v-else class="text-output" v-html="safeFormattedContent"></div>
       </template>
       
       <template v-else-if="effectiveOutputType === 'json'">
         <!-- JSON output -->
         <div class="json-viewer">
-          <pre v-if="formattedContent" v-html="highlightJson(formattedContent)"></pre>
+          <pre v-if="formattedContent" v-html="safeHighlightedJson"></pre>
           <pre v-else>{{ content }}</pre>
         </div>
       </template>

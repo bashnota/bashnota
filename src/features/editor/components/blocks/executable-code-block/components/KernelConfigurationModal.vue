@@ -1,17 +1,15 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { Button } from '@/ui/button'
-import { ButtonGroup } from '@/ui/button-group'
-import { 
+import { Button } from '@/components/ui/button'
+// ButtonGroup functionality will be replaced with flex grouping
+import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogTitle,
-  DialogTrigger
-} from '@/ui/dialog'
-import CustomSelect from '@/ui/CustomSelect.vue'
+  DialogTitle
+} from '@/components/ui/dialog'
 import { 
   Settings, 
   Server, 
@@ -63,6 +61,11 @@ interface Emits {
   // Server/kernel management events
   'server-change': [serverId: string]
   'kernel-change': [kernelName: string]
+  'refresh-servers': []
+  'refresh-kernels': []
+  'add-test-server': []
+  'test-server-connection': [server: any]
+  'apply-configuration': [config: { server: string; kernel: string; session: string }]
   // Session management events
   'session-change': [sessionId: string]
   'create-new-session': []
@@ -80,28 +83,6 @@ const emit = defineEmits<Emits>()
 const localServer = ref(props.selectedServer || '')
 const localKernel = ref(props.selectedKernel || '')
 const localSession = ref(props.selectedSession || '')
-
-// Computed options
-const serverOptions = computed(() => 
-  props.availableServers.map(server => ({
-    value: `${server.ip}:${server.port}`,
-    label: `${server.ip}:${server.port}`,
-  }))
-)
-
-const kernelOptions = computed(() => 
-  props.availableKernels.map(kernel => ({
-    value: kernel.name,
-    label: kernel.spec.display_name || kernel.name
-  }))
-)
-
-const sessionOptions = computed(() => 
-  props.availableSessions.map(session => ({
-    value: session.id,
-    label: session.name
-  }))
-)
 
 // Validation
 const isServerSelected = computed(() => 
@@ -203,8 +184,18 @@ const handleSelectRunningKernel = (kernelId: string) => {
 
 const handleApply = () => {
   if (canApplyConfiguration.value) {
+    // Emit the configuration to save it
+    emit('apply-configuration', {
+      server: localServer.value,
+      kernel: localKernel.value,
+      session: localSession.value
+    })
     emit('update:is-open', false)
   }
+}
+
+const handleCancel = () => {
+  emit('update:is-open', false)
 }
 
 const handleToggleSharedSessionMode = () => {
@@ -218,10 +209,37 @@ const formatLastActivity = (lastActivity: string) => {
     return lastActivity
   }
 }
+
+// Open Jupyter settings
+const openJupyterSettings = () => {
+  // Navigate to Jupyter settings
+  const settingsUrl = `${window.location.origin}/settings/jupyter`
+  window.open(settingsUrl, '_blank')
+}
+
+// Refresh servers
+const refreshServers = () => {
+  emit('refresh-servers')
+}
+
+// Add test server for development
+const addTestServer = () => {
+  emit('add-test-server')
+}
+
+// Refresh kernels for selected server
+const refreshKernels = () => {
+  emit('refresh-kernels')
+}
+
+// Test server connection
+const testServerConnection = (server: any) => {
+  emit('test-server-connection', server)
+}
 </script>
 
 <template>
-  <Dialog :open="isOpen" @update:open="emit('update:is-open', $event)">
+  <Dialog :open="props.isOpen" @update:open="(value) => emit('update:is-open', value)" :modal="false">
     <DialogContent class="max-w-2xl max-h-[80vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
@@ -229,7 +247,7 @@ const formatLastActivity = (lastActivity: string) => {
           Kernel Configuration
         </DialogTitle>
         <DialogDescription>
-          Configure the Jupyter server, kernel, and session for code execution.
+          Configure your Jupyter server, kernel, and session settings for code execution.
         </DialogDescription>
       </DialogHeader>
 
@@ -297,61 +315,162 @@ const formatLastActivity = (lastActivity: string) => {
 
         <!-- Server Selection -->
         <div class="space-y-3">
-          <div class="flex items-center gap-2">
-            <Server class="h-4 w-4" />
-            <h3 class="text-sm font-medium">Jupyter Server</h3>
-            <span class="text-xs text-muted-foreground">
-              ({{ props.availableServers.length }} available)
-            </span>
-            <span v-if="isSharedSessionMode" class="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded">
-              Globally managed
-            </span>
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <Server class="h-4 w-4" />
+              <h3 class="text-sm font-medium">Jupyter Server</h3>
+              <span class="text-xs text-muted-foreground">
+                ({{ props.availableServers.length }} available)
+              </span>
+              <span v-if="isSharedSessionMode" class="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded">
+                Globally managed
+              </span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              @click="refreshServers"
+              class="h-7 w-7 p-0"
+              title="Refresh servers"
+            >
+              <RotateCw class="h-3 w-3" />
+            </Button>
           </div>
           
-          <CustomSelect
-            :options="serverOptions"
-            :model-value="localServer"
-            placeholder="Select a Jupyter server..."
-            :searchable="true"
-            :disabled="isSharedSessionMode"
-            @select="handleServerChange"
-          />
+          <div v-if="availableServers.length > 0" class="space-y-2">
+            <div class="max-h-32 overflow-y-auto space-y-1">
+              <div
+                v-for="server in availableServers"
+                :key="`${server.ip}:${server.port}`"
+                class="group flex items-center justify-between p-3 rounded border text-sm cursor-pointer transition-colors"
+                :class="{
+                  'bg-primary/10 border-primary/30': localServer === `${server.ip}:${server.port}`,
+                  'hover:bg-muted/50': localServer !== `${server.ip}:${server.port}` && !isSharedSessionMode,
+                  'opacity-50 cursor-not-allowed': isSharedSessionMode
+                }"
+                @click="!isSharedSessionMode && handleServerChange(`${server.ip}:${server.port}`)"
+              >
+                <div class="flex items-center gap-2 flex-1">
+                  <Check v-if="localServer === `${server.ip}:${server.port}`" class="h-4 w-4 text-primary" />
+                  <Server v-else class="h-4 w-4" />
+                  <span class="font-medium">{{ server.ip }}:{{ server.port }}</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  @click.stop="testServerConnection(server)"
+                  class="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Test connection"
+                >
+                  <ExternalLink class="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+          </div>
           
           <div
             v-if="availableServers.length === 0"
-            class="p-3 text-sm text-center text-muted-foreground border rounded-lg"
+            class="p-4 text-sm text-center border rounded-lg bg-muted/20"
           >
-            No servers available. Configure servers in the settings.
+            <Server class="w-8 h-8 mx-auto mb-2 text-muted-foreground/50" />
+            <p class="font-medium mb-1">No Jupyter servers configured</p>
+            <p class="text-muted-foreground text-xs mb-3">
+              Add a Jupyter server in Settings > Integrations > Jupyter to start executing code.
+            </p>
+            <div class="flex gap-2 justify-center">
+              <Button 
+                variant="outline" 
+                size="sm"
+                @click="openJupyterSettings"
+              >
+                <Settings class="w-4 h-4 mr-2" />
+                Open Jupyter Settings
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                @click="addTestServer"
+                class="text-muted-foreground"
+                title="Add a test server (localhost:8888)"
+              >
+                <Plus class="w-4 h-4 mr-2" />
+                Add Test Server
+              </Button>
+            </div>
           </div>
         </div>
 
         <!-- Kernel Selection -->
         <div class="space-y-3">
-          <div class="flex items-center gap-2">
-            <Cpu class="h-4 w-4" />
-            <h3 class="text-sm font-medium">Kernel</h3>
-            <span class="text-xs text-muted-foreground">
-              ({{ props.availableKernels.length }} available)
-            </span>
-            <span v-if="isSharedSessionMode" class="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded">
-              Globally managed
-            </span>
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <Cpu class="h-4 w-4" />
+              <h3 class="text-sm font-medium">Kernel</h3>
+              <span class="text-xs text-muted-foreground">
+                ({{ props.availableKernels.length }} available)
+              </span>
+              <span v-if="isSharedSessionMode" class="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded">
+                Globally managed
+              </span>
+            </div>
+            <Button
+              v-if="isServerSelected"
+              variant="ghost"
+              size="sm"
+              @click="refreshKernels"
+              class="h-7 w-7 p-0"
+              :disabled="isSettingUp"
+              title="Refresh kernels"
+            >
+              <RotateCw class="h-3 w-3" :class="{ 'animate-spin': isSettingUp }" />
+            </Button>
           </div>
           
-          <CustomSelect
-            :options="kernelOptions"
-            :model-value="localKernel"
-            placeholder="Select a kernel..."
-            :searchable="true"
-            :disabled="!isServerSelected || isSharedSessionMode"
-            @select="handleKernelChange"
-          />
+          <div v-if="availableKernels.length > 0" class="space-y-2">
+            <div class="max-h-32 overflow-y-auto space-y-1">
+              <div
+                v-for="kernel in availableKernels"
+                :key="kernel.name"
+                class="flex items-center justify-between p-3 rounded border text-sm cursor-pointer transition-colors"
+                :class="{
+                  'bg-primary/10 border-primary/30': localKernel === kernel.name,
+                  'hover:bg-muted/50': localKernel !== kernel.name && !isSharedSessionMode && isServerSelected,
+                  'opacity-50 cursor-not-allowed': isSharedSessionMode || !isServerSelected
+                }"
+                @click="!isSharedSessionMode && isServerSelected && handleKernelChange(kernel.name)"
+              >
+                <div class="flex items-center gap-2">
+                  <Check v-if="localKernel === kernel.name" class="h-4 w-4 text-primary" />
+                  <Cpu v-else class="h-4 w-4" />
+                  <div>
+                    <span class="font-medium">{{ kernel.spec.display_name || kernel.name }}</span>
+                    <div class="text-xs text-muted-foreground">{{ kernel.name }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
           
           <div
-            v-if="isServerSelected && availableKernels.length === 0"
+            v-if="isServerSelected && !isSettingUp && availableKernels.length === 0"
             class="p-3 text-sm text-center text-muted-foreground border rounded-lg"
           >
             No kernels available on the selected server.
+          </div>
+          
+          <div
+            v-if="isServerSelected && isSettingUp"
+            class="p-3 text-sm text-center border rounded-lg bg-muted/20"
+          >
+            <Loader2 class="w-4 h-4 mx-auto mb-2 animate-spin" />
+            Loading kernels from server...
+          </div>
+          
+          <div
+            v-if="!isServerSelected && availableServers.length > 0"
+            class="p-3 text-sm text-center text-muted-foreground border rounded-lg"
+          >
+            Select a Jupyter server above to view available kernels.
           </div>
         </div>
 
@@ -366,13 +485,13 @@ const formatLastActivity = (lastActivity: string) => {
               </span>
             </div>
             
-            <ButtonGroup>
+            <div class="flex items-center border rounded-md">
               <Button
                 variant="outline"
                 size="sm"
                 @click="handleRefreshSessions"
                 :disabled="isExecuting || isSettingUp"
-                class="h-6 px-2 text-xs"
+                class="h-6 px-2 text-xs rounded-r-none border-r-0"
               >
                 <RotateCw class="h-3 w-3 mr-1" />
                 Refresh
@@ -383,53 +502,37 @@ const formatLastActivity = (lastActivity: string) => {
                 size="sm"
                 @click="handleCreateNewSession"
                 :disabled="!isKernelSelected || isExecuting || isSettingUp"
-                class="h-6 px-2 text-xs"
+                class="h-6 px-2 text-xs rounded-l-none"
               >
                 <Plus class="h-3 w-3 mr-1" />
                 New Session
               </Button>
-            </ButtonGroup>
+            </div>
           </div>
 
           <!-- Session Selection -->
-          <CustomSelect
-            :options="sessionOptions"
-            :model-value="localSession"
-            placeholder="Select or create a session..."
-            :searchable="true"
-            :disabled="!isKernelSelected"
-            @select="handleSessionChange"
-          />
-
-          <!-- Available Sessions List -->
           <div v-if="availableSessions.length > 0" class="space-y-2">
             <div class="text-xs font-medium text-muted-foreground">Available Sessions</div>
             <div class="max-h-32 overflow-y-auto space-y-1">
               <div
                 v-for="session in availableSessions"
                 :key="session.id"
-                class="flex items-center justify-between p-2 rounded border text-xs"
+                class="flex items-center justify-between p-3 rounded border text-sm cursor-pointer transition-colors"
                 :class="{
-                  'bg-primary/10 border-primary/30': session.id === localSession,
-                  'hover:bg-muted/50': session.id !== localSession
+                  'bg-primary/10 border-primary/30': localSession === session.id,
+                  'hover:bg-muted/50': localSession !== session.id && isKernelSelected,
+                  'opacity-50 cursor-not-allowed': !isKernelSelected
                 }"
+                @click="isKernelSelected && handleSessionChange(session.id)"
               >
                 <div class="flex items-center gap-2">
-                  <Check v-if="session.id === localSession" class="h-3 w-3 text-primary" />
-                  <Layers v-else class="h-3 w-3" />
-                  <span class="font-medium">{{ session.name }}</span>
-                  <span class="text-muted-foreground">{{ session.kernel.name }}</span>
+                  <Check v-if="localSession === session.id" class="h-4 w-4 text-primary" />
+                  <Layers v-else class="h-4 w-4" />
+                  <div>
+                    <span class="font-medium">{{ session.name }}</span>
+                    <div class="text-xs text-muted-foreground">{{ session.kernel.name }}</div>
+                  </div>
                 </div>
-                
-                <Button
-                  v-if="session.id !== localSession"
-                  variant="ghost"
-                  size="sm"
-                  class="h-5 w-5 p-0"
-                  @click="handleSessionChange(session.id)"
-                >
-                  <ExternalLink class="h-3 w-3" />
-                </Button>
               </div>
             </div>
           </div>
@@ -506,7 +609,7 @@ const formatLastActivity = (lastActivity: string) => {
       <DialogFooter>
         <Button 
           variant="outline" 
-          @click="emit('update:is-open', false)"
+          @click="handleCancel"
         >
           Cancel
         </Button>
@@ -522,3 +625,7 @@ const formatLastActivity = (lastActivity: string) => {
     </DialogContent>
   </Dialog>
 </template>
+
+<style scoped>
+/* Simple styles for the dialog */
+</style>

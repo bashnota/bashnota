@@ -217,9 +217,9 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { Button } from '@/ui/button'
-import { Badge } from '@/ui/badge'
-import { Switch } from '@/ui/switch'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Switch } from '@/components/ui/switch'
 
 import { 
   Settings,
@@ -238,7 +238,7 @@ import { webLLMDefaultModelService } from '@/features/ai/services/webLLMDefaultM
 import type { DefaultModelConfig } from '@/features/ai/services/webLLMDefaultModelService'
 import type { WebLLMModelInfo } from '@/features/ai/services/types'
 
-import { toast } from '@/ui/toast'
+import { toast } from 'vue-sonner'
 import { logger } from '@/services/logger'
 
 interface Props {

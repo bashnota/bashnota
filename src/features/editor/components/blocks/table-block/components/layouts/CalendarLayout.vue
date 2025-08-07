@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
-import { Button } from '@/ui/button'
-import { Card } from '@/ui/card'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { ChevronLeft, ChevronRight, Calendar, Clock, LayoutGrid, Plus } from 'lucide-vue-next'
 import type { TableData } from '@/features/editor/components/blocks/table-block/TableExtension'
 import MonthView from './calendar/MonthView.vue'

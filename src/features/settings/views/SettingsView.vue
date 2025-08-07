@@ -1,14 +1,54 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
-import { Search, ChevronRight, ChevronDown, FileText, Palette, SparklesIcon, Plug, Keyboard, Settings } from 'lucide-vue-next'
-import { Input } from '@/ui/input'
+import { useRoute, useRouter } from 'vue-router'
+import { Search, ChevronRight, ChevronDown, FileText, Palette, SparklesIcon, Plug, Keyboard, Settings, Command } from 'lucide-vue-next'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import SettingsPanel from '@/features/settings/components/SettingsPanel.vue'
+import SettingsCommandPalette from '@/features/settings/components/SettingsCommandPalette.vue'
 
 const route = useRoute()
+const router = useRouter()
 
 // Search functionality
 const searchQuery = ref('')
+const showCommandPalette = ref(false)
+
+// Keyboard shortcuts
+const handleKeyDown = (event: KeyboardEvent) => {
+  // Command/Ctrl + K to open command palette
+  if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
+    event.preventDefault()
+    showCommandPalette.value = true
+  }
+  
+  // Escape to close command palette
+  if (event.key === 'Escape' && showCommandPalette.value) {
+    showCommandPalette.value = false
+  }
+}
+
+// Add keyboard listeners
+onMounted(() => {
+  document.addEventListener('keydown', handleKeyDown)
+})
+
+// Cleanup
+const cleanup = () => {
+  document.removeEventListener('keydown', handleKeyDown)
+}
+
+// Navigation from command palette
+const handleCommandNavigation = (settingId: string) => {
+  selectSetting(settingId)
+}
+
+// Get keyboard shortcut label for the current platform
+const getMacKeyboardLabel = () => {
+  if (typeof window === 'undefined') return 'Ctrl+K'
+  return window.navigator.platform.includes('Mac') ? '⌘K' : 'Ctrl+K'
+}
 
 // Settings categories
 const settingsCategories = ref([
@@ -18,9 +58,10 @@ const settingsCategories = ref([
     icon: FileText,
     expanded: true,
     subcategories: [
-      { id: 'text-editing', title: 'Text Editing', component: 'TextEditingSettings' },
-      { id: 'code-editing', title: 'Code Editing', component: 'CodeEditingSettings' },
-      { id: 'formatting', title: 'Formatting', component: 'FormattingSettings' }
+      { id: 'unified-editor', title: 'All Settings', component: 'UnifiedEditorSettings', badge: 'Recommended' as const },
+      // { id: 'text-editing', title: 'Text Editing', component: 'TextEditingSettings', badge: undefined },
+      // { id: 'code-editing', title: 'Code Editing (Legacy)', component: 'CodeEditingSettings', badge: 'Legacy' as const },
+      // { id: 'formatting', title: 'Formatting (Legacy)', component: 'FormattingSettings', badge: 'Legacy' as const }
     ]
   },
   {
@@ -29,8 +70,9 @@ const settingsCategories = ref([
     icon: Palette,
     expanded: false,
     subcategories: [
-      { id: 'theme', title: 'Theme', component: 'ThemeSettings' },
-      { id: 'interface', title: 'Interface', component: 'InterfaceSettings' }
+      { id: 'unified-appearance', title: 'All Settings (New)', component: 'UnifiedAppearanceSettings', badge: 'Recommended' as const },
+      // { id: 'theme', title: 'Theme (Legacy)', component: 'ThemeSettings', badge: 'Legacy' as const },
+      // { id: 'interface', title: 'Interface (Legacy)', component: 'InterfaceSettings', badge: 'Legacy' as const }
     ]
   },
   {
@@ -39,10 +81,11 @@ const settingsCategories = ref([
     icon: SparklesIcon,
     expanded: true,
     subcategories: [
-      { id: 'ai-providers', title: 'AI Providers', component: 'AIProvidersSettings' },
-      { id: 'ai-actions', title: 'AI Actions', component: 'AIActionsSettings' },
-      { id: 'ai-code-actions', title: 'AI Code Actions', component: 'AICodeActionsSettings' },
-      { id: 'ai-generation', title: 'Generation Settings', component: 'AIGenerationSettings' }
+      { id: 'unified-ai', title: 'Provider Settings', component: 'UnifiedAISettings', badge: 'Recommended' as const },
+      { id: 'ai-actions', title: 'AI Actions', component: 'AIActionsSettings', badge: undefined },
+      { id: 'ai-code-actions', title: 'Code Actions', component: 'AICodeActionsSettings', badge: undefined },
+      // { id: 'ai-providers', title: 'Providers (Legacy)', component: 'AIProvidersSettings', badge: 'Legacy' as const },
+      // { id: 'ai-generation', title: 'Generation (Legacy)', component: 'AIGenerationSettings', badge: 'Legacy' as const }
     ]
   },
   {
@@ -51,8 +94,8 @@ const settingsCategories = ref([
     icon: Plug,
     expanded: false,
     subcategories: [
-      { id: 'jupyter', title: 'Jupyter', component: 'JupyterSettings' },
-      { id: 'external-tools', title: 'External Tools', component: 'ExternalToolsSettings' }
+      { id: 'jupyter', title: 'Jupyter', component: 'JupyterSettings', badge: undefined },
+      { id: 'external-tools', title: 'External Tools', component: 'ExternalToolsSettings', badge: undefined }
     ]
   },
   {
@@ -61,9 +104,9 @@ const settingsCategories = ref([
     icon: Keyboard,
     expanded: false,
     subcategories: [
-      { id: 'editor-shortcuts', title: 'Editor', component: 'EditorShortcutsSettings' },
-      { id: 'navigation-shortcuts', title: 'Navigation', component: 'NavigationShortcutsSettings' },
-      { id: 'global-shortcuts', title: 'Global', component: 'GlobalShortcutsSettings' }
+      { id: 'editor-shortcuts', title: 'Editor', component: 'EditorShortcutsSettings', badge: undefined },
+      { id: 'navigation-shortcuts', title: 'Navigation', component: 'NavigationShortcutsSettings', badge: undefined },
+      { id: 'global-shortcuts', title: 'Global', component: 'GlobalShortcutsSettings', badge: undefined }
     ]
   },
   {
@@ -72,15 +115,17 @@ const settingsCategories = ref([
     icon: Settings,
     expanded: false,
     subcategories: [
-      { id: 'performance', title: 'Performance', component: 'PerformanceSettings' },
-      { id: 'data-management', title: 'Data Management', component: 'DataManagementSettings' },
-      { id: 'system-info', title: 'System Information', component: 'SystemInfoSettings' }
+      { id: 'performance', title: 'Performance', component: 'PerformanceSettings', badge: undefined },
+      { id: 'data-management', title: 'Data Management', component: 'DataManagementSettings', badge: undefined },
+      { id: 'system-info', title: 'System Information', component: 'SystemInfoSettings', badge: undefined }
     ]
   }
 ])
 
-// Currently selected setting
-const selectedSetting = ref('ai-providers')
+// Currently selected setting - get from route params
+const selectedSetting = computed(() => {
+  return (route.params.section as string) || 'unified-editor'
+})
 
 // Filtered categories based on search
 const filteredCategories = computed(() => {
@@ -108,7 +153,8 @@ const toggleCategory = (categoryId: string) => {
 
 // Select a setting
 const selectSetting = (settingId: string) => {
-  selectedSetting.value = settingId
+  // Navigate to the settings route with the section parameter
+  router.push({ name: 'settings-detail', params: { section: settingId } })
   
   // Find and expand the parent category
   for (const category of settingsCategories.value) {
@@ -120,28 +166,29 @@ const selectSetting = (settingId: string) => {
   }
 }
 
-// Handle query parameters for direct navigation
-const handleQueryNavigation = () => {
-  const section = route.query.section as string
+// Handle route parameters for direct navigation
+const handleRouteNavigation = () => {
+  const section = route.params.section as string
   if (section) {
-    // Check if the section exists
-    const exists = settingsCategories.value.some(category => 
-      category.subcategories.some(sub => sub.id === section)
-    )
-    if (exists) {
-      selectSetting(section)
+    // Check if the section exists and expand its parent category
+    for (const category of settingsCategories.value) {
+      const hasSubcategory = category.subcategories.some(sub => sub.id === section)
+      if (hasSubcategory) {
+        category.expanded = true
+        break
+      }
     }
   }
 }
 
 // Initialize
 onMounted(() => {
-  handleQueryNavigation()
+  handleRouteNavigation()
 })
 
 // Watch for route changes
-watch(() => route.query.section, () => {
-  handleQueryNavigation()
+watch(() => route.params.section, () => {
+  handleRouteNavigation()
 })
 
 // Get the current setting title
@@ -176,14 +223,31 @@ const currentSettingComponent = computed(() => {
       <!-- Header -->
       <div class="p-4 border-b">
         <h1 class="text-lg font-semibold mb-3">Settings</h1>
+        
         <!-- Search -->
-        <div class="relative">
-          <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            v-model="searchQuery"
-            placeholder="Search settings..."
-            class="pl-9"
-          />
+        <div class="space-y-2">
+          <div class="relative">
+            <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              v-model="searchQuery"
+              placeholder="Search settings..."
+              class="pl-9"
+            />
+          </div>
+          
+          <!-- Command Palette Button -->
+          <Button
+            variant="outline"
+            size="sm"
+            class="w-full justify-start"
+            @click="showCommandPalette = true"
+          >
+            <Command class="mr-2 h-3 w-3" />
+            Quick Search
+            <Badge variant="secondary" class="ml-auto text-xs">
+              {{ getMacKeyboardLabel() }}
+            </Badge>
+          </Button>
         </div>
       </div>
       
@@ -220,13 +284,16 @@ const currentSettingComponent = computed(() => {
               :key="subcategory.id"
               @click="selectSetting(subcategory.id)"
               :class="[
-                'w-full text-left p-2 rounded-md text-sm transition-colors',
+                'w-full text-left p-2 rounded-md text-sm transition-colors flex items-center justify-between',
                 selectedSetting === subcategory.id
                   ? 'bg-primary text-primary-foreground'
                   : 'hover:bg-muted/50'
               ]"
             >
-              {{ subcategory.title }}
+              <span>{{ subcategory.title }}</span>
+              <Badge v-if="subcategory.badge" :variant="subcategory.badge === 'Recommended' ? 'default' : 'secondary'" class="text-xs">
+                {{ subcategory.badge }}
+              </Badge>
             </button>
           </div>
         </div>
@@ -251,6 +318,12 @@ const currentSettingComponent = computed(() => {
         />
       </div>
     </div>
+    
+    <!-- Command Palette -->
+    <SettingsCommandPalette
+      v-model:open="showCommandPalette"
+      @navigate="handleCommandNavigation"
+    />
   </div>
 </template> 
 

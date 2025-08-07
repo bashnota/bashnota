@@ -42,7 +42,7 @@
 import { ref, computed, watch, onErrorCaptured } from 'vue'
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import type { NodeViewProps } from '@tiptap/vue-3'
-import { Card, CardContent } from '@/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import MathDisplay from './MathDisplay.vue'
 import MathInput from './MathInput.vue'
 import { logger } from '@/services/logger'

@@ -371,50 +371,50 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-} from '@/ui/card'
+} from '@/components/ui/card'
 import {
   Button
-} from '@/ui/button'
+} from '@/components/ui/button'
 import {
   Input
-} from '@/ui/input'
+} from '@/components/ui/input'
 import {
   Label
-} from '@/ui/label'
+} from '@/components/ui/label'
 import {
   Switch
-} from '@/ui/switch'
+} from '@/components/ui/switch'
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
-} from '@/ui/tabs'
+} from '@/components/ui/tabs'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/ui/select'
+} from '@/components/ui/select'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/ui/dropdown-menu'
+} from '@/components/ui/dropdown-menu'
 import {
   Collapsible,
   CollapsibleContent,
-} from '@/ui/collapsible'
+} from '@/components/ui/collapsible'
 import {
   Alert,
   AlertDescription,
   AlertTitle,
-} from '@/ui/alert'
+} from '@/components/ui/alert'
 import {
   Badge
-} from '@/ui/badge'
+} from '@/components/ui/badge'
 import {
   Grid3x3,
   Settings,

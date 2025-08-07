@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import { MessageSquare, RefreshCw, Shield } from 'lucide-vue-next'
 import { commentService } from '@/features/nota/services/commentService'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { logger } from '@/services/logger'
 import CommentForm from './CommentForm.vue'
 import CommentItem from './CommentItem.vue'
@@ -101,7 +101,7 @@ const loadMoreComments = async () => {
     hasMore.value = moreComments.length === itemsPerPage
   } catch (err) {
     logger.error('Failed to load more comments:', err)
-    toast('Failed to load more comments', '', 'destructive')
+    toast('Failed to load more comments')
   } finally {
     isLoadingMore.value = false
   }

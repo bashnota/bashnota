@@ -1,18 +1,18 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/ui/dialog'
-import { Label } from '@/ui/label'
-import { Input } from '@/ui/input'
-import { Textarea } from '@/ui/textarea'
-import { Button } from '@/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/ui/tabs'
-import { Alert, AlertDescription } from '@/ui/alert'
-import { Badge } from '@/ui/badge'
-import { Separator } from '@/ui/separator'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Button } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
 import { FileText, Wand2, AlertCircle, CheckCircle2, Loader2 } from 'lucide-vue-next'
 import { useCitationStore } from '@/features/editor/stores/citationStore'
 import type { CitationEntry } from '@/features/nota/types/nota'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { useBibTexParser } from '@/features/nota/composables/useBibTexParser'
 import { useReferenceForm } from '@/features/nota/composables/useReferenceForm'
 
@@ -71,7 +71,7 @@ watch(() => props.open, (isOpen) => {
 // Save citation
 const saveCitation = async () => {
   if (!validateForm()) {
-    toast('Please fix the validation errors', 'destructive')
+    toast('Please fix the validation errors')
     return
   }
   
@@ -109,7 +109,7 @@ const saveCitation = async () => {
     emit('saved')
   } catch (error) {
     console.error('Failed to save citation:', error)
-    toast('Failed to save reference', 'destructive')
+    toast('Failed to save reference')
   } finally {
     isSaving.value = false
   }

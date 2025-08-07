@@ -2,9 +2,9 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/features/auth/stores/auth'
-import { Button } from '@/ui/button'
-import { Input } from '@/ui/input'
-import { Label } from '@/ui/label'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Card,
   CardContent,
@@ -12,9 +12,9 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from '@/ui/card'
+} from '@/components/ui/card'
 import { Eye, EyeOff, Mail, Lock, User } from 'lucide-vue-next'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { logger } from '@/services/logger'
 
 const authStore = useAuthStore()
@@ -66,7 +66,9 @@ const isFormValid = computed(() => {
 // Handle registration
 const handleRegister = async () => {
   if (!isFormValid.value) {
-    toast('Please fill in all fields correctly', 'Invalid Form', 'destructive')
+    toast('Please fill in all fields correctly', {
+      description: 'Invalid Form'
+    })
     return
   }
 
@@ -80,7 +82,9 @@ const handleRegister = async () => {
     })
 
     if (result) {
-      toast('Your account has been created successfully!', 'Welcome to BashNota!')
+      toast('Your account has been created successfully!', {
+        description: 'Welcome to BashNota!'
+      })
       router.push('/')
     }
   } catch (error) {
@@ -98,7 +102,9 @@ const handleGoogleSignup = async () => {
     const result = await authStore.loginWithGoogle()
 
     if (result) {
-      toast('You have signed up with Google successfully!', 'Welcome to BashNota!')
+      toast('You have signed up with Google successfully!', {
+        description: 'Welcome to BashNota!'
+      })
       router.push('/')
     }
   } catch (error) {

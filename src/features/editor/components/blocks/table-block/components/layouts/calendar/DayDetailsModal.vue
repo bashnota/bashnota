@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/ui/dialog'
-import { Button } from '@/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 import { Plus, Pencil, Trash2 } from 'lucide-vue-next'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { TableData } from '@/features/editor/components/blocks/table-block/TableExtension'
 
 const props = defineProps<{
@@ -141,7 +141,9 @@ type Event = {
 }
 
 // Update the handleCategoryUpdate function
-const handleCategoryUpdate = (event: Event, field: 'category' | 'priority' | 'status', value: string) => {
+const handleCategoryUpdate = (event: Event, field: 'category' | 'priority' | 'status', value: any) => {
+  if (!value || typeof value !== 'string') return
+  
   const updatedEvent = {
     ...event,
     cells: {
@@ -222,7 +224,7 @@ const handleDeleteEvent = (event: any, e: MouseEvent) => {
                   <div class="mt-3 flex items-center gap-2 text-sm">
                     <Select 
                       :model-value="event.cells.category" 
-                      @update:model-value="(value: string) => handleCategoryUpdate(event, 'category', value)"
+                      @update:model-value="(value: any) => handleCategoryUpdate(event, 'category', value)"
                     >
                       <SelectTrigger class="h-7 w-[100px]">
                         <SelectValue :placeholder="event.cells.category" />
@@ -235,7 +237,7 @@ const handleDeleteEvent = (event: any, e: MouseEvent) => {
                     </Select>
                     <Select 
                       :model-value="event.cells.priority" 
-                      @update:model-value="(value: string) => handleCategoryUpdate(event, 'priority', value)"
+                      @update:model-value="(value: any) => handleCategoryUpdate(event, 'priority', value)"
                     >
                       <SelectTrigger class="h-7 w-[100px]">
                         <SelectValue :placeholder="event.cells.priority" />
@@ -248,7 +250,7 @@ const handleDeleteEvent = (event: any, e: MouseEvent) => {
                     </Select>
                     <Select 
                       :model-value="event.cells.status" 
-                      @update:model-value="(value: string) => handleCategoryUpdate(event, 'status', value)"
+                      @update:model-value="(value: any) => handleCategoryUpdate(event, 'status', value)"
                     >
                       <SelectTrigger class="h-7 w-[100px]">
                         <SelectValue :placeholder="event.cells.status" />

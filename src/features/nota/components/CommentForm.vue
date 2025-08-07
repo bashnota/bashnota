@@ -1,11 +1,21 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { Button } from '@/ui/button'
-import { Textarea } from '@/ui/textarea'
+import { toTypedSchema } from "@vee-validate/zod"
+import { useForm } from "vee-validate"
+import * as z from "zod"
+import { Button } from '@/components/ui/button'
+import {
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormMessage,
+} from "@/components/ui/form"
+import { Textarea } from '@/components/ui/textarea'
 import { Send, Loader2 } from 'lucide-vue-next'
 import { useAuthStore } from '@/features/auth/stores/auth'
 import { commentService } from '@/features/nota/services/commentService'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { logger } from '@/services/logger'
 
 const props = defineProps<{
@@ -20,33 +30,36 @@ const emit = defineEmits<{
   (e: 'cancel-reply'): void
 }>()
 
-const commentText = ref('')
 const isSubmitting = ref(false)
 const authStore = useAuthStore()
-
-// Computed property to control when the submit button is enabled
-const canSubmit = computed(() => {
-  // Must be authenticated and have text that's not just whitespace
-  return authStore.isAuthenticated && commentText.value.trim().length > 0
-})
 
 // Maximum comment length
 const MAX_COMMENT_LENGTH = 1000
 
-const handleSubmit = async () => {
+// Form schema
+const formSchema = toTypedSchema(z.object({
+  comment: z.string()
+    .min(1, "Comment cannot be empty")
+    .max(MAX_COMMENT_LENGTH, `Comment must be ${MAX_COMMENT_LENGTH} characters or less`)
+    .refine((val) => val.trim().length > 0, "Comment cannot be empty")
+}))
+
+// Form setup
+const { handleSubmit, resetForm, values } = useForm({
+  validationSchema: formSchema,
+  initialValues: {
+    comment: ''
+  }
+})
+
+// Computed property to control when the submit button is enabled
+const canSubmit = computed(() => {
+  // Must be authenticated and have text that's not just whitespace
+  return authStore.isAuthenticated && values.comment && values.comment.trim().length > 0
+})
+
+const onSubmit = handleSubmit(async (formValues) => {
   if (!canSubmit.value || isSubmitting.value) return
-  
-  // Validate comment
-  const text = commentText.value.trim()
-  if (text.length === 0) {
-    toast('Comment cannot be empty', '', 'destructive')
-    return
-  }
-  
-  if (text.length > MAX_COMMENT_LENGTH) {
-    toast(`Comment is too long (max ${MAX_COMMENT_LENGTH} characters)`, '', 'destructive')
-    return
-  }
   
   isSubmitting.value = true
   
@@ -57,27 +70,27 @@ const handleSubmit = async () => {
       authStore.currentUser?.uid as string,
       authStore.currentUser?.displayName || 'Anonymous',
       authStore.currentUser?.userTag || '',
-      text,
+      formValues.comment.trim(),
       props.parentId || null
     )
     
     // Clear the input and emit an event
-    commentText.value = ''
+    resetForm()
     emit('comment-added')
     
     // Show success toast
     toast(props.isReply ? 'Reply posted' : 'Comment posted')
   } catch (error) {
     logger.error('Error posting comment:', error)
-    toast('Failed to post comment. Please try again.', '', 'destructive')
+    toast('Failed to post comment. Please try again.')
   } finally {
     isSubmitting.value = false
   }
-}
+})
 
 // Handle cancel reply
 const cancelReply = () => {
-  commentText.value = ''
+  resetForm()
   emit('cancel-reply')
 }
 </script>
@@ -88,38 +101,44 @@ const cancelReply = () => {
       <p class="text-muted-foreground">Please <a href="/login" class="text-primary hover:underline">log in</a> to comment</p>
     </div>
     
-    <form v-else @submit.prevent="handleSubmit" class="space-y-3">
-      <Textarea
-        v-model="commentText"
-        :placeholder="placeholder || 'Add a comment...'"
-        class="min-h-[80px] resize-y"
-        :maxlength="MAX_COMMENT_LENGTH"
-      />
+    <form v-else @submit="onSubmit" class="space-y-3">
+      <FormField v-slot="{ componentField }" name="comment">
+        <FormItem>
+          <FormControl>
+            <Textarea
+              :placeholder="placeholder || 'Add a comment...'"
+              class="min-h-[80px] resize-y"
+              v-bind="componentField"
+            />
+          </FormControl>
+          <FormDescription class="flex justify-between items-center">
+            <span>{{ values.comment?.length || 0 }}/{{ MAX_COMMENT_LENGTH }}</span>
+            <span class="text-xs">Share your thoughts respectfully</span>
+          </FormDescription>
+          <FormMessage />
+        </FormItem>
+      </FormField>
       
-      <div class="flex justify-between items-center text-xs text-muted-foreground">
-        <span>{{ commentText.length }}/{{ MAX_COMMENT_LENGTH }}</span>
+      <div class="flex justify-end gap-2">
+        <Button 
+          v-if="isReply"
+          type="button" 
+          variant="ghost" 
+          size="sm" 
+          @click="cancelReply"
+        >
+          Cancel
+        </Button>
         
-        <div class="flex gap-2">
-          <Button 
-            v-if="isReply"
-            type="button" 
-            variant="ghost" 
-            size="sm" 
-            @click="cancelReply"
-          >
-            Cancel
-          </Button>
-          
-          <Button 
-            type="submit" 
-            size="sm"
-            :disabled="!canSubmit || isSubmitting"
-          >
-            <Loader2 v-if="isSubmitting" class="h-4 w-4 mr-1 animate-spin" />
-            <Send v-else class="h-4 w-4 mr-1" />
-            {{ isReply ? 'Reply' : 'Post Comment' }}
-          </Button>
-        </div>
+        <Button 
+          type="submit" 
+          size="sm"
+          :disabled="!canSubmit || isSubmitting"
+        >
+          <Loader2 v-if="isSubmitting" class="h-4 w-4 mr-1 animate-spin" />
+          <Send v-else class="h-4 w-4 mr-1" />
+          {{ isReply ? 'Reply' : 'Post Comment' }}
+        </Button>
       </div>
     </form>
   </div>

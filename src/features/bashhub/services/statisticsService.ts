@@ -329,7 +329,7 @@ export const statisticsService = {
       }
       
       // Get user information for each voter
-      const voters = [];
+      const voters: { userId: string, userTag: string, voteType: 'like' | 'dislike' }[] = [];
       
       for (const [userId, voteType] of Object.entries(votes)) {
         try {
@@ -374,7 +374,7 @@ export const statisticsService = {
       const data = notaDoc.data();
       
       // Handle timestamp conversions properly
-      let lastViewedAt = null;
+      let lastViewedAt: Date | null = null;
       if (data.lastViewedAt) {
         try {
           // Check if it's a Firestore Timestamp

@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { toast } from '@/ui/toast'
+import { toast } from 'vue-sonner'
 import { logger } from '@/services/logger'
 import { aiService } from '@/features/ai/services'
 import { useAISettingsStore } from '@/features/ai/stores/aiSettingsStore'

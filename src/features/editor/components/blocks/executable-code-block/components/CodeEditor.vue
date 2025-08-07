@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { Copy, Check } from 'lucide-vue-next'
-import { Button } from '@/ui/button'
-import { ButtonGroup } from '@/ui/button-group'
+import { Button } from '@/components/ui/button'
 import CodeMirror from '../CodeMirror.vue'
 
 interface Props {
@@ -30,7 +29,7 @@ const emit = defineEmits<Emits>()
   <div v-show="isCodeVisible" class="relative">
     <!-- Floating action buttons overlay (only visible on hover) -->
     <div class="absolute right-3 top-3 z-10 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-      <ButtonGroup class="btn-group-tight">
+      <div class="flex items-center border rounded-md">
         <Button
           variant="secondary"
           size="sm"
@@ -41,7 +40,7 @@ const emit = defineEmits<Emits>()
           <Copy v-if="!isCodeCopied" class="h-3 w-3" />
           <Check v-else class="h-3 w-3 text-success" />
         </Button>
-      </ButtonGroup>
+      </div>
     </div>
 
     <!-- Code editor with minimal styling -->

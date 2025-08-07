@@ -80,10 +80,10 @@ import {
   DialogTitle,
   DialogDescription,
   DialogClose
-} from '@/ui/dialog'
-import { Button } from '@/ui/button'
-import { Badge } from '@/ui/badge'
-import { toast } from '@/ui/toast'
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { toast } from 'vue-sonner'
 import { 
   Globe, 
   CheckCircle, 

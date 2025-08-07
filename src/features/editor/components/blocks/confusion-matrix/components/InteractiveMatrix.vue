@@ -227,22 +227,22 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-} from '@/ui/card'
+} from '@/components/ui/card'
 import {
   Button
-} from '@/ui/button'
+} from '@/components/ui/button'
 import {
   Badge
-} from '@/ui/badge'
+} from '@/components/ui/badge'
 import {
   Switch
-} from '@/ui/switch'
+} from '@/components/ui/switch'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/ui/dropdown-menu'
+} from '@/components/ui/dropdown-menu'
 import {
   Grid3x3,
   Settings,

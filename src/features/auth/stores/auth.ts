@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { authService } from '@/features/auth/services/auth'
 import type { AuthState, LoginCredentials, RegisterCredentials } from '@/features/auth/types/user'
 import { logAnalyticsEvent } from '@/services/firebase'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { validateUserTag } from '@/utils/userTagGenerator'
 
 export const useAuthStore = defineStore('auth', {
@@ -70,7 +70,9 @@ export const useAuthStore = defineStore('auth', {
       try {
         const user = await authService.loginWithEmail(credentials.email, credentials.password)
         this.user = await authService.mapUserToProfile(user)
-        toast('You have successfully logged in!', 'Welcome back!')
+        toast('You have successfully logged in!', {
+          description: 'Welcome back!'
+        })
 
         // Log analytics event
         if (this.user) {
@@ -95,7 +97,9 @@ export const useAuthStore = defineStore('auth', {
       try {
         const user = await authService.loginWithGoogle()
         this.user = await authService.mapUserToProfile(user)
-        toast('You have successfully logged in with Google!', 'Welcome!')
+        toast('You have successfully logged in with Google!', {
+          description: 'Welcome!'
+        })
 
         // Log analytics event
         if (this.user) {
@@ -124,7 +128,9 @@ export const useAuthStore = defineStore('auth', {
           credentials.displayName,
         )
         this.user = await authService.mapUserToProfile(user)
-        toast('Your account has been created successfully!', 'Welcome to BashNota!')
+        toast('Your account has been created successfully!', {
+          description: 'Welcome to BashNota!'
+        })
 
         // Log analytics event
         if (this.user) {
@@ -161,7 +167,9 @@ export const useAuthStore = defineStore('auth', {
           // Refresh user profile to get the newly created tag
           this.user = await authService.mapUserToProfile(await authService.getCurrentUser())
           
-          toast('Your user tag has been generated', 'User Tag Created')
+          toast('Your user tag has been generated', {
+            description: 'User Tag Created'
+          })
           return true
         }
         
@@ -187,7 +195,9 @@ export const useAuthStore = defineStore('auth', {
         
         if (!validation.isValid || !validation.isAvailable) {
           this.error = validation.error || 'Invalid or unavailable user tag'
-          toast(this.error, 'User Tag Error', 'destructive')
+          toast(this.error, {
+            description: 'User Tag Error'
+          })
           return false
         }
         
@@ -235,7 +245,9 @@ export const useAuthStore = defineStore('auth', {
 
       try {
         await authService.resetPassword(email)
-        toast('Password reset email has been sent to your email address.', 'Password Reset')
+        toast('Password reset email has been sent to your email address.', {
+          description: 'Password Reset'
+        })
         return true
       } catch (error: any) {
         this.error = error.message || 'Password reset failed'

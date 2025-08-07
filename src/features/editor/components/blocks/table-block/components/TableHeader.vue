@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import { Plus, Pencil } from 'lucide-vue-next'
-import { Input } from '@/ui/input'
+import { Input } from '@/components/ui/input'
 import { ref, watch } from 'vue'
 
 const props = defineProps<{

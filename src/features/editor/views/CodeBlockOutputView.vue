@@ -3,9 +3,9 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useCodeExecutionStore } from '@/features/editor/stores/codeExecutionStore'
-import { Button } from '@/ui/button'
-import { Card, CardContent, CardHeader } from '@/ui/card'
-import { Badge } from '@/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { ExternalLink, Copy, Check, Download, RefreshCw, Code, AlertCircle } from 'lucide-vue-next'
 import IframeOutputRenderer from '@/features/editor/components/blocks/executable-code-block/IframeOutputRenderer.vue'
 import { ansiToHtml, stripAnsi } from '@/lib/utils'
@@ -102,7 +102,7 @@ const loadNotaAndBlock = async () => {
     nota.value = loadedNota
     
     // Parse the nota content to find the specific code block
-    let foundBlock = null
+    let foundBlock: any = null
     if (loadedNota.content) {
       const content = JSON.parse(loadedNota.content)
       foundBlock = findCodeBlockInContent(content, props.blockId)
@@ -132,7 +132,7 @@ const loadNotaAndBlock = async () => {
       blockOutput: foundBlock?.attrs?.output?.substring(0, 100) || 'No output in attrs'
     })
     
-    if (cell) {
+    if (cell && foundBlock) {
       // Merge the content structure with the execution store data
       codeBlock.value = {
         ...foundBlock,
@@ -140,7 +140,7 @@ const loadNotaAndBlock = async () => {
         hasError: cell.hasError || false,
         attrs: foundBlock?.attrs || {}
       }
-    } else {
+    } else if (foundBlock) {
       // Fallback to the content from nota if not in execution store
       // Use the output from the nota's stored attributes
       codeBlock.value = {

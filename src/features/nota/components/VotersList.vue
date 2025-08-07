@@ -21,7 +21,7 @@
         
         <div class="py-4">
           <div v-if="isLoading" class="flex justify-center py-4">
-            <LoadingSpinner class="h-8 w-8" />
+            <Skeleton class="h-8 w-8 rounded-full" />
           </div>
           
           <div v-else-if="voters.length === 0" class="text-center py-4 text-muted-foreground">
@@ -70,11 +70,11 @@ import { ref, onMounted, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { statisticsService } from '@/features/bashhub/services/statisticsService'
 import { logger } from '@/services/logger'
-import { Button } from '@/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/ui/dialog'
-import { Badge } from '@/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Badge } from '@/components/ui/badge'
 import { ThumbsUp, ThumbsDown, Users, UserCircle } from 'lucide-vue-next'
-import LoadingSpinner from '@/ui/LoadingSpinner.vue'
+import { Skeleton } from '@/components/ui/skeleton'
 
 const props = defineProps<{
   notaId: string

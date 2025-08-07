@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Edit, Trash2, ExternalLink, Copy } from 'lucide-vue-next'
-import { Button } from '@/ui/button'
-import { Badge } from '@/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import type { CitationEntry } from '@/features/nota/types/nota'
-import { toast } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 
 const props = defineProps<{
   citations: CitationEntry[]
@@ -58,7 +58,7 @@ const copyCitation = async (citation: CitationEntry) => {
     toast('Citation copied to clipboard')
   } catch (error) {
     console.error('Failed to copy citation:', error)
-    toast('Failed to copy citation', 'destructive')
+    toast('Failed to copy citation')
   }
 }
 

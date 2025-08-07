@@ -45,7 +45,7 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted, computed } from 'vue'
-import { Input } from '@/ui/input'
+import { Input } from '@/components/ui/input'
 import { LockIcon } from 'lucide-vue-next'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'

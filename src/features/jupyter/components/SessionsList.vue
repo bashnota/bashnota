@@ -40,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { Button } from '@/ui/button'
+import { Button } from '@/components/ui/button'
 import type { JupyterSession } from '@/features/jupyter/composables/useJupyterSessions'
 
 interface Props {

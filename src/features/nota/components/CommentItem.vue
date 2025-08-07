@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Button } from '@/ui/button'
-import { Badge } from '@/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { 
   MessageSquare, 
   ThumbsUp, 
@@ -10,12 +10,13 @@ import {
   Trash2, 
   X
 } from 'lucide-vue-next'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useAuthStore } from '@/features/auth/stores/auth'
 import { commentService } from '@/features/nota/services/commentService'
-import { formatDate, toast } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
+import { toast } from 'vue-sonner'
 import { logger } from '@/services/logger'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import CommentForm from './CommentForm.vue'
 import type { Comment } from '@/features/nota/types/nota'
 import { useRouter } from 'vue-router'
@@ -66,7 +67,7 @@ const isAuthor = computed(() => {
 const handleVote = async (voteType: 'like' | 'dislike') => {
   // Must be logged in to vote
   if (!authStore.isAuthenticated || !authStore.currentUser?.uid) {
-    toast('Please log in to vote', '', 'destructive')
+    toast('Please log in to vote')
     return
   }
   
@@ -88,7 +89,7 @@ const handleVote = async (voteType: 'like' | 'dislike') => {
     userVote.value = result.userVote
   } catch (error) {
     logger.error('Failed to record vote:', error)
-    toast('Failed to record your vote', '', 'destructive')
+    toast('Failed to record your vote')
   } finally {
     isSubmittingVote.value = false
   }
@@ -113,7 +114,7 @@ const loadReplies = async () => {
     replies.value = await commentService.getComments(props.notaId, props.comment.id)
   } catch (error) {
     logger.error('Error loading replies:', error)
-    toast('Failed to load replies', '', 'destructive')
+    toast('Failed to load replies')
   } finally {
     isLoadingReplies.value = false
   }
@@ -122,7 +123,7 @@ const loadReplies = async () => {
 // Show the reply form
 const showReply = () => {
   if (!authStore.isAuthenticated) {
-    toast('Please log in to reply', '', 'destructive')
+    toast('Please log in to reply')
     return
   }
   
@@ -174,7 +175,7 @@ const deleteComment = async () => {
     }
   } catch (error) {
     logger.error('Error deleting comment:', error)
-    toast('Failed to delete comment', '', 'destructive')
+    toast('Failed to delete comment')
   } finally {
     isDeleting.value = false
   }

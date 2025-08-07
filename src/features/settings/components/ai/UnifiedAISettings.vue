@@ -1,399 +1,295 @@
-<template>
-  <div class="space-y-6">
-    <!-- Header -->
-    <div class="flex items-center justify-between">
-      <div>
-        <h2 class="text-2xl font-bold tracking-tight">AI Settings</h2>
-        <p class="text-muted-foreground">
-          Configure AI providers and global settings for your workspace
-        </p>
-      </div>
-      <Badge :variant="hasConfiguredProvider ? 'default' : 'secondary'">
-        {{ configuredProvidersCount }} provider{{ configuredProvidersCount !== 1 ? 's' : '' }} configured
-      </Badge>
-    </div>
-
-    <!-- Global Settings Card -->
-    <Card>
-      <CardHeader>
-        <CardTitle class="flex items-center">
-          <Settings class="mr-2 h-5 w-5" />
-          Global AI Settings
-        </CardTitle>
-        <CardDescription>
-          Default parameters applied to all AI providers
-        </CardDescription>
-      </CardHeader>
-      <CardContent class="space-y-6">
-        <!-- Global Parameters -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div class="space-y-2">
-            <Label class="text-sm">Default Temperature ({{ temperature[0].toFixed(1) }})</Label>
-            <Slider
-              v-model="temperature"
-              :min="0"
-              :max="2"
-              :step="0.1"
-            />
-            <p class="text-xs text-gray-500">
-              {{ getTemperatureDescription(temperature[0]) }}
-            </p>
-          </div>
-          <div class="space-y-2">
-            <Label class="text-sm">Default Max Tokens ({{ maxTokens[0] }})</Label>
-            <Slider
-              v-model="maxTokens"
-              :min="100"
-              :max="4000"
-              :step="100"
-            />
-            <p class="text-xs text-gray-500">
-              Maximum length for AI responses
-            </p>
-          </div>
-        </div>
-
-        <!-- Custom System Prompt -->
-        <div class="space-y-2">
-          <Label for="custom-prompt">Custom System Prompt (Optional)</Label>
-          <Textarea
-            id="custom-prompt"
-            v-model="customPrompt"
-            placeholder="Enter a custom system prompt to influence AI behavior..."
-            rows="3"
-          />
-          <p class="text-xs text-gray-500">
-            This prompt will be prepended to all AI conversations
-          </p>
-        </div>
-
-        <!-- Auto-selection Settings -->
-        <div class="flex items-center space-x-2">
-          <Checkbox v-model="autoSelectProvider" />
-          <Label for="auto-select">Automatically select best available provider</Label>
-        </div>
-      </CardContent>
-    </Card>
-
-    <!-- Provider Selection & Configuration -->
-    <Card>
-      <CardHeader>
-        <CardTitle class="flex items-center">
-          <SparklesIcon class="mr-2 h-5 w-5" />
-          AI Providers
-        </CardTitle>
-        <CardDescription>
-          Select and configure your preferred AI provider
-        </CardDescription>
-      </CardHeader>
-      <CardContent class="space-y-6">
-        <!-- Active Provider Selection -->
-        <div class="space-y-3">
-          <Label class="text-sm font-medium">Active Provider</Label>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div 
-              v-for="provider in providerConfigs" 
-              :key="provider.id"
-              :class="[
-                'relative p-4 border-2 rounded-lg cursor-pointer transition-all hover:shadow-md',
-                activeProviderId === provider.id 
-                  ? 'border-primary bg-primary/5' 
-                  : 'border-border hover:border-primary/50'
-              ]"
-              @click="selectProvider(provider.id)"
-            >
-              <div class="flex items-start space-x-3">
-                <component :is="provider.icon" class="h-6 w-6 mt-1" />
-                <div class="flex-1 min-w-0">
-                  <h3 class="font-medium">{{ provider.name }}</h3>
-                  <p class="text-sm text-muted-foreground mt-1">{{ provider.description }}</p>
-                  
-                  <div class="flex items-center justify-between mt-3">
-                    <Badge 
-                      :variant="getProviderStatus(provider.id) === 'connected' ? 'default' : 'secondary'" 
-                      class="text-xs"
-                    >
-                      {{ getProviderStatusText(provider.id) }}
-                    </Badge>
-                    <div v-if="activeProviderId === provider.id" class="flex items-center text-primary">
-                      <CheckCircleIcon class="h-4 w-4 mr-1" />
-                      <span class="text-xs font-medium">Active</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Provider Configuration -->
-        <div v-if="activeProvider" class="space-y-4">
-          <div class="flex items-center justify-between">
-            <h3 class="text-lg font-medium">{{ activeProvider.name }} Configuration</h3>
-            <Button
-              variant="ghost"
-              size="sm"
-              @click="showProviderConfig = !showProviderConfig"
-            >
-              {{ showProviderConfig ? 'Hide' : 'Show' }} Configuration
-            </Button>
-          </div>
-
-          <div v-if="showProviderConfig" class="border rounded-lg p-1">
-            <!-- Gemini Configuration -->
-            <GeminiProviderSettings v-if="activeProviderId === 'gemini'" />
-            
-            <!-- Ollama Configuration -->
-            <OllamaProviderSettings v-if="activeProviderId === 'ollama'" />
-            
-            <!-- WebLLM Configuration -->
-            <WebLLMProviderSettings v-if="activeProviderId === 'webllm'" />
-          </div>
-        </div>
-
-        <!-- Quick Provider Status Overview -->
-        <div class="mt-6 p-4 bg-muted/30 rounded-lg">
-          <h4 class="font-medium mb-3">All Providers Status</h4>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div 
-              v-for="provider in providerStatus" 
-              :key="provider.id"
-              class="flex items-center justify-between p-3 bg-background rounded border"
-            >
-              <div class="flex items-center space-x-2">
-                <component :is="provider.icon" class="h-4 w-4" />
-                <span class="text-sm font-medium">{{ provider.name }}</span>
-              </div>
-              <div class="flex items-center space-x-2">
-                <Badge 
-                  :variant="provider.status === 'connected' ? 'default' : 'secondary'" 
-                  class="text-xs"
-                >
-                  {{ provider.statusText }}
-                </Badge>
-                <span v-if="provider.modelCount" class="text-xs text-muted-foreground">
-                  {{ provider.modelCount }} models
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-
-    <!-- AI Actions Configuration -->
-    <Card>
-      <CardHeader>
-        <CardTitle class="flex items-center">
-          <WandIcon class="mr-2 h-5 w-5" />
-          AI Actions
-        </CardTitle>
-        <CardDescription>
-          Configure AI-powered actions for the context menu
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <AIActionsSettings />
-      </CardContent>
-    </Card>
-
-    <!-- Save Actions -->
-    <div class="flex justify-between items-center pt-6 border-t">
-      <div class="text-sm text-muted-foreground">
-        Changes are saved automatically
-      </div>
-      <div class="flex gap-2">
-        <Button variant="outline" @click="resetToDefaults">
-          Reset to Defaults
-        </Button>
-        <Button @click="saveAllSettings" :disabled="isSaving">
-          <Save class="mr-2 h-4 w-4" />
-          {{ isSaving ? 'Saving...' : 'Save All Settings' }}
-        </Button>
-      </div>
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/ui/card'
-import { Button } from '@/ui/button'
-import { Label } from '@/ui/label'
-import { Slider } from '@/ui/slider'
-import { Textarea } from '@/ui/textarea'
-import { Checkbox } from '@/ui/checkbox'
-import { Badge } from '@/ui/badge'
-import { toast } from '@/ui/toast'
-import { 
-  Sparkles as SparklesIcon, 
-  Server as ServerIcon, 
-  Globe as GlobeIcon, 
-  Settings, 
-  Save,
-  CheckCircle as CheckCircleIcon,
-  Wand as WandIcon
-} from 'lucide-vue-next'
+import { Button } from '@/components/ui/button'
+import { RotateCw, Sparkles, Zap, Globe, Server, Settings2, Brain, MessageSquare, TrendingUp } from 'lucide-vue-next'
+import { toast } from 'vue-sonner'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+
+// Use actual AI stores and composables
 import { useAISettingsStore } from '@/features/ai/stores/aiSettingsStore'
 import { useAIProviders } from '@/features/ai/components/composables/useAIProviders'
-import GeminiProviderSettings from './providers/GeminiProviderSettings.vue'
-import OllamaProviderSettings from './providers/OllamaProviderSettings.vue'
-import WebLLMProviderSettings from './providers/WebLLMProviderSettings.vue'
-import AIActionsSettings from './AIActionsSettings.vue'
 
-// Stores and composables
+// Base components
+import SettingSection from '@/features/settings/components/base/SettingSection.vue'
+import SettingGroup from '@/features/settings/components/base/SettingGroup.vue'
+import SettingSwitch from '@/features/settings/components/base/SettingSwitch.vue'
+
+// AI-specific modular components
+import ProviderSettings from './components/ProviderSettings.vue'
+import ModelSelector from './components/ModelSelector.vue'
+import GenerationSettings from './components/GenerationSettings.vue'
+
+// Store and composable setup
 const aiSettings = useAISettingsStore()
-const aiProviders = useAIProviders()
+const { 
+  providers, 
+  initialize, 
+  availableProviders, 
+  selectProvider,
+  currentProviderId 
+} = useAIProviders()
 
-// State
-const isSaving = ref(false)
-const showProviderConfig = ref(true)
+// Local state
+const activeTab = ref('providers')
+const isInitialized = ref(false)
 
-// Settings
-const activeProviderId = ref(aiSettings.settings.preferredProviderId || 'gemini')
-const temperature = ref([aiSettings.settings.temperature])
-const maxTokens = ref([aiSettings.settings.maxTokens])
-const customPrompt = ref(aiSettings.settings.customPrompt)
-const autoSelectProvider = ref(aiSettings.settings.autoSelectProvider ?? true)
-
-// Provider configurations
-const providerConfigs = [
+// Enhanced provider configurations with icons
+const providerConfigs = computed(() => [
   {
     id: 'gemini',
     name: 'Google Gemini',
-    icon: SparklesIcon,
+    icon: Sparkles,
+    description: 'Google\'s most capable AI model with excellent reasoning capabilities',
     requiresApiKey: true,
-    description: 'Google\'s most capable AI model with excellent reasoning'
-  },
-  {
-    id: 'ollama',
-    name: 'Ollama',
-    icon: ServerIcon,
-    requiresApiKey: false,
-    description: 'Run powerful AI models locally on your machine'
+    setupUrl: 'https://aistudio.google.com/app/apikey',
+    features: ['Multimodal', 'Long Context', 'Function Calling', 'Fast Response']
   },
   {
     id: 'webllm',
     name: 'WebLLM',
-    icon: GlobeIcon,
+    icon: Globe,
+    description: 'Privacy-focused AI that runs entirely in your browser',
     requiresApiKey: false,
-    description: 'Privacy-focused AI that runs entirely in your browser'
+    setupUrl: 'https://webllm.mlc.ai/',
+    features: ['Local Processing', 'Complete Privacy', 'No API Costs', 'Offline Usage']
+  },
+  {
+    id: 'ollama',
+    name: 'Ollama',
+    icon: Server,
+    description: 'Run large language models locally on your machine',
+    requiresApiKey: false,
+    setupUrl: 'https://ollama.ai/',
+    features: ['Local Hosting', 'Custom Models', 'Privacy', 'High Performance']
   }
-]
+])
 
-// Computed
-const activeProvider = computed(() => 
-  providerConfigs.find(p => p.id === activeProviderId.value)
+// Computed properties
+const selectedProvider = computed(() => 
+  providerConfigs.value.find(p => p.id === aiSettings.settings.preferredProviderId)
 )
 
 const configuredProvidersCount = computed(() => {
-  return providerConfigs.filter(provider => {
+  return providerConfigs.value.filter(provider => {
     if (provider.requiresApiKey) {
       return !!aiSettings.getApiKey(provider.id)
     }
-    return true // Assume non-API key providers are always "configured"
+    return true
   }).length
 })
 
 const hasConfiguredProvider = computed(() => configuredProvidersCount.value > 0)
 
-const providerStatus = computed(() => {
-  return providerConfigs.map(provider => ({
-    ...provider,
-    status: getProviderStatus(provider.id),
-    statusText: getProviderStatusText(provider.id),
-    modelCount: getProviderModelCount(provider.id)
-  }))
-})
+const statsData = computed(() => ({
+  totalProviders: providerConfigs.value.length,
+  configuredProviders: configuredProvidersCount.value,
+  availableProviders: availableProviders.value.length,
+  selectedProvider: selectedProvider.value?.name || 'None'
+}))
 
 // Methods
-const getProviderStatus = (providerId: string): 'connected' | 'disconnected' => {
-  const provider = providerConfigs.find(p => p.id === providerId)
-  if (!provider) return 'disconnected'
-  
-  if (provider.requiresApiKey) {
-    return aiSettings.getApiKey(providerId) ? 'connected' : 'disconnected'
-  }
-  
-  return 'connected' // Assume local providers are always available
-}
-
-const getProviderStatusText = (providerId: string): string => {
-  const status = getProviderStatus(providerId)
-  return status === 'connected' ? 'Ready' : 'Not Configured'
-}
-
-const getProviderModelCount = (providerId: string): number => {
-  switch (providerId) {
-    case 'gemini':
-      return aiProviders.geminiModels.value.length
-    case 'webllm':
-      return aiProviders.webLLMModels.value.length
-    default:
-      return 0
-  }
-}
-
-const getTemperatureDescription = (temp: number): string => {
-  if (temp < 0.3) return 'More precise and deterministic'
-  if (temp > 0.7) return 'More creative and varied'
-  return 'Balanced creativity and precision'
-}
-
-const selectProvider = (providerId: string) => {
-  activeProviderId.value = providerId
-  showProviderConfig.value = true
-}
-
-const saveAllSettings = async () => {
+const handleProviderSelection = async (providerId: string) => {
   try {
-    isSaving.value = true
-    
-    await aiSettings.updateSettings({
-      preferredProviderId: activeProviderId.value,
-      temperature: temperature.value[0],
-      maxTokens: maxTokens.value[0],
-      customPrompt: customPrompt.value,
-      autoSelectProvider: autoSelectProvider.value
-    })
-    
-    toast({
-      title: 'Settings Saved',
-      description: 'All AI settings have been saved successfully.'
-    })
+    aiSettings.setPreferredProvider(providerId)
+    await selectProvider(providerId)
+    toast.success(`Switched to ${providerConfigs.value.find(p => p.id === providerId)?.name}`)
   } catch (error) {
-    toast({
-      title: 'Error',
-      description: 'Failed to save settings.',
-      variant: 'destructive'
-    })
-  } finally {
-    isSaving.value = false
+    toast.error('Failed to switch provider')
+    console.error('Provider selection error:', error)
   }
 }
 
-const resetToDefaults = () => {
-  activeProviderId.value = 'gemini'
-  temperature.value = [0.7]
-  maxTokens.value = [2048]
-  customPrompt.value = ''
-  autoSelectProvider.value = true
-  
-  toast({
-    title: 'Reset to Defaults',
-    description: 'Settings have been reset to default values.'
-  })
+const handleApiKeyUpdate = (providerId: string, apiKey: string) => {
+  aiSettings.setApiKey(providerId, apiKey)
+  toast.success('API key updated')
 }
 
-// Initialize
-onMounted(() => {
-  aiProviders.initialize()
+const handleResetToDefaults = () => {
+  // Reset AI settings to defaults
+  aiSettings.updateSettings({
+    preferredProviderId: 'gemini',
+    apiKeys: {},
+    autoSelectProvider: true,
+    requestTimeout: 30,
+    maxTokens: 2048,
+    temperature: 0.7,
+    customPrompt: '',
+    geminiModel: 'gemini-1.5-pro',
+    geminiSafetyThreshold: 'BLOCK_MEDIUM_AND_ABOVE',
+    ollamaServerUrl: 'http://localhost:11434',
+    ollamaModel: 'llama2',
+    webllmModel: '',
+    webllmDefaultModel: '',
+    webllmAutoLoad: true,
+    webllmAutoLoadStrategy: 'smallest',
+    sidebarWidth: 350
+  })
+  toast.success('AI settings reset to defaults')
+}
+
+// Initialize providers
+onMounted(async () => {
+  try {
+    await initialize()
+    isInitialized.value = true
+  } catch (error) {
+    console.error('Failed to initialize AI providers:', error)
+    toast.error('Failed to initialize AI providers')
+  }
 })
-</script> 
+</script>
 
+<template>
+  <div class="space-y-6">
+    <!-- Overview Section -->
+    <SettingSection
+      title="AI Assistant Overview"
+      description="Current AI configuration and quick stats"
+      :icon="TrendingUp"
+    >
+      <SettingGroup title="Configuration Status" description="Overview of your AI setup">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="text-center p-4 bg-blue-50 dark:bg-blue-950 rounded-lg">
+            <div class="text-2xl font-bold text-blue-600">{{ statsData.totalProviders }}</div>
+            <div class="text-sm text-muted-foreground">Total Providers</div>
+          </div>
+          <div class="text-center p-4 bg-green-50 dark:bg-green-950 rounded-lg">
+            <div class="text-2xl font-bold text-green-600">{{ statsData.configuredProviders }}</div>
+            <div class="text-sm text-muted-foreground">Configured</div>
+          </div>
+          <div class="text-center p-4 bg-purple-50 dark:bg-purple-950 rounded-lg">
+            <div class="text-2xl font-bold text-purple-600">{{ statsData.availableProviders }}</div>
+            <div class="text-sm text-muted-foreground">Available</div>
+          </div>
+          <div class="text-center p-4 bg-amber-50 dark:bg-amber-950 rounded-lg">
+            <div class="text-2xl font-bold text-amber-600 truncate">{{ statsData.selectedProvider }}</div>
+            <div class="text-sm text-muted-foreground">Active Provider</div>
+          </div>
+        </div>
+      </SettingGroup>
+    </SettingSection>
 
+    <Tabs v-model="activeTab" class="w-full">
+      <TabsList class="grid w-full grid-cols-3">
+        <TabsTrigger value="providers">
+          <Settings2 class="mr-2 h-4 w-4" />
+          Providers
+        </TabsTrigger>
+        <TabsTrigger value="models">
+          <Brain class="mr-2 h-4 w-4" />
+          Models
+        </TabsTrigger>
+        <TabsTrigger value="generation">
+          <MessageSquare class="mr-2 h-4 w-4" />
+          Generation
+        </TabsTrigger>
+      </TabsList>
 
+      <!-- Providers Tab -->
+      <TabsContent value="providers">
+        <SettingSection
+          title="AI Providers"
+          description="Configure and manage your AI service providers"
+          :icon="Settings2"
+        >
+          <SettingGroup 
+            title="Auto-Selection" 
+            description="Provider fallback and automatic selection"
+          >
+            <SettingSwitch
+              label="Auto-Select Best Provider"
+              description="Automatically choose the best available provider"
+              help="Falls back to configured providers based on availability"
+              :model-value="aiSettings.settings.autoSelectProvider ?? true"
+              @update:model-value="(value) => aiSettings.updateSettings({ autoSelectProvider: value })"
+            />
+          </SettingGroup>
 
+          <SettingGroup 
+            title="Available Providers" 
+            description="Set up and configure AI service providers"
+          >
+            <div class="grid gap-6">
+              <ProviderSettings
+                v-for="provider in providerConfigs"
+                :key="provider.id"
+                :provider-id="provider.id"
+                :provider-name="provider.name"
+                :icon="provider.icon"
+                :description="provider.description"
+                :requires-api-key="provider.requiresApiKey"
+                :setup-url="provider.setupUrl"
+                :features="provider.features"
+                @select="handleProviderSelection"
+                @update-api-key="handleApiKeyUpdate"
+              />
+            </div>
+          </SettingGroup>
+        </SettingSection>
+      </TabsContent>
 
+      <!-- Models Tab -->
+      <TabsContent value="models">
+        <SettingSection
+          title="Model Configuration"
+          description="Configure models for your selected provider"
+          :icon="Brain"
+        >
+          <!-- Only show models for the selected provider -->
+          <div v-if="selectedProvider" class="space-y-6">
+            <ModelSelector
+              :provider-id="selectedProvider.id"
+              :provider-name="selectedProvider.name"
+            />
+          </div>
+          
+          <div v-else class="text-center py-8 text-muted-foreground">
+            <Brain class="mx-auto h-12 w-12 mb-4 opacity-50" />
+            <p class="text-lg font-medium">No Provider Selected</p>
+            <p class="text-sm">Please select a provider in the Providers tab to configure models.</p>
+          </div>
+        </SettingSection>
+      </TabsContent>
 
-
+      <!-- Generation Tab -->
+      <TabsContent value="generation">
+        <div class="space-y-6">
+          <GenerationSettings
+            :temperature="aiSettings.settings.temperature"
+            :max-tokens="aiSettings.settings.maxTokens"
+            :request-timeout="aiSettings.settings.requestTimeout || 30"
+            :custom-prompt="aiSettings.settings.customPrompt"
+            @update:temperature="(value) => aiSettings.updateSettings({ temperature: value })"
+            @update:max-tokens="(value) => aiSettings.updateSettings({ maxTokens: value })"
+            @update:request-timeout="(value) => aiSettings.updateSettings({ requestTimeout: value })"
+            @update:custom-prompt="(value) => aiSettings.updateSettings({ customPrompt: value })"
+          />
+          
+          <!-- Reset Section -->
+          <SettingSection
+            title="Reset Settings"
+            description="Restore AI settings to their default values"
+            :icon="RotateCw"
+          >
+            <SettingGroup title="Reset to Defaults" description="This will restore all AI settings to their original values">
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="text-sm font-medium">Reset All AI Settings</div>
+                  <div class="text-sm text-muted-foreground">This will reset providers, models, generation settings, and API keys</div>
+                </div>
+                <Button 
+                  @click="handleResetToDefaults" 
+                  variant="outline" 
+                  class="gap-2"
+                >
+                  <RotateCw class="h-4 w-4" />
+                  Reset to Defaults
+                </Button>
+              </div>
+            </SettingGroup>
+          </SettingSection>
+        </div>
+      </TabsContent>
+    </Tabs>
+  </div>
+</template>

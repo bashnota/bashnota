@@ -1,29 +1,24 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useCitationStore } from '@/features/editor/stores/citationStore'
-import { Input } from '@/ui/input'
-import { Button } from '@/ui/button'
-import { Search, BookIcon, Loader2, X, ChevronUp, ChevronDown } from 'lucide-vue-next'
+import { useCitationPicker } from '@/features/editor/composables/useCitationPicker'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Search, BookIcon, Loader2, ChevronUp, ChevronDown, Filter, SortAsc, SortDesc, Library, Plus, ExternalLink } from 'lucide-vue-next'
 import type { CitationEntry } from '@/features/nota/types/nota'
-import { toast } from '@/lib/utils'
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/ui/select'
+import { toast } from 'vue-sonner'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 
-const props = defineProps<{
-  notaId: string
-  onSelect: (citation: CitationEntry, index: number) => void
-  onClose: () => void
-}>()
-
-const emit = defineEmits<{
-  close: []
-}>()
+const { state, closeCitationPicker, selectCitation } = useCitationPicker()
 
 const citationStore = useCitationStore()
 const searchQuery = ref('')
 const selectedIndex = ref(0)
 const isSearching = ref(false)
 const searchResults = ref<CitationEntry[]>([])
-const activeSearchTab = ref('crossref')
+const activeTab = ref('library')
 const searchInput = ref<HTMLInputElement | null>(null)
 const citationStyle = ref('numeric') // numeric, author-year, or custom
 const citationFormat = ref('short') // short, full, or custom
@@ -31,9 +26,13 @@ const sortField = ref<'authors' | 'year' | 'title' | 'key'>('authors')
 const sortDirection = ref<'asc' | 'desc'>('asc')
 const typeFilter = ref('all')
 const yearFilter = ref<string>('all')
+const showFilters = ref(false)
 
 // Get citations for the current nota
-const citations = computed(() => citationStore.getCitationsByNotaId(props.notaId))
+const citations = computed(() => {
+  if (!state.value.notaId) return []
+  return citationStore.getCitationsByNotaId(state.value.notaId)
+})
 
 // Available years for filtering
 const availableYears = computed(() => {
@@ -173,7 +172,7 @@ const searchServices = {
         }))
       } catch (error) {
         console.error('Semantic Scholar search error:', error)
-        toast('Failed to search Semantic Scholar. Please try again.', 'Error', 'destructive')
+        toast('Failed to search Semantic Scholar. Please try again.', { description: 'Error' })
         return []
       }
     }
@@ -189,16 +188,22 @@ const searchServices = {
   }
 }
 
-const performSearch = async () => {
+const performSearch = async (service?: string) => {
   if (!searchQuery.value.trim()) return
   
   isSearching.value = true
   searchResults.value = []
   
   try {
-    const service = searchServices[activeSearchTab.value as keyof typeof searchServices]
-    const results = await service.search(searchQuery.value)
+    const searchService = service || 'crossref'
+    const serviceConfig = searchServices[searchService as keyof typeof searchServices]
+    const results = await serviceConfig.search(searchQuery.value)
     searchResults.value = results
+    
+    // Switch to search tab if we have results
+    if (results.length > 0) {
+      activeTab.value = 'search'
+    }
   } catch (error) {
     console.error('Search error:', error)
     searchResults.value = []
@@ -209,8 +214,7 @@ const performSearch = async () => {
 
 const handleSearchButtonClick = (event: MouseEvent, service: string) => {
   event.preventDefault()
-  activeSearchTab.value = service
-  performSearch()
+  performSearch(service)
 }
 
 const handleSearch = (event: MouseEvent) => {
@@ -218,21 +222,21 @@ const handleSearch = (event: MouseEvent) => {
   performSearch()
 }
 
-const handleClose = (event: MouseEvent) => {
-  event.preventDefault()
-  emit('close')
+const handleClose = () => {
+  closeCitationPicker()
 }
 
 const handleSelect = (citation: CitationEntry) => {
   const index = citations.value.findIndex(c => c.key === citation.key)
-  props.onSelect(citation, index)
-  emit('close')
+  selectCitation(citation, index)
 }
 
 const handleSearchSelect = async (citation: CitationEntry) => {
   try {
+    if (!state.value.notaId) return
+    
     // Add the citation to the store
-    const newCitation = await citationStore.addCitation(props.notaId, {
+    const newCitation = await citationStore.addCitation(state.value.notaId, {
       key: citation.key,
       title: citation.title,
       authors: citation.authors,
@@ -248,13 +252,12 @@ const handleSearchSelect = async (citation: CitationEntry) => {
     
     if (newCitation) {
       const index = citations.value.length // New citation will be at the end
-      props.onSelect(newCitation, index)
-      emit('close')
-      toast('Citation added successfully', 'Success')
+      selectCitation(newCitation, index)
+      toast('Citation added successfully', { description: 'Success' })
     }
   } catch (error) {
     console.error('Error importing citation:', error)
-    toast('Failed to add citation. Please try again.', 'Error', 'destructive')
+    toast('Failed to add citation. Please try again.', { description: 'Error' })
   }
 }
 
@@ -266,7 +269,7 @@ const handleJumpToReferences = (event: MouseEvent) => {
 const jumpToReferences = () => {
   const event = new CustomEvent('toggle-references', { detail: { open: true } })
   window.dispatchEvent(event)
-  emit('close')
+  handleClose()
 }
 
 // Keyboard navigation with improved UX
@@ -294,7 +297,7 @@ const handleKeyDown = (e: KeyboardEvent) => {
     }
   } else if (e.key === 'Escape') {
     e.preventDefault()
-    emit('close')
+    handleClose()
   }
 }
 
@@ -333,198 +336,280 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="citation-picker w-80 max-w-[90vw] rounded-md border shadow-lg max-h-[60vh] overflow-hidden flex flex-col">
-    <!-- Header with search -->
-    <div class="p-2 border-b sticky top-0 bg-background z-10">
-      <div class="flex items-center justify-between mb-2">
-        <div class="flex items-center">
-          <BookIcon class="h-4 w-4 mr-1 text-muted-foreground" />
-          <span class="text-sm font-medium">Select a citation</span>
-        </div>
-        <Button variant="ghost" size="sm" @click="handleClose">
-          <X class="h-4 w-4" />
-        </Button>
-      </div>
-      
-      <div class="flex gap-2">
-        <div class="relative flex-1">
-          <Search class="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            ref="searchInput"
-            :value="searchQuery"
-            @input="handleInput"
-            placeholder="Search citations..."
-            class="w-full pl-8"
-            @keyup.enter="handleSearch"
-          />
-        </div>
-        <Button 
-          variant="outline" 
-          size="icon"
-          :disabled="isSearching"
-          @click="handleSearch"
-        >
-          <Search v-if="!isSearching" class="h-4 w-4" />
-          <Loader2 v-else class="h-4 w-4 animate-spin" />
-        </Button>
-      </div>
+  <Dialog :open="state.isOpen" @update:open="(value) => { if (!value) handleClose() }">
+    <DialogContent class="max-w-4xl grid-rows-[auto_1fr] p-0 max-h-[90dvh]">
+      <DialogHeader class="p-6 pb-0">
+        <DialogTitle class="flex items-center gap-2">
+          <BookIcon class="h-5 w-5" />
+          Citation Manager
+        </DialogTitle>
+        <DialogDescription>
+          Search for citations, manage your library, and insert references into your document.
+        </DialogDescription>
+      </DialogHeader>
 
-      <!-- Filters -->
-      <div class="flex items-center gap-2 mt-2">
-        <Select v-model="yearFilter" class="w-24">
-          <SelectTrigger>
-            <SelectValue placeholder="Year" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Years</SelectItem>
-            <SelectItem v-for="year in availableYears" :key="year" :value="year.toString()">
-              {{ year }}
-            </SelectItem>
-          </SelectContent>
-        </Select>
+      <div class="overflow-y-auto px-6 pb-6 min-h-0">
+        <Tabs v-model="activeTab" class="flex flex-col h-full">
+          <TabsList class="grid w-full grid-cols-3 mb-4">
+            <TabsTrigger value="library" class="flex items-center gap-2">
+              <Library class="h-4 w-4" />
+              Library ({{ citations.length }})
+            </TabsTrigger>
+            <TabsTrigger value="search" class="flex items-center gap-2">
+              <Search class="h-4 w-4" />
+              Search Online
+            </TabsTrigger>
+            <TabsTrigger value="add" class="flex items-center gap-2">
+              <Plus class="h-4 w-4" />
+              Add Manual
+            </TabsTrigger>
+          </TabsList>
 
-        <Select v-model="typeFilter" class="w-24">
-          <SelectTrigger>
-            <SelectValue placeholder="Type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="journal">Journal</SelectItem>
-            <SelectItem value="book">Book</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Button variant="ghost" size="sm" @click="clearFilters" class="ml-auto">
-          Clear Filters
-        </Button>
-      </div>
-    </div>
-    
-    <!-- Content -->
-    <div class="overflow-y-auto flex-grow">
-      <!-- Loading state -->
-      <div v-if="isSearching" class="p-4 text-center">
-        <Loader2 class="h-6 w-6 animate-spin mx-auto mb-2" />
-        <p class="text-sm text-muted-foreground">Searching...</p>
-      </div>
-      
-      <!-- Empty state -->
-      <div v-else-if="filteredCitations.length === 0 && !searchResults.length" class="p-4 space-y-4">
-        <div class="text-center text-sm text-muted-foreground">
-          <p class="mb-2">No citations found</p>
-          <p class="text-xs">Search for papers or add them manually</p>
-        </div>
-        
-        <div class="flex flex-col gap-2">
-          <Button 
-            variant="default" 
-            size="sm" 
-            @click="(e) => handleSearchButtonClick(e, 'crossref')"
-            class="w-full"
-          >
-            <Search class="h-4 w-4 mr-2" />
-            Search in Crossref
-          </Button>
-          <Button 
-            variant="default" 
-            size="sm" 
-            @click="(e) => handleSearchButtonClick(e, 'semanticScholar')"
-            class="w-full"
-          >
-            <Search class="h-4 w-4 mr-2" />
-            Search in Semantic Scholar
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            @click="handleJumpToReferences"
-            class="w-full"
-          >
-            <BookIcon class="h-4 w-4 mr-2" />
-            Go to References
-          </Button>
-        </div>
-      </div>
-      
-      <!-- Search results -->
-      <div v-else-if="searchResults.length > 0" class="p-1 space-y-1">
-        <div
-          v-for="(result, index) in searchResults"
-          :key="result.key"
-          class="p-2 rounded-md border hover:bg-accent cursor-pointer"
-          :class="{ 'bg-accent': index === selectedIndex }"
-          @click="handleSearchSelect(result)"
-        >
-          <div class="font-medium text-sm">{{ result.title }}</div>
-          <div class="text-xs text-muted-foreground">
-            {{ result.authors?.join(', ') }} ({{ result.year }})
-          </div>
-          <div v-if="result.journal" class="text-xs italic text-muted-foreground">
-            {{ result.journal }}
-          </div>
-        </div>
-      </div>
-      
-      <!-- Citation list -->
-      <div v-else class="p-1">
-        <!-- Sort headers -->
-        <div class="flex items-center gap-2 px-2 py-1 text-xs font-medium text-muted-foreground border-b">
-          <div class="flex-1 cursor-pointer" @click="toggleSort('authors')">
-            Authors
-            <ChevronUp v-if="sortField === 'authors' && sortDirection === 'asc'" class="h-3 w-3 inline" />
-            <ChevronDown v-if="sortField === 'authors' && sortDirection === 'desc'" class="h-3 w-3 inline" />
-          </div>
-          <div class="w-16 cursor-pointer" @click="toggleSort('year')">
-            Year
-            <ChevronUp v-if="sortField === 'year' && sortDirection === 'asc'" class="h-3 w-3 inline" />
-            <ChevronDown v-if="sortField === 'year' && sortDirection === 'desc'" class="h-3 w-3 inline" />
-          </div>
-          <div class="w-16 text-right">Ref</div>
-        </div>
-
-        <div class="space-y-1">
-          <div
-            v-for="(citation, index) in filteredCitations"
-            :key="citation.id"
-            class="p-2 rounded-md border hover:bg-accent cursor-pointer"
-            :class="{ 'bg-accent': index === selectedIndex }"
-            @click="handleSelect(citation)"
-          >
-            <div class="flex items-center justify-between">
-              <div class="flex-1">
-                <div class="font-medium text-sm truncate">{{ citation.title }}</div>
-                <div class="text-xs text-muted-foreground">
-                  {{ citation.authors?.join(', ') }}
-                </div>
+          <!-- Library Tab -->
+          <TabsContent value="library" class="flex flex-col space-y-4">
+          <!-- Search and Filters -->
+          <div class="space-y-3">
+            <div class="flex gap-2">
+              <div class="relative flex-1">
+                <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  ref="searchInput"
+                  v-model="searchQuery"
+                  placeholder="Search your citations..."
+                  class="pl-10"
+                />
               </div>
-              <div class="flex items-center gap-2">
-                <div class="text-xs text-muted-foreground w-16 text-right">
-                  {{ citation.year }}
-                </div>
-                <div class="px-1.5 py-0.5 text-xs rounded-full bg-primary/10 text-primary">
-                  [{{ index + 1 }}]
+              <Button 
+                variant="outline" 
+                size="icon"
+                @click="showFilters = !showFilters"
+                :class="{ 'bg-accent': showFilters }"
+              >
+                <Filter class="h-4 w-4" />
+              </Button>
+            </div>
+
+            <!-- Filters Row -->
+            <div v-if="showFilters" class="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
+              <Select v-model="yearFilter">
+                <SelectTrigger class="w-32">
+                  <SelectValue placeholder="Year" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Years</SelectItem>
+                  <SelectItem v-for="year in availableYears" :key="year" :value="year">
+                    {{ year }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select v-model="typeFilter">
+                <SelectTrigger class="w-32">
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="journal">Journal</SelectItem>
+                  <SelectItem value="book">Book</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select v-model="sortField">
+                <SelectTrigger class="w-32">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="authors">Authors</SelectItem>
+                  <SelectItem value="year">Year</SelectItem>
+                  <SelectItem value="title">Title</SelectItem>
+                  <SelectItem value="key">Key</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Button 
+                variant="outline" 
+                size="icon"
+                @click="sortDirection = sortDirection === 'asc' ? 'desc' : 'asc'"
+              >
+                <SortAsc v-if="sortDirection === 'asc'" class="h-4 w-4" />
+                <SortDesc v-else class="h-4 w-4" />
+              </Button>
+
+              <Button variant="ghost" size="sm" @click="clearFilters" class="ml-auto">
+                Clear Filters
+              </Button>
+            </div>
+          </div>
+
+          <!-- Citation List -->
+          <div class="overflow-y-auto border rounded-lg max-h-[50vh]">
+            <div v-if="filteredCitations.length === 0" class="p-8 text-center space-y-4">
+              <BookIcon class="h-12 w-12 mx-auto text-muted-foreground" />
+              <div>
+                <h3 class="font-medium">No citations found</h3>
+                <p class="text-sm text-muted-foreground mt-1">
+                  Try adjusting your filters or search in the online tab
+                </p>
+              </div>
+              <Button variant="outline" @click="activeTab = 'search'">
+                Search Online
+              </Button>
+            </div>
+
+            <div v-else class="space-y-1 p-2">
+              <div
+                v-for="(citation, index) in filteredCitations"
+                :key="citation.id"
+                class="p-3 rounded-lg border hover:bg-accent cursor-pointer transition-colors"
+                :class="{ 'bg-accent': index === selectedIndex }"
+                @click="handleSelect(citation)"
+              >
+                <div class="flex items-start justify-between">
+                  <div class="flex-1 min-w-0">
+                    <h4 class="font-medium text-sm leading-tight mb-1">{{ citation.title }}</h4>
+                    <p class="text-xs text-muted-foreground">
+                      {{ citation.authors?.join(', ') || 'Unknown authors' }}
+                    </p>
+                    <div class="flex items-center gap-2 mt-1">
+                      <span v-if="citation.year" class="text-xs text-muted-foreground">{{ citation.year }}</span>
+                      <span v-if="citation.journal" class="text-xs italic text-muted-foreground">{{ citation.journal }}</span>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2 ml-3">
+                    <div class="px-2 py-1 text-xs rounded-full bg-primary/10 text-primary font-medium">
+                      [{{ index + 1 }}]
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </TabsContent>
+
+        <!-- Search Tab -->
+        <TabsContent value="search" class="flex flex-col space-y-4">
+          <div class="space-y-3">
+            <div class="flex gap-2">
+              <div class="relative flex-1">
+                <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  v-model="searchQuery"
+                  placeholder="Search for papers, authors, or DOIs..."
+                  class="pl-10"
+                  @keyup.enter="performSearch()"
+                />
+              </div>
+              <Button 
+                :disabled="isSearching || !searchQuery.trim()"
+                @click="performSearch()"
+              >
+                <Loader2 v-if="isSearching" class="h-4 w-4 animate-spin mr-2" />
+                <Search v-else class="h-4 w-4 mr-2" />
+                Search
+              </Button>
+            </div>
+
+            <!-- Search Service Buttons -->
+            <div class="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                :disabled="isSearching || !searchQuery.trim()"
+                @click="performSearch('crossref')"
+              >
+                🔍 Crossref
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                :disabled="isSearching || !searchQuery.trim()"
+                @click="performSearch('semanticScholar')"
+              >
+                🎓 Semantic Scholar
+              </Button>
+            </div>
+          </div>
+
+          <!-- Search Results -->
+          <div class="overflow-y-auto border rounded-lg max-h-[50vh]">
+            <div v-if="isSearching" class="p-8 text-center">
+              <Loader2 class="h-8 w-8 animate-spin mx-auto mb-4" />
+              <p class="text-sm text-muted-foreground">Searching academic databases...</p>
+            </div>
+
+            <div v-else-if="searchResults.length === 0 && searchQuery.trim()" class="p-8 text-center space-y-4">
+              <Search class="h-12 w-12 mx-auto text-muted-foreground" />
+              <div>
+                <h3 class="font-medium">No results found</h3>
+                <p class="text-sm text-muted-foreground mt-1">
+                  Try different keywords or check spelling
+                </p>
+              </div>
+            </div>
+
+            <div v-else-if="searchResults.length === 0" class="p-8 text-center space-y-4">
+              <Search class="h-12 w-12 mx-auto text-muted-foreground" />
+              <div>
+                <h3 class="font-medium">Search Academic Papers</h3>
+                <p class="text-sm text-muted-foreground mt-1">
+                  Enter keywords, author names, or DOIs to find citations
+                </p>
+              </div>
+            </div>
+
+            <div v-else class="space-y-1 p-2">
+              <div
+                v-for="(result, index) in searchResults"
+                :key="result.key"
+                class="p-3 rounded-lg border hover:bg-accent cursor-pointer transition-colors"
+                :class="{ 'bg-accent': index === selectedIndex }"
+                @click="handleSearchSelect(result)"
+              >
+                <div class="flex items-start justify-between">
+                  <div class="flex-1 min-w-0">
+                    <h4 class="font-medium text-sm leading-tight mb-1">{{ result.title }}</h4>
+                    <p class="text-xs text-muted-foreground">
+                      {{ result.authors?.join(', ') || 'Unknown authors' }}
+                    </p>
+                    <div class="flex items-center gap-2 mt-1">
+                      <span v-if="result.year" class="text-xs text-muted-foreground">{{ result.year }}</span>
+                      <span v-if="result.journal" class="text-xs italic text-muted-foreground">{{ result.journal }}</span>
+                      <ExternalLink v-if="result.url" class="h-3 w-3 text-muted-foreground" />
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm" class="ml-3">
+                    <Plus class="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+
+        <!-- Add Manual Tab -->
+        <TabsContent value="add" class="flex flex-col space-y-4">
+          <div class="p-8 text-center space-y-4">
+            <Plus class="h-12 w-12 mx-auto text-muted-foreground" />
+            <div>
+              <h3 class="font-medium">Add Citation Manually</h3>
+              <p class="text-sm text-muted-foreground mt-1">
+                Manual citation entry coming soon
+              </p>
+            </div>
+            <Button variant="outline" @click="handleJumpToReferences">
+              <BookIcon class="h-4 w-4 mr-2" />
+              Go to References Manager
+            </Button>
+          </div>
+        </TabsContent>
+      </Tabs>
       </div>
-    </div>
-  </div>
+    </DialogContent>
+  </Dialog>
 </template>
 
 <style scoped>
-.citation-picker {
-  @apply bg-background border-border;
-}
-
-.sort-header {
-  @apply cursor-pointer hover:text-foreground transition-colors;
-}
-
-.sort-header.active {
-  @apply text-foreground;
-}
+/* Custom styles if needed */
 </style>
  
 

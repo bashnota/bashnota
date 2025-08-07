@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Card } from '@/ui/card'
-import { Button } from '@/ui/button'
+import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { Plus, Trash2, GripVertical } from 'lucide-vue-next'
 import type { TableData } from '@/features/editor/components/blocks/table-block/TableExtension'
 
