@@ -136,7 +136,8 @@ export function useEnhancedOutputManagement(config: EnhancedOutputConfig) {
         } catch (attributeError) {
           logger.error(`[EnhancedOutputManagement] Failed to update attributes for cell ${config.cellId}:`, attributeError)
           // Don't throw here - continue with other operations
-          error.value = `Failed to save output: ${attributeError.message}`
+          const errorMessage = attributeError instanceof Error ? attributeError.message : 'Unknown error during attribute update'
+          error.value = `Failed to save output: ${errorMessage}`
         }
       }
       
