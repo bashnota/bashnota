@@ -165,7 +165,7 @@ defineExpose({
               :min="12"
               :max="24"
               :step="1"
-              @update:model-value="(value) => { fontSize = value; handleSettingChange() }"
+              @update:model-value="(value) => { fontSize = value || [16]; handleSettingChange() }"
             />
             <p class="text-xs text-muted-foreground">
               Adjust the font size for better readability
@@ -179,7 +179,7 @@ defineExpose({
               :min="1.2"
               :max="2.5"
               :step="0.1"
-              @update:model-value="(value) => { lineHeight = value; handleSettingChange() }"
+              @update:model-value="(value) => { lineHeight = value || [1.6]; handleSettingChange() }"
             />
             <p class="text-xs text-muted-foreground">
               Control spacing between lines of text

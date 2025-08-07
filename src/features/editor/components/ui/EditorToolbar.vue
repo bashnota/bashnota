@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useEditorStore } from '@/features/editor/stores/editorStore'
 import { useUIStore } from '@/stores/uiStore'
+import { useSharedSession } from '@/features/editor/composables/useSharedSession'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Tooltip } from '@/components/ui/tooltip'
@@ -48,6 +49,7 @@ import {
   Heading2,
   Heading3,
   Pilcrow,
+  Link2,
 } from 'lucide-vue-next'
 import { computed, ref, onMounted } from 'vue'
 import type { Editor } from '@tiptap/vue-3'
@@ -89,9 +91,15 @@ const emit = defineEmits<{
   'toggle-sidebar': [id: SidebarId]
 }>()
 
-// Stores
+// Stores and composables
 const editorStore = useEditorStore()
 const uiStore = useUIStore()
+const { 
+  isSharedSessionEnabled, 
+  isToggling, 
+  toggleSharedSession,
+  getSharedSessionInfo 
+} = useSharedSession()
 const editor = computed(() => editorStore.activeEditor as Editor | null)
 const isRenderingMath = ref(true)
 
@@ -186,6 +194,25 @@ const toggleMathRendering = () => {
     isRenderingMath.value = !isRenderingMath.value
   }
 }
+
+// Shared session toggle with proper error handling
+const handleToggleSharedSession = async () => {
+  try {
+    await toggleSharedSession()
+  } catch (error) {
+    console.error('Error toggling shared session mode:', error)
+    // Could add user notification here
+  }
+}
+
+// Computed tooltip content for shared session
+const sharedSessionTooltip = computed(() => {
+  const info = getSharedSessionInfo.value
+  if (info.enabled) {
+    return `Disable shared session mode (${info.cellCount} cells sharing session)`
+  }
+  return 'Enable shared session mode - code blocks share variables'
+})
 
 // Initialize math rendering state
 onMounted(() => {
@@ -588,6 +615,24 @@ const getIconClasses = (action: ToolbarAction) => {
                 >
                   <Eye v-if="isRenderingMath" class="h-4 w-4" />
                   <EyeOff v-else class="h-4 w-4" />
+                </Toggle>
+              </Tooltip>
+
+              <!-- Shared Session Toggle -->
+              <Tooltip :content="sharedSessionTooltip">
+                <Toggle
+                  :pressed="isSharedSessionEnabled"
+                  :disabled="isToggling"
+                  @click="handleToggleSharedSession"
+                  size="sm"
+                  class="h-8 w-8 p-0"
+                  :class="{
+                    'opacity-50': isToggling,
+                    'bg-primary/20 border-primary/50': isSharedSessionEnabled
+                  }"
+                  aria-label="Toggle shared session mode"
+                >
+                  <Link2 class="h-4 w-4" />
                 </Toggle>
               </Tooltip>
             </div>

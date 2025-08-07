@@ -1,13 +1,15 @@
+import type { ThemeColor } from '@/composables/theme'
+
 export interface AppearanceSettings {
   // Theme
   theme: 'light' | 'dark' | 'system'
-  themeColor: string
+  themeColor: ThemeColor
   highContrast: boolean
   reducedMotion: boolean
   darkModeSchedule: boolean
   
   // Interface
-  sidebarWidth: number[]
+  sidebarWidth: number
   sidebarPosition: 'left' | 'right'
   density: 'compact' | 'comfortable' | 'spacious'
   showStatusBar: boolean
@@ -17,11 +19,11 @@ export interface AppearanceSettings {
 
 export const appearanceSettingsDefaults: AppearanceSettings = {
   theme: 'system',
-  themeColor: 'slate',
+  themeColor: 'slate' as ThemeColor,
   highContrast: false,
   reducedMotion: false,
   darkModeSchedule: false,
-  sidebarWidth: [280],
+  sidebarWidth: 280,
   sidebarPosition: 'left',
   density: 'comfortable',
   showStatusBar: true,

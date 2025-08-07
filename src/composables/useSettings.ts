@@ -21,7 +21,9 @@ export function useSettings<K extends keyof AllSettings>(category: K) {
     value: AllSettings[K][T]
   ) => {
     try {
-      settingsStore.updateCategory(category, { [key]: value } as Partial<AllSettings[K]>)
+      const updates = {} as Partial<AllSettings[K]>
+      updates[key] = value
+      settingsStore.updateCategory(category, updates)
       error.value = null
     } catch (err) {
       error.value = `Failed to update ${String(key)}`

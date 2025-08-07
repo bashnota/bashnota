@@ -61,6 +61,11 @@ interface Emits {
   // Server/kernel management events
   'server-change': [serverId: string]
   'kernel-change': [kernelName: string]
+  'refresh-servers': []
+  'refresh-kernels': []
+  'add-test-server': []
+  'test-server-connection': [server: any]
+  'apply-configuration': [config: { server: string; kernel: string; session: string }]
   // Session management events
   'session-change': [sessionId: string]
   'create-new-session': []
@@ -179,6 +184,12 @@ const handleSelectRunningKernel = (kernelId: string) => {
 
 const handleApply = () => {
   if (canApplyConfiguration.value) {
+    // Emit the configuration to save it
+    emit('apply-configuration', {
+      server: localServer.value,
+      kernel: localKernel.value,
+      session: localSession.value
+    })
     emit('update:is-open', false)
   }
 }
@@ -197,6 +208,33 @@ const formatLastActivity = (lastActivity: string) => {
   } catch {
     return lastActivity
   }
+}
+
+// Open Jupyter settings
+const openJupyterSettings = () => {
+  // Navigate to Jupyter settings
+  const settingsUrl = `${window.location.origin}/settings/jupyter`
+  window.open(settingsUrl, '_blank')
+}
+
+// Refresh servers
+const refreshServers = () => {
+  emit('refresh-servers')
+}
+
+// Add test server for development
+const addTestServer = () => {
+  emit('add-test-server')
+}
+
+// Refresh kernels for selected server
+const refreshKernels = () => {
+  emit('refresh-kernels')
+}
+
+// Test server connection
+const testServerConnection = (server: any) => {
+  emit('test-server-connection', server)
 }
 </script>
 
@@ -277,15 +315,26 @@ const formatLastActivity = (lastActivity: string) => {
 
         <!-- Server Selection -->
         <div class="space-y-3">
-          <div class="flex items-center gap-2">
-            <Server class="h-4 w-4" />
-            <h3 class="text-sm font-medium">Jupyter Server</h3>
-            <span class="text-xs text-muted-foreground">
-              ({{ props.availableServers.length }} available)
-            </span>
-            <span v-if="isSharedSessionMode" class="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded">
-              Globally managed
-            </span>
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <Server class="h-4 w-4" />
+              <h3 class="text-sm font-medium">Jupyter Server</h3>
+              <span class="text-xs text-muted-foreground">
+                ({{ props.availableServers.length }} available)
+              </span>
+              <span v-if="isSharedSessionMode" class="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded">
+                Globally managed
+              </span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              @click="refreshServers"
+              class="h-7 w-7 p-0"
+              title="Refresh servers"
+            >
+              <RotateCw class="h-3 w-3" />
+            </Button>
           </div>
           
           <div v-if="availableServers.length > 0" class="space-y-2">
@@ -293,7 +342,7 @@ const formatLastActivity = (lastActivity: string) => {
               <div
                 v-for="server in availableServers"
                 :key="`${server.ip}:${server.port}`"
-                class="flex items-center justify-between p-3 rounded border text-sm cursor-pointer transition-colors"
+                class="group flex items-center justify-between p-3 rounded border text-sm cursor-pointer transition-colors"
                 :class="{
                   'bg-primary/10 border-primary/30': localServer === `${server.ip}:${server.port}`,
                   'hover:bg-muted/50': localServer !== `${server.ip}:${server.port}` && !isSharedSessionMode,
@@ -301,34 +350,80 @@ const formatLastActivity = (lastActivity: string) => {
                 }"
                 @click="!isSharedSessionMode && handleServerChange(`${server.ip}:${server.port}`)"
               >
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-1">
                   <Check v-if="localServer === `${server.ip}:${server.port}`" class="h-4 w-4 text-primary" />
                   <Server v-else class="h-4 w-4" />
                   <span class="font-medium">{{ server.ip }}:{{ server.port }}</span>
                 </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  @click.stop="testServerConnection(server)"
+                  class="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Test connection"
+                >
+                  <ExternalLink class="h-3 w-3" />
+                </Button>
               </div>
             </div>
           </div>
           
           <div
             v-if="availableServers.length === 0"
-            class="p-3 text-sm text-center text-muted-foreground border rounded-lg"
+            class="p-4 text-sm text-center border rounded-lg bg-muted/20"
           >
-            No servers available. Configure servers in the settings.
+            <Server class="w-8 h-8 mx-auto mb-2 text-muted-foreground/50" />
+            <p class="font-medium mb-1">No Jupyter servers configured</p>
+            <p class="text-muted-foreground text-xs mb-3">
+              Add a Jupyter server in Settings > Integrations > Jupyter to start executing code.
+            </p>
+            <div class="flex gap-2 justify-center">
+              <Button 
+                variant="outline" 
+                size="sm"
+                @click="openJupyterSettings"
+              >
+                <Settings class="w-4 h-4 mr-2" />
+                Open Jupyter Settings
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                @click="addTestServer"
+                class="text-muted-foreground"
+                title="Add a test server (localhost:8888)"
+              >
+                <Plus class="w-4 h-4 mr-2" />
+                Add Test Server
+              </Button>
+            </div>
           </div>
         </div>
 
         <!-- Kernel Selection -->
         <div class="space-y-3">
-          <div class="flex items-center gap-2">
-            <Cpu class="h-4 w-4" />
-            <h3 class="text-sm font-medium">Kernel</h3>
-            <span class="text-xs text-muted-foreground">
-              ({{ props.availableKernels.length }} available)
-            </span>
-            <span v-if="isSharedSessionMode" class="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded">
-              Globally managed
-            </span>
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <Cpu class="h-4 w-4" />
+              <h3 class="text-sm font-medium">Kernel</h3>
+              <span class="text-xs text-muted-foreground">
+                ({{ props.availableKernels.length }} available)
+              </span>
+              <span v-if="isSharedSessionMode" class="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded">
+                Globally managed
+              </span>
+            </div>
+            <Button
+              v-if="isServerSelected"
+              variant="ghost"
+              size="sm"
+              @click="refreshKernels"
+              class="h-7 w-7 p-0"
+              :disabled="isSettingUp"
+              title="Refresh kernels"
+            >
+              <RotateCw class="h-3 w-3" :class="{ 'animate-spin': isSettingUp }" />
+            </Button>
           </div>
           
           <div v-if="availableKernels.length > 0" class="space-y-2">
@@ -357,10 +452,25 @@ const formatLastActivity = (lastActivity: string) => {
           </div>
           
           <div
-            v-if="isServerSelected && availableKernels.length === 0"
+            v-if="isServerSelected && !isSettingUp && availableKernels.length === 0"
             class="p-3 text-sm text-center text-muted-foreground border rounded-lg"
           >
             No kernels available on the selected server.
+          </div>
+          
+          <div
+            v-if="isServerSelected && isSettingUp"
+            class="p-3 text-sm text-center border rounded-lg bg-muted/20"
+          >
+            <Loader2 class="w-4 h-4 mx-auto mb-2 animate-spin" />
+            Loading kernels from server...
+          </div>
+          
+          <div
+            v-if="!isServerSelected && availableServers.length > 0"
+            class="p-3 text-sm text-center text-muted-foreground border rounded-lg"
+          >
+            Select a Jupyter server above to view available kernels.
           </div>
         </div>
 

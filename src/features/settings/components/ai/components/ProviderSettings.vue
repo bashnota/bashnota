@@ -170,7 +170,7 @@ onMounted(() => {
             :type="showApiKey ? 'text' : 'password'"
             placeholder="Enter your API key"
             class="pr-20"
-            @update:model-value="handleApiKeyUpdate"
+            @update:model-value="(value) => handleApiKeyUpdate(String(value))"
           />
           <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
             <Button

@@ -306,7 +306,7 @@ const handleDialogClose = () => {
               :icon="feature.icon"
               :enabled="feature.enabled"
               :is-feature="true"
-              @toggle="(enabled) => updateEnabledFeature(feature.key, enabled)"
+              @toggle="(enabled) => updateEnabledFeature(feature.key, Boolean(enabled))"
             />
           </SettingGroup>
         </SettingSection>

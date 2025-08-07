@@ -56,9 +56,9 @@ const themeColors = computed(() =>
 
 // Methods
 const handleThemeChange = (theme: string | number) => {
-  const themeStr = String(theme)
+  const themeStr = String(theme) as 'light' | 'dark' | 'system'
   updateSetting('theme', themeStr)
-  setThemeMode(themeStr as 'light' | 'dark' | 'system')
+  setThemeMode(themeStr)
   toast.success(`Theme changed to ${themeStr}`)
 }
 
@@ -181,7 +181,7 @@ const syncThemeWithComposable = () => {
               help="Choose based on your workflow preference"
               :model-value="settings.sidebarPosition"
               :options="sidebarPositionOptions"
-              @update:model-value="(value) => updateSetting('sidebarPosition', value)"
+              @update:model-value="(value) => updateSetting('sidebarPosition', value as 'left' | 'right')"
             />
           </SettingGroup>
 
@@ -192,7 +192,7 @@ const syncThemeWithComposable = () => {
               help="Compact mode shows more content in less space"
               :model-value="settings.density"
               :options="densityOptions"
-              @update:model-value="(value) => updateSetting('density', value)"
+              @update:model-value="(value) => updateSetting('density', value as 'compact' | 'comfortable' | 'spacious')"
             />
           </SettingGroup>
         </SettingSection>
@@ -230,7 +230,7 @@ const syncThemeWithComposable = () => {
               help="Advanced users can add custom CSS rules"
               :model-value="settings.customCss"
               placeholder="/* Your custom CSS here */"
-              @update:model-value="(value) => updateSetting('customCss', value)"
+              @update:model-value="(value) => updateSetting('customCss', String(value))"
             />
           </SettingGroup>
         </SettingSection>

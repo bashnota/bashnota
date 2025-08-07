@@ -6,14 +6,16 @@ import type { KernelConfig } from '@/features/jupyter/types/jupyter'
 import { useCodeBlockCore } from '@/features/editor/components/blocks/executable-code-block/composables/useCodeBlockCore'
 import { useCodeBlockUI } from '@/features/editor/components/blocks/executable-code-block/composables/ui/useCodeBlockUI'
 import { useCodeBlockExecutionSimplified } from '@/features/editor/components/blocks/executable-code-block/composables/useCodeBlockExecutionSimplified'
+import { useRobustExecution } from '@/features/editor/composables/useRobustExecution'
 import { useCodeExecutionStore } from '@/features/editor/stores/codeExecutionStore'
 
 // Components
 import CodeBlockToolbar from './components/CodeBlockToolbar.vue'
+import SideToolbar from './components/SideToolbar.vue'
 import StatusIndicator from './components/StatusIndicator.vue'
 import WarningBanners from './components/WarningBanners.vue'
 import CodeEditor from './components/CodeEditor.vue'
-import OutputSection from './components/OutputSection.vue'
+import OutputDisplay from './components/OutputDisplay.vue'
 import FullScreenCodeBlock from './FullScreenCodeBlock.vue'
 import ExecutionStatus from './ExecutionStatus.vue'
 import ErrorDisplay from './ErrorDisplay.vue'
@@ -83,36 +85,43 @@ const {
   currentExecutionTime,
   errorMessage,
   cell,
-  selectedServer,
-  selectedKernel,
-  selectedSession,
-  availableServers,
-  availableKernels,
-  availableSessions,
-  runningKernels,
-  isServerOpen,
-  isKernelOpen,
-  isSessionOpen,
-  isSharedSessionMode,
   executeCode,
   initializeComponent,
-  handleServerChange,
-  handleKernelChange,
-  handleSessionChange,
-  handleCreateNewSession,
-  handleClearAllKernels,
-  handleRefreshSessions,
-  handleRunningKernelSelect,
   handleErrorDismissed,
   handleAICodeUpdate,
   handleCustomActionExecuted
 } = useCodeBlockExecutionSimplified(props, emit, {
   codeValue,
   isReadyToExecute
-}) 
+})
+
+// Use our own server/kernel selection logic instead of the composable's
+const selectedServer = computed(() => '')
+const selectedKernel = computed(() => '')
+const selectedSession = computed(() => '')
+const availableServers = computed(() => [])
+const availableKernels = computed(() => [])
+const availableSessions = computed(() => [])
+const runningKernels = computed(() => [])
+const isServerOpen = ref(false)
+const isKernelOpen = ref(false)
+const isSessionOpen = ref(false)
+const isSharedSessionMode = computed(() => false)
+
+// Dummy handlers that won't be used since we have our own toolbar
+const handleServerChange = () => {}
+const handleKernelChange = () => {}
+const handleSessionChange = () => {}
+const handleCreateNewSession = () => {}
+const handleClearAllKernels = () => {}
+const handleRefreshSessions = () => {}
+const handleRunningKernelSelect = () => {} 
 
 // Component state
 const isMounted = ref(false)
+
+// Robust execution handling
+const { executeCell: robustExecuteCell, getExecutionStatus } = useRobustExecution()
 
 // Focus management and initialization
 onMounted(() => {
@@ -144,7 +153,7 @@ onBeforeUnmount(() => {
   isMounted.value = false
 })
 
-// Wrapped execution function with additional safety checks
+// Enhanced execution function with robust configuration
 const safeExecuteCode = async () => {
   if (!isMounted.value) {
     console.warn('Component not mounted, skipping execution')
@@ -152,13 +161,26 @@ const safeExecuteCode = async () => {
   }
   
   try {
-    await executeCode()
+    console.log('Executing code with robust configuration...')
+    
+    // Use the robust execution system
+    const success = await robustExecuteCell(props.id, codeValue.value)
+    
+    if (!success) {
+      console.error('Code execution failed')
+      return
+    }
+    
+    // The robust execution system handles output updates automatically
+    console.log('Code execution completed successfully')
+    
   } catch (error) {
     console.error('Error executing code:', error)
   }
 }
 
-// Computed properties for output handling
+// Output handling is now managed by the OutputDisplay component
+// These computed properties are kept for backward compatibility with other components
 const hasOutput = computed(() => {
   const currentCell = cell.value
   const output = currentCell?.output
@@ -174,7 +196,9 @@ const outputContent = computed(() => {
 const hasError = computed(() => {
   const currentCell = cell.value
   return currentCell?.hasError || false
-})// Mouse event handlers
+})
+
+// Mouse event handlers
 const handleMouseEnter = () => {
   if (!isMounted.value) return
   try {
@@ -186,11 +210,17 @@ const handleMouseEnter = () => {
 
 const handleMouseLeave = () => {
   if (!isMounted.value) return
-  try {
-    isHovered.value = false
-  } catch (error) {
-    console.warn('Error in mouse leave handler:', error)
-  }
+  
+  // Use nextTick to ensure component state is stable
+  nextTick(() => {
+    try {
+      if (isMounted.value) {
+        isHovered.value = false
+      }
+    } catch (error) {
+      console.warn('Error in mouse leave handler:', error)
+    }
+  })
 }
 
 // Configuration modal handler
@@ -247,6 +277,13 @@ const handleToggleSharedSessionMode = async () => {
     })
   }
 }
+
+// AI Assistant handler
+// AI Assistant functionality removed for focused output experience
+const handleShowAIAssistant = () => {
+  // AI Assistant functionality has been removed
+  console.log('AI Assistant feature has been removed for a more focused output experience')
+}
 </script>
 
 <template>
@@ -264,18 +301,9 @@ const handleToggleSharedSessionMode = async () => {
       :is-published="isPublished || false"
     />
 
-    <!-- Subtle hover hint -->
-    <div
-      v-if="!isHovered && !showToolbar && !isReadOnly"
-      class="absolute top-2 right-2 opacity-30 hover:opacity-70 transition-opacity duration-200 pointer-events-none"
-    >
-      <div class="w-1 h-1 bg-muted-foreground rounded-full"></div>
-    </div>
-
-    <!-- Main toolbar -->
-    <CodeBlockToolbar
-      :is-hovered="isHovered"
-      :show-toolbar="showToolbar"
+    <!-- Side Toolbar -->
+    <SideToolbar
+      :is-visible="isHovered || showToolbar"
       :is-read-only="isReadOnly || false"
       :is-executing="isExecuting || false"
       :is-published="isPublished || false"
@@ -283,45 +311,25 @@ const handleToggleSharedSessionMode = async () => {
       :is-code-visible="isCodeVisible"
       :has-unsaved-changes="hasUnsavedChanges"
       :is-code-copied="isCodeCopied"
-      :is-shared-session-mode="isSharedSessionMode"
-      :selected-session="selectedSession"
-      :available-sessions="availableSessions"
-      :running-kernels="runningKernels"
-      :is-session-open="isSessionOpen"
-      :is-setting-up="isSettingUp"
+      :is-configuration-incomplete="!selectedServer || !selectedKernel"
       :selected-server="selectedServer"
       :selected-kernel="selectedKernel"
-      :available-servers="availableServers"
-      :available-kernels="availableKernels"
-      :is-server-open="isServerOpen"
-      :is-kernel-open="isKernelOpen"
       @execute-code="safeExecuteCode"
-      @toggle-toolbar="showToolbar = !showToolbar"
       @toggle-code-visibility="toggleCodeVisibility"
       @toggle-fullscreen="isFullScreen = true"
-      @format-code="handleCodeFormatted"
-      @show-templates="showTemplateDialog"
       @copy-code="copyCode"
       @save-changes="saveChanges"
       @open-configuration="handleOpenConfiguration"
-      @update:is-session-open="isSessionOpen = $event"
-      @session-change="handleSessionChange"
-      @create-new-session="handleCreateNewSession"
-      @clear-all-kernels="handleClearAllKernels"
-      @refresh-sessions="handleRefreshSessions"
-      @select-running-kernel="handleRunningKernelSelect"
-      @update:is-server-open="isServerOpen = $event"
-      @update:is-kernel-open="isKernelOpen = $event"
-      @server-change="handleServerChange"
-      @kernel-change="handleKernelChange"
+      @show-ai-assistant="handleShowAIAssistant"
     />
 
     <!-- Warning Banners -->
     <WarningBanners
+      :cell-id="props.id"
       :is-read-only="isReadOnly || false"
       :is-published="isPublished || false"
-      :is-shared-session-mode="isSharedSessionMode"
       :is-executing="isExecuting || false"
+      :is-shared-session-mode="isSharedSessionMode"
       :selected-server="selectedServer"
       :selected-kernel="selectedKernel"
       :selected-session="selectedSession"
@@ -342,25 +350,12 @@ const handleToggleSharedSessionMode = async () => {
       @copy-code="copyCode"
     />
 
-    <!-- Output/AI Section -->
-    <OutputSection
-      :has-output="hasOutput"
-      :has-error="hasError"
+    <!-- Output Display Section -->
+    <OutputDisplay
+      :cell-id="props.id"
       :is-read-only="isReadOnly || false"
       :is-published="isPublished || false"
       :is-executing="isExecuting || false"
-      :output="outputContent"
-      :code="codeValue"
-      :language="props.language"
-      :block-id="props.id"
-      :nota-id="props.notaId"
-      :execution-time="executionTime"
-      :selected-session="selectedSession"
-      :selected-kernel="selectedKernel"
-      @copy-output="copyOutput"
-      @code-updated="handleAICodeUpdate"
-      @custom-action-executed="handleCustomActionExecuted"
-      @trigger-execution="safeExecuteCode"
     />
 
     <!-- Fullscreen Modal -->

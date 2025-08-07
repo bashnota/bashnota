@@ -3,6 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import { Card, CardContent } from '@/components/ui/card'
 import { useCodeExecution } from './composables/core/useCodeExecution'
+import { useCodeExecutionStore } from '@/features/editor/stores/codeExecutionStore'
+import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
 import CodeBlockWithExecution from './CodeBlockWithExecution.vue'
 import OutputRenderer from './OutputRenderer.vue'
 import KernelConfigurationModal from './components/KernelConfigurationModal.vue'
@@ -20,6 +22,10 @@ const {
   onSessionSelect
 } = useCodeExecution(props)
 
+// Add stores for configuration modal
+const codeExecutionStore = useCodeExecutionStore()
+const jupyterStore = useJupyterStore()
+
 const isExecutable = computed(() => props.node.attrs.executable)
 const language = computed(() => props.node.attrs.language)
 const output = computed(() => props.node.attrs.output || null)
@@ -30,7 +36,34 @@ const code = computed(() => props.node.textContent || '')
 const isPublishedView = computed(() => props.editor.isEditable === false && props.editor.options.editable === false)
 
 // Initialize session if saved
-onMounted(initializeSession)
+onMounted(() => {
+  initializeSession()
+  // Also ensure jupyter servers are loaded
+  jupyterStore.loadServers()
+  
+  // Load configuration from block attributes
+  const nodeAttrs = props.node.attrs
+  if (nodeAttrs.serverID && nodeAttrs.kernelName) {
+    console.log('Loading saved configuration from block:', nodeAttrs)
+    selectedServerRef.value = nodeAttrs.serverID
+    selectedKernelRef.value = nodeAttrs.kernelName
+    selectedSessionRef.value = nodeAttrs.sessionId || ''
+    
+    // Find the server config from available servers
+    const serverConfig = availableServers.value.find(s => `${s.ip}:${s.port}` === nodeAttrs.serverID)
+    if (serverConfig) {
+      // Add the cell to the store with saved configuration
+      codeExecutionStore.addCell({
+        id: blockId.value,
+        code: code.value,
+        serverConfig: serverConfig,
+        kernelName: nodeAttrs.kernelName,
+        sessionId: nodeAttrs.sessionId || 'default',
+        output: nodeAttrs.output || ''
+      })
+    }
+  }
+})
 
 const updateCode = (newCode: string) => {
   const pos = props.getPos()
@@ -44,15 +77,244 @@ const updateCode = (newCode: string) => {
 }
 
 const updateOutput = (newOutput: string) => {
+  // Update the node attributes to persist to database
   props.updateAttributes({ output: newOutput })
+  
+  // Also update the cell in the code execution store for immediate UI updates
+  const cell = codeExecutionStore.getCellById(blockId.value)
+  if (cell) {
+    cell.output = newOutput
+  }
 }
 
 // Modal state
 const isConfigurationModalOpen = ref(false)
 
-const handleOpenConfiguration = () => {
+// Configuration data from stores
+const selectedServerRef = ref('')
+const selectedKernelRef = ref('')
+const selectedSessionRef = ref('')
+
+const selectedServer = computed(() => selectedServerRef.value)
+const selectedKernel = computed(() => selectedKernelRef.value)
+const selectedSession = computed(() => selectedSessionRef.value)
+const availableServers = computed(() => {
+  const servers = jupyterStore.servers || []
+  return servers
+})
+const availableKernels = computed(() => {
+  // Get kernels for the currently selected server
+  if (!selectedServer.value) {
+    console.log('No selected server, returning empty kernels')
+    return []
+  }
+  const serverKey = selectedServer.value
+  const kernels = jupyterStore.kernels[serverKey] || []
+  console.log(`Kernels for server ${serverKey}:`, kernels)
+  console.log('All kernels in store:', jupyterStore.kernels)
+  return kernels
+})
+const availableSessions = computed(() => {
+  const sessions = codeExecutionStore.getAllSessions || []
+  return sessions.map(session => ({
+    id: session.id,
+    name: session.name,
+    kernel: { name: session.kernelName || '', id: session.kernelId || '' }
+  }))
+})
+const runningKernels = computed(() => [])
+const isSharedSessionMode = computed(() => codeExecutionStore.sharedSessionMode)
+const isExecuting = computed(() => codeExecutionStore.getCellById(blockId.value)?.isExecuting || false)
+const isLoadingKernels = ref(false)
+const isSettingUp = computed(() => isLoadingKernels.value)
+
+const handleOpenConfiguration = async () => {
+  // Ensure jupyter servers are loaded before opening the modal
+  jupyterStore.loadServers()
+  
+  // If a server is selected, load its kernels
+  if (selectedServer.value) {
+    const server = availableServers.value.find(s => `${s.ip}:${s.port}` === selectedServer.value)
+    if (server) {
+      isLoadingKernels.value = true
+      try {
+        await jupyterStore.getAvailableKernels(server)
+      } catch (error) {
+        console.error('Failed to load kernels on modal open:', error)
+      } finally {
+        isLoadingKernels.value = false
+      }
+    }
+  }
+  
   isConfigurationModalOpen.value = true
 }
+
+// Modal event handlers
+const handleServerChange = async (serverId: string) => {
+  console.log('Server changed to:', serverId)
+  selectedServerRef.value = serverId
+  selectedKernelRef.value = '' // Reset kernel when server changes
+  selectedSessionRef.value = '' // Reset session when server changes
+  
+  // Load kernels for the selected server
+  const server = availableServers.value.find(s => `${s.ip}:${s.port}` === serverId)
+  console.log('Found server object:', server)
+  console.log('Available servers:', availableServers.value)
+  
+  if (server) {
+    isLoadingKernels.value = true
+    try {
+      console.log('Calling getAvailableKernels with server:', server)
+      const kernels = await jupyterStore.getAvailableKernels(server)
+      console.log('Received kernels:', kernels)
+      console.log('Jupyter store kernels after call:', jupyterStore.kernels)
+    } catch (error) {
+      console.error('Failed to load kernels:', error)
+    } finally {
+      isLoadingKernels.value = false
+    }
+  } else {
+    console.warn('No server found for serverId:', serverId)
+  }
+}
+
+const handleKernelChange = async (kernelName: string) => {
+  selectedKernelRef.value = kernelName
+  selectedSessionRef.value = '' // Reset session when kernel changes
+}
+
+const handleSessionChange = async (sessionId: string) => {
+  selectedSessionRef.value = sessionId
+}
+
+const handleCreateNewSession = async () => {
+  const sessionId = codeExecutionStore.createSession(`Session ${Date.now()}`)
+  console.log('Created session:', sessionId)
+}
+
+const handleClearAllKernels = async () => {
+  // TODO: Implement clear all kernels
+}
+
+const handleRefreshSessions = async () => {
+  // TODO: Implement session refresh
+}
+
+const handleRefreshServers = async () => {
+  jupyterStore.loadServers()
+}
+
+const handleRefreshKernels = async () => {
+  if (selectedServer.value) {
+    const server = availableServers.value.find(s => `${s.ip}:${s.port}` === selectedServer.value)
+    if (server) {
+      isLoadingKernels.value = true
+      try {
+        await jupyterStore.getAvailableKernels(server)
+      } catch (error) {
+        console.error('Failed to refresh kernels:', error)
+      } finally {
+        isLoadingKernels.value = false
+      }
+    }
+  }
+}
+
+const handleTestServerConnection = async (server: any) => {
+  try {
+    console.log('Testing connection to server:', server)
+    const testResult = await jupyterStore.testServerConnection(server)
+    console.log('Test result:', testResult)
+    
+    if (testResult?.success) {
+      alert(`✅ Successfully connected to ${server.ip}:${server.port}`)
+    } else {
+      alert(`❌ Failed to connect to ${server.ip}:${server.port}\n\nError: ${testResult?.message || 'Connection failed'}`)
+    }
+  } catch (error) {
+    console.error('Error testing server connection:', error)
+    alert(`❌ Error testing connection: ${error}`)
+  }
+}
+
+const handleAddTestServer = async () => {
+  const testServer = {
+    ip: 'localhost',
+    port: '8888',
+    token: ''
+  }
+  
+  // First test the connection
+  try {
+    console.log('Testing connection to test server...')
+    const testResult = await jupyterStore.testServerConnection(testServer)
+    console.log('Test result:', testResult)
+    
+    if (testResult?.success) {
+      const success = jupyterStore.addServer(testServer)
+      if (success) {
+        // Auto-select the test server and load its kernels
+        const serverId = `${testServer.ip}:${testServer.port}`
+        await handleServerChange(serverId)
+      }
+    } else {
+      console.error('Test server connection failed:', testResult?.message)
+      alert(`Failed to connect to Jupyter server at localhost:8888. Make sure Jupyter is running.\n\nError: ${testResult?.message || 'Connection failed'}`)
+    }
+  } catch (error) {
+    console.error('Error testing server connection:', error)
+    alert(`Failed to test connection to Jupyter server: ${error}`)
+  }
+}
+
+const handleSelectRunningKernel = async (kernelId: string) => {
+  // TODO: Implement running kernel selection
+}
+
+const handleToggleSharedSessionMode = async () => {
+  await codeExecutionStore.toggleSharedSessionMode(notaId.value)
+}
+
+const handleApplyConfiguration = async (config: { server: string; kernel: string; session: string }) => {
+  console.log('Applying configuration:', config)
+  
+  try {
+    // Update the refs with the applied configuration
+    selectedServerRef.value = config.server
+    selectedKernelRef.value = config.kernel
+    selectedSessionRef.value = config.session
+    
+    // Save the configuration to the nota/block
+    const [ip, port] = config.server.split(':')
+    const serverConfig = availableServers.value.find(s => `${s.ip}:${s.port}` === config.server)
+    
+    if (serverConfig && config.kernel) {
+      // Update the block attributes with server and kernel info
+      props.updateAttributes({
+        serverID: config.server,
+        kernelName: config.kernel,
+        sessionId: config.session || null
+      })
+      
+      // Initialize or update the cell in the code execution store
+      codeExecutionStore.addCell({
+        id: blockId.value,
+        code: code.value,
+        serverConfig: serverConfig,
+        kernelName: config.kernel,
+        sessionId: config.session || 'default',
+        output: ''
+      })
+      
+      console.log('Configuration applied successfully')
+    }
+  } catch (error) {
+    console.error('Failed to apply configuration:', error)
+  }
+}
+
+
 </script>
 
 <template>
@@ -95,17 +357,30 @@ const handleOpenConfiguration = () => {
   <KernelConfigurationModal
     v-if="isExecutable"
     :is-open="isConfigurationModalOpen"
-    :is-shared-session-mode="false"
-    :is-executing="false"
-    :is-setting-up="false"
-    :selected-server="''"
-    :selected-kernel="''"
-    :available-servers="[]"
-    :available-kernels="[]"
-    :selected-session="''"
-    :available-sessions="[]"
-    :running-kernels="[]"
+    :is-shared-session-mode="isSharedSessionMode"
+    :is-executing="isExecuting"
+    :is-setting-up="isSettingUp"
+    :selected-server="selectedServer"
+    :selected-kernel="selectedKernel"
+    :available-servers="availableServers"
+    :available-kernels="availableKernels"
+    :selected-session="selectedSession"
+    :available-sessions="availableSessions"
+    :running-kernels="runningKernels"
     @update:is-open="isConfigurationModalOpen = $event"
+    @server-change="handleServerChange"
+    @kernel-change="handleKernelChange"
+    @session-change="handleSessionChange"
+    @create-new-session="handleCreateNewSession"
+    @clear-all-kernels="handleClearAllKernels"
+    @refresh-sessions="handleRefreshSessions"
+    @refresh-servers="handleRefreshServers"
+    @refresh-kernels="handleRefreshKernels"
+    @add-test-server="handleAddTestServer"
+    @test-server-connection="handleTestServerConnection"
+    @apply-configuration="handleApplyConfiguration"
+    @select-running-kernel="handleSelectRunningKernel"
+    @toggle-shared-session-mode="handleToggleSharedSessionMode"
   />
 </template>
 

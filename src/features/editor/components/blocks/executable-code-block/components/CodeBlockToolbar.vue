@@ -12,7 +12,8 @@ import {
   Copy,
   Check,
   Save,
-  Settings
+  Settings,
+  Zap
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 // ButtonGroup functionality will be replaced with flex grouping
@@ -70,6 +71,7 @@ interface Emits {
   'save-changes': []
   // Configuration modal events
   'open-configuration': []
+  'quick-connect': []
   // Session management events
   'update:is-session-open': [value: boolean]
   'session-change': [sessionId: string]
@@ -174,6 +176,22 @@ const configurationTitle = computed(() => {
           <span class="max-w-[80px] truncate">
             {{ configurationStatusText }}
           </span>
+        </Button>
+
+        <!-- Quick Connect Button -->
+        <Button
+          variant="outline"
+          size="sm"
+          class="h-7 text-xs px-3 gap-1"
+          :class="{
+            'opacity-70': isExecuting
+          }"
+          title="Quick Connect - Auto-select available server and kernel"
+          :disabled="isExecuting"
+          @click="emit('quick-connect')"
+        >
+          <Zap class="h-3 w-3" />
+          <span>Quick</span>
         </Button>
       </template>
     </div>

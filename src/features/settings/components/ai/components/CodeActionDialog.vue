@@ -1,9 +1,20 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { toTypedSchema } from "@vee-validate/zod"
+import { useForm } from "vee-validate"
+import * as z from "zod"
+
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
 import {
   Dialog,
   DialogContent,
@@ -19,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
 import { AlertTriangle, Code2, Copy } from 'lucide-vue-next'
 
 import { useAIActionsStore } from '@/features/editor/stores/aiActionsStore'
@@ -41,18 +52,42 @@ const emit = defineEmits<Emits>()
 
 const aiActionsStore = useAIActionsStore()
 
-// Form state
-const formData = ref({
-  name: '',
-  description: '',
-  icon: 'Brain',
-  prompt: '',
-  category: 'analysis' as 'analysis' | 'transformation' | 'generation' | 'debugging',
-  outputType: 'text' as 'text' | 'code' | 'markdown',
-  shortcut: ''
+// Form schema
+const formSchema = toTypedSchema(z.object({
+  name: z.string().min(1, "Name is required").max(100, "Name must be less than 100 characters"),
+  description: z.string().min(1, "Description is required").max(500, "Description must be less than 500 characters"),
+  icon: z.string().min(1, "Icon is required"),
+  prompt: z.string().min(1, "Prompt template is required"),
+  category: z.enum(['analysis', 'transformation', 'generation', 'debugging']),
+  outputType: z.enum(['text', 'code', 'markdown']),
+  shortcut: z.string().optional()
+}).refine((data) => {
+  // Check for duplicate names
+  const existingActions = aiActionsStore.enabledCustomActions
+  const duplicateName = existingActions.some(action => 
+    action.name === data.name && 
+    action.id !== props.editingAction?.id
+  )
+  return !duplicateName
+}, {
+  message: "An action with this name already exists",
+  path: ["name"]
+}))
+
+// Form setup
+const { handleSubmit, resetForm, setValues, values } = useForm({
+  validationSchema: formSchema,
+  initialValues: {
+    name: '',
+    description: '',
+    icon: 'Brain',
+    prompt: '',
+    category: 'analysis' as const,
+    outputType: 'text' as const,
+    shortcut: ''
+  }
 })
 
-const formErrors = ref<string[]>([])
 const isSubmitting = ref(false)
 
 // Options
@@ -104,16 +139,10 @@ const submitButtonText = computed(() =>
     : (isEditing.value ? 'Save Changes' : 'Create Action')
 )
 
-const isFormValid = computed(() => 
-  formData.value.name.trim() && 
-  formData.value.description.trim() && 
-  formData.value.prompt.trim()
-)
-
 // Watch for editing action changes
 watch(() => props.editingAction, (action) => {
   if (action) {
-    formData.value = {
+    setValues({
       name: action.name,
       description: action.description,
       icon: action.icon,
@@ -121,7 +150,7 @@ watch(() => props.editingAction, (action) => {
       category: action.category,
       outputType: action.outputType,
       shortcut: action.shortcut || ''
-    }
+    })
   } else {
     resetForm()
   }
@@ -135,62 +164,18 @@ watch(isOpen, (open) => {
 })
 
 // Methods
-const resetForm = () => {
-  formData.value = {
-    name: '',
-    description: '',
-    icon: 'Brain',
-    prompt: '',
-    category: 'analysis',
-    outputType: 'text',
-    shortcut: ''
-  }
-  formErrors.value = []
-}
-
-const validateForm = (): boolean => {
-  formErrors.value = []
-  
-  if (!formData.value.name.trim()) {
-    formErrors.value.push('Name is required')
-  }
-  
-  if (!formData.value.description.trim()) {
-    formErrors.value.push('Description is required')
-  }
-  
-  if (!formData.value.prompt.trim()) {
-    formErrors.value.push('Prompt template is required')
-  }
-  
-  // Check for duplicate names
-  const existingActions = aiActionsStore.enabledCustomActions
-  const duplicateName = existingActions.some(action => 
-    action.name === formData.value.name && 
-    action.id !== props.editingAction?.id
-  )
-  
-  if (duplicateName) {
-    formErrors.value.push('An action with this name already exists')
-  }
-  
-  return formErrors.value.length === 0
-}
-
-const handleSubmit = async () => {
-  if (!validateForm()) return
-  
+const onSubmit = handleSubmit(async (formValues) => {
   isSubmitting.value = true
   
   try {
     const actionData = {
-      name: formData.value.name.trim(),
-      description: formData.value.description.trim(),
-      icon: formData.value.icon,
-      prompt: formData.value.prompt.trim(),
-      category: formData.value.category,
-      outputType: formData.value.outputType,
-      shortcut: formData.value.shortcut || undefined,
+      name: formValues.name.trim(),
+      description: formValues.description.trim(),
+      icon: formValues.icon,
+      prompt: formValues.prompt.trim(),
+      category: formValues.category,
+      outputType: formValues.outputType,
+      shortcut: formValues.shortcut || undefined,
       isBuiltIn: false,
       isEnabled: true
     }
@@ -212,7 +197,7 @@ const handleSubmit = async () => {
   } finally {
     isSubmitting.value = false
   }
-}
+})
 
 const handleClose = () => {
   emit('update:open', false)
@@ -234,10 +219,10 @@ const insertTemplate = (template: string) => {
   if (textarea) {
     const start = textarea.selectionStart
     const end = textarea.selectionEnd
-    const text = formData.value.prompt
+    const text = values.prompt || ''
     const before = text.substring(0, start)
     const after = text.substring(end)
-    formData.value.prompt = before + template + after
+    setValues({ ...values, prompt: before + template + after })
     
     // Focus and set cursor position
     setTimeout(() => {
@@ -256,99 +241,123 @@ const insertTemplate = (template: string) => {
         <DialogDescription>{{ dialogDescription }}</DialogDescription>
       </DialogHeader>
       
-      <form @submit.prevent="handleSubmit" class="space-y-4">
+      <form @submit="onSubmit" class="space-y-4">
         <!-- Name and Category -->
         <div class="grid grid-cols-2 gap-4">
-          <div class="space-y-2">
-            <Label for="action-name" class="text-sm font-medium">
-              Name <span class="text-destructive">*</span>
-            </Label>
-            <Input
-              id="action-name"
-              v-model="formData.name"
-              placeholder="e.g., Add Comments"
-              required
-            />
-          </div>
+          <FormField v-slot="{ componentField }" name="name">
+            <FormItem>
+              <FormLabel>Name <span class="text-destructive">*</span></FormLabel>
+              <FormControl>
+                <Input 
+                  id="action-name"
+                  placeholder="e.g., Add Comments"
+                  v-bind="componentField"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          </FormField>
 
-          <div class="space-y-2">
-            <Label for="action-category" class="text-sm font-medium">Category</Label>
-            <Select v-model="formData.category">
-              <SelectTrigger>
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem 
-                  v-for="category in categoryOptions"
-                  :key="category.value"
-                  :value="category.value"
-                >
-                  {{ category.label }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <FormField v-slot="{ componentField }" name="category">
+            <FormItem>
+              <FormLabel>Category</FormLabel>
+              <FormControl>
+                <Select v-bind="componentField">
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem 
+                      v-for="category in categoryOptions"
+                      :key="category.value"
+                      :value="category.value"
+                    >
+                      {{ category.label }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          </FormField>
         </div>
 
         <!-- Description -->
-        <div class="space-y-2">
-          <Label for="action-description" class="text-sm font-medium">
-            Description <span class="text-destructive">*</span>
-          </Label>
-          <Input
-            id="action-description"
-            v-model="formData.description"
-            placeholder="e.g., Add comprehensive comments to explain code functionality"
-            required
-          />
-        </div>
+        <FormField v-slot="{ componentField }" name="description">
+          <FormItem>
+            <FormLabel>Description <span class="text-destructive">*</span></FormLabel>
+            <FormControl>
+              <Input
+                id="action-description"
+                placeholder="e.g., Add comprehensive comments to explain code functionality"
+                v-bind="componentField"
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        </FormField>
 
         <!-- Icon, Output Type, and Shortcut -->
         <div class="grid grid-cols-3 gap-4">
-          <div class="space-y-2">
-            <Label for="action-icon" class="text-sm font-medium">Icon</Label>
-            <Select v-model="formData.icon">
-              <SelectTrigger>
-                <SelectValue placeholder="Select icon" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem 
-                  v-for="icon in iconOptions"
-                  :key="icon.value"
-                  :value="icon.value"
-                >
-                  {{ icon.label }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <FormField v-slot="{ componentField }" name="icon">
+            <FormItem>
+              <FormLabel>Icon</FormLabel>
+              <FormControl>
+                <Select v-bind="componentField">
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select icon" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem 
+                      v-for="icon in iconOptions"
+                      :key="icon.value"
+                      :value="icon.value"
+                    >
+                      {{ icon.label }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          </FormField>
 
-          <div class="space-y-2">
-            <Label for="action-output" class="text-sm font-medium">Output Type</Label>
-            <Select v-model="formData.outputType">
-              <SelectTrigger>
-                <SelectValue placeholder="Select output" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem 
-                  v-for="output in outputTypeOptions"
-                  :key="output.value"
-                  :value="output.value"
-                >
-                  {{ output.label }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <FormField v-slot="{ componentField }" name="outputType">
+            <FormItem>
+              <FormLabel>Output Type</FormLabel>
+              <FormControl>
+                <Select v-bind="componentField">
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select output" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem 
+                      v-for="output in outputTypeOptions"
+                      :key="output.value"
+                      :value="output.value"
+                    >
+                      {{ output.label }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          </FormField>
 
-          <div class="space-y-2">
-            <Label for="action-shortcut" class="text-sm font-medium">Shortcut</Label>
-            <Input
-              id="action-shortcut"
-              v-model="formData.shortcut"
-              placeholder="e.g., Ctrl+Shift+C"
-            />
-          </div>
+          <FormField v-slot="{ componentField }" name="shortcut">
+            <FormItem>
+              <FormLabel>Shortcut</FormLabel>
+              <FormControl>
+                <Input
+                  id="action-shortcut"
+                  placeholder="e.g., Ctrl+Shift+C"
+                  v-bind="componentField"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          </FormField>
         </div>
 
         <!-- Template Variables Helper -->
@@ -374,7 +383,7 @@ const insertTemplate = (template: string) => {
               variant="outline" 
               size="sm"
             >
-              Insert {{code}}
+              Insert &#123;&#123;code&#125;&#125;
             </Button>
             <Button 
               type="button"
@@ -382,7 +391,7 @@ const insertTemplate = (template: string) => {
               variant="outline" 
               size="sm"
             >
-              Insert {{language}}
+              Insert &#123;&#123;language&#125;&#125;
             </Button>
             <Button 
               type="button"
@@ -390,67 +399,59 @@ const insertTemplate = (template: string) => {
               variant="outline" 
               size="sm"
             >
-              Insert {{error}}
+              Insert &#123;&#123;error&#125;&#125;
             </Button>
           </div>
         </div>
 
         <!-- Prompt Template -->
-        <div class="space-y-2">
-          <Label for="action-prompt" class="text-sm font-medium">
-            Prompt Template <span class="text-destructive">*</span>
-          </Label>
-          <Textarea
-            id="action-prompt"
-            v-model="formData.prompt"
-            placeholder="Analyze the following {{language}} code and add comprehensive comments..."
-            rows="6"
-            required
-            class="resize-none"
-          />
-          <p class="text-xs text-muted-foreground">
-            Use template variables to make your prompt dynamic. The code and context will be automatically inserted.
-          </p>
-        </div>
+        <FormField v-slot="{ componentField }" name="prompt">
+          <FormItem>
+            <FormLabel>Prompt Template <span class="text-destructive">*</span></FormLabel>
+            <FormControl>
+              <Textarea
+                id="action-prompt"
+                placeholder="Analyze the following {{language}} code and add comprehensive comments..."
+                rows="6"
+                class="resize-none"
+                v-bind="componentField"
+              />
+            </FormControl>
+            <FormDescription>
+              Use template variables to make your prompt dynamic. The code and context will be automatically inserted.
+            </FormDescription>
+            <FormMessage />
+          </FormItem>
+        </FormField>
 
         <!-- Preview -->
-        <div v-if="formData.name && formData.prompt" class="space-y-2">
-          <Label class="text-sm font-medium">Preview</Label>
+        <div v-if="values.name && values.prompt" class="space-y-2">
+          <FormLabel class="text-sm font-medium">Preview</FormLabel>
           <div class="border rounded-lg p-4 bg-muted/50">
             <div class="flex items-center gap-2 mb-3">
               <Code2 class="h-4 w-4 text-primary" />
-              <span class="font-medium text-sm">{{ formData.name }}</span>
+              <span class="font-medium text-sm">{{ values.name }}</span>
               <Badge :class="{
-                'bg-blue-50 text-blue-700': formData.category === 'analysis',
-                'bg-green-50 text-green-700': formData.category === 'transformation',
-                'bg-purple-50 text-purple-700': formData.category === 'generation',
-                'bg-red-50 text-red-700': formData.category === 'debugging'
+                'bg-blue-50 text-blue-700': values.category === 'analysis',
+                'bg-green-50 text-green-700': values.category === 'transformation',
+                'bg-purple-50 text-purple-700': values.category === 'generation',
+                'bg-red-50 text-red-700': values.category === 'debugging'
               }" class="text-xs">
-                {{ formData.category }}
+                {{ values.category }}
               </Badge>
             </div>
-            <p class="text-xs text-muted-foreground mb-2">{{ formData.description }}</p>
+            <p class="text-xs text-muted-foreground mb-2">{{ values.description }}</p>
             <div class="text-xs bg-background border rounded p-2">
-              <span class="font-medium">Prompt:</span> {{ formData.prompt }}
+              <span class="font-medium">Prompt:</span> {{ values.prompt }}
             </div>
           </div>
         </div>
-
-        <!-- Errors -->
-        <Alert v-if="formErrors.length > 0" variant="destructive">
-          <AlertTriangle class="h-4 w-4" />
-          <AlertDescription>
-            <ul class="list-disc list-inside space-y-1">
-              <li v-for="error in formErrors" :key="error">{{ error }}</li>
-            </ul>
-          </AlertDescription>
-        </Alert>
 
         <DialogFooter class="gap-2">
           <Button type="button" variant="outline" @click="handleCancel">
             Cancel
           </Button>
-          <Button type="submit" :disabled="!isFormValid || isSubmitting">
+          <Button type="submit" :disabled="isSubmitting">
             {{ submitButtonText }}
           </Button>
         </DialogFooter>

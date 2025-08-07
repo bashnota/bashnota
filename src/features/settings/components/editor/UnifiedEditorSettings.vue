@@ -247,7 +247,7 @@ onMounted(() => {
               help="Different themes provide various color schemes for better code readability"
           :model-value="settings.codeTheme"
               :options="themeOptions"
-              @update:model-value="(value) => { updateSetting('codeTheme', value); handleSettingChange() }"
+              @update:model-value="(value) => { updateSetting('codeTheme', String(value)); handleSettingChange() }"
         />
         
         <SettingSlider
@@ -313,7 +313,7 @@ onMounted(() => {
               help="Choose based on your project's coding standards"
           :model-value="settings.indentType"
           :options="indentTypeOptions"
-              @update:model-value="(value) => { updateSetting('indentType', value); handleSettingChange() }"
+              @update:model-value="(value) => { updateSetting('indentType', value as 'spaces' | 'tabs'); handleSettingChange() }"
         />
         
         <SettingSlider

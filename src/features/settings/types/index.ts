@@ -6,6 +6,13 @@ export type { KeyboardSettings, KeyboardShortcut } from './keyboard'
 export type { IntegrationSettings } from './integrations'
 export type { AdvancedSettings } from './advanced'
 
+import type { EditorSettings } from './editor'
+import type { AppearanceSettings } from './appearance'
+import type { AISettings } from './ai'
+import type { KeyboardSettings, KeyboardShortcut } from './keyboard'
+import type { IntegrationSettings } from './integrations'
+import type { AdvancedSettings } from './advanced'
+
 // Combined settings interface
 export interface AllSettings {
   editor: EditorSettings

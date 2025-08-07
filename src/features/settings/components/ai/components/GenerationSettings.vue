@@ -68,6 +68,7 @@ const timeoutDescription = computed(() => {
         </div>
         
         <SettingSlider
+          label="Temperature"
           :model-value="[props.temperature]"
           :min="0"
           :max="2"
@@ -95,6 +96,7 @@ const timeoutDescription = computed(() => {
         </div>
         
         <SettingSlider
+          label="Max Tokens"
           :model-value="[props.maxTokens]"
           :min="256"
           :max="8192"
@@ -123,6 +125,7 @@ const timeoutDescription = computed(() => {
         </div>
         
         <SettingSlider
+          label="Request Timeout"
           :model-value="[props.requestTimeout]"
           :min="10"
           :max="120"

@@ -26,12 +26,14 @@ interface Emits {
   'code-updated': [code: string]
   'custom-action-executed': [actionId: string, result: string]
   'trigger-execution': []
+  'show-ai-assistant': []
 }
 
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
 const activeOutputView = ref<'output' | 'ai'>('output')
+const showAIAssistant = ref(false)
 
 const sessionInfo = computed(() => ({
   sessionId: props.selectedSession,
@@ -42,6 +44,7 @@ const sessionInfo = computed(() => ({
 watch(() => props.hasError, (hasError) => {
   if (hasError && !props.isReadOnly && !props.isPublished) {
     activeOutputView.value = 'ai'
+    showAIAssistant.value = true
   }
 }, { immediate: true })
 
@@ -63,15 +66,33 @@ const openInExternalTab = () => {
 
 const switchToAIForErrorFix = () => {
   activeOutputView.value = 'ai'
+  showAIAssistant.value = true
 }
 
 const switchToAIForAnalysis = () => {
   activeOutputView.value = 'ai'
+  showAIAssistant.value = true
 }
+
+// Check if we should show the output section
+const shouldShowOutputSection = computed(() => {
+  return props.hasOutput || props.hasError || showAIAssistant.value
+})
+
+// Expose method to trigger AI assistant from parent
+const showAIAssistantFromParent = () => {
+  showAIAssistant.value = true
+  activeOutputView.value = 'ai'
+}
+
+// Expose the method to parent component
+defineExpose({
+  showAIAssistant: showAIAssistantFromParent
+})
 </script>
 
 <template>
-  <div v-if="hasOutput || (!isReadOnly && !isPublished)" class="border-t bg-muted/20">
+  <div v-if="shouldShowOutputSection" class="border-t bg-muted/20">
     <!-- Output/AI Toggle Header -->
     <div class="flex items-center justify-between px-4 py-2 border-b bg-background/50">
       <div class="flex items-center gap-2">

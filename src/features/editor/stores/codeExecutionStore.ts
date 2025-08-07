@@ -22,6 +22,27 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
   const sharedSessionMode = ref<boolean>(false)
   const sharedSessionId = ref<string | null>(null)
   
+  // Load shared session mode from localStorage on init
+  const loadSharedSessionMode = () => {
+    try {
+      const saved = localStorage.getItem('code-execution-shared-mode')
+      if (saved !== null) {
+        sharedSessionMode.value = JSON.parse(saved)
+      }
+    } catch (error) {
+      logger.warn('Failed to load shared session mode from localStorage:', error)
+    }
+  }
+  
+  // Save shared session mode to localStorage
+  const saveSharedSessionMode = () => {
+    try {
+      localStorage.setItem('code-execution-shared-mode', JSON.stringify(sharedSessionMode.value))
+    } catch (error) {
+      logger.warn('Failed to save shared session mode to localStorage:', error)
+    }
+  }
+  
   // Dialog control for server selection
   const serverDialogState = reactive({
     isOpen: false,
@@ -207,12 +228,14 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
     if (sharedSessionMode.value) {
       sharedSessionMode.value = false;
       sharedSessionId.value = null;
+      saveSharedSessionMode(); // Persist to localStorage
       await saveSessions(notaId);
       return false;
     }
     
     // Turn on shared mode
     sharedSessionMode.value = true;
+    saveSharedSessionMode(); // Persist to localStorage
     
     // Save the mode change
     await saveSessions(notaId);
@@ -318,10 +341,10 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
       return;
     }
 
-    // If cell has a different session, don't change it
-    if (cell.sessionId && cell.sessionId !== sharedSessionId.value) {
-      logger.log(`[CodeExecStore] Cell ${cellId} has different session ${cell.sessionId}, not changing`);
-      return;
+    // If cell has a different session, update it to use shared session when shared mode is enabled
+    if (cell.sessionId && cell.sessionId !== sharedSessionId.value && sharedSessionMode.value) {
+      logger.log(`[CodeExecStore] Cell ${cellId} has different session ${cell.sessionId}, forcing shared session`);
+      // Continue to force the shared session
     }
 
     // If no shared session exists, create one
@@ -492,9 +515,9 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
       isPipelineCell: cell.isPipelineCell || false
     })
 
-    // If in shared session mode and cell doesn't have a session, add it to the shared session
+    // If in shared session mode, force the cell to use the shared session
     // Don't add published cells or pipeline cells to the shared session as they have their own session management
-    if (sharedSessionMode.value && !cell.sessionId && !cell.isPublished && !cell.isPipelineCell) {
+    if (sharedSessionMode.value && !cell.isPublished && !cell.isPipelineCell) {
       applySharedSessionToCell(cell.id)
     }
   }
@@ -847,6 +870,9 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
     kernelSessions.value.clear()
     cells.value.clear()
   }
+
+  // Initialize the store
+  loadSharedSessionMode()
 
   return {
     cells,
