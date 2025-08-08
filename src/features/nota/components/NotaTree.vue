@@ -5,9 +5,7 @@ import {
   ChevronRight,
   FileText,
   Star,
-  Settings,
-  Plus,
-  X
+  Plus
 } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { Input } from '@/components/ui/input'
@@ -18,6 +16,7 @@ import { useFavoriteBlocksStore } from '@/features/nota/stores/favoriteBlocksSto
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import type { Editor } from '@tiptap/vue-3'
 import { logger } from '@/services/logger'
+import NotaEditMenu from '@/features/nota/components/NotaEditMenu.vue'
 
 interface Props {
   items: Nota[]
@@ -33,6 +32,8 @@ const emit = defineEmits<{
   create: [parentId: string | null]
   'show-new-input': [id: string | null]
   'update:newNotaTitle': [value: string]
+  'nota-updated': [nota: Nota]
+  'nota-deleted': [id: string]
 }>()
 
 const props = withDefaults(defineProps<Props>(), {
@@ -75,13 +76,6 @@ const handleRename = async (id: string) => {
   if (!renameTitle.value.trim()) return
   await store.renameItem(id, renameTitle.value)
   showRenameInput.value = null
-}
-
-const handleDelete = async (id: string) => {
-  if (confirm('Are you sure you want to delete this item?')) {
-    await store.deleteItem(id)
-    router.push('/')
-  }
 }
 
 const showContextMenu = (event: MouseEvent, item: Nota) => {
@@ -174,24 +168,13 @@ onUnmounted(() => {
           >
             <Plus class="h-4 w-4" />
           </Button>
-          <Button
+          <NotaEditMenu 
+            :nota="item"
+            size="sm"
             variant="ghost"
-            size="icon"
-            class="h-6 w-6"
-            @click="startRename(item)"
-            title="Rename"
-          >
-            <Settings class="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            class="h-6 w-6"
-            @click="handleDelete(item.id)"
-            title="Delete"
-          >
-            <X class="h-4 w-4" />
-          </Button>
+            @nota-updated="(nota) => emit('nota-updated', nota)"
+            @nota-deleted="(id) => emit('nota-deleted', id)"
+          />
         </div>
       </div>
 
@@ -211,19 +194,10 @@ onUnmounted(() => {
               icon: Plus,
               action: () => emit('show-new-input', item.id),
             },
-            { label: 'Rename', icon: Settings, action: () => startRename(item) },
-            { label: 'Delete', icon: X, action: () => handleDelete(item.id) },
             {
               label: item.favorite ? 'Remove Favorite' : 'Add Favorite',
               icon: Star,
               action: () => store.toggleFavorite(item.id),
-            },
-            {
-              label: 'Add to Favorites',
-              icon: Star,
-              action: () => {
-                isModalOpen = true
-              },
             },
           ]"
           :key="action.label"
@@ -260,6 +234,8 @@ onUnmounted(() => {
           @create="(id) => emit('create', id)"
           @show-new-input="(id) => emit('show-new-input', id)"
           @update:new-nota-title="(value) => emit('update:newNotaTitle', value)"
+          @nota-updated="(nota) => emit('nota-updated', nota)"
+          @nota-deleted="(id) => emit('nota-deleted', id)"
         />
       </div>
     </div>

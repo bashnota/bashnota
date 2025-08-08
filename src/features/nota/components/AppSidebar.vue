@@ -347,6 +347,26 @@ const handleAuthNavigation = () => {
     router.push('/login')
   }
 }
+
+// Handle nota updated
+const handleNotaUpdated = async (nota: any) => {
+  // The nota store should already be updated, but we might want to refresh
+  // the view or handle any UI updates
+  await notaStore.loadNotas()
+}
+
+// Handle nota deleted
+const handleNotaDeleted = async (notaId: string) => {
+  // The nota store should already be updated, but we might want to refresh
+  // the view to ensure consistency
+  await notaStore.loadNotas()
+  
+  // Reset pagination if needed
+  const startIndex = (currentPage.value - 1) * itemsPerPage.value
+  if (startIndex >= filteredNotas.value.length && currentPage.value > 1) {
+    currentPage.value = Math.max(1, currentPage.value - 1)
+  }
+}
 </script>
 
 <template>
@@ -483,6 +503,8 @@ const handleAuthNavigation = () => {
                           newNotaTitle = ''
                         }"
                         @update:new-nota-title="(value) => (newNotaTitle = value)"
+                        @nota-updated="handleNotaUpdated"
+                        @nota-deleted="handleNotaDeleted"
                       />
 
                       <!-- Loading State -->
