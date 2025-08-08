@@ -5,6 +5,7 @@
     side="right" 
     collapsible="none"
     variant="sidebar"
+    class="h-[calc(100vh-3.5rem)] max-h-[calc(100vh-3.5rem)] overflow-hidden"
   >
     <!-- Dynamic sidebar content based on active sidebar -->
     <template v-if="activeSidebar === 'references'">
@@ -25,26 +26,16 @@
         </div>
       </SidebarHeader>
       
-      <SidebarContent>
-        <ReferencesSidebarContent 
-          :editor="editor || undefined" 
-          :nota-id="activeNota?.id || ''"
-          @close="closeSidebar('references')"
-        />
+      <SidebarContent class="flex-1 overflow-hidden">
+        <div class="h-full overflow-y-auto">
+          <ReferencesSidebarContent 
+            :editor="editor || undefined" 
+            :nota-id="activeNota?.id || ''"
+            @close="closeSidebar('references')"
+          />
+        </div>
       </SidebarContent>
       
-      <SidebarFooter class="border-t">
-        <div class="p-2">
-          <div class="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-            <kbd class="px-1.5 py-0.5 text-xs bg-muted border rounded">Ctrl</kbd>
-            <span>+</span>
-            <kbd class="px-1.5 py-0.5 text-xs bg-muted border rounded">Shift</kbd>
-            <span>+</span>
-            <kbd class="px-1.5 py-0.5 text-xs bg-muted border rounded">R</kbd>
-            <span class="ml-2">toggle references</span>
-          </div>
-        </div>
-      </SidebarFooter>
     </template>
 
     <template v-else-if="activeSidebar === 'jupyter'">
@@ -65,11 +56,13 @@
         </div>
       </SidebarHeader>
       
-      <SidebarContent>
-        <JupyterServersSidebarContent 
-          :nota-id="activeNota?.id || ''"
-          @close="closeSidebar('jupyter')"
-        />
+      <SidebarContent class="flex-1 overflow-hidden">
+        <div class="h-full overflow-y-auto">
+          <JupyterServersSidebarContent 
+            :nota-id="activeNota?.id || ''"
+            @close="closeSidebar('jupyter')"
+          />
+        </div>
       </SidebarContent>
       
       <SidebarFooter class="border-t">
@@ -104,12 +97,14 @@
         </div>
       </SidebarHeader>
       
-      <SidebarContent>
-        <AIAssistantSidebarContent 
-          :editor="editor || undefined"
-          :nota-id="activeNota?.id || ''"
-          @close="closeSidebar('ai')"
-        />
+      <SidebarContent class="flex-1 overflow-hidden">
+        <div class="h-full overflow-y-auto">
+          <AIAssistantSidebarContent 
+            :editor="editor || undefined"
+            :nota-id="activeNota?.id || ''"
+            @close="closeSidebar('ai')"
+          />
+        </div>
       </SidebarContent>
       
       <SidebarFooter class="border-t">
@@ -146,12 +141,14 @@
         </div>
       </SidebarHeader>
       
-      <SidebarContent>
-        <MetadataSidebarContent 
-          :nota-id="activeNota?.id || ''"
-          :editor="editor || undefined"
-          @close="closeSidebar('metadata')"
-        />
+      <SidebarContent class="flex-1 overflow-hidden">
+        <div class="h-full overflow-y-auto">
+          <MetadataSidebarContent 
+            :nota-id="activeNota?.id || ''"
+            :editor="editor || undefined"
+            @close="closeSidebar('metadata')"
+          />
+        </div>
       </SidebarContent>
       
       <SidebarFooter class="border-t">
@@ -186,11 +183,13 @@
         </div>
       </SidebarHeader>
       
-      <SidebarContent>
-        <FavoriteBlocksSidebarContent 
-          :editor="editor || undefined"
-          @close="closeSidebar('favorites')"
-        />
+      <SidebarContent class="flex-1 overflow-hidden">
+        <div class="h-full overflow-y-auto">
+          <FavoriteBlocksSidebarContent 
+            :editor="editor || undefined"
+            @close="closeSidebar('favorites')"
+          />
+        </div>
       </SidebarContent>
       
       <SidebarFooter class="border-t">
