@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { toTypedSchema } from "@vee-validate/zod"
 import { useForm } from "vee-validate"
 import * as z from "zod"
@@ -19,15 +19,10 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form"
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Loader2, Eye as EyeIcon, EyeOff as EyeOffIcon } from 'lucide-vue-next'
+import { Separator } from '@/components/ui/separator'
+import { Loader2, Eye as EyeIcon, EyeOff as EyeOffIcon, Link } from 'lucide-vue-next'
 
 interface ServerForm {
   ip: string
@@ -54,12 +49,12 @@ const emit = defineEmits<{
 }>()
 
 // Local state
-const activeTab = ref('manual')
 const showToken = ref(false)
 
-// Form schema for manual setup
-const manualFormSchema = toTypedSchema(z.object({
+// Unified form schema
+const formSchema = toTypedSchema(z.object({
   name: z.string().min(1, "Server name is required").max(100, "Name must be less than 100 characters"),
+  url: z.string().optional(),
   ip: z.string().min(1, "IP address is required"),
   port: z.string()
     .min(1, "Port is required")
@@ -71,57 +66,34 @@ const manualFormSchema = toTypedSchema(z.object({
   token: z.string().optional()
 }))
 
-// Form schema for URL setup
-const urlFormSchema = toTypedSchema(z.object({
-  name: z.string().min(1, "Server name is required").max(100, "Name must be less than 100 characters"),
-  url: z.string()
-    .min(1, "URL is required")
-    .url("Please enter a valid URL")
-    .refine((val) => val.startsWith('http'), "URL must start with http:// or https://")
-}))
-
-// Form setup for manual tab
-const manualForm = useForm({
-  validationSchema: manualFormSchema,
+// Form setup
+const form = useForm({
+  validationSchema: formSchema,
   initialValues: {
     name: '',
+    url: '',
     ip: '',
     port: '',
     token: ''
   }
 })
 
-// Form setup for URL tab
-const urlForm = useForm({
-  validationSchema: urlFormSchema,
-  initialValues: {
-    name: '',
-    url: ''
-  }
-})
-
 // Watch for props changes to update form values
 watch(() => props.form, (newForm) => {
-  if (activeTab.value === 'manual') {
-    manualForm.setValues({
-      name: newForm.name || '',
-      ip: newForm.ip || '',
-      port: newForm.port || '',
-      token: newForm.token || ''
-    })
-  } else {
-    urlForm.setValues({
-      name: newForm.name || '',
-      url: newForm.url || ''
-    })
-  }
+  form.setValues({
+    name: newForm.name || '',
+    url: newForm.url || '',
+    ip: newForm.ip || '',
+    port: newForm.port || '',
+    token: newForm.token || ''
+  })
 }, { immediate: true })
 
 // Methods
-const onManualSubmit = manualForm.handleSubmit((values) => {
+const onSubmit = form.handleSubmit((values) => {
   const updatedForm: ServerForm = {
-    ...props.form,
-    name: values.name || '',
+    name: values.name,
+    url: values.url || '',
     ip: values.ip,
     port: values.port,
     token: values.token || ''
@@ -130,22 +102,12 @@ const onManualSubmit = manualForm.handleSubmit((values) => {
   emit('add-server')
 })
 
-const onUrlSubmit = urlForm.handleSubmit((values) => {
-  const updatedForm: ServerForm = {
-    ...props.form,
-    name: values.name || '',
-    url: values.url
-  }
-  emit('update:form', updatedForm)
-  emit('parse-url')
-})
-
 const parseUrl = () => {
-  if (!urlForm.values.url) return
+  if (!form.values.url?.trim()) return
   const updatedForm: ServerForm = {
     ...props.form,
-    name: urlForm.values.name || '',
-    url: urlForm.values.url
+    name: form.values.name || '',
+    url: form.values.url || ''
   }
   emit('update:form', updatedForm)
   emit('parse-url')
@@ -153,170 +115,142 @@ const parseUrl = () => {
 
 const cancel = () => {
   emit('update:open', false)
-  // Reset forms
-  manualForm.resetForm()
-  urlForm.resetForm()
+  form.resetForm()
 }
 </script>
 
 <template>
   <Dialog :open="props.open" @update:open="$emit('update:open', $event)">
-    <DialogContent class="sm:max-w-[425px]">
+    <DialogContent class="sm:max-w-[500px]">
       <DialogHeader>
         <DialogTitle>Add Jupyter Server</DialogTitle>
         <DialogDescription>
-          Connect to a Jupyter server to use kernels for code execution.
+          Connect to a Jupyter server to use kernels for code execution. Supports both standard Jupyter and Kaggle servers.
         </DialogDescription>
       </DialogHeader>
       
-      <Tabs v-model="activeTab" class="w-full">
-        <TabsList class="grid w-full grid-cols-2">
-          <TabsTrigger value="manual">Manual Setup</TabsTrigger>
-          <TabsTrigger value="url">From URL</TabsTrigger>
-        </TabsList>
-        
-        <!-- Manual Setup Tab -->
-        <TabsContent value="manual">
-          <form @submit="onManualSubmit" class="grid gap-4 py-4">
-            <div class="grid grid-cols-4 items-center gap-2">
-              <FormField v-slot="{ componentField }" name="name" :form-context="manualForm">
-                <FormItem class="col-span-4 grid grid-cols-4 items-center gap-2">
-                  <FormLabel class="text-right">Name</FormLabel>
-                  <div class="col-span-3 space-y-1">
-                    <FormControl>
-                      <Input 
-                        placeholder="My Server"
-                        v-bind="componentField"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </div>
-                </FormItem>
-              </FormField>
-            </div>
+      <form @submit="onSubmit" class="space-y-6">
+        <!-- Server Name -->
+        <FormField v-slot="{ componentField }" name="name">
+          <FormItem>
+            <FormLabel>Server Name</FormLabel>
+            <FormControl>
+              <Input 
+                placeholder="My Jupyter Server"
+                v-bind="componentField"
+              />
+            </FormControl>
+            <FormDescription>
+              A friendly name to identify this server
+            </FormDescription>
+            <FormMessage />
+          </FormItem>
+        </FormField>
+
+        <!-- Quick Setup Section -->
+        <div class="space-y-4">
+          <div class="flex items-center gap-2">
+            <Separator class="flex-1" />
+            <span class="text-sm text-muted-foreground font-medium">Quick Setup</span>
+            <Separator class="flex-1" />
+          </div>
+          
+          <FormField v-slot="{ componentField }" name="url">
+            <FormItem>
+              <FormLabel>Jupyter URL (Optional)</FormLabel>
+              <FormControl>
+                <div class="flex gap-2">
+                  <Input 
+                    placeholder="http://localhost:8888/?token=abc123 or https://kaggle.com/..."
+                    class="flex-1"
+                    v-bind="componentField"
+                  />
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm"
+                    @click="parseUrl" 
+                    :disabled="!form.values.url?.trim() || isParsing"
+                    class="shrink-0"
+                  >
+                    <Loader2 v-if="isParsing" class="mr-2 h-4 w-4 animate-spin" />
+                    <Link v-else class="mr-2 h-4 w-4" />
+                    Parse
+                  </Button>
+                </div>
+              </FormControl>
+              <FormDescription>
+                Paste the full URL from your Jupyter notebook or Kaggle kernel to auto-fill the fields below
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+        </div>
+
+        <!-- Manual Configuration Section -->
+        <div class="space-y-4">
+          <div class="flex items-center gap-2">
+            <Separator class="flex-1" />
+            <span class="text-sm text-muted-foreground font-medium">Manual Configuration</span>
+            <Separator class="flex-1" />
+          </div>
+          
+          <div class="grid grid-cols-2 gap-4">
+            <FormField v-slot="{ componentField }" name="ip">
+              <FormItem>
+                <FormLabel>IP Address / Host</FormLabel>
+                <FormControl>
+                  <Input 
+                    placeholder="localhost"
+                    v-bind="componentField"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            </FormField>
             
-            <div class="grid grid-cols-4 items-center gap-2">
-              <FormField v-slot="{ componentField }" name="ip" :form-context="manualForm">
-                <FormItem class="col-span-4 grid grid-cols-4 items-center gap-2">
-                  <FormLabel class="text-right">IP Address</FormLabel>
-                  <div class="col-span-3 space-y-1">
-                    <FormControl>
-                      <Input 
-                        placeholder="localhost or 127.0.0.1"
-                        v-bind="componentField"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </div>
-                </FormItem>
-              </FormField>
-            </div>
-            
-            <div class="grid grid-cols-4 items-center gap-2">
-              <FormField v-slot="{ componentField }" name="port" :form-context="manualForm">
-                <FormItem class="col-span-4 grid grid-cols-4 items-center gap-2">
-                  <FormLabel class="text-right">Port</FormLabel>
-                  <div class="col-span-3 space-y-1">
-                    <FormControl>
-                      <Input 
-                        placeholder="8888"
-                        v-bind="componentField"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </div>
-                </FormItem>
-              </FormField>
-            </div>
-            
-            <div class="grid grid-cols-4 items-center gap-2">
-              <FormField v-slot="{ componentField }" name="token" :form-context="manualForm">
-                <FormItem class="col-span-4 grid grid-cols-4 items-center gap-2">
-                  <FormLabel class="text-right">Token</FormLabel>
-                  <div class="col-span-3 space-y-1">
-                    <FormControl>
-                      <div class="relative">
-                        <Input 
-                          :type="showToken ? 'text' : 'password'"
-                          placeholder="Leave blank if no token required"
-                          v-bind="componentField"
-                        />
-                        <button 
-                          type="button"
-                          class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                          @click="showToken = !showToken"
-                        >
-                          <EyeIcon v-if="!showToken" class="h-4 w-4" />
-                          <EyeOffIcon v-else class="h-4 w-4" />
-                        </button>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </div>
-                </FormItem>
-              </FormField>
-            </div>
-          </form>
-        </TabsContent>
-        
-        <!-- URL Tab -->
-        <TabsContent value="url">
-          <form @submit="onUrlSubmit" class="grid gap-4 py-4">
-            <div class="grid grid-cols-4 items-center gap-2">
-              <FormField v-slot="{ componentField }" name="name" :form-context="urlForm">
-                <FormItem class="col-span-4 grid grid-cols-4 items-center gap-2">
-                  <FormLabel class="text-right">Name</FormLabel>
-                  <div class="col-span-3 space-y-1">
-                    <FormControl>
-                      <Input 
-                        placeholder="My Server"
-                        v-bind="componentField"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </div>
-                </FormItem>
-              </FormField>
-            </div>
-            
-            <div class="grid grid-cols-4 items-center gap-2">
-              <FormField v-slot="{ componentField }" name="url" :form-context="urlForm">
-                <FormItem class="col-span-4 grid grid-cols-4 items-center gap-2">
-                  <FormLabel class="text-right">URL</FormLabel>
-                  <div class="col-span-3 space-y-2">
-                    <div class="space-y-1">
-                      <FormControl>
-                        <Input 
-                          placeholder="http://localhost:8888/?token=abc123"
-                          class="w-full"
-                          v-bind="componentField"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </div>
-                    
-                    <FormDescription>
-                      Paste the full URL from your Jupyter notebook, including the token.
-                    </FormDescription>
-                    
-                    <Button 
-                      type="button" 
-                      variant="secondary" 
-                      size="sm" 
-                      @click="parseUrl" 
-                      :disabled="!urlForm.values.url || isParsing"
-                      class="w-full"
-                    >
-                      <Loader2 v-if="isParsing" class="mr-2 h-4 w-4 animate-spin" />
-                      Parse URL
-                    </Button>
-                  </div>
-                </FormItem>
-              </FormField>
-            </div>
-          </form>
-        </TabsContent>
-      </Tabs>
+            <FormField v-slot="{ componentField }" name="port">
+              <FormItem>
+                <FormLabel>Port</FormLabel>
+                <FormControl>
+                  <Input 
+                    placeholder="8888"
+                    v-bind="componentField"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            </FormField>
+          </div>
+          
+          <FormField v-slot="{ componentField }" name="token">
+            <FormItem>
+              <FormLabel>Token (Optional)</FormLabel>
+              <FormControl>
+                <div class="relative">
+                  <Input 
+                    :type="showToken ? 'text' : 'password'"
+                    placeholder="Leave blank if no token required"
+                    v-bind="componentField"
+                  />
+                  <button 
+                    type="button"
+                    class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    @click="showToken = !showToken"
+                  >
+                    <EyeIcon v-if="!showToken" class="h-4 w-4" />
+                    <EyeOffIcon v-else class="h-4 w-4" />
+                  </button>
+                </div>
+              </FormControl>
+              <FormDescription>
+                Authentication token if required by your Jupyter server
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+        </div>
+      </form>
 
       <DialogFooter>
         <Button 
@@ -327,8 +261,8 @@ const cancel = () => {
           Cancel
         </Button>
         <Button 
-          type="button" 
-          @click="activeTab === 'manual' ? onManualSubmit() : onUrlSubmit()" 
+          type="submit" 
+          @click="onSubmit"
           :disabled="testingConnection"
           class="gap-2"
         >
