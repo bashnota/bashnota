@@ -300,7 +300,7 @@ const toggleTextarea = () => {
                   @remove-entry="handleRemoveEntry"
                   @validate-entry="handleValidateEntry"
                   @view-details="handleViewDetails"
-                  @select-all="selectAll"
+                  @select-all="(checked: boolean) => checked ? selectAll() : deselectAll()"
                 />
               </div>
             </div>

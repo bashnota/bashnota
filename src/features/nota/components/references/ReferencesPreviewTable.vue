@@ -41,6 +41,7 @@ const emit = defineEmits<{
   removeEntry: [id: string]
   validateEntry: [id: string]
   viewDetails: [entry: ParsedBibTexEntry]
+  selectAll: [checked: boolean]
 }>()
 
 // Track validation states
@@ -161,7 +162,7 @@ const invalidCount = computed(() => props.entries.filter(e => e.validationStatus
               <Checkbox 
                 :checked="selectedCount === entries.length && entries.length > 0"
                 :indeterminate="selectedCount > 0 && selectedCount < entries.length"
-                @update:checked="$emit('selectAll')"
+                @update:checked="(checked: boolean) => $emit('selectAll', checked)"
               />
             </TableHead>
             <TableHead>Reference</TableHead>

@@ -2,7 +2,7 @@
   <div class="h-full w-full flex overflow-hidden">
     <!-- Left Sidebar (TOC) -->
     <div v-if="sidebarStates.toc.isOpen" class="left-sidebar-container">
-      <div class="py-1 px-2 border-b flex items-center justify-between">
+      <div class="py-1 px-2 border-b flex items-center justify-between flex-shrink-0">
         <div class="flex items-center">
           <svg class="h-3.5 w-3.5 text-primary mr-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -18,14 +18,14 @@
           </svg>
         </Button>
       </div>
-      <div class="flex-1 flex flex-col relative overflow-hidden w-full h-full p-0 m-0">
+      <div class="flex-1 flex flex-col overflow-hidden min-h-0">
         <TableOfContents v-if="editorStore.activeEditor" :editor="editorStore.activeEditor as Editor" />
       </div>
     </div>
     
     <!-- Main Content Area -->
-    <div class="h-full w-full flex flex-col bg-background flex-1">
-      <SplitViewContainer class="flex-1" ref="splitViewContainerRef" />
+    <div class="h-full w-full flex flex-col bg-background flex-1 min-h-0 overflow-hidden">
+      <SplitViewContainer class="flex-1 min-h-0" ref="splitViewContainerRef" />
     </div>
   </div>
 </template>
@@ -105,7 +105,12 @@ watch(
 .left-sidebar-container {
   min-width: 300px;
   max-width: 800px;
+  height: 100%;
+  max-height: 100%;
   position: relative;
   border-right: 1px solid hsl(var(--border));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 </style> 

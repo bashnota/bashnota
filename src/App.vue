@@ -222,10 +222,10 @@ onMounted(async () => {
 </script>
 
 <template>
-  <TooltipProvider>
-    <SidebarProvider>
+  <TooltipProvider class="h-full">
+    <SidebarProvider class="h-full">
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset class="h-full">
         <!-- Top Bar -->
         <div class="sticky top-0 z-10 border-b bg-background text-foreground backdrop-blur-sm">
           <div class="flex items-center justify-between px-4 h-14">
@@ -264,9 +264,9 @@ onMounted(async () => {
         <AppTabs />
 
         <!-- Main content area with right sidebar -->
-        <div class="flex flex-1 min-h-0 overflow-hidden">
+        <div class="flex flex-1 min-h-0 overflow-hidden h-full">
           <!-- Content Area: Use RouterView for all routes -->
-          <div class="flex-1 min-h-0 flex flex-col overflow-auto">
+          <div class="flex-1 min-h-0 flex flex-col overflow-hidden">
             <RouterView class="flex-1 h-full" />
           </div>
           
@@ -287,6 +287,23 @@ onMounted(async () => {
 </template>
 
 <style>
+/* Prevent root level scrolling */
+html, body {
+  height: 100%;
+  max-height: 100vh;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+}
+
+#app {
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
 /* Custom Scrollbar Styles */
 * {
   /* For Firefox */

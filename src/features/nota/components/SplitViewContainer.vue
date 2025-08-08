@@ -1,5 +1,5 @@
 <template>
-  <div class="split-view-container w-full h-full" ref="gridRef" :style="gridStyle">
+  <div class="split-view-container w-full h-full max-h-full overflow-hidden" ref="gridRef" :style="gridStyle">
     <!-- 1 Pane Layout -->
     <template v-if="layoutStore.panes.length === 1">
       <NotaPane :pane="layoutStore.panes[0]" :ref="setPaneRef" />
