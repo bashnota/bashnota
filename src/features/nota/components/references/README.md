@@ -1,125 +1,201 @@
-# References Components (`src/features/nota/components/references`)
+# References Components
 
-This directory contains the components for managing bibliographic references within a document.
+This directory contains components for managing citations and references in Nota documents with advanced batch processing capabilities.
 
 ## Components
 
--   **`EmptyReferencesState.vue`**: A component displayed when there are no references in the current document, guiding the user on how to add them.
--   **`ReferenceDialog.vue`**: A modal dialog for adding a new reference manually or importing from a BibTeX file. It also handles editing existing references.
--   **`ReferencesList.vue`**: Displays the list of all references for the current document, with actions to edit, delete, or insert a citation into the editor.
+### ReferencesList.vue
+- Main component for displaying a list of references
+- Includes search and filtering functionality
+- Shows reference count and allows adding new references
 
-## Index
+### ReferenceDialog.vue
+- **NEW**: Enhanced modal dialog for batch BibTeX import
+- Supports multiple BibTeX entries at once
+- Real-time parsing and validation preview
+- Table view with hover cards showing full details
+- Individual entry selection and validation via CrossRef/Semantic Scholar APIs
+- Duplicate detection and filtering
 
--   **`index.ts`**: Exports the components from this directory.
+### ReferenceEditDialog.vue
+- Simple modal for editing single references manually
+- Traditional form-based entry for individual references
+- Full validation and error handling
+
+### ReferencesPreviewTable.vue
+- Interactive table component for previewing parsed references
+- Hover cards with detailed reference information
+- Selection controls and validation status indicators
+- Integration with external validation services
+
+### EmptyReferencesState.vue
+- Empty state component shown when no references exist
+- Includes call-to-action for adding first reference
 
 ## Features
 
-### 🎯 **Improved User Experience**
-- **Clean, modern interface** with better visual hierarchy
-- **Smart search** across all citation fields (title, authors, journal, DOI, etc.)
-- **Empty state guidance** to help users get started
-- **Visual feedback** with loading states and error handling
-- **Citation type badges** (Journal, Book, Other) for quick identification
-- **Copy to clipboard** functionality for citations
-- **Hover actions** for better discoverability
+### Batch Processing
+- **Multi-Entry Parsing**: Parse multiple BibTeX entries simultaneously
+- **Smart Duplicate Detection**: Automatically detect and filter duplicate entries
+- **Bulk Validation**: Validate references against CrossRef and Semantic Scholar
+- **Selective Import**: Choose which references to import with checkbox selection
 
-### 🧩 **Modular Architecture**
-- **Composables-based logic** for reusable functionality
-- **Separated concerns** with dedicated components
-- **Type-safe interfaces** throughout
-- **Easy to test and maintain**
+### Validation & Quality Control
+- **External Validation**: CrossRef and Semantic Scholar API integration
+- **Confidence Scoring**: Match confidence percentages for validation results
+- **Error Detection**: Identify incomplete or invalid entries
+- **Suggestions**: Helpful suggestions for improving reference quality
 
-### 📚 **Enhanced Citation Management**
-- **BibTeX import** with improved parsing and error handling
-- **Form validation** with clear error messages
-- **Duplicate detection** for citation keys
-- **Rich metadata support** (DOI, URL, volume, pages, etc.)
-- **Multiple citation formats** support
+### User Experience
+- **Hover Cards**: Rich preview of reference details on hover
+- **Real-time Feedback**: Instant parsing and validation feedback
+- **Progress Indicators**: Clear status for parsing and validation operations
+- **Responsive Design**: Optimized for all screen sizes
+
+### Legacy Support
+- **Manual Entry**: Traditional form-based entry still available
+- **Single BibTeX**: Support for single entry parsing
+- **Editing**: Full editing capabilities for existing references
 
 ## Usage
 
-### Basic Usage
-
-```vue
-<template>
-  <ReferencesSidebar 
-    :editor="editor"
-    :nota-id="notaId"
-    @close="handleClose"
-  />
-</template>
-```
-
-### Using Individual Components
-
+### Batch Import (Recommended)
 ```vue
 <script setup>
-import { ReferencesList, useReferencesSearch } from '@/components/sidebars/references'
+import { ReferencesList, ReferenceDialog } from '@/features/nota/components/references'
 
-const { searchQuery, filteredCitations } = useReferencesSearch(citations)
+const isDialogOpen = ref(false)
+const citations = ref([])
 </script>
 
 <template>
-  <ReferencesList
-    :citations="filteredCitations"
-    @edit="handleEdit"
-    @delete="handleDelete"
-    @insert="handleInsert"
+  <ReferencesList 
+    :citations="citations" 
+    @add-reference="isDialogOpen = true"
+  />
+  
+  <!-- New batch import dialog -->
+  <ReferenceDialog
+    v-model:open="isDialogOpen"
+    :nota-id="notaId"
+    :existing-citations="citations"
+    @saved="handleBatchReferenceAdded"
   />
 </template>
 ```
 
-## Improvements Made
+### Single Entry Editing
+```vue
+<script setup>
+import { ReferenceEditDialog } from '@/features/nota/components/references'
 
-### 🎨 **User Experience**
-1. **Better Visual Design**: Modern card-based layout with hover effects
-2. **Improved Search**: Real-time search across all fields
-3. **Clear Actions**: Intuitive buttons and icons
-4. **Loading States**: Visual feedback during operations
-5. **Error Handling**: Clear error messages and validation
-6. **Empty States**: Helpful guidance for new users
+const isEditDialogOpen = ref(false)
+const currentCitation = ref(null)
+</script>
 
-### 🏗️ **Code Architecture**
-1. **Modular Components**: Separated into focused, reusable components
-2. **Composables**: Logic extracted into reusable composables
-3. **Type Safety**: Full TypeScript support with proper interfaces
-4. **Separation of Concerns**: Clear boundaries between UI and logic
-5. **Testability**: Easy to unit test individual components and composables
-
-### 🚀 **Performance**
-1. **Efficient Search**: Optimized filtering with computed properties
-2. **Lazy Loading**: Components only render when needed
-3. **Memory Management**: Proper cleanup and state management
-
-### 🔧 **Maintainability**
-1. **Clear Structure**: Organized file structure
-2. **Documentation**: Comprehensive comments and documentation
-3. **Consistent Patterns**: Following Vue 3 Composition API best practices
-4. **Error Boundaries**: Proper error handling throughout
-
-## File Structure
-
-```
-src/components/sidebars/references/
-├── README.md                           # This documentation
-├── index.ts                           # Export barrel
-├── ReferencesSidebar.vue              # Main sidebar component
-├── ReferencesList.vue                 # References list component
-├── ReferenceDialog.vue                # Add/edit dialog component
-├── EmptyReferencesState.vue           # Empty state component
-└── composables/
-    ├── useReferencesSearch.ts         # Search functionality
-    ├── useReferenceDialog.ts          # Dialog state management
-    ├── useReferenceForm.ts            # Form validation and state
-    └── useBibTexParser.ts             # BibTeX parsing logic
+<template>
+  <ReferenceEditDialog
+    v-model:open="isEditDialogOpen"
+    :is-editing="true"
+    :current-citation="currentCitation"
+    :nota-id="notaId"
+    :existing-citations="citations"
+    @saved="handleReferenceUpdated"
+  />
+</template>
 ```
 
-## Best Practices Implemented
+## Data Structure
 
-1. **Composition API**: Using Vue 3's Composition API for better logic reuse
-2. **TypeScript**: Full type safety with interfaces and proper typing
-3. **Single Responsibility**: Each component and composable has a clear purpose
-4. **Accessibility**: Proper ARIA labels and keyboard navigation
-5. **Performance**: Optimized rendering and state management
-6. **Error Handling**: Comprehensive error handling and user feedback
-7. **Testing**: Structure designed for easy unit and integration testing 
+References follow the `CitationEntry` interface:
+
+```typescript
+interface CitationEntry {
+  id: string
+  key: string           // Unique citation key (e.g., "smith2023")
+  title: string
+  authors: string[]
+  year: string
+  journal?: string
+  volume?: string
+  number?: string
+  pages?: string
+  publisher?: string
+  url?: string
+  doi?: string
+  createdAt: Date | string
+}
+```
+
+Parsed entries include additional metadata:
+
+```typescript
+interface ParsedBibTexEntry extends CitationEntry {
+  id: string
+  type: string                    // Reference type (Journal Article, Book, etc.)
+  isValid: boolean               // Whether entry passes validation
+  isSelected: boolean            // Whether entry is selected for import
+  validationStatus: 'pending' | 'validating' | 'valid' | 'invalid' | 'not_found'
+  validationSource?: 'crossref' | 'semantic_scholar'
+  validationDetails?: ValidationResult
+}
+```
+
+## Composables
+
+### useBatchBibTexParser
+- **NEW**: Advanced parser for multiple BibTeX entries
+- Supports various reference types and formats
+- Duplicate detection and validation
+- Selection management
+
+### useReferenceBatchDialog
+- **NEW**: Complete dialog state management
+- Integration with validation services
+- Batch operations and save functionality
+
+### useReferenceForm (Legacy)
+- Manages form state and validation for single entries
+- Handles form population and reset
+
+### useBibTexParser (Legacy)
+- Single-entry BibTeX parser
+- Maintained for backward compatibility
+
+### useReferencesSearch
+- Provides search and filtering functionality
+- Debounced search for performance
+
+## Services
+
+### referenceValidationService
+- **NEW**: External validation service
+- CrossRef API integration for academic papers
+- Semantic Scholar API for additional coverage
+- Similarity matching and confidence scoring
+
+## Validation Rules
+
+- **Citation Key**: Required, must be unique across the document
+- **Title**: Required, minimum length validation
+- **Authors**: Required, proper formatting expected
+- **Year**: Required, must be 4-digit number
+- **DOI**: Optional, format validation when provided
+- **URL**: Optional, URL format validation when provided
+
+## External Validation
+
+The system validates references against:
+- **CrossRef**: Academic papers, journals, books
+- **Semantic Scholar**: AI/CS papers, additional academic content
+- **Confidence Scoring**: 0-100% match confidence
+- **Automatic Suggestions**: Corrections for common issues
+
+## Migration Guide
+
+Existing code using the old ReferenceDialog will continue to work, but we recommend updating to use the new batch functionality:
+
+1. Replace single BibTeX imports with batch imports
+2. Use ReferenceEditDialog for manual single-entry editing
+3. Leverage the new validation features for higher quality references
+4. Take advantage of hover cards for better reference review

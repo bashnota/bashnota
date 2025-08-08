@@ -1,25 +1,31 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { FileText, Wand2, AlertCircle, CheckCircle2, Loader2 } from 'lucide-vue-next'
-import { useCitationStore } from '@/features/editor/stores/citationStore'
+import { 
+  FileText, 
+  Plus, 
+  AlertCircle, 
+  CheckCircle2, 
+  Loader2, 
+  Upload,
+  Eye,
+  Trash2,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight
+} from 'lucide-vue-next'
 import type { CitationEntry } from '@/features/nota/types/nota'
 import { toast } from 'vue-sonner'
-import { useBibTexParser } from '@/features/nota/composables/useBibTexParser'
-import { useReferenceForm } from '@/features/nota/composables/useReferenceForm'
+import { useReferenceBatchDialog } from '@/features/nota/composables/useReferenceBatchDialog'
+import ReferencesPreviewTable from './ReferencesPreviewTable.vue'
 
 const props = defineProps<{
   open: boolean
-  isEditing: boolean
-  currentCitation: CitationEntry | null
   notaId: string
   existingCitations: CitationEntry[]
 }>()
@@ -30,88 +36,44 @@ const emit = defineEmits<{
   close: []
 }>()
 
-const citationStore = useCitationStore()
-const activeTab = ref('fields')
-const isSaving = ref(false)
-
-// Use form composable
-const {
-  formData,
-  validationErrors,
-  validateForm,
-  resetForm,
-  populateForm
-} = useReferenceForm(props.existingCitations, () => props.currentCitation)
-
-// Use BibTeX parser composable
+// Use batch dialog composable
 const {
   bibtexInput,
-  parseBibTex,
+  parsedEntries,
   isParsing,
   parseError,
-  clearBibTex
-} = useBibTexParser((parsedData) => {
-  populateForm(parsedData)
-  activeTab.value = 'fields'
-  toast('BibTeX parsed successfully')
-})
+  selectedCount,
+  selectedEntries,
+  isSaving,
+  parseBatchBibTex,
+  toggleSelection,
+  selectAll,
+  deselectAll,
+  removeEntry,
+  clearAll,
+  saveBatch,
+  validateEntry,
+  validateAll,
+  canSave,
+  hasValidEntries
+} = useReferenceBatchDialog(props.notaId, props.existingCitations)
 
 // Watch for dialog open/close
 watch(() => props.open, (isOpen) => {
-  if (isOpen) {
-    if (props.isEditing && props.currentCitation) {
-      populateForm(props.currentCitation)
-    } else {
-      resetForm()
-    }
-    activeTab.value = 'fields'
+  if (!isOpen) {
+    clearAll()
   }
 })
 
-// Save citation
-const saveCitation = async () => {
-  if (!validateForm()) {
-    toast('Please fix the validation errors')
-    return
-  }
-  
-  isSaving.value = true
-  
+// Handle save and emit events
+const handleSave = async () => {
   try {
-    const citationData = {
-      notaId: props.notaId,
-      key: formData.value.key.trim(),
-      title: formData.value.title.trim(),
-      authors: formData.value.authors.trim().split(',').map(author => author.trim()),
-      year: formData.value.year.trim(),
-      journal: formData.value.journal.trim(),
-      volume: formData.value.volume.trim(),
-      number: formData.value.number.trim(),
-      pages: formData.value.pages.trim(),
-      publisher: formData.value.publisher.trim(),
-      url: formData.value.url.trim(),
-      doi: formData.value.doi.trim()
-    }
-    
-    if (props.isEditing && props.currentCitation) {
-      await citationStore.updateCitation(
-        props.currentCitation.id,
-        props.notaId,
-        {
-          ...props.currentCitation,
-          ...citationData
-        }
-      )
-    } else {
-      await citationStore.addCitation(props.notaId, citationData as Omit<CitationEntry, 'id' | 'createdAt'>)
-    }
-    
+    await saveBatch()
     emit('saved')
+    emit('update:open', false)
+    emit('close')
   } catch (error) {
-    console.error('Failed to save citation:', error)
-    toast('Failed to save reference')
-  } finally {
-    isSaving.value = false
+    // Error handling is done in saveBatch
   }
 }
 
@@ -121,277 +83,266 @@ const closeDialog = () => {
   emit('close')
 }
 
-// Check if form has validation errors
-const hasValidationErrors = computed(() => {
-  return Object.values(validationErrors.value).some(error => error !== '')
-})
+// Handle table events
+const handleToggleSelection = (id: string) => {
+  toggleSelection(id)
+}
 
-// Get citation type from form data
-const getCitationType = computed(() => {
-  if (formData.value.journal) return 'Journal Article'
-  if (formData.value.publisher) return 'Book'
-  return 'Other'
-})
+const handleRemoveEntry = (id: string) => {
+  removeEntry(id)
+}
+
+const handleValidateEntry = (id: string) => {
+  validateEntry(id)
+}
+
+const handleViewDetails = (entry: any) => {
+  // Could open a detailed view modal in the future
+  console.log('View details for:', entry)
+}
+
+// Enhanced parsing with feedback
+const handleParseBibTex = async () => {
+  if (!bibtexInput.value.trim()) {
+    toast('Please paste BibTeX entries first')
+    return
+  }
+  
+  await parseBatchBibTex()
+  
+  if (parsedEntries.value.length > 0) {
+    const validCount = parsedEntries.value.filter(e => e.isValid).length
+    const totalCount = parsedEntries.value.length
+    
+    if (validCount === totalCount) {
+      toast(`Successfully parsed ${totalCount} references`)
+    } else {
+      toast(`Parsed ${totalCount} entries (${validCount} valid, ${totalCount - validCount} with issues)`)
+    }
+  }
+}
+
+// Validate all entries
+const handleValidateAll = async () => {
+  if (parsedEntries.value.length === 0) {
+    toast('No entries to validate')
+    return
+  }
+  
+  await validateAll()
+  toast('Validation completed')
+}
+
+// Summary stats
+const validEntriesCount = computed(() => 
+  parsedEntries.value.filter(e => e.isValid).length
+)
+
+const invalidEntriesCount = computed(() => 
+  parsedEntries.value.filter(e => !e.isValid).length
+)
+
+// Textarea collapse state
+const isTextareaCollapsed = ref(false)
+
+const toggleTextarea = () => {
+  isTextareaCollapsed.value = !isTextareaCollapsed.value
+}
 </script>
 
 <template>
   <Dialog :open="open" @update:open="$emit('update:open', $event)">
-    <DialogContent class="max-w-2xl max-h-[90vh] overflow-y-auto">
-      <DialogHeader>
+    <DialogContent class="max-w-7xl grid-rows-[auto_minmax(0,1fr)_auto] p-0 max-h-[90dvh]">
+      <DialogHeader class="p-6 pb-0">
         <DialogTitle class="flex items-center gap-2">
           <FileText class="h-5 w-5" />
-          {{ isEditing ? 'Edit Reference' : 'Add Reference' }}
+          Add References
         </DialogTitle>
         <DialogDescription>
-          {{ isEditing ? 'Edit the details of your reference' : 'Add a new reference to your document' }}
+          Paste multiple BibTeX entries to batch import references with validation
         </DialogDescription>
       </DialogHeader>
       
-      <Tabs v-model="activeTab" class="w-full">
-        <TabsList class="grid w-full grid-cols-2 mb-6">
-          <TabsTrigger value="fields" class="flex items-center gap-2">
-            <FileText class="h-4 w-4" />
-            Manual Entry
-          </TabsTrigger>
-          <TabsTrigger value="bibtex" class="flex items-center gap-2">
-            <Wand2 class="h-4 w-4" />
-            BibTeX Import
-          </TabsTrigger>
-        </TabsList>
-        
-        <!-- Validation Errors Alert -->
-        <Alert v-if="hasValidationErrors" variant="destructive" class="mb-6">
-          <AlertCircle class="h-4 w-4" />
-          <AlertDescription>
-            <p class="font-medium mb-2">Please fix the following errors:</p>
-            <ul class="text-sm space-y-1">
-              <li v-if="validationErrors.key">• {{ validationErrors.key }}</li>
-              <li v-if="validationErrors.title">• {{ validationErrors.title }}</li>
-              <li v-if="validationErrors.authors">• {{ validationErrors.authors }}</li>
-              <li v-if="validationErrors.year">• {{ validationErrors.year }}</li>
-            </ul>
-          </AlertDescription>
-        </Alert>
-        
-        <TabsContent value="fields" class="space-y-6">
-          <!-- Citation Type Badge -->
-          <div v-if="formData.title" class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <span class="text-sm font-medium">Type:</span>
-              <Badge variant="secondary">{{ getCitationType }}</Badge>
-            </div>
-          </div>
-          
-          <!-- Required Fields -->
-          <div class="space-y-4">
-            <h4 class="text-sm font-semibold text-foreground">Required Information</h4>
-            
-            <div class="grid grid-cols-2 gap-4">
-              <div class="space-y-2">
-                <Label for="key" class="flex items-center gap-1">
-                  Citation Key
-                  <span class="text-destructive">*</span>
+      <div class="overflow-y-auto px-6">
+        <div class="py-4">
+          <div :class="['grid gap-6', isTextareaCollapsed ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2']">
+            <!-- Left Side - BibTeX Input (Collapsible) -->
+            <div v-if="!isTextareaCollapsed" class="space-y-4">
+              <div class="flex items-center justify-between">
+                <Label for="bibtex" class="text-sm font-semibold">
+                  BibTeX Entries
                 </Label>
-                <Input 
-                  id="key" 
-                  v-model="formData.key" 
-                  placeholder="smith2023"
-                  :class="{ 'border-destructive': validationErrors.key }"
-                />
-                <p v-if="validationErrors.key" class="text-xs text-destructive">
-                  {{ validationErrors.key }}
-                </p>
+                <div class="flex items-center gap-2">
+                  <Button 
+                    variant="ghost"
+                    size="sm"
+                    @click="toggleTextarea"
+                    class="gap-2"
+                  >
+                    <ChevronLeft class="h-4 w-4" />
+                    Collapse
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    size="sm"
+                    @click="clearAll"
+                    :disabled="parsedEntries.length === 0"
+                    class="gap-2"
+                  >
+                    <Trash2 class="h-4 w-4" />
+                    Clear All
+                  </Button>
+                  <Button 
+                    variant="default" 
+                    size="sm" 
+                    @click="handleParseBibTex"
+                    :disabled="isParsing || !bibtexInput.trim()"
+                    class="gap-2"
+                  >
+                    <Loader2 v-if="isParsing" class="h-4 w-4 animate-spin" />
+                    <Upload v-else class="h-4 w-4" />
+                    {{ isParsing ? 'Parsing...' : 'Parse BibTeX' }}
+                  </Button>
+                </div>
               </div>
               
-              <div class="space-y-2">
-                <Label for="year" class="flex items-center gap-1">
-                  Year
-                  <span class="text-destructive">*</span>
-                </Label>
-                <Input 
-                  id="year" 
-                  v-model="formData.year" 
-                  placeholder="2023" 
-                  :class="{ 'border-destructive': validationErrors.year }"
-                />
-                <p v-if="validationErrors.year" class="text-xs text-destructive">
-                  {{ validationErrors.year }}
-                </p>
-              </div>
-            </div>
-            
-            <div class="space-y-2">
-              <Label for="title" class="flex items-center gap-1">
-                Title
-                <span class="text-destructive">*</span>
-              </Label>
-              <Input 
-                id="title" 
-                v-model="formData.title" 
-                placeholder="The Title of the Paper or Book"
-                :class="{ 'border-destructive': validationErrors.title }"
+              <Textarea 
+                id="bibtex" 
+                v-model="bibtexInput" 
+                placeholder="Paste multiple BibTeX entries here... (e.g., from Zotero, Mendeley, Google Scholar)"
+                class="min-h-[400px] font-mono text-sm resize-none"
               />
-              <p v-if="validationErrors.title" class="text-xs text-destructive">
-                {{ validationErrors.title }}
-              </p>
+              
+              <!-- Parse Error Alert -->
+              <Alert v-if="parseError" variant="destructive">
+                <AlertCircle class="h-4 w-4" />
+                <AlertDescription>
+                  {{ parseError }}
+                </AlertDescription>
+              </Alert>
+              
+              <!-- Quick Help -->
+              <div v-if="!bibtexInput.trim() && parsedEntries.length === 0" class="text-center py-8">
+                <div class="text-muted-foreground space-y-2">
+                  <Upload class="h-8 w-8 mx-auto opacity-50" />
+                  <p class="text-sm">Paste BibTeX entries from your reference manager</p>
+                  <p class="text-xs">Supports batch import from Zotero, Mendeley, Google Scholar, and more</p>
+                </div>
+              </div>
             </div>
             
-            <div class="space-y-2">
-              <Label for="authors" class="flex items-center gap-1">
-                Authors
-                <span class="text-destructive">*</span>
-              </Label>
-              <Input 
-                id="authors" 
-                v-model="formData.authors" 
-                placeholder="John Smith, Jane Doe"
-                :class="{ 'border-destructive': validationErrors.authors }"
-              />
-              <p v-if="validationErrors.authors" class="text-xs text-destructive">
-                {{ validationErrors.authors }}
-              </p>
-              <p class="text-xs text-muted-foreground">
-                Separate multiple authors with commas
-              </p>
-            </div>
-          </div>
-          
-          <Separator />
-          
-          <!-- Publication Details -->
-          <div class="space-y-4">
-            <h4 class="text-sm font-semibold text-foreground">Publication Details</h4>
-            
-            <div class="space-y-2">
-              <Label for="journal">Journal / Publisher</Label>
-              <Input 
-                id="journal" 
-                v-model="formData.journal" 
-                placeholder="Journal of Science or Publisher Name" 
-              />
-            </div>
-            
-            <div class="grid grid-cols-3 gap-4">
-              <div class="space-y-2">
-                <Label for="volume">Volume</Label>
-                <Input id="volume" v-model="formData.volume" placeholder="10" />
-              </div>
-              <div class="space-y-2">
-                <Label for="number">Issue/Number</Label>
-                <Input id="number" v-model="formData.number" placeholder="2" />
-              </div>
-              <div class="space-y-2">
-                <Label for="pages">Pages</Label>
-                <Input id="pages" v-model="formData.pages" placeholder="123-145" />
-              </div>
-            </div>
-          </div>
-          
-          <Separator />
-          
-          <!-- Links & Identifiers -->
-          <div class="space-y-4">
-            <h4 class="text-sm font-semibold text-foreground">Links & Identifiers</h4>
-            
-            <div class="grid grid-cols-2 gap-4">
-              <div class="space-y-2">
-                <Label for="doi">DOI</Label>
-                <Input 
-                  id="doi" 
-                  v-model="formData.doi" 
-                  placeholder="10.1000/xyz123" 
-                />
-              </div>
-              <div class="space-y-2">
-                <Label for="url">URL</Label>
-                <Input 
-                  id="url" 
-                  v-model="formData.url" 
-                  placeholder="https://example.com" 
-                />
-              </div>
-            </div>
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="bibtex" class="space-y-6">
-          <!-- Parse Error Alert -->
-          <Alert v-if="parseError" variant="destructive">
-            <AlertCircle class="h-4 w-4" />
-            <AlertDescription>
-              {{ parseError }}
-            </AlertDescription>
-          </Alert>
-          
-          <div class="space-y-4">
-            <div class="flex justify-between items-center">
-              <Label for="bibtex" class="text-sm font-semibold">BibTeX Entry</Label>
+            <!-- Collapsed Textarea Indicator -->
+            <div v-if="isTextareaCollapsed" class="flex items-center justify-center">
               <Button 
-                variant="default" 
-                size="sm" 
-                @click="parseBibTex"
-                :disabled="isParsing || !bibtexInput.trim()"
+                variant="outline"
+                size="sm"
+                @click="toggleTextarea"
                 class="gap-2"
               >
-                <Loader2 v-if="isParsing" class="h-4 w-4 animate-spin" />
-                <Wand2 v-else class="h-4 w-4" />
-                {{ isParsing ? 'Parsing...' : 'Parse BibTeX' }}
+                <ChevronRight class="h-4 w-4" />
+                Show BibTeX Input
               </Button>
             </div>
             
-            <Textarea 
-              id="bibtex" 
-              v-model="bibtexInput" 
-              placeholder="Paste your BibTeX entry here..."
-              class="min-h-[200px] font-mono text-sm"
-            />
-          </div>
-          
-          <!-- Help Section -->
-          <Alert>
-            <CheckCircle2 class="h-4 w-4" />
-            <AlertDescription>
-              <div class="space-y-3">
-                <p class="font-medium">How to use BibTeX import:</p>
-                <ol class="text-sm space-y-1 ml-4 list-decimal">
-                  <li>Copy BibTeX from your reference manager (Zotero, Mendeley, etc.)</li>
-                  <li>Paste it in the text area above</li>
-                  <li>Click "Parse BibTeX" to extract the data</li>
-                  <li>Review and edit in the Manual Entry tab</li>
-                  <li>Save to add the reference</li>
-                </ol>
+            <!-- Right Side - Preview Section -->
+            <div class="space-y-4">
+              <div v-if="parsedEntries.length > 0">
+              <!-- Preview Header -->
+              <div class="flex items-center justify-between">
+                <div class="space-y-1">
+                  <h3 class="text-lg font-semibold">Parsed References</h3>
+                  <p class="text-sm text-muted-foreground">
+                    Review and validate before importing
+                  </p>
+                </div>
                 
-                <div class="mt-4">
-                  <p class="text-sm font-medium mb-2">Example BibTeX format:</p>
-                  <pre class="bg-muted p-3 rounded text-xs overflow-x-auto">@article{smith2023,
-  author = {Smith, John and Doe, Jane},
-  title = {Example Paper Title},
-  journal = {Journal of Science},
-  year = {2023},
-  volume = {10},
-  number = {2},
-  pages = {123--145},
-  doi = {10.1000/xyz123}
-}</pre>
+                <div class="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    @click="handleValidateAll"
+                    :disabled="parsedEntries.every(e => e.validationStatus !== 'pending')"
+                    class="gap-2"
+                  >
+                    <RefreshCw class="h-4 w-4" />
+                    Validate All
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    @click="selectAll"
+                    :disabled="parsedEntries.length === 0"
+                    class="gap-2"
+                  >
+                    <CheckCircle2 class="h-4 w-4" />
+                    Select All Valid
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    @click="deselectAll"
+                    :disabled="selectedCount === 0"
+                    class="gap-2"
+                  >
+                    <Eye class="h-4 w-4" />
+                    Deselect All
+                  </Button>
                 </div>
               </div>
-            </AlertDescription>
-          </Alert>
-        </TabsContent>
-      </Tabs>
+              
+              <!-- Preview Table -->
+              <div :class="['border rounded-lg overflow-auto', isTextareaCollapsed ? 'max-h-[600px]' : 'max-h-[400px]']">
+                <ReferencesPreviewTable
+                  :entries="parsedEntries"
+                  @toggle-selection="handleToggleSelection"
+                  @remove-entry="handleRemoveEntry"
+                  @validate-entry="handleValidateEntry"
+                  @view-details="handleViewDetails"
+                  @select-all="selectAll"
+                />
+              </div>
+            </div>
+            
+              <!-- Empty state for right side -->
+              <div v-else class="text-center py-12 text-muted-foreground">
+                <FileText class="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p class="text-lg font-medium mb-2">No references parsed yet</p>
+                <p class="text-sm">Paste BibTeX entries on the left to see preview here</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       
-      <DialogFooter class="gap-2">
-        <Button variant="outline" @click="closeDialog">
-          Cancel
-        </Button>
-        <Button 
-          @click="saveCitation" 
-          :disabled="isSaving || hasValidationErrors"
-          class="gap-2"
-        >
-          <Loader2 v-if="isSaving" class="h-4 w-4 animate-spin" />
-          {{ isEditing ? 'Update Reference' : 'Add Reference' }}
-        </Button>
+      <DialogFooter class="p-6 pt-0 border-t">
+        <div class="flex items-center justify-between w-full">
+          <!-- Stats -->
+          <div v-if="parsedEntries.length > 0" class="flex items-center gap-4 text-sm text-muted-foreground">
+            <span>{{ parsedEntries.length }} parsed</span>
+            <span>{{ selectedCount }} selected</span>
+            <span v-if="validEntriesCount > 0" class="text-green-600">{{ validEntriesCount }} valid</span>
+            <span v-if="invalidEntriesCount > 0" class="text-red-600">{{ invalidEntriesCount }} invalid</span>
+          </div>
+          <div v-else></div>
+          
+          <!-- Actions -->
+          <div class="flex items-center gap-2">
+            <Button variant="outline" @click="closeDialog">
+              Cancel
+            </Button>
+            <Button 
+              @click="handleSave" 
+              :disabled="!canSave"
+              class="gap-2"
+            >
+              <Loader2 v-if="isSaving" class="h-4 w-4 animate-spin" />
+              <Plus v-else class="h-4 w-4" />
+              {{ isSaving ? 'Adding...' : `Add ${selectedCount} Reference${selectedCount !== 1 ? 's' : ''}` }}
+            </Button>
+          </div>
+        </div>
       </DialogFooter>
     </DialogContent>
   </Dialog>
