@@ -73,9 +73,9 @@ const getHeadingIcon = (level: number) => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-4">
+  <div class="flex flex-col h-full min-h-0 overflow-hidden">
     <!-- Enhanced Header -->
-    <div class="flex flex-col gap-2 sticky top-0 z-10 bg-background">
+    <div class="flex flex-col gap-2 flex-shrink-0 bg-background">
       <div class="flex items-center gap-2 px-2">
         <ListOrdered class="w-4 h-4 text-primary" />
         <h3 class="font-semibold">Table of Contents</h3>
@@ -83,7 +83,7 @@ const getHeadingIcon = (level: number) => {
       <Separator class="w-full" />
     </div>
 
-    <ScrollArea class="flex-1">
+    <ScrollArea class="flex-1 min-h-0">
       <div v-if="headings.length === 0" class="px-4 py-8 text-center">
         <ListOrdered class="w-8 h-8 mx-auto mb-3 text-muted-foreground/50" />
         <p class="text-sm font-medium text-muted-foreground">No headings found</p>
@@ -92,7 +92,7 @@ const getHeadingIcon = (level: number) => {
         </p>
       </div>
 
-      <div v-else class="flex flex-col gap-0.5">
+      <div v-else class="flex flex-col gap-0.5 p-2">
         <Button
           v-for="(heading, index) in headings"
           :key="index"

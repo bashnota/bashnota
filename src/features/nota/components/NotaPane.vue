@@ -1,6 +1,6 @@
 <template>
   <div 
-    class="h-full w-full flex flex-col bg-background border-r border-border overflow-hidden"
+    class="h-full w-full max-h-full flex flex-col bg-background border-r border-border overflow-hidden"
     :class="{ 'border-primary border-2': isActive }"
     @click="handlePaneClick"
   >
@@ -32,7 +32,7 @@
     </div>
     
     <!-- Nota Content -->
-    <div v-else class="flex-1 min-h-0 w-full overflow-hidden">
+    <div v-else class="flex-1 min-h-0 w-full max-h-full overflow-hidden">
       <template v-if="isReady && nota">
         <BlockCommandMenu :editor-view="notaEditorRef?.editor?.view">
           <NotaEditor
