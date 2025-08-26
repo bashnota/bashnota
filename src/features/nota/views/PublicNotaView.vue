@@ -447,7 +447,7 @@ const openCitationDialog = () => {
 </script>
 
 <template>
-  <main class="container mx-auto py-8 px-4">
+  <main class="container mx-auto py-8 px-4 max-h-screen flex flex-col">
     <!-- Loading state -->
     <div v-if="isLoading" class="flex justify-center items-center h-64" aria-live="polite">
       <Skeleton class="w-10 h-10 rounded-full" />
@@ -464,7 +464,7 @@ const openCitationDialog = () => {
     </div>
 
     <!-- Content state -->
-    <article v-else-if="nota" class="space-y-6" itemscope itemtype="https://schema.org/Article">
+    <article v-else-if="nota" class="flex-1 flex flex-col min-h-0" itemscope itemtype="https://schema.org/Article">
       <!-- Hidden structured data for SEO -->
       <meta itemprop="headline" :content="nota.title">
       <meta itemprop="description" :content="metaDescription">
@@ -502,182 +502,188 @@ const openCitationDialog = () => {
         <meta itemprop="caption" :content="nota.title">
       </div>
 
-      <!-- Breadcrumbs for sub-pages -->
-      <nav v-if="showBreadcrumbs" aria-label="Breadcrumb" class="flex items-center text-sm mb-4">
-        <ol class="flex items-center" itemscope itemtype="https://schema.org/BreadcrumbList">
-          <li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
-            <Button variant="ghost" size="sm" class="flex items-center gap-1" @click="goBack">
-              <ChevronLeft class="h-4 w-4" />
-              <span itemprop="name">Back to {{ parentNota?.title || 'Parent' }}</span>
-              <meta itemprop="position" content="1" />
-              <meta itemprop="item" :content="parentNota ? getPublicLink(parentNota.id) : '/'" />
+      <!-- Fixed header section -->
+      <div class="flex-shrink-0">
+        <!-- Breadcrumbs for sub-pages -->
+        <nav v-if="showBreadcrumbs" aria-label="Breadcrumb" class="flex items-center text-sm mb-4">
+          <ol class="flex items-center" itemscope itemtype="https://schema.org/BreadcrumbList">
+            <li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+              <Button variant="ghost" size="sm" class="flex items-center gap-1" @click="goBack">
+                <ChevronLeft class="h-4 w-4" />
+                <span itemprop="name">Back to {{ parentNota?.title || 'Parent' }}</span>
+                <meta itemprop="position" content="1" />
+                <meta itemprop="item" :content="parentNota ? getPublicLink(parentNota.id) : '/'" />
+              </Button>
+            </li>
+          </ol>
+        </nav>
+
+        <!-- Header section -->
+        <header class="flex items-center justify-between pb-4 border-b">
+          <div class="flex items-center gap-4">
+            <h1 itemprop="name" class="text-2xl font-bold tracking-tight">{{ nota.title }}</h1>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <Button variant="outline" size="sm" @click="cloneNota" v-if="authStore.isAuthenticated">
+              <FileText class="mr-2 h-4 w-4" />
+              Clone
             </Button>
-          </li>
-        </ol>
-      </nav>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              @click="openCitationDialog"
+              title="Cite this nota"
+            >
+              <FileCode class="mr-2 h-4 w-4" />
+              Cite
+            </Button>
+            <CitationDialog 
+              v-if="nota" 
+              :nota="nota"
+              :showTrigger="false"
+              ref="citationDialogRef"
+            />
+            <Button variant="outline" size="sm" @click="shareNota">
+              <Share2 class="mr-2 h-4 w-4" />
+              Share
+            </Button>
+          </div>
+        </header>
 
-      <!-- Header section -->
-      <header class="flex items-center justify-between pb-4 border-b">
-        <div class="flex items-center gap-4">
-          <h1 itemprop="name" class="text-2xl font-bold tracking-tight">{{ nota.title }}</h1>
-        </div>
+        <!-- Meta information -->
+        <div class="flex flex-wrap items-center justify-between text-sm text-muted-foreground">
+          <div class="flex items-center gap-4">
+            <div itemscope itemtype="https://schema.org/PublicationEvent">
+              <span>Published: <time itemprop="datePublished" :datetime="new Date(nota.publishedAt).toISOString()">{{ formatDate(nota.publishedAt) }}</time></span>
+              <span class="mx-2">•</span>
+              <span>Last updated: <time itemprop="dateModified" :datetime="new Date(nota.updatedAt).toISOString()">{{ formatDate(nota.updatedAt) }}</time></span>
+              <span class="mx-2">•</span>
+              <span>
+                By:
+                <a
+                  @click="router.push(getAuthorLink)"
+                  class="underline cursor-pointer hover:text-black"
+                  itemprop="author"
+                  itemscope
+                  itemtype="https://schema.org/Person"
+                >
+                  <span itemprop="name">
+                    {{ userTag ? `@${userTag}` : nota.authorName }}
+                  </span>
+                </a>
+              </span>
+            </div>
+            
+            <!-- Voting buttons moved next to metadata -->
+            <div class="flex items-center gap-2">
+              <div class="relative group">
+                <Button
+                  :variant="userVote === 'like' ? 'default' : 'ghost'"
+                  :class="[
+                    'transition-all duration-200 flex items-center gap-1 relative',
+                    userVote === 'like' ? 'text-green-600 hover:text-green-700' : 'hover:text-green-600',
+                    !authStore.isAuthenticated ? 'cursor-help' : ''
+                  ]"
+                  size="sm"
+                  :disabled="isVoting"
+                  @click="authStore.isAuthenticated ? handleVote('like') : null"
+                  @mouseenter="!authStore.isAuthenticated ? toast('Please login to vote') : null"
+                >
+                  <ChevronUp 
+                    class="h-5 w-5 transition-transform duration-200" 
+                    :class="{ 'scale-125': userVote === 'like' }" 
+                  />
+                  <span class="font-medium">{{ likeCount }}</span>
+                  <span v-if="isVoting && userVote === 'like'" class="absolute -top-1 -right-1 h-2 w-2 bg-green-500 rounded-full animate-ping"></span>
+                </Button>
+                <div class="absolute -top-8 left-0 bg-black bg-opacity-80 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
+                  {{ userVote === 'like' ? 'Remove Upvote' : 'Upvote this nota' }}
+                </div>
+              </div>
+              
+              <div class="relative group">
+                <Button
+                  :variant="userVote === 'dislike' ? 'default' : 'ghost'"
+                  :class="[
+                    'transition-all duration-200 flex items-center gap-1 relative',
+                    userVote === 'dislike' ? 'text-red-600 hover:text-red-700' : 'hover:text-red-600',
+                    !authStore.isAuthenticated ? 'cursor-help' : ''
+                  ]"
+                  size="sm"
+                  :disabled="isVoting"
+                  @click="authStore.isAuthenticated ? handleVote('dislike') : null"
+                  @mouseenter="!authStore.isAuthenticated ? toast('Please login to vote') : null"
+                >
+                  <ChevronDown 
+                    class="h-5 w-5 transition-transform duration-200" 
+                    :class="{ 'scale-125': userVote === 'dislike' }" 
+                  />
+                  <span class="font-medium">{{ dislikeCount }}</span>
+                  <span v-if="isVoting && userVote === 'dislike'" class="absolute -top-1 -right-1 h-2 w-2 bg-red-500 rounded-full animate-ping"></span>
+                </Button>
+                <div class="absolute -top-8 left-0 bg-black bg-opacity-80 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
+                  {{ userVote === 'dislike' ? 'Remove Downvote' : 'Downvote this nota' }}
+                </div>
+              </div>
+              
+              <!-- Show voters list button -->
+              <VotersList :notaId="notaId" v-if="likeCount > 0 || dislikeCount > 0" />
+              
+              <!-- Clone count display -->
+              <div class="flex items-center gap-1 ml-2">
+                <FileText class="h-4 w-4 text-muted-foreground" />
+                <span class="text-sm">{{ cloneCount }} clone{{ cloneCount !== 1 ? 's' : '' }}</span>
+              </div>
+            </div>
+          </div>
 
-        <div class="flex items-center gap-2">
-          <Button variant="outline" size="sm" @click="cloneNota" v-if="authStore.isAuthenticated">
-            <FileText class="mr-2 h-4 w-4" />
-            Clone
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            @click="openCitationDialog"
-            title="Cite this nota"
-          >
-            <FileCode class="mr-2 h-4 w-4" />
-            Cite
-          </Button>
-          <CitationDialog 
-            v-if="nota" 
-            :nota="nota"
-            :showTrigger="false"
-            ref="citationDialogRef"
-          />
-          <Button variant="outline" size="sm" @click="shareNota">
-            <Share2 class="mr-2 h-4 w-4" />
-            Share
-          </Button>
-        </div>
-      </header>
-
-      <!-- Meta information -->
-      <div class="flex flex-wrap items-center justify-between text-sm text-muted-foreground">
-        <div class="flex items-center gap-4">
-          <div itemscope itemtype="https://schema.org/PublicationEvent">
-            <span>Published: <time itemprop="datePublished" :datetime="new Date(nota.publishedAt).toISOString()">{{ formatDate(nota.publishedAt) }}</time></span>
-            <span class="mx-2">•</span>
-            <span>Last updated: <time itemprop="dateModified" :datetime="new Date(nota.updatedAt).toISOString()">{{ formatDate(nota.updatedAt) }}</time></span>
-            <span class="mx-2">•</span>
-            <span>
-              By:
-              <a
-                @click="router.push(getAuthorLink)"
-                class="underline cursor-pointer hover:text-black"
-                itemprop="author"
-                itemscope
-                itemtype="https://schema.org/Person"
-              >
-                <span itemprop="name">
-                  {{ userTag ? `@${userTag}` : nota.authorName }}
-                </span>
-              </a>
+          <!-- Tags display if available -->
+          <div v-if="nota.tags && nota.tags.length > 0" class="mt-2 sm:mt-0">
+            <span class="text-muted-foreground">Tags: </span>
+            <span v-for="(tag, index) in nota.tags" :key="index" class="inline-block bg-muted/50 text-xs px-2 py-1 rounded-md mx-1">
+              {{ tag }}
             </span>
           </div>
-          
-          <!-- Voting buttons moved next to metadata -->
-          <div class="flex items-center gap-2">
-            <div class="relative group">
-              <Button
-                :variant="userVote === 'like' ? 'default' : 'ghost'"
-                :class="[
-                  'transition-all duration-200 flex items-center gap-1 relative',
-                  userVote === 'like' ? 'text-green-600 hover:text-green-700' : 'hover:text-green-600',
-                  !authStore.isAuthenticated ? 'cursor-help' : ''
-                ]"
-                size="sm"
-                :disabled="isVoting"
-                @click="authStore.isAuthenticated ? handleVote('like') : null"
-                @mouseenter="!authStore.isAuthenticated ? toast('Please login to vote') : null"
-              >
-                <ChevronUp 
-                  class="h-5 w-5 transition-transform duration-200" 
-                  :class="{ 'scale-125': userVote === 'like' }" 
-                />
-                <span class="font-medium">{{ likeCount }}</span>
-                <span v-if="isVoting && userVote === 'like'" class="absolute -top-1 -right-1 h-2 w-2 bg-green-500 rounded-full animate-ping"></span>
-              </Button>
-              <div class="absolute -top-8 left-0 bg-black bg-opacity-80 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
-                {{ userVote === 'like' ? 'Remove Upvote' : 'Upvote this nota' }}
-              </div>
-            </div>
-            
-            <div class="relative group">
-              <Button
-                :variant="userVote === 'dislike' ? 'default' : 'ghost'"
-                :class="[
-                  'transition-all duration-200 flex items-center gap-1 relative',
-                  userVote === 'dislike' ? 'text-red-600 hover:text-red-700' : 'hover:text-red-600',
-                  !authStore.isAuthenticated ? 'cursor-help' : ''
-                ]"
-                size="sm"
-                :disabled="isVoting"
-                @click="authStore.isAuthenticated ? handleVote('dislike') : null"
-                @mouseenter="!authStore.isAuthenticated ? toast('Please login to vote') : null"
-              >
-                <ChevronDown 
-                  class="h-5 w-5 transition-transform duration-200" 
-                  :class="{ 'scale-125': userVote === 'dislike' }" 
-                />
-                <span class="font-medium">{{ dislikeCount }}</span>
-                <span v-if="isVoting && userVote === 'dislike'" class="absolute -top-1 -right-1 h-2 w-2 bg-red-500 rounded-full animate-ping"></span>
-              </Button>
-              <div class="absolute -top-8 left-0 bg-black bg-opacity-80 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
-                {{ userVote === 'dislike' ? 'Remove Downvote' : 'Downvote this nota' }}
-              </div>
-            </div>
-            
-            <!-- Show voters list button -->
-            <VotersList :notaId="notaId" v-if="likeCount > 0 || dislikeCount > 0" />
-            
-            <!-- Clone count display -->
-            <div class="flex items-center gap-1 ml-2">
-              <FileText class="h-4 w-4 text-muted-foreground" />
-              <span class="text-sm">{{ cloneCount }} clone{{ cloneCount !== 1 ? 's' : '' }}</span>
-            </div>
-          </div>
+        </div>
+        
+        <!-- Login prompt for non-authenticated users -->
+        <div v-if="!authStore.isAuthenticated" class="text-sm text-muted-foreground bg-muted/30 p-2 rounded text-center my-2">
+          Please <button class="underline text-primary hover:text-primary/80" @click="router.push('/login')">login</button> to vote on this nota
         </div>
 
-        <!-- Tags display if available -->
-        <div v-if="nota.tags && nota.tags.length > 0" class="mt-2 sm:mt-0">
-          <span class="text-muted-foreground">Tags: </span>
-          <span v-for="(tag, index) in nota.tags" :key="index" class="inline-block bg-muted/50 text-xs px-2 py-1 rounded-md mx-1">
-            {{ tag }}
-          </span>
+        <hr class="border-t border-gray-200" />
+      </div>
+
+      <!-- Scrollable content area -->
+      <div class="flex-1 overflow-y-auto min-h-0 space-y-6">
+        <!-- Content area with itemprop for search engines -->
+        <div itemprop="articleBody">
+          <NotaContentViewer 
+            :content="nota.content" 
+            :citations="nota.citations" 
+            :isPublished="true" 
+            readonly 
+            @content-rendered="handleContentRendered"
+          />
         </div>
+        
+        <!-- Footer with related/related articles if available -->
+        <footer v-if="nota.relatedNotas && nota.relatedNotas.length > 0" class="mt-8 pt-6 border-t">
+          <h2 class="text-xl font-semibold mb-4">Related Notes</h2>
+          <ul class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <li v-for="(relatedNota, index) in nota.relatedNotas" :key="index" class="border rounded-lg p-4 hover:bg-muted/30 transition-colors">
+              <a :href="getPublicLink(relatedNota.id)" class="block">
+                <h3 class="font-medium text-lg">{{ relatedNota.title }}</h3>
+                <p class="text-sm text-muted-foreground mt-1">{{ formatDate(relatedNota.updatedAt) }}</p>
+              </a>
+            </li>
+          </ul>
+        </footer>
+        
+        <!-- Comments Section -->
+        <CommentSection v-if="nota" :nota-id="notaId" />
       </div>
-      
-      <!-- Login prompt for non-authenticated users -->
-      <div v-if="!authStore.isAuthenticated" class="text-sm text-muted-foreground bg-muted/30 p-2 rounded text-center my-2">
-        Please <button class="underline text-primary hover:text-primary/80" @click="router.push('/login')">login</button> to vote on this nota
-      </div>
-
-      <hr class="border-t border-gray-200" />
-
-      <!-- Content area with itemprop for search engines -->
-      <div itemprop="articleBody">
-        <NotaContentViewer 
-          :content="nota.content" 
-          :citations="nota.citations" 
-          :isPublished="true" 
-          readonly 
-          @content-rendered="handleContentRendered"
-        />
-      </div>
-      
-      <!-- Footer with related/related articles if available -->
-      <footer v-if="nota.relatedNotas && nota.relatedNotas.length > 0" class="mt-8 pt-6 border-t">
-        <h2 class="text-xl font-semibold mb-4">Related Notes</h2>
-        <ul class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <li v-for="(relatedNota, index) in nota.relatedNotas" :key="index" class="border rounded-lg p-4 hover:bg-muted/30 transition-colors">
-            <a :href="getPublicLink(relatedNota.id)" class="block">
-              <h3 class="font-medium text-lg">{{ relatedNota.title }}</h3>
-              <p class="text-sm text-muted-foreground mt-1">{{ formatDate(relatedNota.updatedAt) }}</p>
-            </a>
-          </li>
-        </ul>
-      </footer>
-      
-      <!-- Comments Section -->
-      <CommentSection v-if="nota" :nota-id="notaId" />
     </article>
   </main>
 </template>
