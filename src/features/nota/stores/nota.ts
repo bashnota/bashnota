@@ -457,6 +457,9 @@ export const useNotaStore = defineStore('nota', {
             for (const notaData of rawNotasToImport) {
               const deserializedNota = deserializeNota(notaData)
               
+              // If the .nota includes inline content (TipTap JSON), stash it for block import
+              const inlineContent = (notaData as any).content
+              
               // Content is now stored as JSON objects (no need to stringify)
               
               if (deserializedNota.parentId) {
@@ -467,6 +470,9 @@ export const useNotaStore = defineStore('nota', {
                   deserializedNota.parentId = null;
                 }
               }
+              
+              // Attach content for later processing
+              ;(deserializedNota as any).__inlineContent = inlineContent
               validNotasToProcess.push(deserializedNota)
             }
 
@@ -495,6 +501,12 @@ export const useNotaStore = defineStore('nota', {
                   this.items.push(mergedNota)
                 }
                 successfullyImportedNotas.push(mergedNota);
+                // Populate blocks if inline content present
+                const inline = (notaToSave as any).__inlineContent
+                if (inline) {
+                  const blockStore = useBlockStore()
+                  await blockStore.importTiptapContent(mergedNota.id, inline)
+                }
               } else {
                 const newNota = deserializeNota({
                     ...serializeNota(notaToSave),
@@ -505,6 +517,12 @@ export const useNotaStore = defineStore('nota', {
                 await db.notas.add(serializeNota(newNota))
                 this.items.push(newNota)
                 successfullyImportedNotas.push(newNota);
+                // Populate blocks if inline content present
+                const inline = (notaToSave as any).__inlineContent
+                if (inline) {
+                  const blockStore = useBlockStore()
+                  await blockStore.importTiptapContent(newNota.id, inline)
+                }
               }
             }
 

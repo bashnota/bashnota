@@ -168,6 +168,13 @@ export function useBlockEditor(notaId: string) {
               blockData.latex = node.content?.[0]?.text || ''
               blockData.displayMode = node.attrs?.displayMode || false
               break
+            
+            case 'math':
+              blockData.type = 'math'
+              // Some math nodes may carry latex in attrs or content; support both
+              blockData.latex = node.attrs?.latex ?? (node.content?.[0]?.text || '')
+              blockData.displayMode = node.attrs?.displayMode || false
+              break
               
             case 'table':
               blockData.type = 'table'

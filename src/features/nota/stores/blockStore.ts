@@ -151,7 +151,7 @@ export const useBlockStore = defineStore('blocks', {
         
         // Update the block with the generated ID
         const savedBlock = { ...block, id: savedBlockId } as Block
-        const compositeId = toCompositeId(savedBlock)
+        const compositeId = toCompositeId({ id: (savedBlock as any).id, type: (savedBlock as any).type })
 
         // Add to memory with composite key
         this.blocks.set(compositeId, savedBlock)
@@ -324,11 +324,11 @@ export const useBlockStore = defineStore('blocks', {
             lastModified: new Date(),
           }
         }
-
+        
         // Load individual blocks from all block tables
         const blocks = await db.getAllBlocksForNota(notaId)
         logger.info('Loaded blocks from DB:', blocks)
-
+        
         // Index blocks in memory by composite id
         this.blocks.clear()
         for (const block of blocks) {
@@ -382,7 +382,7 @@ export const useBlockStore = defineStore('blocks', {
         const savedTitleBlock = { ...titleBlock, id: savedBlockId } as HeadingBlock
         const structure: NotaBlockStructure = {
           notaId,
-          blockOrder: [toCompositeId(savedTitleBlock)],
+          blockOrder: [toCompositeId({ id: (savedTitleBlock as any).id, type: (savedTitleBlock as any).type })],
           version: 1,
           lastModified: new Date(),
         }
@@ -390,7 +390,7 @@ export const useBlockStore = defineStore('blocks', {
         await this.saveBlockStructure(structure)
 
         // Add to memory
-        this.blocks.set(toCompositeId(savedTitleBlock), savedTitleBlock as unknown as Block)
+        this.blocks.set(toCompositeId({ id: (savedTitleBlock as any).id, type: (savedTitleBlock as any).type }), savedTitleBlock as unknown as Block)
         this.blockStructures.set(notaId, structure)
 
         logger.info('Initialized blocks for new nota:', notaId)
@@ -481,8 +481,11 @@ export const useBlockStore = defineStore('blocks', {
         
         case 'math':
           return {
-            type: 'mathBlock',
-            attrs: { displayMode: (block as any).displayMode || false },
+            type: 'math',
+            attrs: { 
+              displayMode: (block as any).displayMode || false,
+              latex: (block as any).latex || ''
+            },
             content: [{ type: 'text', text: ensureTextContent((block as any).latex) }]
           }
         
@@ -672,6 +675,178 @@ export const useBlockStore = defineStore('blocks', {
           }
       }
     },
+
+    /**
+     * Import TipTap JSON content into blocks for a nota (used by .nota import)
+     */
+    async importTiptapContent(notaId: string, tiptapContent: any): Promise<void> {
+      try {
+        // Ensure structure exists
+        let structure = this.blockStructures.get(notaId)
+        if (!structure) {
+          structure = {
+            notaId,
+            blockOrder: [],
+            version: 1,
+            lastModified: new Date(),
+          }
+          this.blockStructures.set(notaId, structure)
+        }
+
+        const newBlockOrder: string[] = []
+
+        if (tiptapContent?.content && Array.isArray(tiptapContent.content)) {
+          for (let i = 0; i < tiptapContent.content.length; i++) {
+            const node = tiptapContent.content[i]
+            const order = i
+
+            let blockData: any = { type: 'text', order, notaId }
+
+            switch (node.type) {
+              case 'heading':
+                blockData.type = 'heading'
+                blockData.level = node.attrs?.level || 1
+                blockData.content = node.content?.[0]?.text || ''
+                break
+              case 'paragraph':
+                blockData.type = 'text'
+                blockData.content = node.content?.[0]?.text || ''
+                break
+              case 'codeBlock':
+                blockData.type = 'code'
+                blockData.language = node.attrs?.language || 'text'
+                blockData.content = node.content?.[0]?.text || ''
+                break
+              case 'executableCodeBlock':
+                blockData.type = 'executableCodeBlock'
+                blockData.language = node.attrs?.language || 'text'
+                blockData.content = node.content?.[0]?.text || ''
+                blockData.output = node.attrs?.output
+                blockData.sessionId = node.attrs?.sessionId
+                blockData.isExecuting = node.attrs?.isExecuting || false
+                blockData.executionTime = node.attrs?.executionTime
+                blockData.error = node.attrs?.error
+                blockData.kernelPreferences = node.attrs?.kernelPreferences
+                break
+              case 'math':
+                blockData.type = 'math'
+                blockData.latex = node.attrs?.latex ?? (node.content?.[0]?.text || '')
+                blockData.displayMode = node.attrs?.displayMode || false
+                break
+              case 'table':
+                blockData.type = 'table'
+                blockData.headers = node.content?.[0]?.content?.map((cell: any) => cell.content?.[0]?.text || '') || []
+                blockData.rows = node.content?.slice(1)?.map((row: any) => row.content?.map((cell: any) => cell.content?.[0]?.text || '') || []) || []
+                break
+              case 'image':
+                blockData.type = 'image'
+                blockData.src = node.attrs?.src || ''
+                blockData.alt = node.attrs?.alt || ''
+                blockData.caption = node.attrs?.title || ''
+                break
+              case 'blockquote':
+                blockData.type = 'quote'
+                blockData.content = node.content?.[0]?.content?.[0]?.text || ''
+                break
+              case 'bulletList':
+              case 'orderedList':
+                blockData.type = 'list'
+                blockData.listType = node.type === 'orderedList' ? 'ordered' : 'unordered'
+                blockData.items = node.content?.map((item: any) => item.content?.[0]?.content?.[0]?.text || '') || []
+                break
+              case 'horizontalRule':
+                blockData.type = 'horizontalRule'
+                break
+              case 'youtube':
+                blockData.type = 'youtube'
+                blockData.videoId = node.attrs?.videoId || ''
+                blockData.title = node.attrs?.title || ''
+                break
+              case 'drawio':
+                blockData.type = 'drawio'
+                blockData.diagramData = node.attrs?.diagramData || ''
+                blockData.width = node.attrs?.width
+                blockData.height = node.attrs?.height
+                break
+              case 'citation':
+                blockData.type = 'citation'
+                blockData.citationKey = node.attrs?.citationKey || ''
+                blockData.citationData = node.attrs?.citationData || {}
+                break
+              case 'bibliography':
+                blockData.type = 'bibliography'
+                blockData.citations = node.attrs?.citations || []
+                break
+              case 'subfigure':
+                blockData.type = 'subfigure'
+                blockData.images = node.attrs?.images || []
+                blockData.layout = node.attrs?.layout || 'horizontal'
+                break
+              case 'notaTable':
+                blockData.type = 'notaTable'
+                blockData.tableData = node.attrs?.tableData || []
+                blockData.columns = node.attrs?.columns || []
+                break
+              case 'aiGeneration':
+                blockData.type = 'aiGeneration'
+                blockData.prompt = node.attrs?.prompt || ''
+                blockData.generatedContent = node.content?.[0]?.text || ''
+                blockData.model = node.attrs?.model
+                blockData.timestamp = new Date()
+                break
+              case 'confusionMatrix':
+                blockData.type = 'confusionMatrix'
+                blockData.matrixData = node.attrs?.matrixData
+                blockData.title = node.attrs?.title || 'Confusion Matrix'
+                blockData.source = node.attrs?.source || 'upload'
+                blockData.filePath = node.attrs?.filePath || ''
+                blockData.stats = node.attrs?.stats
+                break
+              case 'theorem':
+                blockData.type = 'theorem'
+                blockData.title = node.attrs?.title || 'Theorem'
+                blockData.content = node.attrs?.content || ''
+                blockData.proof = node.attrs?.proof || ''
+                blockData.theoremType = node.attrs?.type || 'theorem'
+                blockData.number = node.attrs?.number
+                blockData.tags = node.attrs?.tags || []
+                break
+              case 'pipeline':
+                blockData.type = 'pipeline'
+                blockData.title = node.attrs?.title || 'Pipeline'
+                blockData.description = node.attrs?.description
+                blockData.nodes = node.attrs?.nodes || []
+                blockData.edges = node.attrs?.edges || []
+                blockData.config = node.attrs?.config
+                break
+              case 'mermaid':
+                blockData.type = 'mermaid'
+                blockData.content = node.attrs?.content || ''
+                blockData.title = node.attrs?.title
+                blockData.theme = node.attrs?.theme || 'default'
+                blockData.config = node.attrs?.config
+                break
+              default:
+                blockData.content = node.content?.[0]?.text || `[${node.type} block]`
+            }
+
+            // Create each block fresh (import should overwrite prior state)
+            const newBlock = await this.createBlock(JSON.parse(JSON.stringify(blockData)))
+            const compositeId = `${newBlock.type}:${String(newBlock.id)}`
+            newBlockOrder.push(compositeId)
+          }
+        }
+
+        // Replace structure order
+        structure.blockOrder = newBlockOrder
+        structure.version++
+        structure.lastModified = new Date()
+        await this.saveBlockStructure(structure)
+      } catch (error) {
+        logger.error('Failed to import TipTap content into blocks:', error)
+        throw error
+      }
+    }
   },
 })
 
