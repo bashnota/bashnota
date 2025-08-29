@@ -1,6 +1,30 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { logger } from '@/services/logger'
 import { useNotaStore } from '@/features/nota/stores/nota'
+import { useBlockEditor } from '@/features/nota/composables/useBlockEditor'
+
+// Helper function to extract text from Tiptap JSON content
+const extractTextFromTiptapContent = (content: any): string => {
+  if (!content || typeof content !== 'object') return ''
+  
+  let text = ''
+  
+  // Recursively extract text from Tiptap content structure
+  const extractText = (node: any) => {
+    if (node.text) {
+      text += node.text
+    }
+    if (node.content && Array.isArray(node.content)) {
+      node.content.forEach(extractText)
+    }
+  }
+  
+  if (content.content && Array.isArray(content.content)) {
+    content.content.forEach(extractText)
+  }
+  
+  return text
+}
 
 // Debounce utility function
 function debounce<T extends (...args: any[]) => any>(fn: T, delay: number): (...args: Parameters<T>) => void {
@@ -206,23 +230,32 @@ export function useMentions() {
         // If not in cache, fetch from store
         if (!content) {
           const nota = await notaStore.getCurrentNota(mention.id)
-          if (nota && nota.content) {
-            content = nota.content
+          if (nota) {
+            // Get content from block-based system
+            const { getTiptapContent } = useBlockEditor(mention.id)
+            const blockContent = getTiptapContent.value
             
-            // Add to cache (with a maximum size check)
-            if (notaContentCache.size > 50) {
-              // If cache is too large, clear oldest entries
-              const keys = Array.from(notaContentCache.keys())
-              for (let i = 0; i < 10; i++) {
-                notaContentCache.delete(keys[i])
-              }
+            if (blockContent) {
+              // Extract text from Tiptap object directly
+              content = extractTextFromTiptapContent(blockContent)
             }
-            notaContentCache.set(mention.id, content)
+            
+            // Add to cache (with a maximum size check) if content was found
+            if (content) {
+              if (notaContentCache.size > 50) {
+                // If cache is too large, clear oldest entries
+                const keys = Array.from(notaContentCache.keys())
+                for (let i = 0; i < 10; i++) {
+                  notaContentCache.delete(keys[i])
+                }
+              }
+              notaContentCache.set(mention.id, content)
+            }
           }
         }
         
         // If content was found, replace the mention with the content
-        if (content) {
+        if (content && typeof content === 'string') {
           const mentionRegex = new RegExp(`#\\[${mention.title}\\]\\(${mention.id}\\)`, 'g')
           enhancedPrompt = enhancedPrompt.replace(
             mentionRegex,

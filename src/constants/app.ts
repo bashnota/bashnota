@@ -136,6 +136,13 @@ export const ERROR_MESSAGES = {
     loadFailed: 'Failed to load notas',
     importFailed: 'Failed to import notas',
     exportFailed: 'Failed to export notas'
+  },
+  blocks: {
+    createFailed: 'Failed to create block',
+    updateFailed: 'Failed to update block',
+    deleteFailed: 'Failed to delete block',
+    reorderFailed: 'Failed to reorder blocks',
+    loadFailed: 'Failed to load blocks'
   }
 } as const
 
@@ -148,6 +155,12 @@ export const SUCCESS_MESSAGES = {
     imported: 'Notas imported successfully',
     exported: 'Notas exported successfully',
     favoriteToggled: 'Favorite status updated'
+  },
+  blocks: {
+    created: 'Block created successfully',
+    updated: 'Block updated successfully',
+    deleted: 'Block deleted successfully',
+    reordered: 'Blocks reordered successfully'
   },
   auth: {
     loginSuccess: 'Login successful',

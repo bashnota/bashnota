@@ -30,8 +30,8 @@ export function useNotaFiltering(
       const query = filters.value.searchQuery.toLowerCase().trim()
       result = result.filter(nota => 
         nota.title.toLowerCase().includes(query) ||
-        nota.content?.toLowerCase().includes(query) ||
         nota.tags?.some(tag => tag.toLowerCase().includes(query))
+        // TODO: Add content search using block system
       )
     }
 

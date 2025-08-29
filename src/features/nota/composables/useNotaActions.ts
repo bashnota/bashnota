@@ -1,7 +1,9 @@
 import { useRouter } from 'vue-router'
 import { useNotaStore } from '@/features/nota/stores/nota'
+import { useBlockStore } from '@/features/nota/stores/blockStore'
 import { toast } from 'vue-sonner'
 import { ERROR_MESSAGES, SUCCESS_MESSAGES, FILE_EXTENSIONS } from '@/constants/app'
+import { logger } from '@/services/logger'
 
 export function useNotaActions() {
   const router = useRouter()
@@ -53,12 +55,14 @@ export function useNotaActions() {
 
       const duplicatedNota = await store.createItem(`${originalNota.title} (Copy)`)
       
-      // Update the duplicated nota with original content and tags
+      // Update the duplicated nota with original tags
       await store.saveNota({
         ...duplicatedNota,
-        content: originalNota.content,
         tags: [...(originalNota.tags || [])]
       })
+
+      // TODO: Implement proper block copying from original nota
+      logger.info('Content copying not yet implemented for block system')
 
       toast('Nota duplicated successfully')
       return duplicatedNota.id

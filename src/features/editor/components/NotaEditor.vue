@@ -18,7 +18,8 @@ import { useEquationCounter, EQUATION_COUNTER_KEY } from '@/features/editor/comp
 import { useCitationStore } from '@/features/editor/stores/citationStore'
 import { logger } from '@/services/logger'
 import { useDebounceFn } from '@vueuse/core'
-import type { CitationEntry } from "@/features/nota/types/nota";
+import type { CitationEntry } from "@/features/nota/types/nota"
+import { useBlockEditor } from '@/features/nota/composables/useBlockEditor'
 
 // Import shared CSS
 import '@/assets/editor-styles.css'
@@ -39,6 +40,15 @@ const citationStore = useCitationStore()
 const router = useRouter()
 const autoSaveEnabled = ref(true)
 const showVersionHistory = ref(false)
+
+// Initialize block editor integration
+const { 
+  syncContentToBlocks, 
+  initializeBlocks, 
+  getTiptapContent, 
+  blockStats,
+  isInitialized 
+} = useBlockEditor(props.notaId)
 
 // New ref for tracking if shared session mode toggle is in progress
 const isTogglingSharedMode = ref(false)
@@ -64,11 +74,8 @@ const debouncedSave = useDebounceFn(async () => {
     // Save sessions whenever content updates
     await codeExecutionStore.saveSessions(props.notaId);
 
-    await notaStore.saveNota({
-      id: props.notaId,
-      content: JSON.stringify(content),
-      updatedAt: new Date(),
-    });
+    // Save to block-based system
+    await syncContentToBlocks(content);
   } catch (error) {
     logger.error('Error saving content:', error);
   } finally {
@@ -81,28 +88,25 @@ const currentNota = computed(() => {
 })
 
 const content = computed(() => {
-  // Insert the title as the first block if not present
+  // Get content from block-based system
   if (!currentNota.value) return null
-  let doc
-  try {
-    doc = currentNota.value.content ? JSON.parse(currentNota.value.content) : null
-  } catch (e) {
-    doc = null
+  
+  // Use the block system to get Tiptap content
+  const blockContent = getTiptapContent.value
+  
+  if (blockContent) {
+    return blockContent
   }
-  if (!doc || !doc.content || !Array.isArray(doc.content)) {
-    doc = { type: 'doc', content: [] }
-  }
-  // Ensure first block is h1 with title
-  if (!doc.content.length || doc.content[0].type !== 'heading' || doc.content[0].attrs?.level !== 1) {
-    doc.content.unshift({
+  
+  // Fallback to empty document with title
+  return {
+    type: 'doc',
+    content: [{
       type: 'heading',
       attrs: { level: 1 },
       content: [{ type: 'text', text: currentNota.value.title || 'Untitled' }]
-    })
-  } else if (doc.content[0].content?.[0]?.text !== currentNota.value.title) {
-    doc.content[0].content = [{ type: 'text', text: currentNota.value.title || 'Untitled' }]
+    }]
   }
-  return doc
 })
 
 const registerCodeCells = (content: any, notaId: string) => {
@@ -244,15 +248,16 @@ const editor = useEditor({
   },
 })
 
+// Function to check if block system is ready
+const isBlockSystemReady = computed(() => isInitialized.value)
+
 // Watch for ID changes to update editor content
 watch(
   [() => props.notaId],
   ([newNotaId]) => {
-    if (editor.value) {
-      if (newNotaId) {
-        const nota = notaStore.getCurrentNota(newNotaId)
-        editor.value.commands.setContent(nota?.content || '')
-      }
+    if (editor.value && newNotaId) {
+      // Content will be loaded from blocks when the editor initializes
+      // The block system handles content loading automatically
     }
   },
   { immediate: true },
@@ -262,6 +267,19 @@ watch(
 watch(() => content.value, () => {
   // Reset the equation counter when the content changes
   resetEquationCounter()
+})
+
+// Watch for block system initialization to ensure content is loaded
+watch(isBlockSystemReady, (ready) => {
+  if (ready && editor.value) {
+    // Block system is ready, ensure editor has the latest content
+    const blockContent = getTiptapContent.value
+    if (blockContent) {
+      // Always update editor content when blocks are loaded
+      editor.value.commands.setContent(blockContent)
+      logger.info('Updated editor content from blocks:', blockContent)
+    }
+  }
 })
 
 const isLoading = ref(true)
@@ -406,7 +424,10 @@ const handleKeyboardShortcuts = (event: KeyboardEvent) => {
 };
 
 // Listen for custom event to open AI sidebar
-onMounted(() => {
+onMounted(async () => {
+  // Initialize block system for this nota
+  await initializeBlocks()
+  
   // Add keyboard shortcut event listener
   document.addEventListener('keydown', handleKeyboardShortcuts)
   
@@ -492,14 +513,19 @@ onUnmounted(() => {
 const isSavingVersion = ref(false)
 
 const saveVersion = async () => {
-  if (!editor.value || !currentNota.value) return
-
+  if (isSavingVersion.value || !editor.value || !currentNota.value) return
+  
+  isSavingVersion.value = true
   try {
-    isSavingVersion.value = true
     const content = editor.value.getJSON()
+    // Save version using the current nota
+    const versionNota = {
+      ...currentNota.value
+    } as any
+    
     await notaStore.saveNotaVersion({
       id: props.notaId,
-      content: JSON.stringify(content),
+      nota: versionNota,
       versionName: `Version ${new Date().toLocaleString()}`,
       createdAt: new Date(),
     })
@@ -513,12 +539,23 @@ const saveVersion = async () => {
 }
 const refreshEditorContent = async () => {
   if (editor.value) {
-    // Reload the nota content
-    const nota = await notaStore.loadNota(props.notaId)
-    if (nota?.content) {
-      // Set the editor content from the restored version
-      editor.value.commands.setContent(JSON.parse(nota.content))
+    // Reload the nota content from blocks
+    const blockContent = getTiptapContent.value
+    
+    if (blockContent) {
+      // Set content directly as Tiptap object
+      editor.value.commands.setContent(blockContent)
     }
+  }
+}
+
+// Function to get block statistics for display
+const getBlockStatistics = () => {
+  return {
+    totalBlocks: blockStats.value.totalBlocks,
+    wordCount: blockStats.value.wordCount,
+    characterCount: blockStats.value.characterCount,
+    blockTypes: blockStats.value.blockTypes
   }
 }
 

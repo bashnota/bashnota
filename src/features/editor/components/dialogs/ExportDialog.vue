@@ -116,6 +116,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Download, FileText, Globe } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
+import { useNotaStore } from '@/features/nota/stores/nota'
+import { useBlockStore } from '@/features/nota/stores/blockStore'
 
 interface Props {
   open: boolean
@@ -129,6 +131,7 @@ interface Emits {
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
+const notaStore = useNotaStore()
 const isOpen = ref(props.open)
 const selectedFormat = ref('nota') // Default to .nota format
 const notaTitle = ref(props.nota?.title || 'Untitled')
@@ -151,11 +154,15 @@ const closeDialog = () => {
   isOpen.value = false
 }
 
-const exportDocument = () => {
+const exportDocument = async () => {
   if (!props.nota || !selectedFormat.value) return
 
   const title = props.nota.title || 'Untitled'
-  const content = props.nota.content || ''
+  
+  // Get content from block system instead of legacy content field
+  const blockStore = useBlockStore()
+  const tiptapContent = blockStore.getTiptapContent(props.nota.id)
+  const content = tiptapContent ? JSON.stringify(tiptapContent) : ''
   
   let blob: Blob
   let filename: string
@@ -163,24 +170,17 @@ const exportDocument = () => {
   
   switch (selectedFormat.value) {
     case 'nota':
-      // Export as .nota (JSON format with metadata)
-      const notaData = {
-        id: props.nota.id,
-        title: props.nota.title,
-        content: props.nota.content,
-        tags: props.nota.tags || [],
-        favorite: props.nota.favorite || false,
-        parentId: props.nota.parentId,
-        config: props.nota.config,
-        createdAt: props.nota.createdAt,
-        updatedAt: props.nota.updatedAt,
-        exportedAt: new Date().toISOString(),
-        version: '1.0'
+      // Export as .nota using the store method for proper format
+      try {
+        await notaStore.exportNota(props.nota.id)
+        return // The store method handles the download
+      } catch (error) {
+        toast('Export failed', {
+          description: 'Failed to export as .nota format.',
+          duration: 3000
+        })
+        return
       }
-      blob = new Blob([JSON.stringify(notaData, null, 2)], { type: 'application/json' })
-      filename = `${title}.nota`
-      description = 'exported as native .nota format'
-      break
       
     case 'html':
       // Export as HTML
