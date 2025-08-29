@@ -274,8 +274,9 @@ export function useBlockEditor(notaId: string) {
             case 'theorem':
               blockData.type = 'theorem'
               blockData.title = node.attrs?.title || 'Theorem'
-              blockData.content = node.content?.[0]?.text || ''
-              blockData.theoremType = node.attrs?.theoremType || 'theorem'
+              blockData.content = node.attrs?.content || ''
+              blockData.proof = node.attrs?.proof || ''
+              blockData.theoremType = node.attrs?.type || 'theorem'
               blockData.number = node.attrs?.number
               blockData.tags = node.attrs?.tags || []
               break
@@ -303,24 +304,25 @@ export function useBlockEditor(notaId: string) {
           }
           
           // Create or update the block
-          let blockId: string
-          const existingBlock = currentStructure.blockOrder[i] ? 
-            blockStore.getBlock(currentStructure.blockOrder[i]) : null
+          let compositeId: string
+          const existingCompositeId = currentStructure.blockOrder[i]
+          const existingBlock = existingCompositeId ? 
+            blockStore.getBlock(existingCompositeId) : null
           
           // Sanitize block data to prevent DataCloneError
           const sanitizedBlockData = JSON.parse(JSON.stringify(blockData))
           
           if (existingBlock && existingBlock.type === blockData.type) {
-            // Update existing block
-            await blockStore.updateBlock(existingBlock.id!, sanitizedBlockData)
-            blockId = existingBlock.id!
+            // Update existing block using composite ID
+            await blockStore.updateBlock(existingCompositeId, sanitizedBlockData)
+            compositeId = existingCompositeId
           } else {
             // Create new block
             const newBlock = await blockStore.createBlock(sanitizedBlockData)
-            blockId = newBlock.id!
+            compositeId = `${newBlock.type}:${String(newBlock.id)}`
           }
           
-          newBlockOrder.push(blockId)
+          newBlockOrder.push(compositeId)
         }
       }
       
@@ -420,7 +422,7 @@ export function useBlockEditor(notaId: string) {
           blockData = { ...blockData, matrixData: undefined, title: 'Confusion Matrix', source: 'upload', filePath: '', stats: undefined }
           break
         case 'theorem':
-          blockData = { ...blockData, title: 'Theorem', content: content, theoremType: 'theorem', number: undefined, tags: [] }
+          blockData = { ...blockData, title: 'Theorem', content: content, proof: '', theoremType: 'theorem', number: undefined, tags: [] }
           break
         case 'pipeline':
           blockData = { ...blockData, title: 'Pipeline', description: undefined, nodes: [], edges: [], config: undefined }

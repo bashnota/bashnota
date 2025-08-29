@@ -6,6 +6,18 @@ import type { Block, NotaBlockStructure } from '@/features/nota/types/blocks'
 import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '@/constants/app'
 import type { HeadingBlock } from '@/features/nota/types/blocks'
 
+// Helper utilities for globally unique block identifiers
+function toCompositeId(block: { id: any; type: string }): string {
+  return `${block.type}:${String(block.id)}`
+}
+function parseCompositeId(compositeId: string): { type: string; id: string } {
+  const [type, ...rest] = compositeId.split(':')
+  return { type, id: rest.join(':') }
+}
+function isCompositeId(value: any): value is string {
+  return typeof value === 'string' && value.includes(':')
+}
+
 export const useBlockStore = defineStore('blocks', {
   state: () => ({
     blocks: new Map<string, Block>(),
@@ -28,9 +40,9 @@ export const useBlockStore = defineStore('blocks', {
       logger.info('Getting blocks for structure:', structure)
       
       const blocks = structure.blockOrder
-        .map(blockId => {
-          const block = state.blocks.get(blockId)
-          logger.info('Block lookup:', blockId, block ? 'found' : 'not found')
+        .map(compositeId => {
+          const block = state.blocks.get(compositeId)
+          logger.info('Block lookup:', compositeId, block ? 'found' : 'not found')
           return block
         })
         .filter((block): block is Block => block !== undefined)
@@ -41,10 +53,10 @@ export const useBlockStore = defineStore('blocks', {
     },
 
     /**
-     * Get a specific block by ID
+     * Get a specific block by composite ID
      */
-    getBlock: (state) => (blockId: string): Block | undefined => {
-      return state.blocks.get(blockId)
+    getBlock: (state) => (compositeId: string): Block | undefined => {
+      return state.blocks.get(compositeId)
     },
 
     /**
@@ -61,8 +73,8 @@ export const useBlockStore = defineStore('blocks', {
       const structure = state.blockStructures.get(notaId)
       if (!structure || structure.blockOrder.length === 0) return 0
       
-      const maxOrder = Math.max(...structure.blockOrder.map(id => {
-        const block = state.blocks.get(id)
+      const maxOrder = Math.max(...structure.blockOrder.map(cid => {
+        const block = state.blocks.get(cid)
         return block?.order || 0
       }))
       
@@ -82,7 +94,6 @@ export const useBlockStore = defineStore('blocks', {
         lastModified: structure.lastModified.toISOString(),
       }
       
-      // Only include id if it exists (for updates), not for new records
       if (structure.id) {
         serialized.id = structure.id
       }
@@ -95,7 +106,7 @@ export const useBlockStore = defineStore('blocks', {
      */
     deserializeBlockStructure(dbStructure: any): NotaBlockStructure {
       return {
-        id: dbStructure.id, // Include id from database
+        id: dbStructure.id,
         notaId: dbStructure.notaId,
         blockOrder: dbStructure.blockOrder,
         version: dbStructure.version,
@@ -110,18 +121,14 @@ export const useBlockStore = defineStore('blocks', {
       const serialized = this.serializeBlockStructure(structure)
       logger.info('Saving block structure:', serialized)
       
-      // Sanitize the entire serialized object to prevent DataCloneError
       const sanitizedSerialized = JSON.parse(JSON.stringify(serialized))
       logger.info('Sanitized block structure:', sanitizedSerialized)
       
       if (structure.id) {
-        // Update existing structure
         await db.blockStructures.put(sanitizedSerialized)
         logger.info('Updated existing block structure:', structure.id)
       } else {
-        // Create new structure
         const savedStructure = await db.blockStructures.add(sanitizedSerialized)
-        // Update the in-memory structure with the generated id
         structure.id = savedStructure
         logger.info('Created new block structure:', savedStructure)
       }
@@ -139,30 +146,29 @@ export const useBlockStore = defineStore('blocks', {
           version: 1,
         } as Block
 
-        // Save to database first to get the auto-generated ID
+        // Save to database first to get the auto-generated numeric ID per-table
         const savedBlockId = await db.saveBlock(block)
         
         // Update the block with the generated ID
         const savedBlock = { ...block, id: savedBlockId } as Block
+        const compositeId = toCompositeId(savedBlock)
 
-        // Add to memory with the generated ID
-        this.blocks.set(savedBlockId, savedBlock)
+        // Add to memory with composite key
+        this.blocks.set(compositeId, savedBlock)
 
         // Update block structure (only metadata, not full blocks)
         const structure = this.blockStructures.get(block.notaId)
         if (structure) {
-          structure.blockOrder.push(savedBlockId)
-          // Don't store full blocks in structure - they're stored separately
+          structure.blockOrder.push(compositeId)
           structure.version++
           structure.lastModified = new Date()
         }
 
-        // Update block structure metadata in database
         if (structure) {
           await this.saveBlockStructure(structure)
         }
 
-        logger.info('Block created successfully:', savedBlockId)
+        logger.info('Block created successfully:', compositeId)
         return savedBlock
       } catch (error) {
         logger.error('Failed to create block:', error)
@@ -174,9 +180,9 @@ export const useBlockStore = defineStore('blocks', {
     /**
      * Update an existing block
      */
-    async updateBlock(blockId: string, updates: Partial<Block>): Promise<Block | null> {
+    async updateBlock(compositeId: string, updates: Partial<Block>): Promise<Block | null> {
       try {
-        const block = this.blocks.get(blockId)
+        const block = this.blocks.get(compositeId)
         if (!block) {
           throw new Error('Block not found')
         }
@@ -189,23 +195,22 @@ export const useBlockStore = defineStore('blocks', {
         } as Block
 
         // Update in memory
-        this.blocks.set(blockId, updatedBlock)
+        this.blocks.set(compositeId, updatedBlock)
 
-        // Update block structure (only metadata, not full blocks)
+        // Update block structure metadata
         const structure = this.blockStructures.get(block.notaId)
         if (structure) {
-          // Don't store full blocks in structure - they're stored separately
           structure.version++
           structure.lastModified = new Date()
         }
 
-        // Save to database
+        // Save to database (uses per-table numeric id)
         await db.saveBlock(updatedBlock)
         if (structure) {
           await this.saveBlockStructure(structure)
         }
 
-        logger.info('Block updated successfully:', blockId)
+        logger.info('Block updated successfully:', compositeId)
         return updatedBlock
       } catch (error) {
         logger.error('Failed to update block:', error)
@@ -217,32 +222,31 @@ export const useBlockStore = defineStore('blocks', {
     /**
      * Delete a block
      */
-    async deleteBlock(blockId: string): Promise<boolean> {
+    async deleteBlock(compositeId: string): Promise<boolean> {
       try {
-        const block = this.blocks.get(blockId)
+        const block = this.blocks.get(compositeId)
         if (!block) {
           throw new Error('Block not found')
         }
 
         // Remove from memory
-        this.blocks.delete(blockId)
+        this.blocks.delete(compositeId)
 
-        // Update block structure (only metadata, not full blocks)
+        // Update block structure
         const structure = this.blockStructures.get(block.notaId)
         if (structure) {
-          structure.blockOrder = structure.blockOrder.filter(id => id !== blockId)
-          // Don't store full blocks in structure - they're stored separately
+          structure.blockOrder = structure.blockOrder.filter(id => id !== compositeId)
           structure.version++
           structure.lastModified = new Date()
         }
 
-        // Remove from database
-        await db.deleteBlock(blockId, block.type)
+        // Remove from database using per-table id
+        await db.deleteBlock(String(block.id), block.type)
         if (structure) {
           await this.saveBlockStructure(structure)
         }
 
-        logger.info('Block deleted successfully:', blockId)
+        logger.info('Block deleted successfully:', compositeId)
         return true
       } catch (error) {
         logger.error('Failed to delete block:', error)
@@ -267,15 +271,14 @@ export const useBlockStore = defineStore('blocks', {
         structure.lastModified = new Date()
 
         // Update block order numbers
-        newOrder.forEach((blockId, index) => {
-          const block = this.blocks.get(blockId)
+        newOrder.forEach((compositeId, index) => {
+          const block = this.blocks.get(compositeId)
           if (block) {
             block.order = index
-            this.blocks.set(blockId, block)
+            this.blocks.set(compositeId, block)
           }
         })
 
-        // Save to database
         await this.saveBlockStructure(structure)
 
         logger.info('Blocks reordered successfully for nota:', notaId)
@@ -292,76 +295,63 @@ export const useBlockStore = defineStore('blocks', {
      */
     async loadNotaBlocks(notaId: string, nota?: any): Promise<Block[]> {
       try {
-        // Check if already loaded
+        // If already loaded, return current
         if (this.blockStructures.has(notaId)) {
           logger.info('Blocks already loaded for nota:', notaId)
           return this.getNotaBlocks(notaId)
         }
 
-        // If we have the nota and it has a blockStructureId, use direct lookup
+        let structureFromDb: any | null = null
+
         if (nota?.blockStructureId) {
-          const structure = await db.blockStructures.get(nota.blockStructureId)
-          logger.info('Loaded block structure from DB by ID:', structure)
-          
-          if (!structure) {
-            logger.error('Block structure not found for ID:', nota.blockStructureId)
-            return []
-          }
-
-          // Load structure and blocks (deserialize from database format)
-          const deserializedStructure = this.deserializeBlockStructure(structure)
-          this.blockStructures.set(notaId, deserializedStructure)
-          logger.info('Deserialized structure:', deserializedStructure)
-          
-          // Load individual blocks from all block tables
-          const blocks = await db.getAllBlocksForNota(notaId)
-          logger.info('Loaded blocks from DB:', blocks)
-          
-          for (const block of blocks) {
-            if (block.id) {
-              this.blocks.set(block.id, block as Block)
-              logger.info('Added block to memory:', block.id, block.type)
-            }
-          }
-
-          const result = this.getNotaBlocks(notaId)
-          logger.info('Final loaded blocks for nota:', notaId, result.length)
-          return result
+          structureFromDb = await db.blockStructures.get(nota.blockStructureId)
+          logger.info('Loaded block structure from DB by ID:', structureFromDb)
+        } else {
+          const structures = await db.blockStructures.where('notaId').equals(notaId).toArray()
+          structureFromDb = structures[0]
+          logger.info('Loaded block structure from DB by notaId:', structureFromDb)
         }
 
-        // Fallback: query by notaId (for backward compatibility)
-        const structures = await db.blockStructures.where('notaId').equals(notaId).toArray()
-        const structure = structures[0]
-        logger.info('Loaded block structure from DB by notaId:', structure)
-        
-        if (!structure) {
+        let structure: NotaBlockStructure
+        if (structureFromDb) {
+          structure = this.deserializeBlockStructure(structureFromDb)
+        } else {
           // Create empty structure for new nota
-          const emptyStructure: NotaBlockStructure = {
+          structure = {
             notaId,
             blockOrder: [],
             version: 1,
             lastModified: new Date(),
           }
-          this.blockStructures.set(notaId, emptyStructure)
-          logger.info('Created empty structure for new nota:', notaId)
-          return []
         }
 
-        // Load structure and blocks (deserialize from database format)
-        const deserializedStructure = this.deserializeBlockStructure(structure)
-        this.blockStructures.set(notaId, deserializedStructure)
-        logger.info('Deserialized structure:', deserializedStructure)
-        
         // Load individual blocks from all block tables
         const blocks = await db.getAllBlocksForNota(notaId)
         logger.info('Loaded blocks from DB:', blocks)
-        
+
+        // Index blocks in memory by composite id
+        this.blocks.clear()
         for (const block of blocks) {
-          if (block.id) {
-            this.blocks.set(block.id, block as Block)
-            logger.info('Added block to memory:', block.id, block.type)
+          if (block.id != null && block.type) {
+            const compositeId = toCompositeId(block as any)
+            this.blocks.set(compositeId, block as Block)
           }
         }
+
+        // Migration: if blockOrder entries are not composite, rebuild in correct order
+        const needsMigration = structure.blockOrder.some(id => !isCompositeId(id))
+        if (needsMigration) {
+          logger.info('Migrating blockOrder to composite IDs for nota:', notaId)
+          const sortedBlocks = Array.from(this.blocks.entries())
+            .map(([cid, b]) => b)
+            .sort((a, b) => a.order - b.order)
+          structure.blockOrder = sortedBlocks.map(b => toCompositeId(b as any))
+          structure.version++
+          structure.lastModified = new Date()
+          await this.saveBlockStructure(structure)
+        }
+
+        this.blockStructures.set(notaId, structure)
 
         const result = this.getNotaBlocks(notaId)
         logger.info('Final loaded blocks for nota:', notaId, result.length)
@@ -377,7 +367,6 @@ export const useBlockStore = defineStore('blocks', {
      */
     async initializeNotaBlocks(notaId: string, title: string): Promise<void> {
       try {
-        // Create title block without ID (Dexie will auto-generate)
         const titleBlock: Omit<HeadingBlock, 'id'> = {
           type: 'heading',
           order: 0,
@@ -389,32 +378,19 @@ export const useBlockStore = defineStore('blocks', {
           version: 1,
         }
 
-        // Save to database first to get the auto-generated ID
         const savedBlockId = await db.saveBlock(titleBlock)
-        
-        // Update the block with the generated ID
         const savedTitleBlock = { ...titleBlock, id: savedBlockId } as HeadingBlock
-
-        // Create initial structure (only metadata, not full blocks)
         const structure: NotaBlockStructure = {
           notaId,
-          blockOrder: [savedBlockId],
-          // Don't store full blocks in structure - they're stored separately
+          blockOrder: [toCompositeId(savedTitleBlock)],
           version: 1,
           lastModified: new Date(),
         }
         
-        // Save structure to database and get the generated ID
         await this.saveBlockStructure(structure)
-        
-        // Update the nota with the block structure ID
-        if (structure.id) {
-          await db.notas.update(notaId, { blockStructureId: structure.id })
-          logger.info('Updated nota with block structure ID:', structure.id)
-        }
 
         // Add to memory
-        this.blocks.set(savedBlockId, savedTitleBlock)
+        this.blocks.set(toCompositeId(savedTitleBlock), savedTitleBlock as unknown as Block)
         this.blockStructures.set(notaId, structure)
 
         logger.info('Initialized blocks for new nota:', notaId)
@@ -424,8 +400,6 @@ export const useBlockStore = defineStore('blocks', {
       }
     },
 
-
-
     /**
      * Clear all blocks for a nota (when deleting nota)
      */
@@ -434,13 +408,11 @@ export const useBlockStore = defineStore('blocks', {
         const structure = this.blockStructures.get(notaId)
         if (!structure) return
 
-        // Remove blocks from memory using blockOrder
-        for (const blockId of structure.blockOrder) {
-          this.blocks.delete(blockId)
+        for (const compositeId of structure.blockOrder) {
+          this.blocks.delete(compositeId)
         }
         this.blockStructures.delete(notaId)
 
-        // Remove from database
         await db.deleteAllBlocksForNota(notaId)
         await db.blockStructures.delete(notaId)
 
@@ -460,9 +432,8 @@ export const useBlockStore = defineStore('blocks', {
         return null
       }
       
-      // Get blocks from the blocks store using blockOrder
       const blocks = structure.blockOrder
-        .map(blockId => this.blocks.get(blockId))
+        .map(cid => this.blocks.get(cid))
         .filter((block): block is Block => block !== undefined)
         .sort((a, b) => a.order - b.order)
       
@@ -470,7 +441,6 @@ export const useBlockStore = defineStore('blocks', {
         return null
       }
       
-      // Convert blocks back to Tiptap format
       const content = {
         type: 'doc',
         content: blocks.map(block => this.convertBlockToTiptap(block))
@@ -478,8 +448,6 @@ export const useBlockStore = defineStore('blocks', {
       
       return content
     },
-
-
 
     /**
      * Convert a single block to Tiptap format
@@ -665,13 +633,12 @@ export const useBlockStore = defineStore('blocks', {
             type: 'theorem',
             attrs: { 
               title: (block as any).title || 'Theorem',
-              theoremType: (block as any).theoremType || 'theorem',
+              type: (block as any).theoremType || 'theorem',
               number: (block as any).number,
-              tags: (block as any).tags || []
-            },
-            content: [
-              { type: 'text', text: ensureTextContent((block as any).content) }
-            ]
+              tags: (block as any).tags || [],
+              content: (block as any).content || '',
+              proof: (block as any).proof || ''
+            }
           }
         
         case 'pipeline':
@@ -707,3 +674,4 @@ export const useBlockStore = defineStore('blocks', {
     },
   },
 })
+
