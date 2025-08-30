@@ -726,6 +726,23 @@ function createAdvancedCommands(): CommandItem[] {
           )
         };
       }),
+
+    },
+    // Markdown & Content
+    {
+      title: 'Insert Markdown',
+      category: 'Content & Import',
+      icon: FileText,
+      keywords: ['markdown', 'md', 'import', 'paste', 'content', 'blocks'],
+      description: 'Insert and validate markdown content with block preview',
+      command: ({ editor, range }: CommandArgs) => {
+        // Dispatch a custom event to open the markdown input dialog
+        const event = new CustomEvent('open-markdown-input', { 
+          detail: { editor, range } 
+        })
+        document.dispatchEvent(event)
+        editor.chain().focus().deleteRange(range).run()
+      },
     },
   ];
 }

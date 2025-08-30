@@ -16,10 +16,9 @@ export interface SubNotaLinkAttributes {
 
 export class SubNotaLinkService {
   private static instance: SubNotaLinkService
-  private notaStore: ReturnType<typeof useNotaStore>
 
   private constructor() {
-    this.notaStore = useNotaStore()
+    // Don't initialize store in constructor to avoid Pinia initialization issues
   }
 
   public static getInstance(): SubNotaLinkService {
@@ -30,11 +29,29 @@ export class SubNotaLinkService {
   }
 
   /**
+   * Get the nota store safely, initializing it only when needed
+   */
+  private getNotaStore() {
+    try {
+      return useNotaStore()
+    } catch (error) {
+      console.warn('Pinia store not available yet:', error)
+      return null
+    }
+  }
+
+  /**
    * Get filtered notas based on search query
    */
   public getFilteredNotas(query: string): SubNotaLinkItem[] {
     try {
-      const allNotas = this.notaStore.items || []
+      const notaStore = this.getNotaStore()
+      if (!notaStore) {
+        console.warn('Nota store not available, returning empty results')
+        return []
+      }
+
+      const allNotas = notaStore.items || []
       
       if (!query || query.trim() === '') {
         return this.formatNotas(allNotas.slice(0, 10))
@@ -96,5 +113,5 @@ export class SubNotaLinkService {
   }
 }
 
-// Export singleton instance
-export const subNotaLinkService = SubNotaLinkService.getInstance()
+// Export the class for lazy instantiation
+// Use SubNotaLinkService.getInstance() when you need the service

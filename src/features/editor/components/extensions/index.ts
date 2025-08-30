@@ -51,7 +51,7 @@ import {
 } from '@/features/editor/components/blocks/pipeline/PipelineExtension'
 import { SubNotaLink } from './SubNotaLinkExtension'
 import { SubNotaLinkSlashCommand } from './SubNotaLinkSlashCommand'
-import { subNotaLinkService } from './services/SubNotaLinkService'
+// SubNotaLinkService is now imported lazily to avoid Pinia initialization issues
 import { NotaTitleExtension } from './NotaTitleExtension'
 
 // Import command-related extensions

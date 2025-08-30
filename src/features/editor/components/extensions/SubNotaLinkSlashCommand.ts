@@ -3,7 +3,7 @@ import Suggestion from '@tiptap/suggestion'
 import { VueRenderer } from '@tiptap/vue-3'
 import tippy from 'tippy.js'
 import SubNotaLinkSuggestionList from './SubNotaLinkSuggestionList.vue'
-import { subNotaLinkService, type SubNotaLinkItem, type SubNotaLinkAttributes } from './services/SubNotaLinkService'
+import { SubNotaLinkService, type SubNotaLinkItem, type SubNotaLinkAttributes } from './services/SubNotaLinkService'
 
 export const SubNotaLinkSlashCommand = Extension.create({
   name: 'subNotaLinkSlashCommand',
@@ -39,7 +39,7 @@ export const SubNotaLinkSlashCommand = Extension.create({
             }
 
             // Validate attributes before insertion
-            if (!subNotaLinkService.validateAttributes(props)) {
+            if (!SubNotaLinkService.getInstance().validateAttributes(props)) {
               console.warn('Invalid subNotaLink attributes:', props)
               return false
             }
@@ -82,7 +82,7 @@ export const SubNotaLinkSlashCommand = Extension.create({
 
         items: ({ query }: any) => {
           try {
-            return subNotaLinkService.getFilteredNotas(query)
+            return SubNotaLinkService.getInstance().getFilteredNotas(query)
           } catch (error) {
             console.error('Error getting items for subNotaLink slash command:', error)
             return []

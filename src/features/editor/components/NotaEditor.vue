@@ -21,6 +21,8 @@ import { useDebounceFn } from '@vueuse/core'
 import type { CitationEntry } from "@/features/nota/types/nota"
 import { useBlockEditor } from '@/features/nota/composables/useBlockEditor'
 import NotaBreadcrumb from '@/features/nota/components/NotaBreadcrumb.vue'
+import MarkdownInputComponent from './blocks/MarkdownInputComponent.vue'
+import { EnhancedMarkdownPasteHandler } from '../services/EnhancedMarkdownPasteHandler'
 
 // Import shared CSS
 import '@/assets/editor-styles.css'
@@ -41,6 +43,7 @@ const citationStore = useCitationStore()
 const router = useRouter()
 const autoSaveEnabled = ref(true)
 const showVersionHistory = ref(false)
+const showMarkdownInput = ref(false)
 
 // Initialize block editor integration
 const { 
@@ -356,35 +359,53 @@ const editor = useEditor({
       // If there's no text, let the default handler work
       if (!text) return false
 
-      // Check if it looks like markdown
-      const isMarkdown =
-        /(\#{1,6}\s.+)|(\*\*.+\*\*)|(\*.+\*)|(\[.+\]\(.+\))|(\`\`\`.+\`\`\`)|(\>\s.+)|(\-\s.+)|(\d+\.\s.+)/m.test(
-          text,
-        )
-
-      if (isMarkdown) {
-        // Get the editor instance to use its markdown parsing capability
+      // Use enhanced markdown detection
+      if (EnhancedMarkdownPasteHandler.isMarkdownContent(text)) {
+        // Get the editor instance
         const editorInstance = editor.value
 
         if (editorInstance) {
           // Prevent the default paste behavior
           event.preventDefault()
 
-          // Use the Markdown extension's parsing capability directly
-          // This delays the processing to let the editor handle it properly
-          setTimeout(() => {
-            // First delete the selection if there is one
-            if (view.state.selection.from !== view.state.selection.to) {
-              editorInstance.commands.deleteSelection()
-            }
+          // Use enhanced paste handler for better parsing and validation
+          EnhancedMarkdownPasteHandler.handlePaste(text).then(pasteResult => {
+            if (pasteResult.success && pasteResult.blocks.length > 0) {
+              // Insert validated blocks
+              setTimeout(() => {
+                // Delete selection if there is one
+                if (view.state.selection.from !== view.state.selection.to) {
+                  editorInstance.commands.deleteSelection()
+                }
 
-            // Now insert the markdown as HTML content to trigger proper parsing
-            editorInstance.commands.insertContent(text, {
-              parseOptions: {
-                preserveWhitespace: 'full',
-              },
-            })
-          }, 0)
+                // Insert the parsed blocks
+                editorInstance.commands.insertContent(pasteResult.blocks)
+                
+                // Show success message
+                toast.success(pasteResult.message)
+              }, 0)
+            } else {
+              // Show error message and offer to open markdown input
+              toast.error(pasteResult.message)
+              
+              // Ask user if they want to open the markdown input dialog
+              if (confirm('Would you like to open the markdown input dialog to fix the issues?')) {
+                showMarkdownInput.value = true
+              }
+            }
+          }).catch(error => {
+            logger.error('Error in enhanced paste handling:', error)
+            
+            // Fallback to original behavior
+            setTimeout(() => {
+              if (view.state.selection.from !== view.state.selection.to) {
+                editorInstance.commands.deleteSelection()
+              }
+              editorInstance.commands.insertContent(text, {
+                parseOptions: { preserveWhitespace: 'full' },
+              })
+            }, 0)
+          })
 
           return true
         }
@@ -811,6 +832,11 @@ onMounted(async () => {
     // The Jupyter sidebar is now managed by SplitNotaView
   }) as EventListener)
 
+  // Add event listener for opening markdown input dialog from slash commands
+  document.addEventListener('open-markdown-input', ((event: CustomEvent) => {
+    showMarkdownInput.value = true
+  }) as EventListener)
+
   // Load saved editor settings
   const savedEditorSettings = localStorage.getItem('editor-settings')
   if (savedEditorSettings) {
@@ -875,6 +901,7 @@ onUnmounted(() => {
   document.removeEventListener('keydown', handleKeyboardShortcuts)
   window.removeEventListener('activate-ai-assistant', (() => { }) as EventListener)
   window.removeEventListener('open-jupyter-sidebar', (() => { }) as EventListener)
+  document.removeEventListener('open-markdown-input', (() => { }) as EventListener)
   codeExecutionStore.cleanup()
 })
 
@@ -1104,12 +1131,36 @@ const saveTitle = async (title: string) => {
   }
 }
 
+// Handle markdown block insertion
+const handleMarkdownBlocksInsertion = (blocks: any[]) => {
+  if (!editor.value || blocks.length === 0) return
+  
+  try {
+    // Insert blocks at current cursor position
+    editor.value.commands.insertContent(blocks)
+    
+    // Show success message
+    toast.success(`Successfully inserted ${blocks.length} block${blocks.length !== 1 ? 's' : ''}`)
+    
+    // Close the dialog
+    showMarkdownInput.value = false
+    
+    // Trigger save
+    debouncedSave()
+    
+  } catch (error) {
+    logger.error('Error inserting markdown blocks:', error)
+    toast.error('Failed to insert blocks. Please try again.')
+  }
+}
+
 defineExpose({
   editor,
   insertSubNotaLink,
   createAndLinkSubNota,
   saveVersion,
   showVersionHistory,
+  showMarkdownInput,
   registerCodeCell,
   registerCodeCellsOnDemand,
   findCodeBlocks,
@@ -1158,17 +1209,31 @@ defineExpose({
               
               <!-- Nota Title Field -->
               <div class="nota-title-field mb-6">
-                <div
-                  ref="titleInput"
-                  class="nota-title-input"
-                  contenteditable="true"
-                  :placeholder="'Untitled'"
-                  @input="handleTitleInput"
-                  @blur="handleTitleBlur"
-                  @keydown="handleTitleKeydown"
-                  @focus="handleTitleFocus"
-                ></div>
+                <div class="flex items-center justify-between">
+                  <div
+                    ref="titleInput"
+                    class="nota-title-input flex-1"
+                    contenteditable="true"
+                    :placeholder="'Untitled'"
+                    @input="handleTitleInput"
+                    @blur="handleTitleBlur"
+                    @keydown="handleTitleKeydown"
+                    @focus="handleTitleFocus"
+                  ></div>
+                  
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    @click="showVersionHistory = true"
+                    class="ml-4 h-8 px-2 text-xs"
+                  >
+                    <Clock class="h-3 w-3 mr-1" />
+                    History
+                  </Button>
+                </div>
               </div>
+              
+
               
               <!-- Editor content area -->
               <editor-content :editor="editor" />
@@ -1196,6 +1261,12 @@ defineExpose({
     <!-- Version History Dialog -->
     <VersionHistoryDialog :nota-id="notaId" v-model:open="showVersionHistory"
       @version-restored="refreshEditorContent" />
+    
+    <!-- Markdown Input Dialog -->
+    <MarkdownInputComponent 
+      v-model="showMarkdownInput"
+      @insert-blocks="handleMarkdownBlocksInsertion"
+    />
   </div>
 </template>
 
@@ -1223,6 +1294,7 @@ defineExpose({
   resize: none;
   font-family: inherit;
   width: 100%;
+  margin-right: 0.5rem;
 }
 
 .nota-title-input:empty::before {
