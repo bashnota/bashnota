@@ -49,6 +49,9 @@ import {
 import {
   PipelineExtension
 } from '@/features/editor/components/blocks/pipeline/PipelineExtension'
+import { SubNotaLink } from './SubNotaLinkExtension'
+import { SubNotaLinkSlashCommand } from './SubNotaLinkSlashCommand'
+import { subNotaLinkService } from './services/SubNotaLinkService'
 
 // Import command-related extensions
 import SlashCommands from './Commands'
@@ -136,6 +139,8 @@ export function getEditorExtensions() {
     TheoremExtension,
     ConfusionMatrixExtension,
     PipelineExtension,
+    SubNotaLink,
+    SubNotaLinkSlashCommand,
   ]
 }
 
@@ -201,6 +206,7 @@ export function getViewerExtensions() {
     TheoremExtension,
     ConfusionMatrixExtension,
     PipelineExtension,
+    SubNotaLink,
   ]
 }
 

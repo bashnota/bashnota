@@ -271,6 +271,15 @@ onMounted(async () => {
   
   // Initialize sidebar manager
   sidebarManager.initialize()
+  
+  // Add global keyboard shortcuts
+  document.addEventListener('keydown', (event) => {
+    // Sub-nota sidebar: Ctrl+Shift+Alt+S
+    if (event.ctrlKey && event.shiftKey && event.altKey && event.key.toLowerCase() === 's') {
+      event.preventDefault()
+      sidebarManager.toggleSidebar('subNotas')
+    }
+  })
 })
 
 

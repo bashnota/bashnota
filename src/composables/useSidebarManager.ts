@@ -2,7 +2,7 @@ import { ref, reactive, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 // Types
-export type SidebarId = 'toc' | 'references' | 'jupyter' | 'ai' | 'metadata' | 'favorites'
+export type SidebarId = 'toc' | 'references' | 'jupyter' | 'ai' | 'metadata' | 'favorites' | 'subNotas'
 export type SidebarPosition = 'left' | 'right'
 export type SidebarCategory = 'navigation' | 'content' | 'development' | 'analysis'
 
@@ -82,6 +82,15 @@ const sidebarConfigs: Record<SidebarId, Omit<SidebarConfig, 'isOpen' | 'isAvaila
     description: 'Saved content blocks',
     order: 6,
   },
+  subNotas: {
+    id: 'subNotas',
+    title: 'Sub-Notas',
+    icon: 'SubNotasIcon',
+    position: 'right',
+    category: 'content',
+    description: 'Sub-nota management',
+    order: 7,
+  },
 }
 
 // Category configurations
@@ -120,6 +129,7 @@ const sidebarStates = reactive<Record<SidebarId, { isOpen: boolean; isAvailable:
   ai: { isOpen: false, isAvailable: true, isPinned: false },
   metadata: { isOpen: false, isAvailable: true, isPinned: false },
   favorites: { isOpen: false, isAvailable: true, isPinned: false },
+  subNotas: { isOpen: false, isAvailable: true, isPinned: false },
 })
 
 const categoryStates = reactive<Record<SidebarCategory, { isCollapsed: boolean }>>({

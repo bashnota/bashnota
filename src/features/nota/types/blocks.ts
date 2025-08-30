@@ -252,9 +252,21 @@ export interface PipelineBlock extends BaseBlock {
 export interface MermaidBlock extends BaseBlock {
   type: 'mermaid'
   content: string
-  title?: string
-  theme?: 'default' | 'forest' | 'dark' | 'neutral'
-  config?: any
+  config?: {
+    theme?: string
+    flowchart?: {
+      useMaxWidth?: boolean
+      htmlLabels?: boolean
+    }
+  }
+}
+
+export interface SubNotaLinkBlock extends BaseBlock {
+  type: 'subNotaLink'
+  targetNotaId: string
+  targetNotaTitle: string
+  displayText?: string
+  linkStyle?: 'inline' | 'button' | 'card'
 }
 
 /**
@@ -282,6 +294,7 @@ export type Block =
   | TheoremBlock
   | PipelineBlock
   | MermaidBlock
+  | SubNotaLinkBlock
 
 /**
  * Block order and structure for a nota

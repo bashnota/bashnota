@@ -43,6 +43,9 @@ export const useBlockStore = defineStore('blocks', {
         .map(compositeId => {
           const block = state.blocks.get(compositeId)
           logger.info('Block lookup:', compositeId, block ? 'found' : 'not found')
+          if (block && block.type === 'subNotaLink') {
+            logger.info('Found subNotaLink block in getNotaBlocks:', compositeId, block)
+          }
           return block
         })
         .filter((block): block is Block => block !== undefined)
@@ -139,6 +142,17 @@ export const useBlockStore = defineStore('blocks', {
      */
     async createBlock(blockData: Omit<Block, 'id' | 'createdAt' | 'updatedAt' | 'version'>): Promise<Block> {
       try {
+        // Validate subNotaLink blocks have required fields
+        if (blockData.type === 'subNotaLink') {
+          const subNotaLinkData = blockData as any
+          if (!subNotaLinkData.targetNotaId || subNotaLinkData.targetNotaId === 'placeholder') {
+            logger.warn('subNotaLink block created with placeholder targetNotaId')
+          }
+          if (!subNotaLinkData.targetNotaTitle) {
+            logger.warn('subNotaLink block missing targetNotaTitle')
+          }
+        }
+        
         const block = {
           ...blockData,
           createdAt: new Date(),
@@ -193,6 +207,17 @@ export const useBlockStore = defineStore('blocks', {
           updatedAt: new Date(),
           version: block.version + 1,
         } as Block
+
+        // Validate subNotaLink blocks after update
+        if (updatedBlock.type === 'subNotaLink') {
+          const subNotaLinkBlock = updatedBlock as any
+          if (!subNotaLinkBlock.targetNotaId || subNotaLinkBlock.targetNotaId === 'placeholder') {
+            logger.warn('subNotaLink block updated with invalid targetNotaId')
+          }
+          if (!subNotaLinkBlock.targetNotaTitle) {
+            logger.warn('subNotaLink block updated with missing targetNotaTitle')
+          }
+        }
 
         // Update in memory
         this.blocks.set(compositeId, updatedBlock)
@@ -328,6 +353,14 @@ export const useBlockStore = defineStore('blocks', {
         // Load individual blocks from all block tables
         const blocks = await db.getAllBlocksForNota(notaId)
         logger.info('Loaded blocks from DB:', blocks)
+        
+        // Log subNotaLink blocks specifically
+        const subNotaLinkBlocks = blocks.filter(block => block.type === 'subNotaLink')
+        if (subNotaLinkBlocks.length > 0) {
+          logger.info('Found subNotaLink blocks in DB:', subNotaLinkBlocks)
+        } else {
+          logger.info('No subNotaLink blocks found in DB for nota:', notaId)
+        }
         
         // Index blocks in memory by composite id
         this.blocks.clear()
@@ -666,7 +699,17 @@ export const useBlockStore = defineStore('blocks', {
               config: (block as any).config
             }
           }
-        
+        case 'subNotaLink':
+          const subNotaLinkBlock = block as any
+          return {
+            type: 'subNotaLink',
+            attrs: {
+              targetNotaId: subNotaLinkBlock.targetNotaId || '',
+              targetNotaTitle: subNotaLinkBlock.targetNotaTitle || 'Untitled Nota',
+              displayText: subNotaLinkBlock.displayText || subNotaLinkBlock.targetNotaTitle || 'Untitled Nota',
+              linkStyle: subNotaLinkBlock.linkStyle || 'inline'
+            }
+          }
         default:
           // Fallback to text block for unknown types
           return {
@@ -709,8 +752,23 @@ export const useBlockStore = defineStore('blocks', {
                 blockData.content = node.content?.[0]?.text || ''
                 break
               case 'paragraph':
-                blockData.type = 'text'
-                blockData.content = node.content?.[0]?.text || ''
+                // Check if paragraph contains subNotaLink content
+                const hasSubNotaLink = node.content?.some((child: any) => child.type === 'subNotaLink')
+                if (hasSubNotaLink) {
+                  // Extract the subNotaLink data from the first subNotaLink child
+                  const subNotaLinkChild = node.content.find((child: any) => child.type === 'subNotaLink')
+                  if (subNotaLinkChild) {
+                    blockData.type = 'subNotaLink'
+                    blockData.targetNotaId = subNotaLinkChild.attrs?.targetNotaId || ''
+                    blockData.targetNotaTitle = subNotaLinkChild.attrs?.targetNotaTitle || 'Untitled Nota'
+                    blockData.displayText = subNotaLinkChild.attrs?.displayText || subNotaLinkChild.attrs?.targetNotaTitle || 'Untitled Nota'
+                    blockData.linkStyle = subNotaLinkChild.attrs?.linkStyle || 'inline'
+                  }
+                } else {
+                  // Regular paragraph
+                  blockData.type = 'text'
+                  blockData.content = node.content?.[0]?.text || ''
+                }
                 break
               case 'codeBlock':
                 blockData.type = 'code'
@@ -825,6 +883,19 @@ export const useBlockStore = defineStore('blocks', {
                 blockData.title = node.attrs?.title
                 blockData.theme = node.attrs?.theme || 'default'
                 blockData.config = node.attrs?.config
+                break
+              case 'subNotaLink':
+                // Handle standalone subNotaLink blocks
+                blockData.type = 'subNotaLink'
+                blockData.targetNotaId = node.attrs?.targetNotaId || ''
+                blockData.targetNotaTitle = node.attrs?.targetNotaTitle || 'Untitled Nota'
+                blockData.displayText = node.attrs?.displayText || node.attrs?.targetNotaTitle || 'Untitled Nota'
+                blockData.linkStyle = node.attrs?.linkStyle || 'inline'
+                
+                // Validate imported subNotaLink blocks
+                if (!blockData.targetNotaId) {
+                  logger.warn('Imported subNotaLink block missing targetNotaId')
+                }
                 break
               default:
                 blockData.content = node.content?.[0]?.text || `[${node.type} block]`

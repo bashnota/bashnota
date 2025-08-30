@@ -30,6 +30,7 @@ import { CitationExtension, BibliographyExtension } from './citation-block/Citat
 import Citation from './citation-block/Citation.vue'
 import Bibliography from './citation-block/Bibliography.vue'
 import SubNotaDialog from './SubNotaDialog.vue'
+import { SubNotaBlock, SubNotaInlineComponent } from './sub-nota-block'
 
 // Re-export everything
 export {
@@ -57,6 +58,10 @@ export {
   
   // Dialog components
   SubNotaDialog,
+  
+  // Sub-Nota block components
+  SubNotaBlock,
+  SubNotaInlineComponent,
 
   // Confusion Matrix components
   ConfusionMatrixExtension,

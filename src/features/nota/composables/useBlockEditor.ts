@@ -153,8 +153,44 @@ export function useBlockEditor(notaId: string) {
               break
               
             case 'paragraph':
-              blockData.type = 'text'
-              blockData.content = node.content?.[0]?.text || ''
+              // Check if paragraph contains subNotaLink content
+              const hasSubNotaLink = node.content?.some((child: any) => child.type === 'subNotaLink')
+              if (hasSubNotaLink) {
+                // Extract the subNotaLink data from the first subNotaLink child
+                const subNotaLinkChild = node.content.find((child: any) => child.type === 'subNotaLink')
+                if (subNotaLinkChild) {
+                  blockData.type = 'subNotaLink'
+                  blockData.targetNotaId = subNotaLinkChild.attrs?.targetNotaId || ''
+                  blockData.targetNotaTitle = subNotaLinkChild.attrs?.targetNotaTitle || 'Untitled Nota'
+                  blockData.displayText = subNotaLinkChild.attrs?.displayText || subNotaLinkChild.attrs?.targetNotaTitle || 'Untitled Nota'
+                  blockData.linkStyle = subNotaLinkChild.attrs?.linkStyle || 'inline'
+                  
+                  // Validate required fields for subNotaLink blocks
+                  if (!blockData.targetNotaId) {
+                    logger.warn('subNotaLink block missing targetNotaId, using placeholder')
+                    blockData.targetNotaId = 'placeholder'
+                  }
+                }
+              } else {
+                // Regular paragraph
+                blockData.type = 'text'
+                blockData.content = node.content?.[0]?.text || ''
+              }
+              break
+              
+            case 'subNotaLink':
+              // Handle standalone subNotaLink blocks (if they ever come as direct nodes)
+              blockData.type = 'subNotaLink'
+              blockData.targetNotaId = node.attrs?.targetNotaId || ''
+              blockData.targetNotaTitle = node.attrs?.targetNotaTitle || 'Untitled Nota'
+              blockData.displayText = node.attrs?.displayText || node.attrs?.targetNotaTitle || 'Untitled Nota'
+              blockData.linkStyle = node.attrs?.linkStyle || 'inline'
+              
+              // Validate required fields for subNotaLink blocks
+              if (!blockData.targetNotaId) {
+                logger.warn('subNotaLink block missing targetNotaId, using placeholder')
+                blockData.targetNotaId = 'placeholder'
+              }
               break
               
             case 'codeBlock':
@@ -305,9 +341,23 @@ export function useBlockEditor(notaId: string) {
               blockData.config = node.attrs?.config
               break
               
-            default:
-              // For unknown types, try to extract text content
-              blockData.content = node.content?.[0]?.text || `[${node.type} block]`
+            case 'subNotaLink':
+              blockData.type = 'subNotaLink'
+              blockData.targetNotaId = node.attrs?.targetNotaId || ''
+              blockData.targetNotaTitle = node.attrs?.targetNotaTitle || 'Untitled Nota'
+              blockData.displayText = node.attrs?.displayText || node.attrs?.targetNotaTitle || 'Untitled Nota'
+              blockData.linkStyle = node.attrs?.linkStyle || 'inline'
+              
+              // Validate required fields for subNotaLink blocks
+              if (!blockData.targetNotaId) {
+                logger.warn('subNotaLink block missing targetNotaId, using placeholder')
+                blockData.targetNotaId = 'placeholder'
+              }
+              break
+              
+              default:
+                // For unknown types, try to extract text content
+                blockData.content = node.content?.[0]?.text || `[${node.type} block]`
           }
           
           // Create or update the block
@@ -436,6 +486,15 @@ export function useBlockEditor(notaId: string) {
           break
         case 'mermaid':
           blockData = { ...blockData, content: content, title: undefined, theme: 'default', config: undefined }
+          break
+        case 'subNotaLink':
+          blockData = { 
+            ...blockData, 
+            targetNotaId: 'placeholder', 
+            targetNotaTitle: 'Untitled Nota', 
+            displayText: 'Untitled Nota', 
+            linkStyle: 'inline' 
+          }
           break
         default:
           blockData = { ...blockData, content: content }

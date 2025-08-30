@@ -715,6 +715,220 @@ export const useNotaStore = defineStore('nota', {
       return result
     },
 
+    /**
+     * Create a sub-nota under a parent
+     */
+    async createSubNota(parentId: string, title: string): Promise<Nota> {
+      if (!parentId) {
+        throw new Error('Parent ID is required for sub-nota creation')
+      }
+
+      const parentNota = this.getItem(parentId)
+      if (!parentNota) {
+        throw new Error('Parent nota not found')
+      }
+
+      const notaId = nanoid()
+      const nota: Nota = {
+        id: notaId,
+        title,
+        parentId: parentId,
+        tags: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        blockStructure: {
+          notaId: notaId,
+          blockOrder: [],
+          version: 1,
+          lastModified: new Date(),
+        },
+      }
+
+      const serialized = serializeNota(nota)
+      await db.notas.add(serialized)
+      this.items.push(nota)
+
+      toast(`Sub-nota "${title}" created successfully under "${parentNota.title}"`)
+      return nota
+    },
+
+    /**
+     * Move a nota to become a sub-nota of another nota
+     */
+    async moveNota(notaId: string, newParentId: string | null): Promise<boolean> {
+      const nota = this.getItem(notaId)
+      if (!nota) {
+        throw new Error('Nota not found')
+      }
+
+      // Prevent circular references
+      if (newParentId) {
+        const newParent = this.getItem(newParentId)
+        if (!newParent) {
+          throw new Error('New parent nota not found')
+        }
+
+        // Check if moving would create a circular reference
+        if (this.wouldCreateCircularReference(notaId, newParentId)) {
+          throw new Error('Cannot move nota: would create circular reference')
+        }
+      }
+
+      const oldParentId = nota.parentId
+      nota.parentId = newParentId
+      nota.updatedAt = new Date()
+
+      const serialized = serializeNota(nota)
+      await db.notas.update(notaId, serialized)
+
+      // Update in memory
+      const index = this.items.findIndex(n => n.id === notaId)
+      if (index !== -1) {
+        this.items[index] = { ...nota }
+      }
+
+      const action = newParentId ? 'moved to' : 'moved from'
+      const target = newParentId ? this.getItem(newParentId)?.title : 'root level'
+      toast(`Nota "${nota.title}" ${action} "${target}"`)
+
+      return true
+    },
+
+    /**
+     * Check if moving a nota would create a circular reference
+     */
+    wouldCreateCircularReference(notaId: string, newParentId: string): boolean {
+      if (notaId === newParentId) return true
+
+      const checkAncestors = (currentId: string, targetId: string): boolean => {
+        const current = this.getItem(currentId)
+        if (!current?.parentId) return false
+        if (current.parentId === targetId) return true
+        return checkAncestors(current.parentId, targetId)
+      }
+
+      return checkAncestors(newParentId, notaId)
+    },
+
+    /**
+     * Get the full hierarchy path for a nota
+     */
+    getNotaHierarchy(notaId: string): Nota[] {
+      const hierarchy: Nota[] = []
+      let currentId = notaId
+
+      while (currentId) {
+        const nota = this.getItem(currentId)
+        if (!nota) break
+        
+        hierarchy.unshift(nota)
+        currentId = nota.parentId || ''
+      }
+
+      return hierarchy
+    },
+
+    /**
+     * Get the depth level of a nota in the hierarchy
+     */
+    getNotaDepth(notaId: string): number {
+      let depth = 0
+      let currentId = notaId
+
+      while (currentId) {
+        const nota = this.getItem(currentId)
+        if (!nota?.parentId) break
+        depth++
+        currentId = nota.parentId
+      }
+
+      return depth
+    },
+
+    /**
+     * Export a nota with all its sub-notas
+     */
+    async exportNotaWithSubNotas(notaId: string): Promise<any> {
+      const mainNota = this.getItem(notaId)
+      if (!mainNota) {
+        throw new Error('Nota not found')
+      }
+
+      const descendants = await this.getAllDescendants(notaId)
+      const allRelatedNotas = [mainNota, ...descendants]
+      
+      // Get content for each nota
+      const notasWithContent = await Promise.all(
+        allRelatedNotas.map(async (nota) => ({
+          ...serializeNota(nota),
+          content: await this.getNotaContentAsTiptap(nota.id)
+        }))
+      )
+
+      return {
+        nota: notasWithContent[0], // Main nota
+        subnotas: notasWithContent.slice(1) // All sub-notas
+      }
+    },
+
+    /**
+     * Import a nota with sub-notas, maintaining hierarchy
+     */
+    async importNotaWithSubNotas(importData: any): Promise<Nota[]> {
+      if (!importData.nota) {
+        throw new Error('Invalid import data: missing main nota')
+      }
+
+      const importedNotas: Nota[] = []
+      const idMapping = new Map<string, string>() // old ID -> new ID
+
+      // First, create all notas without parent relationships
+      const allNotas = [importData.nota, ...(importData.subnotas || [])]
+      
+      for (const notaData of allNotas) {
+        const newId = nanoid()
+        idMapping.set(notaData.id, newId)
+
+        const newNota: Nota = {
+          ...deserializeNota(notaData),
+          id: newId,
+          parentId: null, // Will be set after all notas are created
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }
+
+        const serialized = serializeNota(newNota)
+        await db.notas.add(serialized)
+        this.items.push(newNota)
+        importedNotas.push(newNota)
+      }
+
+      // Now establish parent-child relationships
+      for (const notaData of allNotas) {
+        if (notaData.parentId) {
+          const newNotaId = idMapping.get(notaData.id)
+          const newParentId = idMapping.get(notaData.parentId)
+          
+          if (newNotaId && newParentId) {
+            await this.moveNota(newNotaId, newParentId)
+          }
+        }
+      }
+
+      // Import content for each nota
+      for (let i = 0; i < allNotas.length; i++) {
+        const notaData = allNotas[i]
+        const newNotaId = idMapping.get(notaData.id)
+        
+        if (newNotaId && notaData.content) {
+          const blockStore = useBlockStore()
+          await blockStore.importTiptapContent(newNotaId, notaData.content)
+        }
+      }
+
+      return importedNotas
+    },
+
     async publishNota(id: string, includeSubPages = false): Promise<PublishedNota> {
       try {
         const nota = this.getCurrentNota(id)

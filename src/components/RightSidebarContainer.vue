@@ -207,6 +207,50 @@
         </div>
       </SidebarFooter>
     </template>
+
+    <template v-else-if="activeSidebar === 'subNotas'">
+      <SidebarHeader class="border-b">
+        <div class="flex items-center justify-between p-3">
+          <div class="flex items-center gap-2">
+            <FolderIcon class="h-5 w-5" />
+            <h2 class="font-semibold">Sub-Notas</h2>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            @click="closeSidebar('subNotas')"
+            class="h-8 w-8 p-0"
+          >
+            <X class="h-4 w-4" />
+          </Button>
+        </div>
+      </SidebarHeader>
+      
+      <SidebarContent class="flex-1 overflow-hidden">
+        <div class="h-full overflow-y-auto">
+          <SubNotaManager 
+            v-if="activeNota?.id"
+            :current-nota-id="activeNota.id"
+            @insert-sub-nota-link="handleInsertSubNotaLink"
+          />
+        </div>
+      </SidebarContent>
+      
+      <SidebarFooter class="border-t">
+        <div class="p-2">
+          <div class="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+            <kbd class="px-1.5 py-0.5 text-xs bg-muted border rounded">Ctrl</kbd>
+            <span>+</span>
+            <kbd class="px-1.5 py-0.5 text-xs bg-muted border rounded">Shift</kbd>
+            <span>+</span>
+            <kbd class="px-1.5 py-0.5 text-xs bg-muted border rounded">Alt</kbd>
+            <span>+</span>
+            <kbd class="px-1.5 py-0.5 text-xs bg-muted border rounded">S</kbd>
+            <span class="ml-2">toggle sub-notas</span>
+          </div>
+        </div>
+      </SidebarFooter>
+    </template>
   </Sidebar>
 </template>
 
@@ -223,7 +267,7 @@ import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter } from '@/compone
 import { Button } from '@/components/ui/button'
 
 // Icons
-import { BookIcon, ServerIcon, BrainIcon, FileTextIcon, StarIcon, X } from 'lucide-vue-next'
+import { BookIcon, ServerIcon, BrainIcon, FileTextIcon, StarIcon, X, FolderIcon } from 'lucide-vue-next'
 
 // Import sidebar content components (we'll create these)
 import ReferencesSidebarContent from '@/features/nota/components/ReferencesSidebarContent.vue'
@@ -231,6 +275,7 @@ import JupyterServersSidebarContent from '@/features/jupyter/components/JupyterS
 import AIAssistantSidebarContent from '@/features/ai/components/AIAssistantSidebarContent.vue'
 import MetadataSidebarContent from '@/features/nota/components/MetadataSidebarContent.vue'
 import FavoriteBlocksSidebarContent from '@/features/nota/components/FavoriteBlocksSidebarContent.vue'
+import SubNotaManager from '@/features/nota/components/SubNotaManager.vue'
 
 const props = defineProps<{
   editor?: Editor | null
@@ -255,6 +300,34 @@ const activeSidebar = computed(() => {
   if (sidebarStates.ai.isOpen) return 'ai'
   if (sidebarStates.metadata.isOpen) return 'metadata'
   if (sidebarStates.favorites.isOpen) return 'favorites'
+  if (sidebarStates.subNotas.isOpen) return 'subNotas'
   return null
 })
+
+// Event handler for inserting sub-nota link
+const handleInsertSubNotaLink = (notaId: string, title: string) => {
+  console.log('handleInsertSubNotaLink called with:', { notaId, title })
+  if (props.editor) {
+    // Get the target nota to get its title
+    const targetNota = notaStore.getItem(notaId)
+    console.log('Target nota found:', targetNota)
+    if (targetNota) {
+      console.log('Inserting subNotaLink with:', {
+        targetNotaId: notaId,
+        targetNotaTitle: targetNota.title,
+        displayText: title,
+        linkStyle: 'inline'
+      })
+      props.editor.chain().focus().setSubNotaLink({
+        targetNotaId: notaId,
+        targetNotaTitle: targetNota.title,
+        displayText: title,
+        linkStyle: 'inline'
+      }).run()
+      console.log('setSubNotaLink command executed')
+    }
+  } else {
+    console.log('No editor available')
+  }
+}
 </script>

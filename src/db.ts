@@ -24,7 +24,8 @@ import type {
   ConfusionMatrixBlock,
   TheoremBlock,
   PipelineBlock,
-  MermaidBlock
+  MermaidBlock,
+  SubNotaLinkBlock
 } from '@/features/nota/types/blocks'
 
 export class NotaDB extends Dexie {
@@ -54,6 +55,7 @@ export class NotaDB extends Dexie {
   theoremBlocks!: Table<TheoremBlock>
   pipelineBlocks!: Table<PipelineBlock>
   mermaidBlocks!: Table<MermaidBlock>
+  subNotaLinkBlocks!: Table<SubNotaLinkBlock>
   
   blockStructures!: Table<NotaBlockStructure>
 
@@ -88,6 +90,7 @@ export class NotaDB extends Dexie {
       theoremBlocks: '++id, type, notaId, order, createdAt, updatedAt',
       pipelineBlocks: '++id, type, notaId, order, createdAt, updatedAt',
       mermaidBlocks: '++id, type, notaId, order, createdAt, updatedAt',
+      subNotaLinkBlocks: '++id, type, notaId, order, createdAt, updatedAt',
       
       blockStructures: '++id, notaId, blockOrder, version, lastModified'
     })
@@ -140,6 +143,8 @@ export class NotaDB extends Dexie {
         return this.pipelineBlocks
       case 'mermaid':
         return this.mermaidBlocks
+      case 'subNotaLink':
+        return this.subNotaLinkBlocks
       default:
         throw new Error(`Unknown block type: ${blockType}`)
     }
@@ -209,6 +214,7 @@ export class NotaDB extends Dexie {
     const theoremBlocks = await this.theoremBlocks.where('notaId').equals(notaId).toArray()
     const pipelineBlocks = await this.pipelineBlocks.where('notaId').equals(notaId).toArray()
     const mermaidBlocks = await this.mermaidBlocks.where('notaId').equals(notaId).toArray()
+    const subNotaLinkBlocks = await this.subNotaLinkBlocks.where('notaId').equals(notaId).toArray()
     
     // Combine all blocks
     allBlocks.push(
@@ -232,7 +238,8 @@ export class NotaDB extends Dexie {
       ...confusionMatrixBlocks,
       ...theoremBlocks,
       ...pipelineBlocks,
-      ...mermaidBlocks
+      ...mermaidBlocks,
+      ...subNotaLinkBlocks
     )
     
     return allBlocks
@@ -263,6 +270,7 @@ export class NotaDB extends Dexie {
     await this.theoremBlocks.where('notaId').equals(notaId).delete()
     await this.pipelineBlocks.where('notaId').equals(notaId).delete()
     await this.mermaidBlocks.where('notaId').equals(notaId).delete()
+    await this.subNotaLinkBlocks.where('notaId').equals(notaId).delete()
   }
 }
 

@@ -20,6 +20,7 @@ import { logger } from '@/services/logger'
 import { useDebounceFn } from '@vueuse/core'
 import type { CitationEntry } from "@/features/nota/types/nota"
 import { useBlockEditor } from '@/features/nota/composables/useBlockEditor'
+import NotaBreadcrumb from '@/features/nota/components/NotaBreadcrumb.vue'
 
 // Import shared CSS
 import '@/assets/editor-styles.css'
@@ -58,11 +59,13 @@ const lastSavedContent = ref<string>('')
 
 // Add debounced save function
 const debouncedSave = useDebounceFn(async () => {
+  console.log('debouncedSave called')
   if (!editor.value) return;
   
   try {
     emit('saving', true);
     const content = editor.value.getJSON();
+    console.log('Editor content to save:', content)
 
     // Only register code cells if content has changed
     const currentContent = JSON.stringify(content);
@@ -75,6 +78,7 @@ const debouncedSave = useDebounceFn(async () => {
     await codeExecutionStore.saveSessions(props.notaId);
 
     // Save to block-based system
+    console.log('Calling syncContentToBlocks with content:', content)
     await syncContentToBlocks(content);
   } catch (error) {
     logger.error('Error saving content:', error);
@@ -171,6 +175,7 @@ const editor = useEditor({
     attributes: {
       class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none',
     },
+
     handlePaste: (view, event) => {
       // Get the plain text content
       const text = event.clipboardData?.getData('text/plain')
@@ -680,6 +685,9 @@ defineExpose({
         <div class="h-full overflow-hidden px-4 md:px-8 lg:px-12">
           <ScrollArea class="h-full">
             <div class="max-w-4xl mx-auto py-8">
+              <!-- Breadcrumb Navigation -->
+              <NotaBreadcrumb v-if="currentNota" :nota-id="currentNota.id" class="mb-4" />
+              
               <!-- The title is now the first block inside the editor -->
               <editor-content :editor="editor" />
               <!-- Tags and Save Status below title -->
