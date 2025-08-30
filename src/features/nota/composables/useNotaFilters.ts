@@ -81,8 +81,7 @@ export function useNotaFilters(options: UseNotaFiltersOptions) {
   const applyFilters = (
     notas: Nota[], 
     searchQuery: string = '', 
-    selectedTag: string = '',
-    legacyShowFavorites: boolean = false
+    selectedTag: string = ''
   ): Nota[] => {
     let result = [...notas]
     
@@ -109,11 +108,17 @@ export function useNotaFilters(options: UseNotaFiltersOptions) {
     // Apply search filtering
     const query = searchQuery.toLowerCase().trim()
     if (query) {
-      result = result.filter(nota => 
-        nota.title.toLowerCase().includes(query) ||
-        nota.content?.toLowerCase().includes(query) ||
-        nota.tags?.some(tag => tag.toLowerCase().includes(query))
-      )
+      result = result.filter(nota => {
+        // Check title and tags first
+        if (nota.title.toLowerCase().includes(query) ||
+            nota.tags?.some(tag => tag.toLowerCase().includes(query))) {
+          return true
+        }
+        
+        // TODO: Implement block-based content search
+        // For now, only search title and tags
+        return false
+      })
     }
     
     // Apply tag filtering
@@ -131,10 +136,7 @@ export function useNotaFilters(options: UseNotaFiltersOptions) {
       })
     }
     
-    // Apply legacy favorites filtering (for backward compatibility)
-    if (legacyShowFavorites && viewFilter.value === 'all') {
-      result = result.filter(nota => nota.favorite)
-    }
+
     
     return result
   }

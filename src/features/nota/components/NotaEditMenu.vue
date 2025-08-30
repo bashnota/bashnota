@@ -162,27 +162,7 @@ const toggleFavorite = async () => {
 // Export/Download nota
 const exportNota = async () => {
   try {
-    const notas = await notaStore.exportNota(props.nota.id)
-    
-    // Create file content
-    const fileContent = JSON.stringify(notas, null, 2)
-    
-    // Create blob and download link
-    const blob = new Blob([fileContent], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    
-    // Create download link
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `${props.nota.title || 'nota'}.nota`
-    
-    // Trigger download
-    document.body.appendChild(link)
-    link.click()
-    
-    // Cleanup
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
+    await notaStore.exportNota(props.nota.id)
     
     toast({
       title: 'Success',

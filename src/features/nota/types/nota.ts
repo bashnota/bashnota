@@ -1,9 +1,13 @@
 import type { NotaConfig } from '@/features/jupyter/types/jupyter'
+import type { Block, NotaBlockStructure } from './blocks'
 
 export interface Nota {
   id: string
   title: string
-  content: string | null
+  // Block-based content structure - store just the ID for efficient lookup
+  blockStructureId?: string
+  // Block structure for the nota
+  blockStructure?: NotaBlockStructure
   parentId: string | null
   config?: NotaConfig
   favorite?: boolean
@@ -19,14 +23,14 @@ export interface Nota {
 export interface NotaVersion {
   id: string
   notaId: string
-  content: string
+  nota: Nota // Store the full nota object instead of just content
   versionName: string
   createdAt: Date | string
 }
 export interface FavoriteBlock {
   id: string
   name: string
-  content: string
+  content: any // Tiptap JSON content structure
   type: string
   tags: string[]
   createdAt: Date | string
@@ -35,7 +39,7 @@ export interface FavoriteBlock {
 export interface PublishedNota {
   id: string
   title: string
-  content: string | null
+  content: any | null // Tiptap JSON content structure
   updatedAt: string
   publishedAt: string
   authorId: string
@@ -93,7 +97,7 @@ export interface CitationEntry {
 export interface Comment {
   id: string
   notaId: string
-  content: string
+  content: any // Tiptap JSON content structure
   authorId: string
   authorName: string
   authorTag?: string

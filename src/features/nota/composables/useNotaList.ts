@@ -60,7 +60,7 @@ export function useNotaList(options: UseNotaListOptions) {
     const showFavorites = options.showFavorites?.() || false
     
     // Apply filters
-    const filtered = applyFilters(notas, searchQuery, selectedTag, showFavorites)
+    const filtered = applyFilters(notas, searchQuery, selectedTag)
     
     // Apply sorting
     return applySorting(filtered)

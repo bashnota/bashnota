@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNotaStore } from '@/features/nota/stores/nota'
+import { useBlockStore } from '@/features/nota/stores/blockStore'
 import { toast } from 'vue-sonner'
 import { logger } from '@/services/logger'
 import { FILE_EXTENSIONS } from '@/constants/app'
@@ -14,6 +15,7 @@ export interface ImportOptions {
 export function useNotaImport(options: ImportOptions = {}) {
   const router = useRouter()
   const notaStore = useNotaStore()
+  const blockStore = useBlockStore()
   
   // State
   const isImporting = ref(false)
@@ -105,11 +107,11 @@ export function useNotaImport(options: ImportOptions = {}) {
             const title = extractNotebookTitle(notebook, file.name)
             const newNota = await notaStore.createItem(title)
             
-            // Update the nota with the converted content
-            await notaStore.saveNota({
-              id: newNota.id,
-              content: JSON.stringify(notaContent)
-            })
+            // Initialize block structure and convert notebook content to blocks
+            await blockStore.initializeNotaBlocks(newNota.id, title)
+            
+            // TODO: Convert notebook content to blocks
+            // For now, the notebook content will be handled when the editor loads
 
             toast(`Notebook "${title}" imported successfully`)
 

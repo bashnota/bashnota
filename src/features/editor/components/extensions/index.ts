@@ -49,6 +49,10 @@ import {
 import {
   PipelineExtension
 } from '@/features/editor/components/blocks/pipeline/PipelineExtension'
+import { SubNotaLink } from './SubNotaLinkExtension'
+import { SubNotaLinkSlashCommand } from './SubNotaLinkSlashCommand'
+// SubNotaLinkService is now imported lazily to avoid Pinia initialization issues
+import { NotaTitleExtension } from './NotaTitleExtension'
 
 // Import command-related extensions
 import SlashCommands from './Commands'
@@ -136,6 +140,9 @@ export function getEditorExtensions() {
     TheoremExtension,
     ConfusionMatrixExtension,
     PipelineExtension,
+    SubNotaLink,
+    SubNotaLinkSlashCommand,
+    NotaTitleExtension,
   ]
 }
 
@@ -201,6 +208,7 @@ export function getViewerExtensions() {
     TheoremExtension,
     ConfusionMatrixExtension,
     PipelineExtension,
+    SubNotaLink,
   ]
 }
 

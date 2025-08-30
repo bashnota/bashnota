@@ -4,32 +4,37 @@ import { logger } from '@/services/logger'
 declare global {
   interface Window {
     MathJax: any
+    __MATHJAX_CONFIGURED__?: boolean
+    __MATHJAX_LOADING__?: boolean
   }
 }
 
-// Initialize MathJax configuration
-if (typeof window !== 'undefined') {
-  window.MathJax = {
-    tex: {
-      inlineMath: [['$', '$'], ['\\(', '\\)']],
-      displayMath: [['$$', '$$'], ['\\[', '\\]']],
-      processEscapes: true,
-      processEnvironments: true
-    },
-    svg: {
-      fontCache: 'global'
-    },
-    options: {
-      ignoreHtmlClass: 'tex2jax_ignore',
-      processHtmlClass: 'tex2jax_process'
-    },
-    startup: {
-      ready: () => {
-        console.log('MathJax is loaded and ready')
+// Initialize MathJax configuration once
+if (typeof window !== 'undefined' && !window.__MATHJAX_CONFIGURED__) {
+  window.MathJax = window.MathJax || {}
+  window.MathJax.tex = window.MathJax.tex || {
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']],
+    processEscapes: true,
+    processEnvironments: true
+  }
+  window.MathJax.svg = window.MathJax.svg || { fontCache: 'global' }
+  window.MathJax.options = window.MathJax.options || {
+    ignoreHtmlClass: 'tex2jax_ignore',
+    processHtmlClass: 'tex2jax_process'
+  }
+  window.MathJax.startup = window.MathJax.startup || {}
+  // Only set ready handler if not already set
+  if (!window.MathJax.startup.ready) {
+    window.MathJax.startup.ready = () => {
+      console.log('MathJax is loaded and ready')
+      // Guard defaultReady call
+      if (window.MathJax?.startup?.defaultReady) {
         window.MathJax.startup.defaultReady()
       }
     }
   }
+  window.__MATHJAX_CONFIGURED__ = true
 }
 
 export function useMathJax() {
@@ -39,7 +44,7 @@ export function useMathJax() {
   // Check if MathJax is loaded
   const checkMathJaxLoaded = () => {
     try {
-      if (window.MathJax) {
+      if (window.MathJax && (window.MathJax.tex2svg || window.MathJax.startup?.document)) {
         isMathJaxLoaded.value = true
         return true
       }
@@ -50,26 +55,55 @@ export function useMathJax() {
     return false
   }
 
-  // Initialize MathJax
+  // Initialize MathJax (idempotent)
   const initMathJax = () => {
     return new Promise<boolean>((resolve) => {
       try {
-        // Check if MathJax is already loaded
+        // Already loaded
         if (window.MathJax && window.MathJax.tex2svg) {
           isMathJaxLoaded.value = true
           resolve(true)
           return
         }
 
-        // Dynamically load MathJax
+        // Already loading: wait until available
+        const existing = document.querySelector('script[src*="mathjax@3/es5/tex-svg.js"]') as HTMLScriptElement | null
+        if (existing) {
+          const waitReady = () => {
+            if (window.MathJax && window.MathJax.tex2svg) {
+              isMathJaxLoaded.value = true
+              resolve(true)
+            } else {
+              setTimeout(waitReady, 50)
+            }
+          }
+          waitReady()
+          return
+        }
+
+        if (window.__MATHJAX_LOADING__) {
+          const waitReady = () => {
+            if (window.MathJax && window.MathJax.tex2svg) {
+              isMathJaxLoaded.value = true
+              resolve(true)
+            } else {
+              setTimeout(waitReady, 50)
+            }
+          }
+          waitReady()
+          return
+        }
+
+        // Dynamically load MathJax once
+        window.__MATHJAX_LOADING__ = true
         const script = document.createElement('script')
         script.src = 'https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js'
         script.async = true
         script.onload = () => {
-          // Wait for MathJax to be fully initialized
           const checkReady = () => {
             if (window.MathJax && window.MathJax.tex2svg) {
               isMathJaxLoaded.value = true
+              window.__MATHJAX_LOADING__ = false
               resolve(true)
             } else {
               setTimeout(checkReady, 50)
@@ -80,6 +114,7 @@ export function useMathJax() {
         script.onerror = () => {
           error.value = new Error('Failed to load MathJax')
           logger.error('Failed to load MathJax script')
+          window.__MATHJAX_LOADING__ = false
           resolve(false)
         }
         document.head.appendChild(script)
@@ -95,8 +130,7 @@ export function useMathJax() {
   const renderLatex = (latex: string, element: HTMLElement | null, display = true) => {
     if (!element) return false
     if (!latex) {
-      // Clear the element if no LaTeX
-      if (element) element.innerHTML = ''
+      element.innerHTML = ''
       return true
     }
     
@@ -106,7 +140,6 @@ export function useMathJax() {
     }
     
     try {
-      // Use MathJax v3 API
       const output = window.MathJax.tex2svg(latex, { display })
       if (output) {
         element.innerHTML = ''
@@ -129,19 +162,15 @@ export function useMathJax() {
     if (!isMathJaxLoaded.value) return text
     
     try {
-      // Process the string to find and replace LaTeX expressions
       let result = text
-      let inlineRegex = /\$([^\$]+)\$/g
-      let displayRegex = /\$\$([^\$]+)\$\$/g
+      const inlineRegex = /\$([^\$]+)\$/g
+      const displayRegex = /\$\$([^\$]+)\$\$/g
       
-      // Replace display mode LaTeX ($$...$$)
       result = result.replace(displayRegex, (match, latex) => {
         try {
           const output = window.MathJax.tex2svg(latex, { display: true })
-          // Convert the SVG node to a string
           const tempDiv = document.createElement('div')
           tempDiv.appendChild(output.cloneNode(true))
-          // Add a wrapper div with proper styling to avoid line breaks
           return `<div class="mathjax-display-wrapper">${tempDiv.innerHTML}</div>`
         } catch (err) {
           logger.error('Error rendering display LaTeX:', err)
@@ -149,14 +178,11 @@ export function useMathJax() {
         }
       })
       
-      // Replace inline mode LaTeX ($...$)
       result = result.replace(inlineRegex, (match, latex) => {
         try {
           const output = window.MathJax.tex2svg(latex, { display: false })
-          // Convert the SVG node to a string
           const tempDiv = document.createElement('div')
           tempDiv.appendChild(output.cloneNode(true))
-          // Add a span wrapper with proper styling to keep inline math truly inline
           return `<span class="mathjax-inline-wrapper" style="display:inline-flex;vertical-align:middle;">${tempDiv.innerHTML}</span>`
         } catch (err) {
           logger.error('Error rendering inline LaTeX:', err)
@@ -168,7 +194,7 @@ export function useMathJax() {
     } catch (err) {
       error.value = err instanceof Error ? err : new Error(String(err))
       logger.error('Error rendering inline LaTeX:', err)
-      return text // Return original text on error
+      return text
     }
   }
 

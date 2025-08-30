@@ -50,6 +50,7 @@ import {
   Heading3,
   Pilcrow,
   Link2,
+  FileText,
 } from 'lucide-vue-next'
 import { computed, ref, onMounted } from 'vue'
 import type { Editor } from '@tiptap/vue-3'
@@ -221,6 +222,26 @@ onMounted(() => {
     isRenderingMath.value = window['markdownAndKatexRenderState'] ?? true
   }
 })
+
+// Sub-Nota Link Dialog
+const showSubNotaLinkDialog = ref(false)
+const selectedNotaForLink = ref<any>(null)
+
+const openSubNotaLinkDialog = () => {
+  showSubNotaLinkDialog.value = true
+}
+
+const insertSubNotaLink = (nota: any) => {
+  if (editor.value && nota) {
+    editor.value.chain().focus().setSubNotaLink({
+      targetNotaId: nota.id,
+      targetNotaTitle: nota.title,
+      displayText: nota.title,
+      linkStyle: 'inline'
+    }).run()
+    showSubNotaLinkDialog.value = false
+  }
+}
 
 // Toolbar actions configuration
 const historyActions = computed(() => {
@@ -453,6 +474,17 @@ const insertActions = computed(() => {
       label: 'Horizontal Rule',
       tooltip: 'Horizontal rule',
       action: () => editor.value?.chain().focus().setHorizontalRule().run(),
+      group: 'insert'
+    },
+    {
+      id: 'subNotaLink',
+      icon: FileText,
+      label: 'Sub-Nota Link',
+      tooltip: 'Insert link to sub-nota',
+      action: () => {
+        // Show a dialog to select the target nota
+        openSubNotaLinkDialog()
+      },
       group: 'insert'
     },
   ]

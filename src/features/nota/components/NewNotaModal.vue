@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useNotaStore } from '@/features/nota/stores/nota'
+import { useBlockStore } from '@/features/nota/stores/blockStore'
 import { useRouter } from 'vue-router'
 import { 
   FileText, 
@@ -53,6 +54,7 @@ const emit = defineEmits<{
 }>()
 
 const notaStore = useNotaStore()
+const blockStore = useBlockStore()
 const router = useRouter()
 
 // Form state
@@ -155,27 +157,22 @@ const createNota = async () => {
       props.parentId || null
     )
 
-    // Consolidate updates for content and tags
-    const updates: Partial<Nota> = {}
-    if (selectedTemplate.value?.content) {
-      // Convert markdown to Tiptap JSON before saving
-      const tiptapContent = markdownToTiptap(selectedTemplate.value.content)
-      updates.content = JSON.stringify(tiptapContent)
-    }
-    if (selectedTemplate.value?.tags && selectedTemplate.value.tags.length > 0) {
-      updates.tags = selectedTemplate.value.tags
-    }
+    // Initialize with basic block structure
+    await blockStore.initializeNotaBlocks(nota.id, title.value)
+    
+    // TODO: Handle template content conversion to blocks
+    // For now, templates will be handled when the editor loads
 
-    // Apply updates in a single call before navigating
-    if (Object.keys(updates).length > 0) {
+    // Apply tags if provided
+    if (selectedTemplate.value?.tags && selectedTemplate.value.tags.length > 0) {
       await notaStore.saveNota({
         id: nota.id,
-        ...updates,
+        tags: selectedTemplate.value.tags,
       })
     }
 
-    if (updates.tags) {
-      logger.info('Created nota with template tags:', updates.tags)
+    if (selectedTemplate.value?.tags && selectedTemplate.value.tags.length > 0) {
+      logger.info('Created nota with template tags:', selectedTemplate.value.tags)
     }
 
     emit('created', nota)

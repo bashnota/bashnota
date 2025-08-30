@@ -116,31 +116,11 @@ const toggleShareDialog = () => {
 }
 
 /**
- * Export the nota to a JSON file
+ * Export the nota to a .nota file
  */
 const exportNota = async () => {
   try {
-    const notas = await notaStore.exportNota(props.id)
-    
-    // Create file content
-    const fileContent = JSON.stringify(notas, null, 2)
-    
-    // Create blob and download link
-    const blob = new Blob([fileContent], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    
-    // Create download link
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `${nota.value?.title || 'nota'}.nota`
-    
-    // Trigger download
-    document.body.appendChild(link)
-    link.click()
-    
-    // Cleanup
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
+    await notaStore.exportNota(props.id)
     
     toast({
       title: 'Export Complete',

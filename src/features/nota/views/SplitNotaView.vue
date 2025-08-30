@@ -60,17 +60,36 @@ const activeNota = computed(() => {
   return null
 })
 
-// Calculate word count from nota content
+// Helper function to extract text from Tiptap JSON content
+const extractTextFromTiptapContent = (content: any): string => {
+  if (!content || typeof content !== 'object') return ''
+  
+  let text = ''
+  
+  // Recursively extract text from Tiptap content structure
+  const extractText = (node: any) => {
+    if (node.text) {
+      text += node.text
+    }
+    if (node.content && Array.isArray(node.content)) {
+      node.content.forEach(extractText)
+    }
+  }
+  
+  if (content.content && Array.isArray(content.content)) {
+    content.content.forEach(extractText)
+  }
+  
+  return text
+}
+
+// Calculate word count from nota blocks
 const wordCount = computed(() => {
-  if (!activeNota.value?.content) return 0
+  if (!activeNota.value) return 0
   
-  // Remove HTML tags and count words
-  const textContent = activeNota.value.content
-    .replace(/<[^>]*>/g, '') // Remove HTML tags
-    .replace(/\s+/g, ' ') // Normalize whitespace
-    .trim()
-  
-  return textContent ? textContent.split(' ').length : 0
+  // TODO: Implement block-based word count
+  // For now, return 0 as we need to get content from block system
+  return 0
 })
 
 // Get the active pane component reference
