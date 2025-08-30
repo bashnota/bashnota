@@ -1,7 +1,7 @@
 <template>
   <div class="markdown-input-component">
     <Dialog v-model="isOpen" :open="isOpen">
-      <DialogContent class="max-w-6xl max-h-[90vh]">
+      <DialogScrollContent class="max-w-6xl">
         <DialogHeader>
           <DialogTitle>Insert Markdown Content</DialogTitle>
           <DialogDescription>
@@ -9,7 +9,7 @@
           </DialogDescription>
         </DialogHeader>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[70vh]">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <!-- Left Side - Input -->
           <div class="space-y-4">
             <div>
@@ -17,7 +17,7 @@
               <Textarea
                 id="markdown-input"
                 v-model="markdownContent"
-                :rows="20"
+                :rows="15"
                 class="font-mono text-sm resize-none"
                 placeholder="Paste or type your markdown content here...
 
@@ -119,7 +119,7 @@ print(df)
             Insert All Valid Blocks
           </Button>
         </DialogFooter>
-      </DialogContent>
+      </DialogScrollContent>
     </Dialog>
   </div>
 </template>
@@ -129,7 +129,7 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogScrollContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { 
   Trash2, 
   FileText, 
