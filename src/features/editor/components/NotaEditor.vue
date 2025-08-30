@@ -54,54 +54,177 @@ const {
 // New ref for tracking if shared session mode toggle is in progress
 const isTogglingSharedMode = ref(false)
 
-// Add ref to track last saved content
-const lastSavedContent = ref<string>('')
+// Edit queue system for smooth editing experience
+interface EditOperation {
+  id: string
+  type: 'insert' | 'delete' | 'update'
+  position: number
+  content?: any
+  timestamp: number
+  applied: boolean
+}
 
-// Add debounced save function with improved performance
-const debouncedSave = useDebounceFn(async () => {
-  if (!editor.value) return;
+const editQueue = ref<EditOperation[]>([])
+const isProcessingQueue = ref(false)
+const lastSavedContent = ref<string>('')
+const editorContentHash = ref<string>('')
+
+// Generate a hash for content comparison
+const generateContentHash = (content: any): string => {
+  return JSON.stringify(content, (key, value) => {
+    // Ignore temporary attributes that shouldn't affect content hash
+    if (key === 'marks' || key === 'selection') return undefined
+    return value
+  })
+}
+
+// Add edit operation to queue
+const queueEdit = (operation: Omit<EditOperation, 'id' | 'timestamp' | 'applied'>) => {
+  // Don't queue if we're already processing
+  if (isProcessingQueue.value) return
+  
+  // Limit queue size to prevent memory issues
+  if (editQueue.value.length >= 50) {
+    logger.warn('Edit queue limit reached, processing queue immediately')
+    processEditQueue()
+    return
+  }
+  
+  const editOp: EditOperation = {
+    ...operation,
+    id: `edit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    timestamp: Date.now(),
+    applied: false
+  }
+  
+  editQueue.value.push(editOp)
+  
+  // Process queue if not already processing
+  if (!isProcessingQueue.value) {
+    // Use nextTick to ensure we're not in the middle of a transaction
+    nextTick(() => {
+      if (!isProcessingQueue.value) {
+        processEditQueue()
+      }
+    })
+  }
+}
+
+// Handle specific edit types more intelligently
+const handleEditOperation = (transaction: any, editor: any) => {
+  if (!transaction.docChanged || isProcessingQueue.value) return
+  
+  // Analyze the transaction to determine edit type
+  const { steps } = transaction
+  
+  for (const step of steps) {
+    if (step.from !== undefined && step.to !== undefined) {
+      // This is a replacement operation
+      if (step.slice && step.slice.content && step.slice.content.size > 0) {
+        // Content was inserted/replaced
+        queueEdit({
+          type: 'update',
+          position: step.from,
+          content: editor.getJSON()
+        })
+      } else if (step.from !== step.to) {
+        // Content was deleted
+        queueEdit({
+          type: 'delete',
+          position: step.from,
+          content: editor.getJSON()
+        })
+      }
+    }
+  }
+}
+
+// Process edit queue
+const processEditQueue = async () => {
+  if (isProcessingQueue.value || editQueue.value.length === 0) return
+  
+  isProcessingQueue.value = true
   
   try {
-    // Get content without triggering editor updates
-    const content = editor.value.getJSON();
+    // Get current editor content
+    const currentContent = editor.value?.getJSON()
+    if (!currentContent) return
     
-    // Only save if content has actually changed
-    const currentContent = JSON.stringify(content);
-    if (currentContent === lastSavedContent.value) {
-      return; // No changes, skip saving
+    // Clean up old edits (older than 5 minutes) to prevent memory issues
+    const now = Date.now()
+    editQueue.value = editQueue.value.filter(edit => 
+      now - edit.timestamp < 5 * 60 * 1000 && !edit.applied
+    )
+    
+    // Apply all pending edits
+    for (const edit of editQueue.value) {
+      if (!edit.applied) {
+        await applyEditToDatabase(edit, currentContent)
+        edit.applied = true
+      }
     }
     
-    // Update last saved content first to prevent duplicate saves
-    lastSavedContent.value = currentContent;
+    // Clear processed edits
+    editQueue.value = editQueue.value.filter(edit => edit.applied)
     
-    // Emit saving state
-    emit('saving', true);
-    
-    // Save sessions
-    await codeExecutionStore.saveSessions(props.notaId);
-    
-    // Save to block-based system
-    await syncContentToBlocks(content);
+    // Update last saved content
+    lastSavedContent.value = JSON.stringify(currentContent)
     
   } catch (error) {
-    logger.error('Error saving content:', error);
+    logger.error('Error processing edit queue:', error)
   } finally {
-    emit('saving', false);
+    isProcessingQueue.value = false
+    
+    // Don't recursively call processEditQueue here to prevent infinite loops
+    // New edits will be processed on the next save cycle
   }
-}, 2000); // Increased debounce time for smoother experience
+}
 
-// Add a more intelligent save strategy
-const smartSave = useDebounceFn(async () => {
-  if (!editor.value || !editor.value.isFocused) return;
-  
-  // Only save if user has stopped typing for a while
-  const content = editor.value.getJSON();
-  const currentContent = JSON.stringify(content);
-  
-  if (currentContent !== lastSavedContent.value) {
-    debouncedSave();
+// Apply edit to database
+const applyEditToDatabase = async (edit: EditOperation, currentContent: any) => {
+  try {
+    // Save to block-based system
+    await syncContentToBlocks(currentContent)
+    
+    // Save sessions
+    await codeExecutionStore.saveSessions(props.notaId)
+    
+    logger.info(`Applied edit ${edit.id} to database`)
+  } catch (error) {
+    logger.error(`Error applying edit ${edit.id}:`, error)
+    throw error
   }
-}, 3000); // Longer delay for smart save
+}
+
+// Debounced save function that uses the edit queue
+const debouncedSave = useDebounceFn(async () => {
+  if (!editor.value) return
+  
+  try {
+    emit('saving', true)
+    
+    // Process any pending edits
+    await processEditQueue()
+    
+  } catch (error) {
+    logger.error('Error in debounced save:', error)
+  } finally {
+    emit('saving', false)
+  }
+}, 2000)
+
+// Smart save that respects the edit queue
+const smartSave = useDebounceFn(async () => {
+  if (!editor.value || !editor.value.isFocused) return
+  
+  const content = editor.value.getJSON()
+  const currentHash = generateContentHash(content)
+  
+  if (currentHash !== editorContentHash.value) {
+    editorContentHash.value = currentHash
+    debouncedSave()
+  }
+}, 3000)
 
 const currentNota = computed(() => {
   return notaStore.getCurrentNota(props.notaId)
@@ -278,6 +401,9 @@ const editor = useEditor({
     // Set initial content for tracking changes
     const content = editor.getJSON()
     lastSavedContent.value = JSON.stringify(content)
+    
+    // Initialize content hash for the initial content
+    editorContentHash.value = generateContentHash(content)
 
     // Update citation numbers
     updateCitationNumbers()
@@ -324,15 +450,25 @@ const editor = useEditor({
       }
     })
   },
-  onUpdate: ({ editor }) => {
-    // Use smart save to prevent interference with typing
-    if (editor.isFocused && editor.getText().trim().length > 0) {
-      smartSave()
+  onUpdate: ({ editor, transaction }) => {
+    // Only handle edits if they're actual content changes, not just cursor movements
+    // AND we're not currently processing the edit queue to prevent infinite loops
+    if (transaction.docChanged && editor.isFocused && !isProcessingQueue.value) {
+      // Use intelligent edit handling
+      handleEditOperation(transaction, editor)
+      
+      // Update content hash for smart save
+      const content = editor.getJSON()
+      const currentHash = generateContentHash(content)
+      if (currentHash !== editorContentHash.value) {
+        editorContentHash.value = currentHash
+        smartSave()
+      }
     }
   },
   onBlur: ({ editor }) => {
-    // Save immediately when editor loses focus
-    if (editor.getText().trim().length > 0) {
+    // Process any pending edits when editor loses focus
+    if (editQueue.value.length > 0) {
       debouncedSave()
     }
   },
@@ -365,6 +501,46 @@ watch(() => content.value, () => {
 
 // Title block is now displayed separately in the UI, not in the content
 
+// Function to load content from blocks into editor
+const loadContentFromBlocks = () => {
+  try {
+    if (!editor.value) return false
+    
+    const blockContent = getTiptapContent.value
+    if (blockContent) {
+      const currentContent = editor.value.getJSON()
+      const hasRealContent = currentContent && 
+        currentContent.content && 
+        currentContent.content.length > 0 && 
+        currentContent.content.some((node: any) => 
+          node.type !== 'doc' && 
+          (node.content && node.content.length > 0 || node.text)
+        )
+      
+      if (!hasRealContent) {
+        // Load content from database
+        editor.value.commands.setContent(blockContent)
+        
+        // Update content hash and last saved content
+        editorContentHash.value = generateContentHash(blockContent)
+        lastSavedContent.value = JSON.stringify(blockContent)
+        
+        logger.info('Content loaded from blocks into editor:', blockContent)
+        return true
+      } else {
+        logger.info('Editor already has content, skipping load')
+        return false
+      }
+    } else {
+      logger.warn('No block content available to load')
+      return false
+    }
+  } catch (error) {
+    logger.error('Error loading content from blocks:', error)
+    return false
+  }
+}
+
 // Watch for block system initialization to ensure content is loaded
 watch(isBlockSystemReady, (ready) => {
   try {
@@ -372,34 +548,61 @@ watch(isBlockSystemReady, (ready) => {
       // Block system is ready, ensure editor has the latest content
       const blockContent = getTiptapContent.value
       if (blockContent) {
-        // Only update content if editor is empty or significantly different
+        // Always load content on initial block system ready (page refresh)
+        // This is the main purpose of the blocking system
         const currentContent = editor.value.getJSON()
-        const currentContentStr = JSON.stringify(currentContent)
-        const blockContentStr = JSON.stringify(blockContent)
+        const hasRealContent = currentContent && 
+          currentContent.content && 
+          currentContent.content.length > 0 && 
+          currentContent.content.some((node: any) => 
+            node.type !== 'doc' && 
+            (node.content && node.content.length > 0 || node.text)
+          )
         
-        if (currentContentStr !== blockContentStr) {
-          // Preserve cursor position when updating content
-          const { from, to } = editor.value.state.selection
+        if (!hasRealContent) {
+          // This is the initial load (page refresh), set content from database
           editor.value.commands.setContent(blockContent)
           
-          // Restore cursor position if possible
-          try {
-            if (from <= editor.value.state.doc.content.size) {
-              editor.value.commands.setTextSelection(from)
-            }
-          } catch (e) {
-            // If cursor position is invalid, just focus the editor
-            editor.value.commands.focus()
-          }
+          // Update content hash and last saved content for the new content
+          editorContentHash.value = generateContentHash(blockContent)
+          lastSavedContent.value = JSON.stringify(blockContent)
           
-          logger.info('Updated editor content from blocks:', blockContent)
+          logger.info('Initial editor content loaded from blocks (page refresh):', blockContent)
+        } else {
+          logger.info('Editor already has content, skipping load:', currentContent)
         }
+      } else {
+        logger.warn('No block content available when block system is ready')
       }
     }
   } catch (error) {
     logger.error('Error in block system ready watcher:', error)
   }
 })
+
+// Additional watcher specifically for page refresh scenarios
+watch(() => getTiptapContent.value, (newContent, oldContent) => {
+  try {
+    if (newContent && editor.value && !oldContent) {
+      // This is likely a page refresh - content just became available
+      const currentContent = editor.value.getJSON()
+      const hasContent = currentContent && currentContent.content && currentContent.content.length > 0
+      
+      if (!hasContent) {
+        // Force load content from database on page refresh
+        editor.value.commands.setContent(newContent)
+        
+        // Update content hash and last saved content
+        editorContentHash.value = generateContentHash(newContent)
+        lastSavedContent.value = JSON.stringify(newContent)
+        
+        logger.info('Content loaded from database on page refresh:', newContent)
+      }
+    }
+  } catch (error) {
+    logger.error('Error in page refresh content watcher:', error)
+  }
+}, { immediate: true })
 
 // Watch for content changes to update editor when content becomes available
 watch(() => getTiptapContent.value, (newContent) => {
@@ -408,27 +611,20 @@ watch(() => getTiptapContent.value, (newContent) => {
       // Check if we're still loading by evaluating the conditions directly
       const stillLoading = !currentNota.value || !isInitialized.value || !editor.value
       if (!stillLoading) {
-        // Only update content if it's significantly different to prevent cursor jumping
+        // Always load content when it becomes available (page refresh)
+        // This is the main purpose of the blocking system
         const currentContent = editor.value.getJSON()
-        const currentContentStr = JSON.stringify(currentContent)
-        const newContentStr = JSON.stringify(newContent)
+        const hasContent = currentContent && currentContent.content && currentContent.content.length > 0
         
-        if (currentContentStr !== newContentStr) {
-          // Preserve cursor position when updating content
-          const { from, to } = editor.value.state.selection
+        if (!hasContent) {
+          // This is the initial load (page refresh), set content from database
           editor.value.commands.setContent(newContent)
           
-          // Restore cursor position if possible
-          try {
-            if (from <= editor.value.state.doc.content.size) {
-              editor.value.commands.setTextSelection(from)
-            }
-          } catch (e) {
-            // If cursor position is invalid, just focus the editor
-            editor.value.commands.focus()
-          }
+          // Update content hash and last saved content for the new content
+          editorContentHash.value = generateContentHash(newContent)
+          lastSavedContent.value = JSON.stringify(newContent)
           
-          logger.info('Updated editor content from content watcher:', newContent)
+          logger.info('Initial editor content loaded from content watcher (page refresh):', newContent)
         }
       }
     }
@@ -917,7 +1113,32 @@ defineExpose({
   registerCodeCell,
   registerCodeCellsOnDemand,
   findCodeBlocks,
-  registerCodeCellForExecution
+  registerCodeCellForExecution,
+  // Edit queue management
+  processEditQueue,
+  queueEdit,
+  // Manual sync when needed
+  syncContent: () => {
+    if (editor.value) {
+      const content = editor.value.getJSON()
+      syncContentToBlocks(content)
+    }
+  },
+  // Force load content from database (for debugging/testing)
+  forceLoadContent: () => {
+    if (editor.value) {
+      const blockContent = getTiptapContent.value
+      if (blockContent) {
+        editor.value.commands.setContent(blockContent)
+        editorContentHash.value = generateContentHash(blockContent)
+        lastSavedContent.value = JSON.stringify(blockContent)
+        logger.info('Content force-loaded from database:', blockContent)
+        return true
+      }
+      return false
+    }
+    return false
+  }
 })
 
 </script>

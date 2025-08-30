@@ -383,6 +383,25 @@ export const useBlockStore = defineStore('blocks', {
           structure.lastModified = new Date()
           await this.saveBlockStructure(structure)
         }
+        
+        // Ensure blockOrder is populated even if migration wasn't needed
+        if (structure.blockOrder.length === 0 && this.blocks.size > 0) {
+          logger.info('BlockOrder is empty but blocks exist, rebuilding order for nota:', notaId)
+          const sortedBlocks = Array.from(this.blocks.entries())
+            .map(([cid, b]) => b)
+            .sort((a, b) => a.order - b.order)
+          structure.blockOrder = sortedBlocks.map(b => toCompositeId(b as any))
+          structure.version++
+          structure.lastModified = new Date()
+          await this.saveBlockStructure(structure)
+        }
+        
+        // Log the final structure for debugging
+        logger.info('Final block structure for nota:', notaId, {
+          blockOrderLength: structure.blockOrder.length,
+          blocksCount: this.blocks.size,
+          blockOrder: structure.blockOrder.slice(0, 5) // Show first 5 for debugging
+        })
 
         this.blockStructures.set(notaId, structure)
 
@@ -461,7 +480,42 @@ export const useBlockStore = defineStore('blocks', {
      */
     getTiptapContent(notaId: string): any | null {
       const structure = this.blockStructures.get(notaId)
+      logger.info('getTiptapContent called for nota:', notaId, {
+        hasStructure: !!structure,
+        blockOrderLength: structure?.blockOrder?.length || 0,
+        blocksSize: this.blocks.size
+      })
+      
+      // Fallback: if blockOrder is empty but blocks exist, try to rebuild the order
+      if (structure && structure.blockOrder.length === 0 && this.blocks.size > 0) {
+        logger.info('BlockOrder is empty but blocks exist, attempting to rebuild order for nota:', notaId)
+        try {
+          // Get all blocks for this nota and sort them by order
+          const allBlocks = Array.from(this.blocks.values())
+            .filter(block => block.notaId === notaId)
+            .sort((a, b) => a.order - b.order)
+          
+          if (allBlocks.length > 0) {
+            // Rebuild the blockOrder
+            structure.blockOrder = allBlocks.map(block => toCompositeId(block as any))
+            structure.version++
+            structure.lastModified = new Date()
+            
+            // Save the updated structure
+            this.saveBlockStructure(structure)
+            
+            logger.info('Successfully rebuilt blockOrder for nota:', notaId, {
+              newBlockOrderLength: structure.blockOrder.length,
+              blockTypes: allBlocks.map(b => b.type)
+            })
+          }
+        } catch (error) {
+          logger.error('Failed to rebuild blockOrder for nota:', notaId, error)
+        }
+      }
+      
       if (!structure || structure.blockOrder.length === 0) {
+        logger.warn('No block structure or empty blockOrder for nota:', notaId)
         return null
       }
       
@@ -470,7 +524,14 @@ export const useBlockStore = defineStore('blocks', {
         .filter((block): block is Block => block !== undefined)
         .sort((a, b) => a.order - b.order)
       
+      logger.info('Converted blocks for Tiptap:', {
+        requestedBlocks: structure.blockOrder.length,
+        foundBlocks: blocks.length,
+        blockTypes: blocks.map(b => b.type)
+      })
+      
       if (blocks.length === 0) {
+        logger.warn('No blocks found after conversion for nota:', notaId)
         return null
       }
       
@@ -478,6 +539,11 @@ export const useBlockStore = defineStore('blocks', {
         type: 'doc',
         content: blocks.map(block => this.convertBlockToTiptap(block))
       }
+      
+      logger.info('Generated Tiptap content for nota:', notaId, {
+        contentLength: content.content.length,
+        firstBlockType: content.content[0]?.type
+      })
       
       return content
     },
