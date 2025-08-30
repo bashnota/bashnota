@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useBlockStore } from '@/features/nota/stores/blockStore'
 import { useRouter } from 'vue-router'
@@ -19,7 +19,7 @@ import {
 } from 'lucide-vue-next'
 import {
   Dialog,
-  DialogContent,
+  DialogScrollContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
@@ -63,6 +63,10 @@ const description = ref('')
 const selectedTemplate = ref<NotaTemplate | null>(null)
 const searchQuery = ref('')
 const isCreating = ref(false)
+
+// Form validation
+const titleError = ref('')
+const isFormValid = computed(() => title.value.trim().length > 0 && selectedTemplate.value)
 
 // Template definitions
 const templates = ref<NotaTemplate[]>([
@@ -141,9 +145,29 @@ const selectTemplate = (template: NotaTemplate) => {
   if (!title.value && template.id !== 'blank') {
     title.value = template.name
   }
+  
+
+}
+
+const validateTitle = () => {
+  const trimmedTitle = title.value.trim()
+  if (trimmedTitle.length === 0) {
+    titleError.value = 'Title is required'
+    return false
+  }
+  if (trimmedTitle.length > 100) {
+    titleError.value = 'Title must be 100 characters or less'
+    return false
+  }
+  titleError.value = ''
+  return true
 }
 
 const createNota = async () => {
+  if (!validateTitle()) {
+    return
+  }
+
   if (!title.value.trim()) {
     title.value = selectedTemplate.value?.name || 'Untitled Nota'
   }
@@ -197,6 +221,23 @@ const resetForm = () => {
   description.value = ''
   selectedTemplate.value = null
   searchQuery.value = ''
+  titleError.value = ''
+}
+
+const handleKeydown = (event: KeyboardEvent) => {
+  // Enter key to create nota
+  if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+    event.preventDefault()
+    if (isFormValid.value) {
+      createNota()
+    }
+  }
+  
+  // Escape key to close modal
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    emit('update:open', false)
+  }
 }
 
 // Watch for modal close to reset form
@@ -206,30 +247,42 @@ watch(() => props.open, (open) => {
   } else {
     // Auto-select blank template by default
     selectedTemplate.value = templates.value[0]
+    
+
+  }
+})
+
+// Watch title for real-time validation
+watch(title, () => {
+  if (titleError.value) {
+    validateTitle()
   }
 })
 </script>
 
 <template>
   <Dialog :open="open" @update:open="$emit('update:open', $event)">
-    <DialogContent class="max-w-4xl max-h-[90vh] p-0">
+    <DialogScrollContent 
+      class="max-w-4xl max-h-[90vh] p-0" 
+      @keydown="handleKeydown"
+    >
       <DialogHeader class="p-6 pb-0">
         <DialogTitle class="text-xl font-semibold">Create New Nota</DialogTitle>
         <DialogDescription class="text-muted-foreground">
           Create a new nota from a template or start with a blank canvas.
+          <span class="block text-xs mt-1">Press Ctrl/Cmd + Enter to create, Esc to cancel</span>
         </DialogDescription>
       </DialogHeader>
 
-      <div class="flex h-[70vh]">
+      <div class="flex h-[calc(90vh-120px)]">
         <!-- Template Selection Panel -->
-        <div class="w-1/2 border-r flex flex-col">
+        <div class="w-1/2 border-r flex flex-col overflow-hidden">
           <!-- Search -->
-          <div class="p-4 border-b">
+          <div class="p-4 border-b flex-shrink-0">
             <div class="relative">
               <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                :value="searchQuery"
-                @input="searchQuery = ($event.target as HTMLInputElement).value"
+                v-model="searchQuery"
                 placeholder="Search templates..."
                 class="pl-9"
               />
@@ -245,9 +298,14 @@ watch(() => props.open, (open) => {
                   <div
                     v-for="template in templatesByCategory[category]"
                     :key="template.id"
-                    class="p-3 border rounded-lg cursor-pointer transition-all hover:shadow-sm"
+                    class="p-3 border rounded-lg cursor-pointer transition-all hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     :class="selectedTemplate?.id === template.id ? 'border-primary bg-primary/5' : 'hover:border-muted-foreground/30'"
                     @click="selectTemplate(template)"
+                    @keydown.enter="selectTemplate(template)"
+                    @keydown.space="selectTemplate(template)"
+                    tabindex="0"
+                    role="button"
+                    :aria-label="`Select ${template.name} template`"
                   >
                     <div class="flex items-start gap-3">
                       <div class="p-2 rounded-md bg-muted">
@@ -271,22 +329,32 @@ watch(() => props.open, (open) => {
         </div>
 
         <!-- Preview and Form Panel -->
-        <div class="w-1/2 flex flex-col">
+        <div class="w-1/2 flex flex-col overflow-hidden">
           <!-- Form -->
-          <div class="p-4 border-b space-y-4">
+          <div class="p-4 border-b space-y-4 flex-shrink-0">
             <div>
-              <label class="text-sm font-medium mb-2 block">Title</label>
+              <label for="nota-title" class="text-sm font-medium mb-2 block">Title *</label>
               <Input
-                :value="title"
-                @input="title = ($event.target as HTMLInputElement).value"
+                id="nota-title"
+                v-model="title"
                 placeholder="Enter nota title..."
                 class="w-full"
+                :class="{ 'border-destructive': titleError }"
+                @blur="validateTitle"
+                @keydown.enter="() => createNota()"
               />
+              <div v-if="titleError" class="text-sm text-destructive mt-1">
+                {{ titleError }}
+              </div>
+              <div class="text-xs text-muted-foreground mt-1">
+                {{ title.length }}/100 characters
+              </div>
             </div>
             
             <div v-if="selectedTemplate && selectedTemplate.id !== 'blank'">
-              <label class="text-sm font-medium mb-2 block">Description (Optional)</label>
+              <label for="nota-description" class="text-sm font-medium mb-2 block">Description (Optional)</label>
               <Textarea
+                id="nota-description"
                 v-model="description"
                 placeholder="Add a description..."
                 class="w-full resize-none"
@@ -296,7 +364,7 @@ watch(() => props.open, (open) => {
           </div>
 
           <!-- Preview -->
-          <div class="flex-1 p-4">
+          <div class="flex-1 p-4 overflow-y-auto">
             <div v-if="selectedTemplate">
               <div class="flex items-center gap-2 mb-3">
                 <component :is="selectedTemplate.icon" class="h-5 w-5" />
@@ -317,7 +385,7 @@ watch(() => props.open, (open) => {
           </div>
 
           <!-- Actions -->
-          <div class="p-4 border-t flex justify-end gap-2">
+          <div class="p-4 border-t flex justify-end gap-2 flex-shrink-0">
             <Button 
               variant="outline" 
               @click="$emit('update:open', false)"
@@ -327,7 +395,7 @@ watch(() => props.open, (open) => {
             </Button>
             <Button 
               @click="createNota"
-              :disabled="isCreating || !selectedTemplate"
+              :disabled="isCreating || !isFormValid"
               class="min-w-[100px]"
             >
               <div v-if="isCreating" class="flex items-center gap-2">
@@ -339,7 +407,7 @@ watch(() => props.open, (open) => {
           </div>
         </div>
       </div>
-    </DialogContent>
+    </DialogScrollContent>
   </Dialog>
 </template>
 
@@ -350,5 +418,11 @@ watch(() => props.open, (open) => {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* Focus styles for template selection */
+.template-item:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
 }
 </style> 
