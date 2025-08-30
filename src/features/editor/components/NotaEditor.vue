@@ -77,9 +77,6 @@ const debouncedSave = useDebounceFn(async () => {
     // Emit saving state
     emit('saving', true);
     
-    // Register code cells if needed (only when content changes)
-    registerCodeCells(content, props.notaId);
-    
     // Save sessions
     await codeExecutionStore.saveSessions(props.notaId);
     
@@ -129,29 +126,13 @@ const content = computed(() => {
   }
 })
 
-const registerCodeCells = (content: any, notaId: string) => {
-  // Find all executable code blocks in the content
-  const findCodeBlocks = (node: any): any[] => {
-    const blocks: any[] = []
-    if (node.type === 'executableCodeBlock') {
-      blocks.push(node)
-    }
-    if (node.content) {
-      node.content.forEach((child: any) => {
-        blocks.push(...findCodeBlocks(child))
-      })
-    }
-    return blocks
-  }
-
-  const codeBlocks = findCodeBlocks(content)
-  const servers = jupyterStore.jupyterServers
-
-  // Register each code block with the store
-  codeBlocks.forEach((block) => {
+// On-demand code cell registration for better performance
+const registerCodeCell = (block: any) => {
+  try {
     const { attrs, content } = block
     const code = content ? content.map((c: any) => c.text).join('\n') : ''
 
+    const servers = jupyterStore.jupyterServers
     const serverID = attrs.serverID ? getURLWithoutProtocol(attrs.serverID).split(':') : null
     const server = serverID
       ? servers.find(
@@ -167,8 +148,61 @@ const registerCodeCells = (content: any, notaId: string) => {
       output: attrs.output,
       sessionId: attrs.sessionId,
     })
-  })
+    
+    logger.info(`Registered code cell: ${attrs.id}`)
+  } catch (error) {
+    logger.error('Error registering code cell:', error)
+  }
 }
+
+// Function to find all code blocks in content (for when we need to scan)
+const findCodeBlocks = (content: any): any[] => {
+  const blocks: any[] = []
+  const scanNode = (node: any) => {
+    if (node.type === 'executableCodeBlock') {
+      blocks.push(node)
+    }
+    if (node.content) {
+      node.content.forEach((child: any) => {
+        scanNode(child)
+      })
+    }
+  }
+  scanNode(content)
+  return blocks
+}
+
+// Function to register code cells on-demand (called when user interacts with them)
+const registerCodeCellsOnDemand = (content: any, notaId: string) => {
+  const codeBlocks = findCodeBlocks(content)
+  codeBlocks.forEach(registerCodeCell)
+}
+
+// Function to register a code cell when it's about to be executed
+const registerCodeCellForExecution = (blockId: string) => {
+  if (!editor.value) return
+  
+  const content = editor.value.getJSON()
+  const findBlockById = (node: any): any => {
+    if (node.attrs?.id === blockId) {
+      return node
+    }
+    if (node.content) {
+      for (const child of node.content) {
+        const found = findBlockById(child)
+        if (found) return found
+      }
+    }
+    return null
+  }
+  
+  const block = findBlockById(content)
+  if (block && block.type === 'executableCodeBlock') {
+    registerCodeCell(block)
+  }
+}
+
+
 
 const editorSettings = reactive({
   fontSize: 16,
@@ -241,23 +275,51 @@ const editor = useEditor({
     // Load saved sessions first
     codeExecutionStore.loadSavedSessions(props.notaId)
 
-    // Then register code cells which will associate them with sessions
+    // Set initial content for tracking changes
     const content = editor.getJSON()
     lastSavedContent.value = JSON.stringify(content)
-    registerCodeCells(content, props.notaId)
 
     // Update citation numbers
     updateCitationNumbers()
 
     editor.view.dom.addEventListener('click', (event) => {
       const target = event.target as HTMLElement
-      // Find the closest link element (either the target or its parent)
+      
+      // Handle link clicks
       const linkElement = target.tagName === 'A' ? target : target.closest('a')
       if (linkElement) {
         event.preventDefault()
         const href = linkElement.getAttribute('href')
         if (href?.startsWith('/nota/')) {
           router.push(href)
+        }
+        return
+      }
+      
+      // Handle code block clicks for on-demand registration
+      const codeBlockElement = target.closest('[data-type="executableCodeBlock"]')
+      if (codeBlockElement) {
+        const blockId = codeBlockElement.getAttribute('data-block-id')
+        if (blockId) {
+          // Find the block in the current content and register it
+          const content = editor.getJSON()
+          const findBlockById = (node: any): any => {
+            if (node.attrs?.id === blockId) {
+              return node
+            }
+            if (node.content) {
+              for (const child of node.content) {
+                const found = findBlockById(child)
+                if (found) return found
+              }
+            }
+            return null
+          }
+          
+          const block = findBlockById(content)
+          if (block && block.type === 'executableCodeBlock') {
+            registerCodeCell(block)
+          }
         }
       }
     })
@@ -852,6 +914,10 @@ defineExpose({
   createAndLinkSubNota,
   saveVersion,
   showVersionHistory,
+  registerCodeCell,
+  registerCodeCellsOnDemand,
+  findCodeBlocks,
+  registerCodeCellForExecution
 })
 
 </script>
