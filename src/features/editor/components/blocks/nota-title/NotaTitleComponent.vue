@@ -17,17 +17,12 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { NodeViewWrapper } from '@tiptap/vue-3'
+import { NodeViewWrapper, type NodeViewProps } from '@tiptap/vue-3'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { toast } from 'vue-sonner'
 
-interface Props {
-  node: any
-  updateAttributes: (attrs: Record<string, any>) => void
-  editor: any
-}
-
-const props = defineProps<Props>()
+// Use the proper NodeViewProps interface from Tiptap
+const props = defineProps<NodeViewProps>()
 
 const notaStore = useNotaStore()
 const titleInput = ref<HTMLElement>()
@@ -105,14 +100,16 @@ const saveTitle = async (title: string) => {
   try {
     isSaving.value = true
     
-    // Get the nota ID from the editor or URL
-    const notaId = props.editor.options.content.notaId || 
-                   window.location.pathname.split('/').pop()
+    // Get the nota ID from the URL path
+    const pathSegments = window.location.pathname.split('/')
+    const notaId = pathSegments[pathSegments.length - 1]
     
-    if (notaId) {
+    if (notaId && notaId !== '') {
       await notaStore.updateNotaTitle(notaId, title)
       originalTitle.value = title
       toast.success('Title updated')
+    } else {
+      throw new Error('Could not determine nota ID')
     }
     
   } catch (error) {

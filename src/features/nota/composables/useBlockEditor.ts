@@ -178,20 +178,7 @@ export function useBlockEditor(notaId: string) {
               }
               break
               
-            case 'subNotaLink':
-              // Handle standalone subNotaLink blocks (if they ever come as direct nodes)
-              blockData.type = 'subNotaLink'
-              blockData.targetNotaId = node.attrs?.targetNotaId || ''
-              blockData.targetNotaTitle = node.attrs?.targetNotaTitle || 'Untitled Nota'
-              blockData.displayText = node.attrs?.displayText || node.attrs?.targetNotaTitle || 'Untitled Nota'
-              blockData.linkStyle = node.attrs?.linkStyle || 'inline'
-              
-              // Validate required fields for subNotaLink blocks
-              if (!blockData.targetNotaId) {
-                logger.warn('subNotaLink block missing targetNotaId, using placeholder')
-                blockData.targetNotaId = 'placeholder'
-              }
-              break
+
               
             case 'codeBlock':
               blockData.type = 'code'
