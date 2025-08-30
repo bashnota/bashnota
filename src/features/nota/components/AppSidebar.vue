@@ -689,7 +689,7 @@ const handleNotaDeleted = async (notaId: string) => {
           
           <!-- Version Info (hidden when collapsed) -->
           <div class="group-data-[collapsible=icon]:hidden ml-auto">
-            <span class="text-xs text-muted-foreground">v0.1</span>
+            <span class="text-xs text-muted-foreground">v0.2.0</span>
           </div>
         </div>
       </div>
