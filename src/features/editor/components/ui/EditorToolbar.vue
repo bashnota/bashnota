@@ -233,7 +233,7 @@ const openSubNotaLinkDialog = () => {
 
 const insertSubNotaLink = (nota: any) => {
   if (editor.value && nota) {
-    editor.value.chain().focus().insertSubNotaLink({
+    editor.value.chain().focus().setSubNotaLink({
       targetNotaId: nota.id,
       targetNotaTitle: nota.title,
       displayText: nota.title,

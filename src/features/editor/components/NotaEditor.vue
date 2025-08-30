@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import { TagsInput } from '@/components/ui/tags-input'
-import { RotateCw, CheckCircle, Star, Share2, Download, PlayCircle, Loader2, Save, Clock, Sparkles, Book, Server, Tag, Link2 } from 'lucide-vue-next'
+import { RotateCw, CheckCircle, Star, Share2, Download, PlayCircle, Save, Clock, Sparkles, Book, Server, Tag, Link2 } from 'lucide-vue-next'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
-import { ref, watch, computed, onUnmounted, onMounted, reactive, provide } from 'vue'
+import { ref, watch, computed, onUnmounted, onMounted, reactive, provide, nextTick } from 'vue'
 import 'highlight.js/styles/github.css'
 import { useRouter } from 'vue-router'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -102,14 +102,11 @@ const content = computed(() => {
     return blockContent
   }
   
-  // Fallback to empty document with title
+  // Return empty document when no block content is available
+  // The title block is displayed separately in the UI, not in the content
   return {
     type: 'doc',
-    content: [{
-      type: 'heading',
-      attrs: { level: 1 },
-      content: [{ type: 'text', text: currentNota.value.title || 'Untitled' }]
-    }]
+    content: []
   }
 })
 
@@ -169,7 +166,7 @@ const editorSettings = reactive({
 const editorExtensions = getEditorExtensions()
 
 const editor = useEditor({
-  content: content.value,
+  content: null, // Start with no content, let the loading state handle it
   extensions: editorExtensions,
   editorProps: {
     attributes: {
@@ -245,7 +242,6 @@ const editor = useEditor({
         }
       }
     })
-    isLoading.value = false
   },
   onUpdate: () => {
     // Use debounced save to prevent too frequent updates
@@ -270,24 +266,52 @@ watch(
 
 // Watch for content changes to reset the equation counter
 watch(() => content.value, () => {
-  // Reset the equation counter when the content changes
-  resetEquationCounter()
-})
-
-// Watch for block system initialization to ensure content is loaded
-watch(isBlockSystemReady, (ready) => {
-  if (ready && editor.value) {
-    // Block system is ready, ensure editor has the latest content
-    const blockContent = getTiptapContent.value
-    if (blockContent) {
-      // Always update editor content when blocks are loaded
-      editor.value.commands.setContent(blockContent)
-      logger.info('Updated editor content from blocks:', blockContent)
-    }
+  try {
+    // Reset the equation counter when the content changes
+    resetEquationCounter()
+  } catch (error) {
+    logger.error('Error in content change watcher:', error)
   }
 })
 
-const isLoading = ref(true)
+// Title block is now displayed separately in the UI, not in the content
+
+// Watch for block system initialization to ensure content is loaded
+watch(isBlockSystemReady, (ready) => {
+  try {
+    if (ready && editor.value) {
+      // Block system is ready, ensure editor has the latest content
+      const blockContent = getTiptapContent.value
+      if (blockContent) {
+        // Update editor content directly - title block is handled separately in UI
+        editor.value.commands.setContent(blockContent)
+        logger.info('Updated editor content from blocks:', blockContent)
+      }
+    }
+  } catch (error) {
+    logger.error('Error in block system ready watcher:', error)
+  }
+})
+
+// Watch for content changes to update editor when content becomes available
+watch(() => getTiptapContent.value, (newContent) => {
+  try {
+    if (newContent && editor.value) {
+      // Check if we're still loading by evaluating the conditions directly
+      const stillLoading = !currentNota.value || !isInitialized.value || !editor.value
+      if (!stillLoading) {
+        // Update editor content directly - title block is handled separately in UI
+        editor.value.commands.setContent(newContent)
+        logger.info('Updated editor content from content watcher:', newContent)
+      }
+    }
+  } catch (error) {
+    logger.error('Error in content watcher:', error)
+  }
+})
+
+// Loading state is now handled by the parent NotaPane component
+// This component focuses on editor-specific functionality
 
 const wordCount = computed(() => {
   if (!editor.value) return 0
@@ -331,6 +355,12 @@ function applyEditorSettings(settings = editorSettings) {
 
 const isSaving = ref(false)
 const showSaved = ref(false)
+
+// Title field refs and state
+const titleInput = ref<HTMLElement>()
+const originalTitle = ref('')
+const currentTitle = ref('')
+const isTitleSaving = ref(false)
 
 // Optimize toggleSharedSessionMode
 const toggleSharedSessionMode = async () => {
@@ -432,6 +462,16 @@ const handleKeyboardShortcuts = (event: KeyboardEvent) => {
 onMounted(async () => {
   // Initialize block system for this nota
   await initializeBlocks()
+  
+  // Initialize title field after a short delay to ensure DOM is ready
+  nextTick(() => {
+    if (titleInput.value && currentNota.value) {
+      const title = currentNota.value.title || ''
+      titleInput.value.textContent = title
+      currentTitle.value = title
+      originalTitle.value = title
+    }
+  })
   
   // Add keyboard shortcut event listener
   document.addEventListener('keydown', handleKeyboardShortcuts)
@@ -660,6 +700,87 @@ watch(() => citationStore.getCitationsByNotaId(props.notaId), () => {
   updateCitationNumbers()
 }, { deep: true })
 
+// Watch for nota changes to update title field
+watch(currentNota, (newNota) => {
+  if (newNota && titleInput.value) {
+    const title = newNota.title || ''
+    titleInput.value.textContent = title
+    currentTitle.value = title
+    originalTitle.value = title
+  }
+})
+
+// Title field methods
+const handleTitleInput = (event: Event) => {
+  const target = event.target as HTMLElement
+  currentTitle.value = target.textContent || ''
+}
+
+const handleTitleFocus = () => {
+  originalTitle.value = currentTitle.value
+}
+
+const handleTitleBlur = async () => {
+  if (isTitleSaving.value) return
+  
+  const title = currentTitle.value.trim()
+  
+  // Don't save if no changes or empty
+  if (title === originalTitle.value || title === '') {
+    if (title === '') {
+      // Revert empty title
+      if (titleInput.value) {
+        titleInput.value.textContent = originalTitle.value
+        currentTitle.value = originalTitle.value
+      }
+    }
+    return
+  }
+  
+  // Auto-save the title
+  await saveTitle(title)
+}
+
+const handleTitleKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Enter') {
+    event.preventDefault()
+    // Move focus to the editor to trigger auto-save
+    editor.value?.commands.focus()
+  } else if (event.key === 'Escape') {
+    event.preventDefault()
+    // Revert to original title
+    if (titleInput.value) {
+      titleInput.value.textContent = originalTitle.value
+      currentTitle.value = originalTitle.value
+    }
+  }
+}
+
+const saveTitle = async (title: string) => {
+  if (isTitleSaving.value) return
+  
+  try {
+    isTitleSaving.value = true
+    
+    // Update the nota title in the store
+    await notaStore.updateNotaTitle(props.notaId, title)
+    originalTitle.value = title
+    toast.success('Title updated')
+    
+  } catch (error) {
+    console.error('Error saving title:', error)
+    toast.error('Failed to update title')
+    
+    // Revert on error
+    if (titleInput.value) {
+      titleInput.value.textContent = originalTitle.value
+      currentTitle.value = originalTitle.value
+    }
+  } finally {
+    isTitleSaving.value = false
+  }
+}
+
 defineExpose({
   editor,
   insertSubNotaLink,
@@ -672,11 +793,6 @@ defineExpose({
 
 <template>
   <div class="h-full w-full flex overflow-hidden">
-    <!-- Loading skeleton -->
-    <div v-if="isLoading" class="absolute inset-0 z-10 flex items-center justify-center bg-background/80">
-      <Skeleton class="w-8 h-8 rounded-full" />
-    </div>
-
     <!-- Main Editor Area -->
     <div class="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
       <!-- Editor Content -->
@@ -688,9 +804,23 @@ defineExpose({
               <!-- Breadcrumb Navigation -->
               <NotaBreadcrumb v-if="currentNota" :nota-id="currentNota.id" class="mb-4" />
               
-              <!-- The title is now the first block inside the editor -->
+              <!-- Nota Title Field -->
+              <div class="nota-title-field mb-6">
+                <div
+                  ref="titleInput"
+                  class="nota-title-input"
+                  contenteditable="true"
+                  :placeholder="'Untitled'"
+                  @input="handleTitleInput"
+                  @blur="handleTitleBlur"
+                  @keydown="handleTitleKeydown"
+                  @focus="handleTitleFocus"
+                ></div>
+              </div>
+              
+              <!-- Editor content area -->
               <editor-content :editor="editor" />
-              <!-- Tags and Save Status below title -->
+              <!-- Tags and Save Status below editor content -->
               <div class="flex items-center gap-4 mt-2">
                 <TagsInput v-if="currentNota" v-model="currentNota.tags" class="w-full border-none" />
                 <div class="flex items-center text-xs text-muted-foreground transition-opacity duration-200"
@@ -721,6 +851,44 @@ defineExpose({
 /* Apply the editor-specific class to the editable ProseMirror instance */
 :deep(.ProseMirror) {
   min-height: calc(100vh - 10rem);
+}
+
+/* Nota title field styles */
+.nota-title-field {
+  margin-bottom: 1.5rem;
+}
+
+.nota-title-input {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: hsl(var(--foreground));
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0.5rem 0;
+  min-height: 3rem;
+  resize: none;
+  font-family: inherit;
+  width: 100%;
+}
+
+.nota-title-input:empty::before {
+  content: attr(placeholder);
+  color: hsl(var(--muted-foreground));
+  pointer-events: none;
+}
+
+.nota-title-input:focus {
+  outline: none;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .nota-title-input {
+    font-size: 1.5rem;
+    min-height: 2.5rem;
+  }
 }
 </style>
 

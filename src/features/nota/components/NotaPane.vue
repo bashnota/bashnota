@@ -54,7 +54,31 @@
       </template>
       
       <div v-else class="flex items-center justify-center h-full">
-        <p class="text-muted-foreground">Loading...</p>
+        <div class="flex flex-col items-center gap-4 p-8 rounded-lg bg-card border shadow-lg">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+            <div class="flex flex-col">
+              <h3 class="text-lg font-semibold">Loading Nota</h3>
+              <p class="text-sm text-muted-foreground">Please wait while we prepare your notebook...</p>
+            </div>
+          </div>
+          
+          <!-- Progress indicators -->
+          <div class="w-full space-y-2">
+            <div class="flex items-center justify-between text-xs">
+              <span>Nota</span>
+              <span :class="loadingStep !== 'nota' ? 'text-green-600' : 'text-muted-foreground'">
+                {{ loadingStep !== 'nota' ? '✓ Loaded' : '⏳ Loading...' }}
+              </span>
+            </div>
+            <div class="flex items-center justify-between text-xs">
+              <span>Editor</span>
+              <span :class="loadingStep === 'ready' ? 'text-green-600' : 'text-muted-foreground'">
+                {{ loadingStep === 'ready' ? '✓ Ready' : '⏳ Initializing...' }}
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     
@@ -116,10 +140,18 @@ const showConfigModal = ref(false)
 const showShareDialog = ref(false)
 const isDragOver = ref(false)
 const notaEditorRef = ref<InstanceType<typeof NotaEditor> | null>(null)
+const loadingStep = ref<'nota' | 'editor' | 'ready'>('nota')
 
 // Computed properties
 const nota = computed(() => {
   return props.pane.notaId ? notaStore.getCurrentNota(props.pane.notaId) : null
+})
+
+// Watch for when nota becomes available to update loading step
+watch(nota, (newNota) => {
+  if (newNota && loadingStep.value === 'nota') {
+    loadingStep.value = 'editor'
+  }
 })
 
 const isActive = computed(() => props.pane.isActive)
@@ -145,6 +177,10 @@ watch(
     if (newEditor && isActive.value) {
       editorStore.setActiveEditor(newEditor)
       editorStore.setActiveEditorComponent(notaEditorRef.value)
+      // Update loading step when editor is ready
+      if (loadingStep.value === 'editor') {
+        loadingStep.value = 'ready'
+      }
     }
   }
 )
@@ -152,6 +188,7 @@ watch(
 const loadNota = async (notaId: string) => {
   try {
     isReady.value = false
+    loadingStep.value = 'nota'
     
     // Ensure the nota is loaded
     const loadedNota = await notaStore.loadNota(notaId)
@@ -173,7 +210,11 @@ const loadNota = async (notaId: string) => {
       })
     }
     
+    loadingStep.value = 'editor'
+    // Wait a bit for the editor to initialize
+    await new Promise(resolve => setTimeout(resolve, 100))
     isReady.value = true
+    loadingStep.value = 'ready'
   } catch (error) {
     logger.error('Error loading nota in pane:', error)
     toast({
@@ -192,6 +233,7 @@ watch(
       await loadNota(newNotaId)
     } else {
       isReady.value = false
+      loadingStep.value = 'nota'
     }
   },
   { immediate: true }

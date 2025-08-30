@@ -52,6 +52,7 @@ import {
 import { SubNotaLink } from './SubNotaLinkExtension'
 import { SubNotaLinkSlashCommand } from './SubNotaLinkSlashCommand'
 import { subNotaLinkService } from './services/SubNotaLinkService'
+import { NotaTitleExtension } from './NotaTitleExtension'
 
 // Import command-related extensions
 import SlashCommands from './Commands'
@@ -141,6 +142,7 @@ export function getEditorExtensions() {
     PipelineExtension,
     SubNotaLink,
     SubNotaLinkSlashCommand,
+    NotaTitleExtension,
   ]
 }
 

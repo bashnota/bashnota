@@ -262,6 +262,27 @@ export const useNotaStore = defineStore('nota', {
       }
     },
 
+    async updateNotaTitle(id: string, newTitle: string) {
+      const item = this.items.find((i) => i.id === id)
+      if (item) {
+        item.title = newTitle
+        item.updatedAt = new Date()
+        await db.notas.update(id, {
+          title: newTitle,
+          updatedAt: new Date().toISOString(),
+        })
+        
+        // Update the item in state
+        const index = this.items.findIndex((n) => n.id === id)
+        if (index !== -1) {
+          this.items[index] = { ...item }
+        }
+        
+        return item
+      }
+      throw new Error(`Nota with id ${id} not found`)
+    },
+
     async deleteItem(id: string) {
       // First delete all children
       const children = this.getChildren(id)
