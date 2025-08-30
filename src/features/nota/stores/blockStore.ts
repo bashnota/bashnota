@@ -416,25 +416,15 @@ export const useBlockStore = defineStore('blocks', {
 
     /**
      * Create initial block structure for a new nota
+     * Note: We don't create a title heading block since the title is displayed separately in the UI
      */
     async initializeNotaBlocks(notaId: string, title: string): Promise<void> {
       try {
-        const titleBlock: Omit<HeadingBlock, 'id'> = {
-          type: 'heading',
-          order: 0,
-          notaId,
-          content: title,
-          level: 1,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          version: 1,
-        }
-
-        const savedBlockId = await db.saveBlock(titleBlock)
-        const savedTitleBlock = { ...titleBlock, id: savedBlockId } as HeadingBlock
+        // Create an empty structure without a title heading block
+        // The title is displayed separately in the NotaEditor UI above the editor content
         const structure: NotaBlockStructure = {
           notaId,
-          blockOrder: [toCompositeId({ id: (savedTitleBlock as any).id, type: (savedTitleBlock as any).type })],
+          blockOrder: [], // Start with empty content
           version: 1,
           lastModified: new Date(),
         }
@@ -442,10 +432,9 @@ export const useBlockStore = defineStore('blocks', {
         await this.saveBlockStructure(structure)
 
         // Add to memory
-        this.blocks.set(toCompositeId({ id: (savedTitleBlock as any).id, type: (savedTitleBlock as any).type }), savedTitleBlock as unknown as Block)
         this.blockStructures.set(notaId, structure)
 
-        logger.info('Initialized blocks for new nota:', notaId)
+        logger.info('Initialized empty block structure for new nota:', notaId)
       } catch (error) {
         logger.error('Failed to initialize nota blocks:', error)
         throw error
@@ -474,6 +463,8 @@ export const useBlockStore = defineStore('blocks', {
         throw error
       }
     },
+
+
 
     /**
      * Get Tiptap content as an object (for the editor)
