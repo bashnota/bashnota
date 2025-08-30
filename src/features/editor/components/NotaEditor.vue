@@ -57,35 +57,54 @@ const isTogglingSharedMode = ref(false)
 // Add ref to track last saved content
 const lastSavedContent = ref<string>('')
 
-// Add debounced save function
+// Add debounced save function with improved performance
 const debouncedSave = useDebounceFn(async () => {
-  console.log('debouncedSave called')
   if (!editor.value) return;
   
   try {
-    emit('saving', true);
+    // Get content without triggering editor updates
     const content = editor.value.getJSON();
-    console.log('Editor content to save:', content)
-
-    // Only register code cells if content has changed
+    
+    // Only save if content has actually changed
     const currentContent = JSON.stringify(content);
-    if (currentContent !== lastSavedContent.value) {
-      lastSavedContent.value = currentContent;
-      registerCodeCells(content, props.notaId);
+    if (currentContent === lastSavedContent.value) {
+      return; // No changes, skip saving
     }
-
-    // Save sessions whenever content updates
+    
+    // Update last saved content first to prevent duplicate saves
+    lastSavedContent.value = currentContent;
+    
+    // Emit saving state
+    emit('saving', true);
+    
+    // Register code cells if needed (only when content changes)
+    registerCodeCells(content, props.notaId);
+    
+    // Save sessions
     await codeExecutionStore.saveSessions(props.notaId);
-
+    
     // Save to block-based system
-    console.log('Calling syncContentToBlocks with content:', content)
     await syncContentToBlocks(content);
+    
   } catch (error) {
     logger.error('Error saving content:', error);
   } finally {
     emit('saving', false);
   }
-}, 1000);
+}, 2000); // Increased debounce time for smoother experience
+
+// Add a more intelligent save strategy
+const smartSave = useDebounceFn(async () => {
+  if (!editor.value || !editor.value.isFocused) return;
+  
+  // Only save if user has stopped typing for a while
+  const content = editor.value.getJSON();
+  const currentContent = JSON.stringify(content);
+  
+  if (currentContent !== lastSavedContent.value) {
+    debouncedSave();
+  }
+}, 3000); // Longer delay for smart save
 
 const currentNota = computed(() => {
   return notaStore.getCurrentNota(props.notaId)
@@ -243,9 +262,17 @@ const editor = useEditor({
       }
     })
   },
-  onUpdate: () => {
-    // Use debounced save to prevent too frequent updates
-    debouncedSave()
+  onUpdate: ({ editor }) => {
+    // Use smart save to prevent interference with typing
+    if (editor.isFocused && editor.getText().trim().length > 0) {
+      smartSave()
+    }
+  },
+  onBlur: ({ editor }) => {
+    // Save immediately when editor loses focus
+    if (editor.getText().trim().length > 0) {
+      debouncedSave()
+    }
   },
 })
 
@@ -283,9 +310,28 @@ watch(isBlockSystemReady, (ready) => {
       // Block system is ready, ensure editor has the latest content
       const blockContent = getTiptapContent.value
       if (blockContent) {
-        // Update editor content directly - title block is handled separately in UI
-        editor.value.commands.setContent(blockContent)
-        logger.info('Updated editor content from blocks:', blockContent)
+        // Only update content if editor is empty or significantly different
+        const currentContent = editor.value.getJSON()
+        const currentContentStr = JSON.stringify(currentContent)
+        const blockContentStr = JSON.stringify(blockContent)
+        
+        if (currentContentStr !== blockContentStr) {
+          // Preserve cursor position when updating content
+          const { from, to } = editor.value.state.selection
+          editor.value.commands.setContent(blockContent)
+          
+          // Restore cursor position if possible
+          try {
+            if (from <= editor.value.state.doc.content.size) {
+              editor.value.commands.setTextSelection(from)
+            }
+          } catch (e) {
+            // If cursor position is invalid, just focus the editor
+            editor.value.commands.focus()
+          }
+          
+          logger.info('Updated editor content from blocks:', blockContent)
+        }
       }
     }
   } catch (error) {
@@ -300,9 +346,28 @@ watch(() => getTiptapContent.value, (newContent) => {
       // Check if we're still loading by evaluating the conditions directly
       const stillLoading = !currentNota.value || !isInitialized.value || !editor.value
       if (!stillLoading) {
-        // Update editor content directly - title block is handled separately in UI
-        editor.value.commands.setContent(newContent)
-        logger.info('Updated editor content from content watcher:', newContent)
+        // Only update content if it's significantly different to prevent cursor jumping
+        const currentContent = editor.value.getJSON()
+        const currentContentStr = JSON.stringify(currentContent)
+        const newContentStr = JSON.stringify(newContent)
+        
+        if (currentContentStr !== newContentStr) {
+          // Preserve cursor position when updating content
+          const { from, to } = editor.value.state.selection
+          editor.value.commands.setContent(newContent)
+          
+          // Restore cursor position if possible
+          try {
+            if (from <= editor.value.state.doc.content.size) {
+              editor.value.commands.setTextSelection(from)
+            }
+          } catch (e) {
+            // If cursor position is invalid, just focus the editor
+            editor.value.commands.focus()
+          }
+          
+          logger.info('Updated editor content from content watcher:', newContent)
+        }
       }
     }
   } catch (error) {
