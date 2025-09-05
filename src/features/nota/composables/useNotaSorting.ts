@@ -49,8 +49,10 @@ export function useNotaSorting(initialSort: SortField = 'updated') {
           bVal = new Date(b.createdAt)
           break
         case 'size':
-          aVal = a.content?.length || 0
-          bVal = b.content?.length || 0
+          // For size sorting, we'll use title length as a proxy for content size
+          // TODO: Implement proper block count when block structures are loaded
+          aVal = a.title.length
+          bVal = b.title.length
           break
         default: // 'updated'
           aVal = new Date(a.updatedAt)

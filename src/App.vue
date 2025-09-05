@@ -15,6 +15,7 @@ import { useAuthStore } from '@/features/auth/stores/auth'
 import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
 import { useEditorStore } from '@/features/editor/stores/editorStore'
 import { useNotaStore } from '@/features/nota/stores/nota'
+import { useBlockEditor } from '@/features/nota/composables/useBlockEditor'
 
 import MenubarSidebars from '@/components/MenubarSidebars.vue'
 import PinnedSidebars from '@/components/PinnedSidebars.vue'
@@ -37,6 +38,29 @@ const sidebarManager = useSidebarManager()
 const showExportDialog = ref(false)
 const exportTargetNota = ref<any>(null)
 
+// Helper function to extract text from Tiptap JSON content
+const extractTextFromTiptapContent = (content: any): string => {
+  if (!content || typeof content !== 'object') return ''
+  
+  let text = ''
+  
+  // Recursively extract text from Tiptap content structure
+  const extractText = (node: any) => {
+    if (node.text) {
+      text += node.text
+    }
+    if (node.content && Array.isArray(node.content)) {
+      node.content.forEach(extractText)
+    }
+  }
+  
+  if (content.content && Array.isArray(content.content)) {
+    content.content.forEach(extractText)
+  }
+  
+  return text
+}
+
 // Computed properties for toolbar
 const activeNota = computed(() => {
   const activePane = layoutStore.activePaneObj
@@ -47,11 +71,16 @@ const activeNota = computed(() => {
 })
 
 const wordCount = computed(() => {
-  if (!activeNota.value?.content) return 0
+  if (!activeNota.value) return 0
   
-  // Remove HTML tags and count words
-  const textContent = activeNota.value.content
-    .replace(/<[^>]*>/g, '') // Remove HTML tags
+  // Get content from block-based system
+  const { getTiptapContent } = useBlockEditor(activeNota.value.id)
+  const blockContent = getTiptapContent.value
+  
+  if (!blockContent) return 0
+  
+  // Extract text from Tiptap object directly
+  const textContent = extractTextFromTiptapContent(blockContent)
     .replace(/\s+/g, ' ') // Normalize whitespace
     .trim()
   
@@ -157,16 +186,42 @@ const handleSaveVersion = async () => {
       await editorStore.saveVersion()
     } else if (activeNota.value) {
       // Fallback for cases where no active editor component is available
-      await notaStore.saveNotaVersion({
-        id: activeNota.value.id,
-        content: activeNota.value.content || '',
-        versionName: `Version ${new Date().toLocaleString()}`,
-        createdAt: new Date()
-      })
-      toast('Version saved successfully', {
-        description: 'A new version of your document has been created.',
-        duration: 3000
-      })
+      // Get content from block-based system
+      const { getTiptapContent } = useBlockEditor(activeNota.value.id)
+      const blockContent = getTiptapContent.value
+      
+      if (blockContent) {
+        // Create a version with the full nota object
+        const versionNota = {
+          ...activeNota.value,
+          // Update the blockStructure to reflect current content
+          blockStructure: activeNota.value.blockStructure ? {
+            ...activeNota.value.blockStructure,
+            lastModified: new Date()
+          } : {
+            notaId: activeNota.value.id,
+            blockOrder: [],
+            version: 1,
+            lastModified: new Date()
+          }
+        }
+        
+        await notaStore.saveNotaVersion({
+          id: activeNota.value.id,
+          nota: versionNota,
+          versionName: `Version ${new Date().toLocaleString()}`,
+          createdAt: new Date()
+        })
+        toast('Version saved successfully', {
+          description: 'A new version of your document has been created.',
+          duration: 3000
+        })
+      } else {
+        toast('Unable to save version', {
+          description: 'No content available to save.',
+          duration: 3000
+        })
+      }
     } else {
       toast('Unable to save version', {
         description: 'No document is currently active.',
@@ -216,6 +271,15 @@ onMounted(async () => {
   
   // Initialize sidebar manager
   sidebarManager.initialize()
+  
+  // Add global keyboard shortcuts
+  document.addEventListener('keydown', (event) => {
+    // Sub-nota sidebar: Ctrl+Shift+Alt+S
+    if (event.ctrlKey && event.shiftKey && event.altKey && event.key.toLowerCase() === 's') {
+      event.preventDefault()
+      sidebarManager.toggleSidebar('subNotas')
+    }
+  })
 })
 
 

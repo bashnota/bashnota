@@ -10,6 +10,7 @@ import { processNotaContent } from '@/features/nota/services/publishNotaUtilitie
 import { statisticsService } from '@/features/bashhub/services/statisticsService'
 import { logger } from '@/services/logger'
 import { FILE_EXTENSIONS, ERROR_MESSAGES, SUCCESS_MESSAGES } from '@/constants/app'
+import { useBlockStore } from './blockStore'
 
 // Helper functions to convert dates and ensure data is serializable
 const serializeNota = (nota: Partial<Nota> & { id: string }): any => {
@@ -28,11 +29,14 @@ const serializeNota = (nota: Partial<Nota> & { id: string }): any => {
   // Properly serialize versions array if it exists
   if (nota.versions && Array.isArray(nota.versions)) {
     serialized.versions = nota.versions.map((version) => ({
-      ...version,
-      createdAt:
-        version.createdAt && version.createdAt instanceof Date
-          ? version.createdAt.toISOString()
-          : version.createdAt,
+      id: version.id,
+      notaId: version.notaId,
+      versionName: version.versionName,
+      createdAt: version.createdAt && version.createdAt instanceof Date
+        ? version.createdAt.toISOString()
+        : version.createdAt,
+      // For the nota object in the version, we need to serialize it properly
+      nota: version.nota ? serializeNota(version.nota) : undefined,
     }))
   }
 
@@ -55,19 +59,43 @@ const serializeNota = (nota: Partial<Nota> & { id: string }): any => {
     }))
   }
 
+  // Handle blockStructure - only store metadata, not the full blocks
+  if (nota.blockStructure) {
+    serialized.blockStructure = {
+      notaId: nota.blockStructure.notaId,
+      blockOrder: [...(nota.blockStructure.blockOrder || [])],
+      version: nota.blockStructure.version,
+      lastModified: nota.blockStructure.lastModified instanceof Date 
+        ? nota.blockStructure.lastModified.toISOString() 
+        : nota.blockStructure.lastModified,
+      // Don't include the blocks object - it's stored separately
+    } as any
+  }
+
   return serialized
 }
 
 const deserializeNota = (nota: any): Nota => ({
   ...nota,
+  // Content is now stored in blocks, not in the content field
   tags: Array.isArray(nota.tags) ? [...nota.tags] : [],
   createdAt: nota.createdAt ? new Date(nota.createdAt) : new Date(),
   updatedAt: nota.updatedAt ? new Date(nota.updatedAt) : new Date(),
   config: nota.config ? JSON.parse(JSON.stringify(nota.config)) : undefined,
-  versions: Array.isArray(nota.versions) ? [...nota.versions] : [],
   citations: Array.isArray(nota.citations) ? nota.citations.map((citation: CitationEntry) => ({
     ...citation,
     createdAt: citation.createdAt ? new Date(citation.createdAt) : new Date(),
+  })) : [],
+  // Handle blockStructure - convert dates back to Date objects
+  blockStructure: nota.blockStructure ? {
+    ...nota.blockStructure,
+    lastModified: nota.blockStructure.lastModified ? new Date(nota.blockStructure.lastModified) : new Date(),
+  } : undefined,
+  // Handle versions - deserialize the nota object in each version
+  versions: Array.isArray(nota.versions) ? nota.versions.map((version: any) => ({
+    ...version,
+    createdAt: version.createdAt ? new Date(version.createdAt) : new Date(),
+    nota: version.nota ? deserializeNota(version.nota) : undefined,
   })) : [],
 })
 
@@ -161,14 +189,20 @@ export const useNotaStore = defineStore('nota', {
 
   actions: {
     async createItem(title: string, parentId: string | null = null): Promise<Nota> {
+      const notaId = nanoid()
       const nota: Nota = {
-        id: nanoid(),
+        id: notaId,
         title,
-        content: null,
         parentId: parentId,
         tags: [],
         createdAt: new Date(),
         updatedAt: new Date(),
+        blockStructure: {
+          notaId: notaId,
+          blockOrder: [],
+          version: 1,
+          lastModified: new Date(),
+        },
       }
 
       const serialized = serializeNota(nota)
@@ -226,6 +260,27 @@ export const useNotaStore = defineStore('nota', {
           updatedAt: new Date().toISOString(),
         })
       }
+    },
+
+    async updateNotaTitle(id: string, newTitle: string) {
+      const item = this.items.find((i) => i.id === id)
+      if (item) {
+        item.title = newTitle
+        item.updatedAt = new Date()
+        await db.notas.update(id, {
+          title: newTitle,
+          updatedAt: new Date().toISOString(),
+        })
+        
+        // Update the item in state
+        const index = this.items.findIndex((n) => n.id === id)
+        if (index !== -1) {
+          this.items[index] = { ...item }
+        }
+        
+        return item
+      }
+      throw new Error(`Nota with id ${id} not found`)
     },
 
     async deleteItem(id: string) {
@@ -310,17 +365,59 @@ export const useNotaStore = defineStore('nota', {
       }
     },
 
+    /**
+     * Export a nota in the new .nota format
+     * 
+     * The new format exports:
+     * 1. Clean Tiptap JSON content (not stringified)
+     * 2. All subnotas recursively (maintaining hierarchy)
+     * 3. Proper metadata and versioning
+     * 
+     * This follows the Tiptap pattern: editor.getJSON() for clean content
+     * and editor.commands.setContent(json) for restoration
+     */
     async exportNota(id: string): Promise<void> {
       const nota = this.getItem(id)
       if (nota) {
         try {
-          const serialized = serializeNota(nota)
-          const dataStr = JSON.stringify(serialized, null, 2)
+          // Get all child notas recursively
+          const getAllChildren = (parentId: string): Nota[] => {
+            const children = this.items.filter(item => item.parentId === parentId)
+            const allChildren: Nota[] = []
+            
+            for (const child of children) {
+              allChildren.push(child)
+              allChildren.push(...getAllChildren(child.id))
+            }
+            
+            return allChildren
+          }
+
+          // Get all related notas (current nota + all children)
+          const relatedNotas = [nota, ...getAllChildren(nota.id)]
+          
+          // Prepare the export data with proper Tiptap JSON content
+          const exportData = {
+            version: '1.0',
+            exportedAt: new Date().toISOString(),
+            nota: {
+              ...serializeNota(nota),
+              // Content is now stored in blocks, get it from the block system
+              content: await this.getNotaContentAsTiptap(nota.id)
+            },
+            subnotas: relatedNotas.length > 1 ? await Promise.all(relatedNotas.slice(1).map(async subNota => ({
+              ...serializeNota(subNota),
+              // Content is now stored in blocks, get it from the block system
+              content: await this.getNotaContentAsTiptap(subNota.id)
+            }))) : []
+          }
+
+          const dataStr = JSON.stringify(exportData, null, 2)
           const blob = new Blob([dataStr], { type: 'application/json' })
           const url = URL.createObjectURL(blob)
           const link = document.createElement('a')
           link.href = url
-          link.download = `${nota.title.replace(/[^a-z0-9]/gi, '_') || 'nota'}${FILE_EXTENSIONS.json}`
+          link.download = `${nota.title.replace(/[^a-z0-9]/gi, '_') || 'nota'}.nota`
           link.click()
           URL.revokeObjectURL(url)
         } catch (error) {
@@ -332,6 +429,16 @@ export const useNotaStore = defineStore('nota', {
       }
     },
 
+    /**
+     * Import notas from various formats including the new .nota format
+     * 
+     * Supports:
+     * 1. New .nota format: { nota: {...}, subnotas: [...] }
+     * 2. Legacy array format: [{...}, {...}]
+     * 3. Single nota format: {...}
+     * 
+     * Automatically handles subnotas hierarchy and maintains parent-child relationships
+     */
     async importNotas(file: File): Promise<Nota[]> {
       return new Promise<Nota[]>(async (resolve, reject) => {
         const reader = new FileReader()
@@ -344,7 +451,22 @@ export const useNotaStore = defineStore('nota', {
             }
             
             const importedData = JSON.parse(text)
-            const rawNotasToImport: any[] = Array.isArray(importedData) ? importedData : [importedData]
+            
+            // Handle new .nota format with main nota and subnotas
+            let rawNotasToImport: any[] = []
+            
+            if (importedData.nota && importedData.subnotas) {
+              // New .nota format
+              rawNotasToImport = [importedData.nota, ...importedData.subnotas]
+            } else if (Array.isArray(importedData)) {
+              // Legacy array format
+              rawNotasToImport = importedData
+            } else if (importedData.id) {
+              // Single nota format
+              rawNotasToImport = [importedData]
+            } else {
+              throw new Error('Invalid .nota file format')
+            }
 
             const allCurrentNotaIds = new Set(this.items.map(item => item.id))
             const importedNotaIdsInBatch = new Set(rawNotasToImport.map(n => n.id).filter(id => id != null))
@@ -356,6 +478,11 @@ export const useNotaStore = defineStore('nota', {
             for (const notaData of rawNotasToImport) {
               const deserializedNota = deserializeNota(notaData)
               
+              // If the .nota includes inline content (TipTap JSON), stash it for block import
+              const inlineContent = (notaData as any).content
+              
+              // Content is now stored as JSON objects (no need to stringify)
+              
               if (deserializedNota.parentId) {
                 const parentExistsInStore = allCurrentNotaIds.has(deserializedNota.parentId)
                 const parentExistsInBatch = importedNotaIdsInBatch.has(deserializedNota.parentId)
@@ -364,6 +491,9 @@ export const useNotaStore = defineStore('nota', {
                   deserializedNota.parentId = null;
                 }
               }
+              
+              // Attach content for later processing
+              ;(deserializedNota as any).__inlineContent = inlineContent
               validNotasToProcess.push(deserializedNota)
             }
 
@@ -392,6 +522,12 @@ export const useNotaStore = defineStore('nota', {
                   this.items.push(mergedNota)
                 }
                 successfullyImportedNotas.push(mergedNota);
+                // Populate blocks if inline content present
+                const inline = (notaToSave as any).__inlineContent
+                if (inline) {
+                  const blockStore = useBlockStore()
+                  await blockStore.importTiptapContent(mergedNota.id, inline)
+                }
               } else {
                 const newNota = deserializeNota({
                     ...serializeNota(notaToSave),
@@ -402,6 +538,12 @@ export const useNotaStore = defineStore('nota', {
                 await db.notas.add(serializeNota(newNota))
                 this.items.push(newNota)
                 successfullyImportedNotas.push(newNota);
+                // Populate blocks if inline content present
+                const inline = (notaToSave as any).__inlineContent
+                if (inline) {
+                  const blockStore = useBlockStore()
+                  await blockStore.importTiptapContent(newNota.id, inline)
+                }
               }
             }
 
@@ -455,7 +597,7 @@ export const useNotaStore = defineStore('nota', {
 
     async saveNotaVersion(version: {
       id: string
-      content: string
+      nota: Nota
       versionName: string
       createdAt: Date
     }) {
@@ -466,7 +608,7 @@ export const useNotaStore = defineStore('nota', {
         const notaVersion: NotaVersion = {
           id: nanoid(),
           notaId: version.id,
-          content: version.content,
+          nota: version.nota,
           versionName: version.versionName,
           createdAt:
             version.createdAt instanceof Date ? version.createdAt.toISOString() : version.createdAt,
@@ -505,12 +647,12 @@ export const useNotaStore = defineStore('nota', {
         const version = nota.versions.find((v) => v.id === versionId)
         if (!version) throw new Error('Version not found')
 
-        // Update nota content with version content
-        await this.saveNota({
-          id: notaId,
-          content: version.content,
-          updatedAt: new Date(),
-        })
+        // Restore the entire nota from the version
+        const restoredNota = version.nota
+        restoredNota.updatedAt = new Date()
+        
+        // Update the current nota with the restored version
+        await this.saveNota(restoredNota)
 
         return true
       } catch (error) {
@@ -594,10 +736,224 @@ export const useNotaStore = defineStore('nota', {
       return result
     },
 
+    /**
+     * Create a sub-nota under a parent
+     */
+    async createSubNota(parentId: string, title: string): Promise<Nota> {
+      if (!parentId) {
+        throw new Error('Parent ID is required for sub-nota creation')
+      }
+
+      const parentNota = this.getItem(parentId)
+      if (!parentNota) {
+        throw new Error('Parent nota not found')
+      }
+
+      const notaId = nanoid()
+      const nota: Nota = {
+        id: notaId,
+        title,
+        parentId: parentId,
+        tags: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        blockStructure: {
+          notaId: notaId,
+          blockOrder: [],
+          version: 1,
+          lastModified: new Date(),
+        },
+      }
+
+      const serialized = serializeNota(nota)
+      await db.notas.add(serialized)
+      this.items.push(nota)
+
+      toast(`Sub-nota "${title}" created successfully under "${parentNota.title}"`)
+      return nota
+    },
+
+    /**
+     * Move a nota to become a sub-nota of another nota
+     */
+    async moveNota(notaId: string, newParentId: string | null): Promise<boolean> {
+      const nota = this.getItem(notaId)
+      if (!nota) {
+        throw new Error('Nota not found')
+      }
+
+      // Prevent circular references
+      if (newParentId) {
+        const newParent = this.getItem(newParentId)
+        if (!newParent) {
+          throw new Error('New parent nota not found')
+        }
+
+        // Check if moving would create a circular reference
+        if (this.wouldCreateCircularReference(notaId, newParentId)) {
+          throw new Error('Cannot move nota: would create circular reference')
+        }
+      }
+
+      const oldParentId = nota.parentId
+      nota.parentId = newParentId
+      nota.updatedAt = new Date()
+
+      const serialized = serializeNota(nota)
+      await db.notas.update(notaId, serialized)
+
+      // Update in memory
+      const index = this.items.findIndex(n => n.id === notaId)
+      if (index !== -1) {
+        this.items[index] = { ...nota }
+      }
+
+      const action = newParentId ? 'moved to' : 'moved from'
+      const target = newParentId ? this.getItem(newParentId)?.title : 'root level'
+      toast(`Nota "${nota.title}" ${action} "${target}"`)
+
+      return true
+    },
+
+    /**
+     * Check if moving a nota would create a circular reference
+     */
+    wouldCreateCircularReference(notaId: string, newParentId: string): boolean {
+      if (notaId === newParentId) return true
+
+      const checkAncestors = (currentId: string, targetId: string): boolean => {
+        const current = this.getItem(currentId)
+        if (!current?.parentId) return false
+        if (current.parentId === targetId) return true
+        return checkAncestors(current.parentId, targetId)
+      }
+
+      return checkAncestors(newParentId, notaId)
+    },
+
+    /**
+     * Get the full hierarchy path for a nota
+     */
+    getNotaHierarchy(notaId: string): Nota[] {
+      const hierarchy: Nota[] = []
+      let currentId = notaId
+
+      while (currentId) {
+        const nota = this.getItem(currentId)
+        if (!nota) break
+        
+        hierarchy.unshift(nota)
+        currentId = nota.parentId || ''
+      }
+
+      return hierarchy
+    },
+
+    /**
+     * Get the depth level of a nota in the hierarchy
+     */
+    getNotaDepth(notaId: string): number {
+      let depth = 0
+      let currentId = notaId
+
+      while (currentId) {
+        const nota = this.getItem(currentId)
+        if (!nota?.parentId) break
+        depth++
+        currentId = nota.parentId
+      }
+
+      return depth
+    },
+
+    /**
+     * Export a nota with all its sub-notas
+     */
+    async exportNotaWithSubNotas(notaId: string): Promise<any> {
+      const mainNota = this.getItem(notaId)
+      if (!mainNota) {
+        throw new Error('Nota not found')
+      }
+
+      const descendants = await this.getAllDescendants(notaId)
+      const allRelatedNotas = [mainNota, ...descendants]
+      
+      // Get content for each nota
+      const notasWithContent = await Promise.all(
+        allRelatedNotas.map(async (nota) => ({
+          ...serializeNota(nota),
+          content: await this.getNotaContentAsTiptap(nota.id)
+        }))
+      )
+
+      return {
+        nota: notasWithContent[0], // Main nota
+        subnotas: notasWithContent.slice(1) // All sub-notas
+      }
+    },
+
+    /**
+     * Import a nota with sub-notas, maintaining hierarchy
+     */
+    async importNotaWithSubNotas(importData: any): Promise<Nota[]> {
+      if (!importData.nota) {
+        throw new Error('Invalid import data: missing main nota')
+      }
+
+      const importedNotas: Nota[] = []
+      const idMapping = new Map<string, string>() // old ID -> new ID
+
+      // First, create all notas without parent relationships
+      const allNotas = [importData.nota, ...(importData.subnotas || [])]
+      
+      for (const notaData of allNotas) {
+        const newId = nanoid()
+        idMapping.set(notaData.id, newId)
+
+        const newNota: Nota = {
+          ...deserializeNota(notaData),
+          id: newId,
+          parentId: null, // Will be set after all notas are created
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }
+
+        const serialized = serializeNota(newNota)
+        await db.notas.add(serialized)
+        this.items.push(newNota)
+        importedNotas.push(newNota)
+      }
+
+      // Now establish parent-child relationships
+      for (const notaData of allNotas) {
+        if (notaData.parentId) {
+          const newNotaId = idMapping.get(notaData.id)
+          const newParentId = idMapping.get(notaData.parentId)
+          
+          if (newNotaId && newParentId) {
+            await this.moveNota(newNotaId, newParentId)
+          }
+        }
+      }
+
+      // Import content for each nota
+      for (let i = 0; i < allNotas.length; i++) {
+        const notaData = allNotas[i]
+        const newNotaId = idMapping.get(notaData.id)
+        
+        if (newNotaId && notaData.content) {
+          const blockStore = useBlockStore()
+          await blockStore.importTiptapContent(newNotaId, notaData.content)
+        }
+      }
+
+      return importedNotas
+    },
+
     async publishNota(id: string, includeSubPages = false): Promise<PublishedNota> {
       try {
         const nota = this.getCurrentNota(id)
-        if (!nota || !nota.content) throw new Error('Nota not found')
+        if (!nota) throw new Error('Nota not found')
 
         toast(`Processing content for "${nota.title}"...`)
 
@@ -631,17 +987,25 @@ export const useNotaStore = defineStore('nota', {
           }
         }
 
+        // Get content from block-based system
+        const blockStore = useBlockStore()
+        const tiptapContent = blockStore.getTiptapContent(id)
+        
+        if (!tiptapContent) {
+          throw new Error('No content available to publish')
+        }
+
         // Process the content with the list of published sub-pages
         // This will replace data URLs with hosted images AND handle page links
         // according to the published sub-pages list
-        const processedContent = await processNotaContent(nota.content, {
+        const processedContent = await processNotaContent(tiptapContent, {
           publishedSubPages: publishedSubPageIds,
         })
 
         // Prepare nota data for publishing with processed content
         const publishData = {
           title: nota.title,
-          content: JSON.stringify(processedContent),
+          content: processedContent, // Send the processed object directly
           updatedAt: nota.updatedAt instanceof Date ? nota.updatedAt.toISOString() : nota.updatedAt,
           parentId: nota.parentId,
           isSubPage: !!nota.parentId,
@@ -662,9 +1026,7 @@ export const useNotaStore = defineStore('nota', {
         nota.isPublished = true
         nota.publishedAt = publishedNota.publishedAt
 
-        // Save the processed content back to the nota
-        // This prevents having to re-upload the same images on future updates
-        nota.content = JSON.stringify(processedContent)
+        // Save the updated nota (no need to store processed content back)
         await this.saveItem({ ...nota })
 
         toast(`Nota "${nota.title}" published successfully`)
@@ -854,14 +1216,20 @@ export const useNotaStore = defineStore('nota', {
         }
 
         // Create a new nota with a new ID but copy the content
+        const newNotaId = nanoid()
         const newNota: Nota = {
-          id: nanoid(), // Generate a new UUID
+          id: newNotaId,
           title: `${publishedNota.title} (Clone)`,
-          content: publishedNota.content,
           parentId: null, // Reset parent ID as this is a clone
           tags: publishedNota.tags ? [...publishedNota.tags] : [],
           createdAt: new Date(),
           updatedAt: new Date(),
+          blockStructure: {
+            notaId: newNotaId,
+            blockOrder: [],
+            version: 1,
+            lastModified: new Date(),
+          },
         }
 
         // Copy citations if they exist
@@ -879,6 +1247,22 @@ export const useNotaStore = defineStore('nota', {
         // Add to the store's items array
         this.items.push(newNota)
 
+        // Convert the published content to blocks
+        const blockStore = useBlockStore()
+        if (publishedNota.content) {
+          try {
+            // Parse the content if it's a string, or use it directly if it's an object
+            const contentToConvert = typeof publishedNota.content === 'string' 
+              ? JSON.parse(publishedNota.content) 
+              : publishedNota.content
+            
+            // TODO: Implement proper block creation instead of legacy conversion
+            logger.info('Content conversion not yet implemented for block system')
+          } catch (error) {
+            logger.error('Failed to convert published content to blocks:', error)
+          }
+        }
+
         // Clone sub-notas if they exist
         if (publishedNota.publishedSubPages && publishedNota.publishedSubPages.length > 0) {
           toast(`Cloning ${publishedNota.publishedSubPages.length} sub-pages...`)
@@ -894,14 +1278,20 @@ export const useNotaStore = defineStore('nota', {
               if (!subPageNota) continue
               
               // Create clone of sub-nota
+              const newSubNotaId = nanoid()
               const newSubNota: Nota = {
-                id: nanoid(),
+                id: newSubNotaId,
                 title: subPageNota.title,
-                content: subPageNota.content,
                 parentId: newNota.id, // Set parent to the new parent nota
                 tags: subPageNota.tags ? [...subPageNota.tags] : [],
                 createdAt: new Date(),
                 updatedAt: new Date(),
+                blockStructure: {
+                  notaId: newSubNotaId,
+                  blockOrder: [],
+                  version: 1,
+                  lastModified: new Date(),
+                },
               }
               
               // Copy citations if they exist
@@ -918,6 +1308,20 @@ export const useNotaStore = defineStore('nota', {
               
               // Add to store's items array
               this.items.push(newSubNota)
+
+              // Convert the published content to blocks for sub-nota
+              if (subPageNota.content) {
+                try {
+                  const contentToConvert = typeof subPageNota.content === 'string' 
+                    ? JSON.parse(subPageNota.content) 
+                    : subPageNota.content
+                  
+                  // TODO: Implement proper block creation instead of legacy conversion
+                  logger.info('Content conversion not yet implemented for block system')
+                } catch (error) {
+                  logger.error('Failed to convert sub-nota content to blocks:', error)
+                }
+              }
               
               // Track ID mapping for updating references
               idMapping.set(subPageId, newSubNota.id)
@@ -932,9 +1336,14 @@ export const useNotaStore = defineStore('nota', {
           for (const newNotaId of idMapping.values()) {
             try {
               const nota = this.getCurrentNota(newNotaId)
-              if (!nota || !nota.content) continue
+              if (!nota) continue
               
-              let contentObj = JSON.parse(nota.content)
+              // Get content from block-based system
+              const blockStore = useBlockStore()
+              const tiptapContent = blockStore.getTiptapContent(newNotaId)
+              
+              if (!tiptapContent) continue
+              
               let modified = false
               
               // Helper function to recursively update page links
@@ -961,14 +1370,14 @@ export const useNotaStore = defineStore('nota', {
               }
               
               // Update links in content
-              if (contentObj.content && Array.isArray(contentObj.content)) {
-                contentObj.content.forEach(updatePageLinks)
+              if (tiptapContent.content && Array.isArray(tiptapContent.content)) {
+                tiptapContent.content.forEach(updatePageLinks)
               }
               
-              // Save updated content if modified
+              // If content was modified, update the blocks
               if (modified) {
-                nota.content = JSON.stringify(contentObj)
-                await this.saveItem(nota)
+                // TODO: Implement proper block update instead of legacy conversion
+                logger.info('Content update not yet implemented for block system')
               }
             } catch (error) {
               logger.error(`Failed to update references in nota ${newNotaId}:`, error)
@@ -982,6 +1391,20 @@ export const useNotaStore = defineStore('nota', {
       } catch (error) {
         logger.error('Failed to clone published nota:', error)
         toast('Failed to clone nota')
+        return null
+      }
+    },
+
+    /**
+     * Get nota content as Tiptap format from the block system
+     * This replaces the legacy content field
+     */
+    async getNotaContentAsTiptap(notaId: string): Promise<any | null> {
+      try {
+        const blockStore = useBlockStore()
+        return blockStore.getTiptapContent(notaId)
+      } catch (error) {
+        logger.error('Failed to get nota content from blocks:', error)
         return null
       }
     }

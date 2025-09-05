@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNotaStore } from '@/features/nota/stores/nota'
+import { useBlockStore } from '@/features/nota/stores/blockStore'
 import { logger } from '@/services/logger'
 
 export function useQuickNotaCreation() {
@@ -33,7 +34,6 @@ export function useQuickNotaCreation() {
 
   const createNotaWithContent = async (
     title: string, 
-    content: string, 
     parentId: string | null = null,
     tags: string[] = []
   ) => {
@@ -47,11 +47,8 @@ export function useQuickNotaCreation() {
       // Create the nota first
       const nota = await notaStore.createItem(title.trim(), parentId)
 
-      // Update with content and tags if provided
+      // Update with tags if provided
       const updates: any = {}
-      if (content) {
-        updates.content = content
-      }
       if (tags.length > 0) {
         updates.tags = tags
       }
@@ -62,6 +59,8 @@ export function useQuickNotaCreation() {
           ...updates
         })
       }
+
+
 
       return { success: true, nota }
     } catch (error) {

@@ -3,6 +3,8 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useCodeExecutionStore } from '@/features/editor/stores/codeExecutionStore'
+import { useBlockStore } from '@/features/nota/stores/blockStore'
+import type { ExecutableCodeBlock } from '@/features/nota/types/blocks'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -101,27 +103,60 @@ const loadNotaAndBlock = async () => {
     
     nota.value = loadedNota
     
-    // Parse the nota content to find the specific code block
-    let foundBlock: any = null
-    if (loadedNota.content) {
-      const content = JSON.parse(loadedNota.content)
-      foundBlock = findCodeBlockInContent(content, props.blockId)
-      
-      if (!foundBlock) {
-        throw new Error('Code block not found in nota')
-      }
-    } else {
-      throw new Error('Nota has no content')
+    // Load blocks for the nota using the block store
+    const blockStore = useBlockStore()
+    const blocks = await blockStore.loadNotaBlocks(props.notaId, loadedNota)
+    
+    // Find the specific code block
+    const foundBlock = blocks.find(block => block.id === props.blockId && block.type === 'executableCodeBlock') as ExecutableCodeBlock | undefined
+    
+    if (!foundBlock) {
+      throw new Error('Code block not found in nota')
     }
     
     // Register the code blocks with the execution store to get latest output
-    if (loadedNota.content) {
-      const content = JSON.parse(loadedNota.content)
-      codeExecutionStore.registerCodeCells(content, props.notaId, true) // true for isPublished
+    // Convert blocks to the format expected by the execution store
+    const content = {
+      type: 'doc',
+      content: blocks.map(block => {
+        if (block.type === 'executableCodeBlock') {
+          const execBlock = block as ExecutableCodeBlock
+          return {
+            type: block.type,
+            attrs: { 
+              id: block.id, 
+              ...execBlock,
+              // Ensure required fields are present
+              serverID: '', // Will be set by execution store
+              kernelName: execBlock.language || 'python3',
+              sessionId: execBlock.sessionId || '',
+              output: execBlock.output || ''
+            },
+            content: [
+              { type: 'text', text: execBlock.content || '' }
+            ]
+          }
+        } else {
+          return {
+            type: block.type,
+            attrs: { id: block.id, ...block },
+            content: []
+          }
+        }
+      })
     }
+    codeExecutionStore.registerCodeCells(content, props.notaId, true) // true for isPublished
     
     // Get the cell from the execution store which has the latest output
     const cell = codeExecutionStore.getCellById(props.blockId)
+    
+    // Debug: Check if cell was found
+    logger.debug('Cell lookup result:', {
+      blockId: props.blockId,
+      cellFound: !!cell,
+      cellOutput: cell?.output,
+      cellHasError: cell?.hasError
+    })
     
     logger.debug('Loading code block output:', {
       blockId: props.blockId,
@@ -129,24 +164,32 @@ const loadNotaAndBlock = async () => {
       foundBlock: !!foundBlock,
       cellFromStore: !!cell,
       cellOutput: cell?.output?.substring(0, 100) || 'No output',
-      blockOutput: foundBlock?.attrs?.output?.substring(0, 100) || 'No output in attrs'
+      blockOutput: foundBlock?.output?.substring(0, 100) || 'No output in block'
     })
     
     if (cell && foundBlock) {
-      // Merge the content structure with the execution store data
+      // Merge the block data with the execution store data
       codeBlock.value = {
-        ...foundBlock,
-        output: cell.output || foundBlock?.attrs?.output,
-        hasError: cell.hasError || false,
-        attrs: foundBlock?.attrs || {}
+        type: foundBlock.type,
+        attrs: { 
+          id: foundBlock.id, 
+          ...foundBlock,
+          output: cell.output || foundBlock.output
+        },
+        content: [],
+        output: cell.output || foundBlock.output
       }
     } else if (foundBlock) {
-      // Fallback to the content from nota if not in execution store
-      // Use the output from the nota's stored attributes
+      // Fallback to the block data if not in execution store
       codeBlock.value = {
-        ...foundBlock,
-        output: foundBlock?.attrs?.output,
-        hasError: false
+        type: foundBlock.type,
+        attrs: { 
+          id: foundBlock.id, 
+          ...foundBlock,
+          output: foundBlock.output
+        },
+        content: [],
+        output: foundBlock.output
       }
     }
     
@@ -160,24 +203,7 @@ const loadNotaAndBlock = async () => {
   }
 }
 
-const findCodeBlockInContent = (content: any, blockId: string): any => {
-  const searchNode = (node: any): any => {
-    if (node.type === 'executableCodeBlock' && node.attrs?.id === blockId) {
-      return node
-    }
-    
-    if (node.content && Array.isArray(node.content)) {
-      for (const child of node.content) {
-        const found = searchNode(child)
-        if (found) return found
-      }
-    }
-    
-    return null
-  }
-  
-  return searchNode(content)
-}
+
 
 const copyOutput = async () => {
   const output = codeBlock.value?.output || codeBlock.value?.attrs?.output

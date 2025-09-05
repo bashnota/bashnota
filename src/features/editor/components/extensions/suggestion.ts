@@ -544,7 +544,7 @@ function createAdvancedCommands(): CommandItem[] {
       category: 'Tables & Data',
       icon: DatabaseIcon,
       keywords: ['db', 'database', 'data', 'table'],
-      description: 'Dynamic table connected to nota database',
+      description: 'Dynamic table connected to database',
       command: ({ editor, range }: CommandArgs) => {
         const notaId = router.currentRoute.value.params.id as string;
         editor.chain().focus().deleteRange(range).insertNotaTable(notaId).run();
@@ -684,17 +684,16 @@ function createAdvancedCommands(): CommandItem[] {
           
           // Wait a tick to ensure cleanup is complete before modifying editor
           setTimeout(() => {
-            // Insert the page link
+            // Insert the sub-nota link using the proper command
             editor
               .chain()
               .focus()
               .deleteRange(range)
-              .insertContent({
-                type: 'pageLink',
-                attrs: {
-                  href: `/nota/${newNotaId}`,
-                  title,
-                },
+              .setSubNotaLink({
+                targetNotaId: newNotaId,
+                targetNotaTitle: title,
+                displayText: title,
+                linkStyle: 'inline'
               })
               .run();
             
@@ -710,7 +709,7 @@ function createAdvancedCommands(): CommandItem[] {
             toast(`"${title}" created successfully${parentContext}`);
             
             // Highlight the newly created link
-            highlightElement(`a[href="/nota/${newNotaId}"]`);
+            highlightElement(`span[data-target-nota-id="${newNotaId}"]`);
           }, 20);
         };
         
@@ -727,6 +726,23 @@ function createAdvancedCommands(): CommandItem[] {
           )
         };
       }),
+
+    },
+    // Markdown & Content
+    {
+      title: 'Insert Markdown',
+      category: 'Content & Import',
+      icon: FileText,
+      keywords: ['markdown', 'md', 'import', 'paste', 'content', 'blocks'],
+      description: 'Insert and validate markdown content with block preview',
+      command: ({ editor, range }: CommandArgs) => {
+        // Dispatch a custom event to open the markdown input dialog
+        const event = new CustomEvent('open-markdown-input', { 
+          detail: { editor, range } 
+        })
+        document.dispatchEvent(event)
+        editor.chain().focus().deleteRange(range).run()
+      },
     },
   ];
 }
