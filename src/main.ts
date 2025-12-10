@@ -64,6 +64,10 @@ const initializeTextColors = () => {
 import '@/features/ai/stores/aiSettingsStore'
 import '@/features/jupyter/stores/jupyterStore'
 
+// Initialize new storage system
+import { initializeDatabaseAdapter } from './services/databaseAdapter'
+import { useFeatureFlags } from './composables/useFeatureFlags'
+
 const app = createApp(App)
 const pinia = createPinia()
 const head = createHead()
@@ -71,6 +75,19 @@ const head = createHead()
 app.use(pinia)
 app.use(router)
 app.use(head)
+
+// Initialize database adapter based on feature flag
+const { useNewStorage } = useFeatureFlags()
+initializeDatabaseAdapter(useNewStorage.value)
+  .then(adapter => {
+    app.provide('dbAdapter', adapter)
+    console.log('[Storage] Database adapter initialized:', {
+      usingNewStorage: adapter.isUsingNewStorage()
+    })
+  })
+  .catch(error => {
+    console.error('[Storage] Failed to initialize database adapter:', error)
+  })
 
 // Log page views when routes change
 router.afterEach((to) => {

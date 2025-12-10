@@ -264,6 +264,24 @@ export class StorageService {
     return this.backend!.listNotas()
   }
 
+  /**
+   * Write multiple notas in batch
+   */
+  async writeMany(notas: Nota[]): Promise<void> {
+    await this.ensureInitialized()
+    // Execute all writes concurrently
+    await Promise.all(notas.map(nota => this.backend!.writeNota(nota)))
+  }
+
+  /**
+   * Read multiple notas in batch
+   */
+  async readMany(notaIds: string[]): Promise<(Nota | null)[]> {
+    await this.ensureInitialized()
+    // Execute all reads concurrently
+    return Promise.all(notaIds.map(id => this.backend!.readNota(id)))
+  }
+
   private async ensureInitialized(): Promise<void> {
     if (!this.backend) {
       await this.initialize()
