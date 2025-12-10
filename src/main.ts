@@ -66,6 +66,7 @@ import '@/features/jupyter/stores/jupyterStore'
 
 // Initialize new storage system
 import { initializeDatabaseAdapter } from './services/databaseAdapter'
+import { initializeSettingsAdapter } from './services/settingsAdapter'
 import { useFeatureFlags } from './composables/useFeatureFlags'
 
 const app = createApp(App)
@@ -77,7 +78,9 @@ app.use(router)
 app.use(head)
 
 // Initialize database adapter based on feature flag
-const { useNewStorage } = useFeatureFlags()
+const { useNewStorage, useConsolidatedSettings } = useFeatureFlags()
+
+// Initialize storage
 initializeDatabaseAdapter(useNewStorage.value)
   .then(adapter => {
     app.provide('dbAdapter', adapter)
@@ -87,6 +90,18 @@ initializeDatabaseAdapter(useNewStorage.value)
   })
   .catch(error => {
     console.error('[Storage] Failed to initialize database adapter:', error)
+  })
+
+// Initialize settings
+initializeSettingsAdapter(useConsolidatedSettings.value)
+  .then(adapter => {
+    app.provide('settingsAdapter', adapter)
+    console.log('[Settings] Settings adapter initialized:', {
+      usingNewSettings: adapter.isUsingNewSettings()
+    })
+  })
+  .catch(error => {
+    console.error('[Settings] Failed to initialize settings adapter:', error)
   })
 
 // Log page views when routes change
