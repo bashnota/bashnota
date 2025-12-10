@@ -1,10 +1,15 @@
-# BashNota Migration Implementation - COMPLETE ✅
+# BashNota Migration Implementation - Phase 1-3 COMPLETE ✅
 
 ## Overview
 
-Successfully implemented complete migration from database-centric (Dexie/IndexedDB with 22+ tables) to file-based local-first architecture, with simplified navigation and consolidated settings.
+Successfully implemented complete **foundation layer** for migration from database-centric (Dexie/IndexedDB with 22+ tables) to file-based local-first architecture, with simplified navigation and consolidated settings.
 
-**Status:** All phases complete with 88 passing tests (100% success rate)
+**Foundation Status:** All phases complete with 88 passing tests (100% success rate)  
+**Integration Status:** Not yet integrated with existing application (Phase 4 planned)
+
+> **Important:** The new services and stores are implemented and tested, but **NOT YET INTEGRATED** with the existing BashNota application. Phase 4 (Integration) is required to connect the new foundation with the UI and existing features.
+
+See [SYSTEM_REVIEW_AND_NEXT_PHASE.md](./SYSTEM_REVIEW_AND_NEXT_PHASE.md) for detailed integration plan.
 
 ---
 
@@ -225,31 +230,38 @@ FileSystem → IndexedDB → Memory
 
 ## Next Steps (Integration)
 
-### Required for Production
-1. **UI Integration**
-   - Integrate new stores with existing components
-   - Add migration UI with progress indicator
-   - Create simplified navigation components
-   - Implement command palette UI
+### **Phase 4: Integration Layer (4 weeks)**
 
-2. **Testing**
-   - End-to-end testing
-   - Browser compatibility testing
-   - Performance benchmarking
-   - User acceptance testing
+The foundation is complete, but integration with the existing application is required:
 
-3. **Deployment**
-   - Feature flags for gradual rollout
-   - User communication
-   - Monitoring and analytics
-   - Rollback procedures ready
+**Phase 4.1: Storage Integration (Week 1)**
+- Initialize StorageService in app
+- Create DatabaseAdapter for gradual migration
+- Update key composables (useNota, etc.)
+- Add migration UI component
+- Feature flag: `USE_NEW_STORAGE`
 
-### Optional Enhancements
-- Settings search functionality
-- Advanced caching strategies
-- Real-time sync between tabs
-- Export/import UI for settings
-- Git integration for version control
+**Phase 4.2: Navigation Integration (Week 2)**
+- Create SimplifiedMenubar component
+- Create ThreePanelLayout component
+- Implement CommandPalette (Ctrl+K)
+- Add feature flag for gradual rollout
+- Feature flag: `USE_SIMPLIFIED_NAVIGATION`
+
+**Phase 4.3: Settings Integration (Week 3)**
+- Update settingsStore to use ConsolidatedSettingsService
+- Add migration from localStorage
+- Update settings UI (import/export/reset)
+- Add validation feedback
+
+**Phase 4.4: Testing & Rollout (Week 4)**
+- E2E integration tests
+- Performance verification
+- Bug fixes and polish
+- Gradual percentage-based rollout
+- Monitoring dashboard
+
+**See [SYSTEM_REVIEW_AND_NEXT_PHASE.md](./SYSTEM_REVIEW_AND_NEXT_PHASE.md) for complete Phase 4 plan.**
 
 ---
 
