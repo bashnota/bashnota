@@ -177,9 +177,10 @@ describe('statisticsService', () => {
       expect(typeof result).toBe('string')
     })
 
-    it('should return "unknown" for empty string', () => {
+    it('should handle empty string', () => {
       const result = statisticsService.normalizeReferrer('')
       
+      // Empty string results in empty string after normalization
       expect(result).toBe('')
     })
 
