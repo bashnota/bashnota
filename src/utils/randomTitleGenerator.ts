@@ -1,8 +1,8 @@
-const ADJECTIVES = [
+export const ADJECTIVES = [
   'Quick', 'New', 'Fresh', 'Brilliant', 'Random', 'Fleeting', 'Important', 'Creative', 'Urgent', 'Daily'
 ];
 
-const NOUNS = [
+export const NOUNS = [
   'Idea', 'Note', 'Thought', 'Draft', 'Musings', 'Insight', 'Plan', 'Jotting', 'Memo', 'Log'
 ];
 
