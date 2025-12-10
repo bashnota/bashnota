@@ -67,8 +67,15 @@ const handleDisableAll = () => {
   })
 }
 
+const emit = defineEmits(['reload'])
+
 const handleReloadPage = () => {
-  window.location.reload()
+  // Emit event for parent to handle
+  emit('reload')
+  // Fallback to direct reload if parent doesn't handle
+  setTimeout(() => {
+    window.location.reload()
+  }, 100)
 }
 </script>
 
@@ -126,7 +133,7 @@ const handleReloadPage = () => {
           variant="default" 
           size="sm" 
           @click="handleReloadPage"
-          :disabled="!hasAnyNewFeatureEnabled"
+          title="Reload to apply feature flag changes"
         >
           Reload Page
         </Button>

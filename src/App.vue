@@ -12,7 +12,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar'
 
 import { useAuthStore } from '@/features/auth/stores/auth'
-import { useJupyterStore } from '@/features/jupiter/stores/jupyterStore'
+import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
 import { useEditorStore } from '@/features/editor/stores/editorStore'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useBlockEditor } from '@/features/nota/composables/useBlockEditor'
@@ -296,6 +296,9 @@ onMounted(async () => {
 <template>
   <TooltipProvider class="h-full">
     <!-- NEW: Simplified Navigation (Feature Flag Controlled) -->
+    <div role="status" aria-live="polite" class="sr-only">
+      {{ useSimplifiedNavigation ? 'Simplified navigation active' : 'Legacy navigation active' }}
+    </div>
     <template v-if="useSimplifiedNavigation">
       <SimplifiedMenubar />
       <ThreePanelLayout>
