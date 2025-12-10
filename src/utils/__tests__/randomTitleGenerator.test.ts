@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { generateRandomTitle } from '../randomTitleGenerator'
+import { generateRandomTitle, ADJECTIVES, NOUNS } from '../randomTitleGenerator'
 
 describe('randomTitleGenerator', () => {
   describe('generateRandomTitle', () => {
@@ -32,15 +32,12 @@ describe('randomTitleGenerator', () => {
     })
 
     it('should only contain expected adjectives and nouns', () => {
-      const expectedAdjectives = ['Quick', 'New', 'Fresh', 'Brilliant', 'Random', 'Fleeting', 'Important', 'Creative', 'Urgent', 'Daily']
-      const expectedNouns = ['Idea', 'Note', 'Thought', 'Draft', 'Musings', 'Insight', 'Plan', 'Jotting', 'Memo', 'Log']
-      
       // Generate multiple titles to check consistency
       for (let i = 0; i < 10; i++) {
         const title = generateRandomTitle()
         const [adjective, noun] = title.split(' ')
-        expect(expectedAdjectives).toContain(adjective)
-        expect(expectedNouns).toContain(noun)
+        expect(ADJECTIVES).toContain(adjective)
+        expect(NOUNS).toContain(noun)
       }
     })
   })
