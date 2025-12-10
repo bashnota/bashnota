@@ -12,7 +12,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar'
 
 import { useAuthStore } from '@/features/auth/stores/auth'
-import { useJupyterStore } from '@/features/jupiter/stores/jupyterStore'
+import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
 import { useEditorStore } from '@/features/editor/stores/editorStore'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useBlockEditor } from '@/features/nota/composables/useBlockEditor'
@@ -26,14 +26,6 @@ import ExportDialog from '@/features/editor/components/dialogs/ExportDialog.vue'
 import { toast } from 'vue-sonner'
 
 import { useLayoutStore } from '@/stores/layoutStore'
-
-// NEW: Feature flag support for gradual migration
-import { useFeatureFlags } from '@/composables/useFeatureFlags'
-import ThreePanelLayout from '@/components/ThreePanelLayout.vue'
-import SimplifiedMenubar from '@/components/SimplifiedMenubar.vue'
-import CommandPalette from '@/components/CommandPalette.vue'
-
-const { useSimplifiedNavigation } = useFeatureFlags()
 
 const authStore = useAuthStore()
 const jupyterStore = useJupyterStore()
@@ -295,32 +287,7 @@ onMounted(async () => {
 
 <template>
   <TooltipProvider class="h-full">
-    <!-- NEW: Simplified Navigation (Feature Flag Controlled) -->
-    <template v-if="useSimplifiedNavigation">
-      <SimplifiedMenubar />
-      <ThreePanelLayout>
-        <template #documents>
-          <AppSidebar />
-        </template>
-        <template #editor>
-          <AppTabs />
-          <RouterView class="flex-1 h-full" />
-        </template>
-        <template #ai>
-          <RightSidebarContainer :editor="editorStore.activeEditor as any" />
-        </template>
-      </ThreePanelLayout>
-      <CommandPalette />
-      
-      <!-- Global components that need to be available anywhere -->
-      <ServerSelectionDialogWrapper />
-      <CitationPicker />
-      <SubNotaDialog />
-      <ExportDialog v-model:open="showExportDialog" :nota="exportTargetNota" />
-    </template>
-
-    <!-- LEGACY: Original 7-Sidebar Navigation -->
-    <SidebarProvider v-else class="h-full">
+    <SidebarProvider class="h-full">
       <AppSidebar />
       <SidebarInset class="h-full">
         <!-- Top Bar -->
@@ -371,15 +338,15 @@ onMounted(async () => {
           <RightSidebarContainer :editor="editorStore.activeEditor as any" />
         </div>
       </SidebarInset>
-      
-      <!-- Global components that need to be available anywhere -->
-      <ServerSelectionDialogWrapper />
-      <CitationPicker />
-      <SubNotaDialog />
-      
-      <!-- Export Dialog -->
-      <ExportDialog v-model:open="showExportDialog" :nota="exportTargetNota" />
     </SidebarProvider>
+    
+    <!-- Global components that need to be available anywhere -->
+    <ServerSelectionDialogWrapper />
+    <CitationPicker />
+    <SubNotaDialog />
+    
+    <!-- Export Dialog -->
+    <ExportDialog v-model:open="showExportDialog" :nota="exportTargetNota" />
   </TooltipProvider>
 </template>
 
