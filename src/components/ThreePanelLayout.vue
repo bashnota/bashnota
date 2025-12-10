@@ -39,12 +39,14 @@
         <button
           @click="nav.openCommandPalette()"
           class="p-2 rounded hover:bg-muted flex items-center gap-2"
-          title="Open Command Palette (Ctrl+K)"
+          :title="`Open Command Palette (${isMac ? '⌘K' : 'Ctrl+K'})`"
         >
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
           </svg>
-          <kbd class="hidden sm:inline-flex px-2 py-1 text-xs font-semibold bg-muted rounded">⌘K</kbd>
+          <kbd class="hidden sm:inline-flex px-2 py-1 text-xs font-semibold bg-muted rounded">
+            {{ isMac ? '⌘K' : 'Ctrl+K' }}
+          </kbd>
         </button>
 
         <!-- Toggle right panel -->
@@ -135,6 +137,11 @@ import { computed } from 'vue'
 import { useSimplifiedNavigationStore } from '@/stores/simplifiedNavigationStore'
 
 const nav = useSimplifiedNavigationStore()
+
+// Detect platform for correct keyboard shortcut display
+const isMac = computed(() => 
+  typeof navigator !== 'undefined' && navigator.platform.toLowerCase().includes('mac')
+)
 
 // Panel sizing
 const leftPanelClass = computed(() => 'w-64')

@@ -110,8 +110,11 @@ export class SettingsAdapter {
   async saveSettings(settings: AllSettings): Promise<void> {
     if (this.useNewSettings && this.service) {
       // Save using new service
+      const validCategories = ['editor', 'appearance', 'ai', 'keyboard', 'integrations', 'advanced'] as const
       for (const [category, data] of Object.entries(settings)) {
-        await this.service.setCategory(category as any, data)
+        if (validCategories.includes(category as any)) {
+          await this.service.setCategory(category as typeof validCategories[number], data)
+        }
       }
     } else {
       // Save using old localStorage method
@@ -183,9 +186,9 @@ export class SettingsAdapter {
   /**
    * Reset a category to defaults
    */
-  async resetCategory(category: string): Promise<void> {
+  async resetCategory(category: 'editor' | 'appearance' | 'ai' | 'keyboard' | 'integrations' | 'advanced'): Promise<void> {
     if (this.useNewSettings && this.service) {
-      await this.service.resetCategory(category as any)
+      await this.service.resetCategory(category)
     } else {
       // Remove from localStorage
       localStorage.removeItem(`${category}-settings`)
