@@ -181,12 +181,21 @@ export class StorageService {
   private async doInitialize(): Promise<void> {
     logger.info('[StorageService] Initializing...')
 
+    // Dynamically import FileSystemBackend to avoid issues in test environment
+    let FileSystemBackend: any = null
+    try {
+      const fsModule = await import('./fileSystemBackend')
+      FileSystemBackend = fsModule.FileSystemBackend
+    } catch (error) {
+      logger.debug('[StorageService] FileSystemBackend not available')
+    }
+
     // Try backends in order of preference
     const backends = [
-      // FileSystemBackend would go here when implemented
-      IndexedDBBackend,
-      MemoryBackend
-    ]
+      FileSystemBackend,  // Preferred: File System Access API
+      IndexedDBBackend,   // Fallback: IndexedDB
+      MemoryBackend       // Last resort: In-memory
+    ].filter(Boolean)  // Remove null entries
 
     for (const BackendClass of backends) {
       try {
