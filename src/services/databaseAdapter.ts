@@ -22,7 +22,8 @@ export class DatabaseAdapter {
    */
   async getNota(id: string): Promise<Nota | undefined> {
     if (this.useNewStorage) {
-      return await this.storage.readNota(id)
+      const result = await this.storage.readNota(id)
+      return result ?? undefined
     }
     return await db.notas.get(id)
   }

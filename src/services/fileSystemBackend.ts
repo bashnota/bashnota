@@ -133,8 +133,10 @@ export class FileSystemBackend implements IStorageBackend {
 
     try {
       // Iterate through all files in the directory
-      for await (const entry of this.directoryHandle!.values()) {
-        if (entry.kind === 'file' && entry.name.endsWith('.json')) {
+      // Type assertion needed as FileSystemDirectoryHandle.entries() is not in all type definitions
+      const handle = this.directoryHandle as any
+      for await (const [name, entry] of handle.entries()) {
+        if (entry.kind === 'file' && name.endsWith('.json')) {
           try {
             const fileHandle = entry as FileSystemFileHandle
             const file = await fileHandle.getFile()

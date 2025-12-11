@@ -148,7 +148,7 @@ const renderedContent = computed(() => {
 })
 
 // Debounce search function
-let searchTimeout: number | null = null
+let searchTimeout: ReturnType<typeof setTimeout> | null = null
 const SEARCH_DEBOUNCE_DELAY = 300 // milliseconds
 
 function debouncedSearch() {

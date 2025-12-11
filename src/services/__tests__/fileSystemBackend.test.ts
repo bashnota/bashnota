@@ -126,7 +126,6 @@ describe('FileSystemBackend', () => {
       const testNota: Nota = {
         id: 'test-nota-1',
         title: 'Test File System Nota',
-        content: { type: 'doc', content: [] },
         tags: ['filesystem', 'test'],
         favorite: false,
         createdAt: new Date('2024-01-01'),
@@ -151,7 +150,6 @@ describe('FileSystemBackend', () => {
       const testNota: Nota = {
         id: 'test-nota-2',
         title: 'Read Test',
-        content: { type: 'doc', content: [] },
         tags: [],
         favorite: false,
         createdAt: new Date('2024-01-01'),
@@ -179,7 +177,6 @@ describe('FileSystemBackend', () => {
       const testNota: Nota = {
         id: 'test-nota-3',
         title: 'To Delete',
-        content: { type: 'doc', content: [] },
         tags: [],
         favorite: false,
         createdAt: new Date(),
@@ -198,7 +195,6 @@ describe('FileSystemBackend', () => {
       const nota1: Nota = {
         id: 'list-nota-1',
         title: 'Nota 1',
-        content: { type: 'doc', content: [] },
         tags: [],
         favorite: false,
         createdAt: new Date(),
@@ -209,7 +205,6 @@ describe('FileSystemBackend', () => {
       const nota2: Nota = {
         id: 'list-nota-2',
         title: 'Nota 2',
-        content: { type: 'doc', content: [] },
         tags: [],
         favorite: false,
         createdAt: new Date(),
@@ -243,7 +238,6 @@ describe('FileSystemBackend', () => {
       const testNota: Nota = {
         id: 'date-test',
         title: 'Date Test',
-        content: { type: 'doc', content: [] },
         tags: [],
         favorite: false,
         createdAt: new Date('2024-01-15T10:30:00Z'),
@@ -273,7 +267,6 @@ describe('FileSystemBackend', () => {
       const nota: Nota = {
         id: 'test',
         title: 'Test',
-        content: { type: 'doc', content: [] },
         tags: [],
         favorite: false,
         createdAt: new Date(),
@@ -294,7 +287,6 @@ describe('FileSystemBackend', () => {
       const notas: Nota[] = Array.from({ length: 10 }, (_, i) => ({
         id: `perf-nota-${i}`,
         title: `Nota ${i}`,
-        content: { type: 'doc', content: [] },
         tags: [],
         favorite: false,
         createdAt: new Date(),

@@ -1,4 +1,5 @@
-import type { HelpTopic, HelpCategory, HelpSection } from '../types'
+import type { HelpTopic, HelpSection } from '../types'
+import { HelpCategory } from '../types'
 
 export const helpTopics: HelpTopic[] = [
   // Getting Started

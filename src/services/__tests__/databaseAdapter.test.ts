@@ -23,10 +23,10 @@ describe('DatabaseAdapter', () => {
   const mockNota: Nota = {
     id: 'test-1',
     title: 'Test Nota',
-    content: 'Test content',
+    parentId: null,
+    tags: [],
     createdAt: new Date(),
-    updatedAt: new Date(),
-    blocks: []
+    updatedAt: new Date()
   }
 
   beforeEach(async () => {

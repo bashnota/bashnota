@@ -9,6 +9,11 @@ import type { Nota } from '@/features/nota/types/nota'
 import { logger } from './logger'
 
 export type StorageBackendType = 'filesystem' | 'indexeddb' | 'memory'
+export const StorageBackendTypes = {
+  FILESYSTEM: 'filesystem' as const,
+  INDEXEDDB: 'indexeddb' as const,
+  MEMORY: 'memory' as const
+}
 
 /**
  * Storage backend interface that all backends must implement
@@ -84,9 +89,6 @@ class MemoryBackend implements IStorageBackend {
     }
     if (typeof nota.title !== 'string') {
       throw new Error('Nota must have a title')
-    }
-    if (!nota.content) {
-      throw new Error('Nota must have content')
     }
   }
 }

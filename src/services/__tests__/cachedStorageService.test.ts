@@ -40,7 +40,6 @@ describe('CachedStorageService', () => {
       const nota: Nota = {
         id: 'cache-test-1',
         title: 'Cache Test',
-        content: { type: 'doc', content: [] },
         tags: [],
         favorite: false,
         createdAt: new Date(),
@@ -65,7 +64,6 @@ describe('CachedStorageService', () => {
       const nota: Nota = {
         id: 'cache-test-2',
         title: 'Original',
-        content: { type: 'doc', content: [] },
         tags: [],
         favorite: false,
         createdAt: new Date(),
@@ -91,7 +89,6 @@ describe('CachedStorageService', () => {
       const nota: Nota = {
         id: 'cache-test-3',
         title: 'To Delete',
-        content: { type: 'doc', content: [] },
         tags: [],
         favorite: false,
         createdAt: new Date(),
@@ -116,7 +113,6 @@ describe('CachedStorageService', () => {
         const nota: Nota = {
           id: `cache-limit-${i}`,
           title: `Nota ${i}`,
-          content: { type: 'doc', content: [] },
           tags: [],
           favorite: false,
           createdAt: new Date(),
@@ -138,7 +134,6 @@ describe('CachedStorageService', () => {
       const nota: Nota = {
         id: 'stats-test',
         title: 'Stats',
-        content: { type: 'doc', content: [] },
         tags: [],
         favorite: false,
         createdAt: new Date(),
@@ -167,7 +162,6 @@ describe('CachedStorageService', () => {
       const nota: Nota = {
         id: 'clear-test',
         title: 'Clear',
-        content: { type: 'doc', content: [] },
         tags: [],
         favorite: false,
         createdAt: new Date(),
@@ -192,7 +186,6 @@ describe('CachedStorageService', () => {
       const notas: Nota[] = Array.from({ length: 5 }, (_, i) => ({
         id: `batch-write-${i}`,
         title: `Nota ${i}`,
-        content: { type: 'doc', content: [] },
         tags: [],
         favorite: false,
         createdAt: new Date(),
@@ -213,7 +206,6 @@ describe('CachedStorageService', () => {
         const nota: Nota = {
           id: `batch-read-${i}`,
           title: `Nota ${i}`,
-          content: { type: 'doc', content: [] },
           tags: [],
           favorite: false,
           createdAt: new Date(),
@@ -236,7 +228,6 @@ describe('CachedStorageService', () => {
       const nota: Nota = {
         id: 'batch-partial-1',
         title: 'Exists',
-        content: { type: 'doc', content: [] },
         tags: [],
         favorite: false,
         createdAt: new Date(),
@@ -262,7 +253,6 @@ describe('CachedStorageService', () => {
       const nota: Nota = {
         id: 'perf-test',
         title: 'Performance',
-        content: { type: 'doc', content: [] },
         tags: [],
         favorite: false,
         createdAt: new Date(),

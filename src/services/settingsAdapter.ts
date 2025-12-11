@@ -20,6 +20,7 @@ export class SettingsAdapter {
     if (this.useNewSettings) {
       // Create a simple backend that uses localStorage as fallback
       const backend = {
+        type: 'localStorage' as const,
         async read(): Promise<string | null> {
           return localStorage.getItem('bashnota-consolidated-settings')
         },
@@ -27,6 +28,16 @@ export class SettingsAdapter {
           localStorage.setItem('bashnota-consolidated-settings', data)
         },
         async delete(): Promise<void> {
+          localStorage.removeItem('bashnota-consolidated-settings')
+        },
+        async readSettings(): Promise<any> {
+          const data = localStorage.getItem('bashnota-consolidated-settings')
+          return data ? JSON.parse(data) : null
+        },
+        async writeSettings(settings: any): Promise<void> {
+          localStorage.setItem('bashnota-consolidated-settings', JSON.stringify(settings))
+        },
+        async deleteSettings(): Promise<void> {
           localStorage.removeItem('bashnota-consolidated-settings')
         }
       }
@@ -95,9 +106,11 @@ export class SettingsAdapter {
    */
   async loadSettings(): Promise<AllSettings> {
     if (this.useNewSettings && this.service) {
-      // Use new consolidated service
-      const allSettings = await this.service.getAll()
-      return allSettings as AllSettings
+      // Use new consolidated service and map to AllSettings format
+      const schema = await this.service.getAll()
+      // Map SettingsSchema to AllSettings - the schemas should be compatible
+      // but AllSettings has more specific types for editor settings
+      return schema as unknown as AllSettings
     } else {
       // Use old localStorage method
       return this.loadFromLocalStorage()
@@ -113,7 +126,7 @@ export class SettingsAdapter {
       const validCategories = ['editor', 'appearance', 'ai', 'keyboard', 'integrations', 'advanced'] as const
       for (const [category, data] of Object.entries(settings)) {
         if (validCategories.includes(category as any)) {
-          await this.service.setCategory(category as typeof validCategories[number], data)
+          await this.service.updateCategory(category as typeof validCategories[number], data)
         }
       }
     } else {

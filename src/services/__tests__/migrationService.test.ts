@@ -41,7 +41,6 @@ describe('MigrationService', () => {
       const nota: Nota = {
         id: `migrate-test-${i}`,
         title: `Test Nota ${i}`,
-        content: { type: 'doc', content: [] },
         tags: [`tag${i}`],
         favorite: i === 0,
         createdAt: new Date(),
@@ -156,7 +155,6 @@ describe('MigrationService', () => {
         const nota: Nota = {
           id: `batch-nota-${i}`,
           title: `Nota ${i}`,
-          content: { type: 'doc', content: [] },
           tags: [],
           favorite: false,
           createdAt: new Date(),

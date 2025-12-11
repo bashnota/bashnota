@@ -13,6 +13,7 @@ describe('lib/citation', () => {
       authorId: 'user-123',
       authorEmail: 'john@example.com',
       publishedAt: new Date('2023-06-15').toISOString(),
+      updatedAt: new Date('2023-06-15').toISOString(),
       content: {},
       tags: ['ml', 'ai'],
       description: 'A comprehensive guide to ML',

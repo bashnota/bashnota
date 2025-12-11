@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { StorageService, StorageBackendType } from '../storageService'
+import { StorageService } from '../storageService'
+import type { StorageBackendType } from '../storageService'
 import type { Nota } from '@/features/nota/types/nota'
 
 describe('StorageService', () => {
@@ -40,7 +41,6 @@ describe('StorageService', () => {
       const testNota: Nota = {
         id: 'test-nota-1',
         title: 'Test Nota',
-        content: { type: 'doc', content: [] },
         tags: ['test'],
         favorite: false,
         createdAt: new Date(),
@@ -65,7 +65,6 @@ describe('StorageService', () => {
       const testNota: Nota = {
         id: 'test-nota-2',
         title: 'To Delete',
-        content: { type: 'doc', content: [] },
         tags: [],
         favorite: false,
         createdAt: new Date(),
@@ -84,7 +83,6 @@ describe('StorageService', () => {
       const nota1: Nota = {
         id: 'list-nota-1',
         title: 'Nota 1',
-        content: { type: 'doc', content: [] },
         tags: [],
         favorite: false,
         createdAt: new Date(),
@@ -95,7 +93,6 @@ describe('StorageService', () => {
       const nota2: Nota = {
         id: 'list-nota-2',
         title: 'Nota 2',
-        content: { type: 'doc', content: [] },
         tags: [],
         favorite: false,
         createdAt: new Date(),
@@ -118,7 +115,6 @@ describe('StorageService', () => {
       const nota: Nota = {
         id: 'update-nota-1',
         title: 'Original Title',
-        content: { type: 'doc', content: [] },
         tags: [],
         favorite: false,
         createdAt: new Date(),

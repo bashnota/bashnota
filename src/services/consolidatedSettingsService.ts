@@ -114,6 +114,13 @@ export class ConsolidatedSettingsService {
     return JSON.parse(JSON.stringify(this.settings[category]))
   }
 
+  async updateCategory(category: keyof SettingsSchema, data: any): Promise<void> {
+    this.ensureInitialized()
+    this.settings[category] = { ...this.settings[category], ...data }
+    await this.save()
+    logger.debug(`[ConsolidatedSettings] Updated category: ${category}`)
+  }
+
   async resetCategory(category: keyof SettingsSchema): Promise<void> {
     this.ensureInitialized()
     this.settings[category] = JSON.parse(JSON.stringify(DEFAULT_SETTINGS[category]))
