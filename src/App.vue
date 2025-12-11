@@ -17,7 +17,7 @@ import { useEditorStore } from '@/features/editor/stores/editorStore'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useBlockEditor } from '@/features/nota/composables/useBlockEditor'
 
-
+import PinnedSidebars from '@/components/PinnedSidebars.vue'
 import { useSidebarManager } from '@/composables/useSidebarManager'
 import RightSidebarContainer from '@/components/RightSidebarContainer.vue'
 import AppMenubar from '@/components/AppMenubar.vue'
@@ -333,25 +333,43 @@ onMounted(async () => {
       <SidebarInset class="h-full">
         <!-- Top Bar -->
         <div class="sticky top-0 z-10 border-b bg-background text-foreground backdrop-blur-sm">
-          <div class="flex items-center px-4 h-14 gap-2">
-            <SidebarTrigger />
+          <div class="flex items-center px-4 h-14 gap-4">
+            <!-- Left: Sidebar Toggle & Menubar -->
+            <div class="flex items-center gap-2 flex-1 min-w-0">
+              <SidebarTrigger />
+              
+              <AppMenubar
+                :can-run-all="canRunAll"
+                :is-executing-all="false"
+                :is-favorite="activeNota?.favorite || false"
+                @run-all="handleRunAll"
+                @toggle-favorite="handleToggleFavorite"
+                @share="handleShare"
+                @open-config="handleOpenConfig"
+                @export-nota="handleExportNota"
+                @save-version="handleSaveVersion"
+                @open-history="handleOpenHistory"
+                @toggle-sidebar="handleToggleSidebar"
+                @open-help="openHelp()"
+              />
+            </div>
+
+            <!-- Center/Right: Pinned Sidebars (Quick Access) -->
+            <div class="flex-shrink-0">
+              <PinnedSidebars />
+            </div>
             
-            <AppMenubar
-              class="flex-1"
-              :can-run-all="canRunAll"
-              :is-executing-all="false"
-              :is-favorite="activeNota?.favorite || false"
-              :word-count="wordCount"
-              @run-all="handleRunAll"
-              @toggle-favorite="handleToggleFavorite"
-              @share="handleShare"
-              @open-config="handleOpenConfig"
-              @export-nota="handleExportNota"
-              @save-version="handleSaveVersion"
-              @open-history="handleOpenHistory"
-              @toggle-sidebar="handleToggleSidebar"
-              @open-help="openHelp()"
-            />
+            <!-- Right: Status & Primary Actions -->
+            <div class="flex items-center gap-3 text-sm flex-shrink-0">
+               <!-- Word Count -->
+              <div v-if="wordCount" class="text-muted-foreground text-xs hidden md:block">
+                {{ wordCount }} words
+              </div>
+              
+              <!-- Save Status (Simple indicator) -->
+              <!-- TODO: Extract status component or keep simple -->
+              
+            </div>
           </div>
         </div>
 
