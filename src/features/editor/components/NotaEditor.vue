@@ -23,6 +23,7 @@ import { useBlockEditor } from '@/features/nota/composables/useBlockEditor'
 import NotaBreadcrumb from '@/features/nota/components/NotaBreadcrumb.vue'
 import MarkdownInputComponent from './blocks/MarkdownInputComponent.vue'
 import { EnhancedMarkdownPasteHandler } from '../services/EnhancedMarkdownPasteHandler'
+import { exportNotaToHtml } from '@/features/editor/services/exportService'
 
 // Import shared CSS
 import '@/assets/editor-styles.css'
@@ -905,6 +906,41 @@ onUnmounted(() => {
   codeExecutionStore.cleanup()
 })
 
+const handleExport = async () => {
+  if (!editor.value || !currentNota.value) return
+  try {
+    toast.message('Starting export... (this may take a moment for large trees)')
+    const content = editor.value.getJSON()
+    await exportNotaToHtml({
+      title: currentNota.value.title || 'Untitled',
+      content,
+      rootNotaId: currentNota.value.id,
+      fetchNota: async (id: string) => {
+          // Avoid refetching current nota if requested
+          if (id === currentNota.value?.id) {
+              return { title: currentNota.value.title, content }
+          }
+          
+          // Get metadata (load if necessary)
+          let targetNota = notaStore.getItem(id)
+          if (!targetNota) {
+              targetNota = await notaStore.loadNota(id) as any
+          }
+          
+          if (!targetNota) return null
+          
+          // Get content
+          const notaContent = await notaStore.getNotaContentAsTiptap(id)
+          return { title: targetNota.title, content: notaContent }
+      }
+    })
+    toast.success('Export completed successfully')
+  } catch (e) {
+    logger.error('Export failed', e)
+    toast.error('Export failed')
+  }
+}
+
 const isSavingVersion = ref(false)
 
 const saveVersion = async () => {
@@ -1229,6 +1265,16 @@ defineExpose({
                   >
                     <Clock class="h-3 w-3 mr-1" />
                     History
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    @click="handleExport"
+                    class="ml-2 h-8 px-2 text-xs"
+                    title="Export to HTML"
+                  >
+                    <Download class="h-3 w-3 mr-1" />
+                    Export
                   </Button>
                 </div>
               </div>
