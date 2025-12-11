@@ -424,11 +424,12 @@ const exportDocument = async () => {
         await exportNotaToHtml({
           title: title,
           content: tiptapContent,
+          citations: props.nota.citations || [],
           rootNotaId: props.nota.id,
           fetchNota: async (id: string) => {
             // Avoid refetching current nota if requested
             if (id === props.nota.id) {
-                return { title: title, content: tiptapContent }
+                return { title: title, content: tiptapContent, citations: props.nota.citations || [] }
             }
             // Get metadata
             let targetNota = notaStore.getItem(id)
@@ -439,7 +440,7 @@ const exportDocument = async () => {
             
             // Get content
             const notaContent = await notaStore.getNotaContentAsTiptap(id)
-            return { title: targetNota.title, content: notaContent }
+            return { title: targetNota.title, content: notaContent, citations: targetNota.citations || [] }
           }
         })
         

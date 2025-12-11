@@ -914,11 +914,12 @@ const handleExport = async () => {
     await exportNotaToHtml({
       title: currentNota.value.title || 'Untitled',
       content,
+      citations: citationStore.getCitationsByNotaId(props.notaId), // Pass citations from store to ensure they are up to date
       rootNotaId: currentNota.value.id,
       fetchNota: async (id: string) => {
           // Avoid refetching current nota if requested
           if (id === currentNota.value?.id) {
-              return { title: currentNota.value.title, content }
+              return { title: currentNota.value.title, content, citations: currentNota.value.citations }
           }
           
           // Get metadata (load if necessary)
@@ -931,7 +932,7 @@ const handleExport = async () => {
           
           // Get content
           const notaContent = await notaStore.getNotaContentAsTiptap(id)
-          return { title: targetNota.title, content: notaContent }
+          return { title: targetNota.title, content: notaContent, citations: targetNota.citations }
       }
     })
     toast.success('Export completed successfully')

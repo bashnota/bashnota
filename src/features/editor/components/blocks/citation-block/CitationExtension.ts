@@ -4,6 +4,7 @@ import { VueNodeViewRenderer } from '@tiptap/vue-3'
 import Citation from './Citation.vue'
 import Bibliography from './Bibliography.vue'
 import type { CitationEntry } from '@/features/nota/types/nota'
+import { updateCitationNumbers } from '@/features/editor/services/citationService'
 
 // Citation inline node
 export const CitationExtension = Node.create({
@@ -72,7 +73,7 @@ export const CitationExtension = Node.create({
     return [
       'span',
       mergeAttributes(
-        { 
+        {
           'data-type': 'citation',
           class: `citation-reference citation-${HTMLAttributes.citationStatus || 'missing'}`,
           'data-citation-key': HTMLAttributes.citationKey || '',
@@ -80,7 +81,7 @@ export const CitationExtension = Node.create({
           'data-citation-style': HTMLAttributes.citationStyle || 'numeric',
           'data-citation-format': HTMLAttributes.citationFormat || 'short',
           'data-citation-status': HTMLAttributes.citationStatus || 'missing'
-        }, 
+        },
         HTMLAttributes
       ),
       `[${HTMLAttributes.citationNumber || '?'}]`,
@@ -90,6 +91,12 @@ export const CitationExtension = Node.create({
   addNodeView() {
     return VueNodeViewRenderer(Citation as any)
   },
+
+  onUpdate() {
+    updateCitationNumbers(this.editor)
+  },
+
+
 
   addCommands() {
     return {
@@ -155,8 +162,8 @@ export const BibliographyExtension = Node.create({
     return [
       'div',
       mergeAttributes(
-        { 
-          'data-type': 'bibliography', 
+        {
+          'data-type': 'bibliography',
           class: 'bibliography-block',
           'data-style': HTMLAttributes.style,
           'data-sort-by': HTMLAttributes.sortBy,
@@ -190,7 +197,7 @@ export const BibliographyExtension = Node.create({
       }
     } as Partial<RawCommands>
   }
-}) 
+})
 
 
 

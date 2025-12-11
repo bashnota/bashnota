@@ -11,46 +11,46 @@ import { logger } from '@/services/logger'
 export function useBlockEditor(notaId: string) {
   const blockStore = useBlockStore()
   const notaStore = useNotaStore()
-  
+
   const isInitialized = ref(false)
   const lastSavedContent = ref<any>(null)
-  
+
   /**
    * Get all blocks for the current nota
    */
   const blocks = computed(() => blockStore.getNotaBlocks(notaId))
-  
+
   /**
    * Get the block structure for the current nota
    */
   const blockStructure = computed(() => blockStore.getBlockStructure(notaId))
-  
+
   /**
    * Initialize blocks for the current nota
    * This should be called when a nota is first loaded
    */
   const initializeBlocks = async () => {
     if (isInitialized.value) return
-    
+
     try {
       // Get the current nota
       const nota = notaStore.getCurrentNota(notaId)
-      
+
       // Check if we already have blocks for this nota
       const existingBlocks = await blockStore.loadNotaBlocks(notaId, nota)
-      
+
       if (existingBlocks.length === 0) {
         // No blocks exist, create initial block structure
         await blockStore.initializeNotaBlocks(notaId, nota?.title || 'Untitled')
       }
-      
+
       isInitialized.value = true
       logger.info('Block system initialized for nota:', notaId)
     } catch (error) {
       logger.error('Failed to initialize blocks:', error)
     }
   }
-  
+
   /**
    * Sanitize data to ensure it can be serialized for database storage
    */
@@ -58,19 +58,19 @@ export function useBlockEditor(notaId: string) {
     if (data === null || data === undefined) {
       return data
     }
-    
+
     if (typeof data === 'string' || typeof data === 'number' || typeof data === 'boolean') {
       return data
     }
-    
+
     if (data instanceof Date) {
       return data.toISOString()
     }
-    
+
     if (Array.isArray(data)) {
       return data.map(item => sanitizeData(item))
     }
-    
+
     if (typeof data === 'object') {
       const sanitized: any = {}
       for (const [key, value] of Object.entries(data)) {
@@ -81,7 +81,7 @@ export function useBlockEditor(notaId: string) {
       }
       return sanitized
     }
-    
+
     // For any other type, return undefined to skip it
     return undefined
   }
@@ -91,18 +91,18 @@ export function useBlockEditor(notaId: string) {
    */
   const extractTextContent = (node: any): string => {
     if (!node || typeof node !== 'object') return ''
-    
+
     if (node.text && typeof node.text === 'string') {
       return node.text
     }
-    
+
     if (node.content && Array.isArray(node.content)) {
       return node.content
         .map((child: any) => extractTextContent(child))
         .filter((text: string) => text.length > 0)
         .join(' ')
     }
-    
+
     return ''
   }
 
@@ -114,12 +114,12 @@ export function useBlockEditor(notaId: string) {
     if (!isInitialized.value) {
       await initializeBlocks()
     }
-    
+
     // Don't sync if content hasn't changed
     if (JSON.stringify(tiptapContent) === JSON.stringify(lastSavedContent.value)) {
       return
     }
-    
+
     try {
       // Get the current block structure
       const currentStructure = blockStore.getBlockStructure(notaId)
@@ -131,19 +131,19 @@ export function useBlockEditor(notaId: string) {
       // Convert Tiptap content to blocks
       const newBlocks: any[] = []
       const newBlockOrder: string[] = []
-      
+
       // Process each Tiptap node
       if (tiptapContent.content && Array.isArray(tiptapContent.content)) {
         for (let i = 0; i < tiptapContent.content.length; i++) {
           const node = tiptapContent.content[i]
           const order = i
-          
+
           let blockData: any = {
             type: 'text', // default type
             order,
             notaId,
           }
-          
+
           // Convert Tiptap node to block data based on type
           switch (node.type) {
             case 'heading':
@@ -151,7 +151,7 @@ export function useBlockEditor(notaId: string) {
               blockData.level = node.attrs?.level || 1
               blockData.content = node.content?.[0]?.text || ''
               break
-              
+
             case 'paragraph':
               // Check if paragraph contains subNotaLink content
               const hasSubNotaLink = node.content?.some((child: any) => child.type === 'subNotaLink')
@@ -164,7 +164,7 @@ export function useBlockEditor(notaId: string) {
                   blockData.targetNotaTitle = subNotaLinkChild.attrs?.targetNotaTitle || 'Untitled Nota'
                   blockData.displayText = subNotaLinkChild.attrs?.displayText || subNotaLinkChild.attrs?.targetNotaTitle || 'Untitled Nota'
                   blockData.linkStyle = subNotaLinkChild.attrs?.linkStyle || 'inline'
-                  
+
                   // Validate required fields for subNotaLink blocks
                   if (!blockData.targetNotaId) {
                     logger.warn('subNotaLink block missing targetNotaId, using placeholder')
@@ -174,104 +174,106 @@ export function useBlockEditor(notaId: string) {
               } else {
                 // Regular paragraph
                 blockData.type = 'text'
-                blockData.content = node.content?.[0]?.text || ''
+                // Store the full content array to preserve inline nodes (citations, formatting, etc.)
+                // If content is missing, fallback to empty string
+                blockData.content = node.content || ''
               }
               break
-              
 
-              
+
+
             case 'codeBlock':
               blockData.type = 'code'
               blockData.language = node.attrs?.language || 'text'
               blockData.content = node.content?.[0]?.text || ''
               break
-              
+
             case 'mathBlock':
               blockData.type = 'math'
               blockData.latex = node.content?.[0]?.text || ''
               blockData.displayMode = node.attrs?.displayMode || false
               break
-            
+
             case 'math':
               blockData.type = 'math'
               // Some math nodes may carry latex in attrs or content; support both
               blockData.latex = node.attrs?.latex ?? (node.content?.[0]?.text || '')
               blockData.displayMode = node.attrs?.displayMode || false
               break
-              
+
             case 'table':
               blockData.type = 'table'
-              blockData.headers = node.content?.[0]?.content?.map((cell: any) => 
+              blockData.headers = node.content?.[0]?.content?.map((cell: any) =>
                 cell.content?.[0]?.text || ''
               ) || []
-              blockData.rows = node.content?.slice(1)?.map((row: any) => 
-                row.content?.map((cell: any) => 
+              blockData.rows = node.content?.slice(1)?.map((row: any) =>
+                row.content?.map((cell: any) =>
                   cell.content?.[0]?.text || ''
                 ) || []
               ) || []
               break
-              
+
             case 'image':
               blockData.type = 'image'
               blockData.src = node.attrs?.src || ''
               blockData.alt = node.attrs?.alt || ''
               blockData.caption = node.attrs?.title || ''
               break
-              
+
             case 'blockquote':
               blockData.type = 'quote'
               blockData.content = node.content?.[0]?.content?.[0]?.text || ''
               break
-              
+
             case 'bulletList':
             case 'orderedList':
               blockData.type = 'list'
               blockData.listType = node.type === 'orderedList' ? 'ordered' : 'unordered'
-              blockData.items = node.content?.map((item: any) => 
+              blockData.items = node.content?.map((item: any) =>
                 item.content?.[0]?.content?.[0]?.text || ''
               ) || []
               break
-              
+
             case 'horizontalRule':
               blockData.type = 'horizontalRule'
               break
-              
+
             case 'youtube':
               blockData.type = 'youtube'
               blockData.videoId = node.attrs?.videoId || ''
               blockData.title = node.attrs?.title || ''
               break
-              
+
             case 'drawio':
               blockData.type = 'drawio'
               blockData.diagramData = node.attrs?.diagramData || ''
               blockData.width = node.attrs?.width
               blockData.height = node.attrs?.height
               break
-              
+
             case 'citation':
               blockData.type = 'citation'
               blockData.citationKey = node.attrs?.citationKey || ''
               blockData.citationData = node.attrs?.citationData || {}
               break
-              
+
             case 'bibliography':
               blockData.type = 'bibliography'
               blockData.citations = node.attrs?.citations || []
               break
-              
+
             case 'subfigure':
               blockData.type = 'subfigure'
               blockData.images = node.attrs?.images || []
               blockData.layout = node.attrs?.layout || 'horizontal'
               break
-              
+
             case 'notaTable':
               blockData.type = 'notaTable'
               blockData.tableData = node.attrs?.tableData || []
               blockData.columns = node.attrs?.columns || []
               break
-              
+
             case 'aiGeneration':
               blockData.type = 'aiGeneration'
               blockData.prompt = node.attrs?.prompt || ''
@@ -279,7 +281,7 @@ export function useBlockEditor(notaId: string) {
               blockData.model = node.attrs?.model
               blockData.timestamp = new Date()
               break
-              
+
             case 'executableCodeBlock':
               blockData.type = 'executableCodeBlock'
               blockData.language = node.attrs?.language || 'text'
@@ -291,7 +293,7 @@ export function useBlockEditor(notaId: string) {
               blockData.error = node.attrs?.error
               blockData.kernelPreferences = node.attrs?.kernelPreferences
               break
-              
+
             case 'confusionMatrix':
               blockData.type = 'confusionMatrix'
               blockData.matrixData = node.attrs?.matrixData
@@ -300,7 +302,7 @@ export function useBlockEditor(notaId: string) {
               blockData.filePath = node.attrs?.filePath || ''
               blockData.stats = node.attrs?.stats
               break
-              
+
             case 'theorem':
               blockData.type = 'theorem'
               blockData.title = node.attrs?.title || 'Theorem'
@@ -310,7 +312,7 @@ export function useBlockEditor(notaId: string) {
               blockData.number = node.attrs?.number
               blockData.tags = node.attrs?.tags || []
               break
-              
+
             case 'pipeline':
               blockData.type = 'pipeline'
               blockData.title = node.attrs?.title || 'Pipeline'
@@ -319,7 +321,7 @@ export function useBlockEditor(notaId: string) {
               blockData.edges = node.attrs?.edges || []
               blockData.config = node.attrs?.config
               break
-              
+
             case 'mermaid':
               blockData.type = 'mermaid'
               blockData.content = node.attrs?.content || ''
@@ -327,35 +329,35 @@ export function useBlockEditor(notaId: string) {
               blockData.theme = node.attrs?.theme || 'default'
               blockData.config = node.attrs?.config
               break
-              
+
             case 'subNotaLink':
               blockData.type = 'subNotaLink'
               blockData.targetNotaId = node.attrs?.targetNotaId || ''
               blockData.targetNotaTitle = node.attrs?.targetNotaTitle || 'Untitled Nota'
               blockData.displayText = node.attrs?.displayText || node.attrs?.targetNotaTitle || 'Untitled Nota'
               blockData.linkStyle = node.attrs?.linkStyle || 'inline'
-              
+
               // Validate required fields for subNotaLink blocks
               if (!blockData.targetNotaId) {
                 logger.warn('subNotaLink block missing targetNotaId, using placeholder')
                 blockData.targetNotaId = 'placeholder'
               }
               break
-              
-              default:
-                // For unknown types, try to extract text content
-                blockData.content = node.content?.[0]?.text || `[${node.type} block]`
+
+            default:
+              // For unknown types, try to extract text content
+              blockData.content = node.content?.[0]?.text || `[${node.type} block]`
           }
-          
+
           // Create or update the block
           let compositeId: string
           const existingCompositeId = currentStructure.blockOrder[i]
-          const existingBlock = existingCompositeId ? 
+          const existingBlock = existingCompositeId ?
             blockStore.getBlock(existingCompositeId) : null
-          
+
           // Sanitize block data to prevent DataCloneError
           const sanitizedBlockData = JSON.parse(JSON.stringify(blockData))
-          
+
           if (existingBlock && existingBlock.type === blockData.type) {
             // Update existing block using composite ID
             await blockStore.updateBlock(existingCompositeId, sanitizedBlockData)
@@ -365,11 +367,11 @@ export function useBlockEditor(notaId: string) {
             const newBlock = await blockStore.createBlock(sanitizedBlockData)
             compositeId = `${newBlock.type}:${String(newBlock.id)}`
           }
-          
+
           newBlockOrder.push(compositeId)
         }
       }
-      
+
       // Update block structure with new order
       if (JSON.stringify(newBlockOrder) !== JSON.stringify(currentStructure.blockOrder)) {
         currentStructure.blockOrder = newBlockOrder
@@ -377,10 +379,10 @@ export function useBlockEditor(notaId: string) {
         currentStructure.lastModified = new Date()
         await blockStore.saveBlockStructure(currentStructure)
       }
-      
+
       // Update the last saved content
       lastSavedContent.value = tiptapContent
-      
+
       logger.info('Successfully synced Tiptap content to blocks for nota:', notaId, {
         blockCount: newBlockOrder.length,
         blockOrder: newBlockOrder
@@ -390,7 +392,7 @@ export function useBlockEditor(notaId: string) {
       throw error
     }
   }
-  
+
   /**
    * Get blocks as Tiptap content for the editor
    * This converts our blocks back to Tiptap format
@@ -399,16 +401,16 @@ export function useBlockEditor(notaId: string) {
     if (!blockStructure.value || blocks.value.length === 0) {
       return null
     }
-    
+
     // Use the store's method to get Tiptap content
     return blockStore.getTiptapContent(notaId)
   })
-  
+
   // Use the store's convertBlockToTiptap method
   const convertBlockToTiptap = (block: Block): any => {
     return blockStore.convertBlockToTiptap(block)
   }
-  
+
   /**
    * Insert a new block at a specific position
    * This is called when Tiptap creates new blocks
@@ -475,12 +477,12 @@ export function useBlockEditor(notaId: string) {
           blockData = { ...blockData, content: content, title: undefined, theme: 'default', config: undefined }
           break
         case 'subNotaLink':
-          blockData = { 
-            ...blockData, 
-            targetNotaId: 'placeholder', 
-            targetNotaTitle: 'Untitled Nota', 
-            displayText: 'Untitled Nota', 
-            linkStyle: 'inline' 
+          blockData = {
+            ...blockData,
+            targetNotaId: 'placeholder',
+            targetNotaTitle: 'Untitled Nota',
+            displayText: 'Untitled Nota',
+            linkStyle: 'inline'
           }
           break
         default:
@@ -488,7 +490,7 @@ export function useBlockEditor(notaId: string) {
       }
 
       const newBlock = await blockStore.createBlock(blockData)
-      
+
       logger.info('Inserted new block:', newBlock.id)
       return newBlock
     } catch (error) {
@@ -496,7 +498,7 @@ export function useBlockEditor(notaId: string) {
       throw error
     }
   }
-  
+
   /**
    * Update a specific block
    * This is called when Tiptap updates block content
@@ -511,7 +513,7 @@ export function useBlockEditor(notaId: string) {
       throw error
     }
   }
-  
+
   /**
    * Delete a block
    * This is called when Tiptap deletes blocks
@@ -525,7 +527,7 @@ export function useBlockEditor(notaId: string) {
       throw error
     }
   }
-  
+
   /**
    * Reorder blocks
    * This is called when Tiptap reorders blocks
@@ -539,7 +541,7 @@ export function useBlockEditor(notaId: string) {
       throw error
     }
   }
-  
+
   /**
    * Get block statistics for the nota
    */
@@ -550,11 +552,11 @@ export function useBlockEditor(notaId: string) {
       wordCount: 0,
       characterCount: 0
     }
-    
+
     blocks.value.forEach(block => {
       // Count block types
       stats.blockTypes[block.type] = (stats.blockTypes[block.type] || 0) + 1
-      
+
       // Count words and characters
       if ('content' in block && typeof block.content === 'string') {
         const words = block.content.trim().split(/\s+/).filter(word => word.length > 0)
@@ -562,16 +564,16 @@ export function useBlockEditor(notaId: string) {
         stats.characterCount += block.content.length
       }
     })
-    
+
     return stats
   })
-  
+
   return {
     // State
     isInitialized,
     blocks,
     blockStructure,
-    
+
     // Actions
     initializeBlocks,
     syncContentToBlocks,
@@ -579,7 +581,7 @@ export function useBlockEditor(notaId: string) {
     updateBlock,
     deleteBlock,
     reorderBlocks,
-    
+
     // Computed
     getTiptapContent,
     blockStats

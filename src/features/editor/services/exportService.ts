@@ -9,11 +9,13 @@ import { buildHtmlPage } from './export/templates/defaultTemplate'
 export interface NotaExportContent {
     title: string
     content: any // Tiptap JSON
+    citations?: any[] // CitationEntry[]
 }
 
 export interface NotaExportOptions {
     title: string
     content: any
+    citations?: any[]
     rootNotaId?: string
     fetchNota?: (id: string) => Promise<NotaExportContent | null>
 }
@@ -21,7 +23,7 @@ export interface NotaExportOptions {
 interface ExportContext {
     zip: JSZip
     assetsFolder: JSZip | null
-    queue: { id: string | 'root', title: string, content: any }[]
+    queue: { id: string | 'root', title: string, content: any, citations?: any[] }[]
     processedIds: Set<string>
     fetchNota?: (id: string) => Promise<NotaExportContent | null>
     imgCounter: number // Global counter for images
@@ -29,7 +31,7 @@ interface ExportContext {
 
 // --- Main Export Function ---
 export const exportNotaToHtml = async (options: NotaExportOptions) => {
-    const { title, content, rootNotaId, fetchNota } = options
+    const { title, content, citations, rootNotaId, fetchNota } = options
     const zip = new JSZip()
     const assetsFolder = zip.folder('assets')
 
@@ -44,7 +46,7 @@ export const exportNotaToHtml = async (options: NotaExportOptions) => {
 
     // Initialize with root
     const rootId = rootNotaId || 'root'
-    context.queue.push({ id: rootId, title, content })
+    context.queue.push({ id: rootId, title, content, citations })
     context.processedIds.add(rootId)
 
     const extensions = getEditorExtensions()
@@ -64,6 +66,9 @@ export const exportNotaToHtml = async (options: NotaExportOptions) => {
         await processLinks(doc, isRoot, context)
         processAssets(doc, relativePathPrefix, context)
         processCustomBlocks(doc)
+        processAssets(doc, relativePathPrefix, context)
+        processCustomBlocks(doc)
+        processCitations(doc, item.citations || [])
         processInlineLatex(doc)
 
         // 3. Build Final HTML Page
@@ -321,6 +326,81 @@ function processCustomBlocks(doc: Document) {
     })
 
 }
+
+function processCitations(doc: Document, citations: any[]) {
+    // map key -> citation data
+    const citationMap = new Map(citations.map(c => [c.key, c]))
+    const usedCitations = new Map<string, number>()
+    let counter = 1
+
+    // 1. Process inline citations
+    doc.querySelectorAll('span[data-type="citation"]').forEach((span) => {
+        const key = span.getAttribute('data-citation-key')
+        if (key) {
+            let num = usedCitations.get(key)
+            if (!num) {
+                num = counter++
+                usedCitations.set(key, num)
+            }
+
+            // Update Number and Text
+            span.setAttribute('data-citation-number', num.toString())
+            span.textContent = `[${num}]`
+
+            // Embed Metadata for Modal
+            const data = citationMap.get(key)
+            if (data) {
+                span.setAttribute('data-citation-json', JSON.stringify(data))
+                span.classList.add('citation-interactive')
+            }
+        }
+    })
+
+    // 2. Update Bibliography
+    const bibliographyBlock = doc.querySelector('div[data-type="bibliography"]')
+    if (bibliographyBlock) {
+        if (usedCitations.size === 0) {
+            bibliographyBlock.remove()
+            return
+        }
+
+        const list = document.createElement('ul')
+        list.className = 'bibliography-list'
+
+        // Sort by number
+        const sorted = Array.from(usedCitations.entries()).sort((a, b) => a[1] - b[1])
+
+        sorted.forEach(([key, num]) => {
+            const data = citationMap.get(key)
+            const li = document.createElement('li')
+            li.className = 'bibliography-item'
+            li.id = `ref-${key}`
+
+            let text = `[${num}] ${key}`
+            if (data) {
+                // Formatting logic (simplified APA-ish)
+                const authors = data.authors?.map((a: any) => `${a.family}, ${a.given}`).join(' & ') || 'Unknown Author'
+                const title = data.title || 'Untitled'
+                const year = data.year || 'n.d.'
+                text = `[${num}] ${authors} (${year}). ${title}.`
+                if (data.journal) text += ` ${data.journal}`
+                if (data.volume) text += `, ${data.volume}`
+                if (data.pages) text += `, ${data.pages}`
+                text += '.'
+            }
+
+            li.textContent = text
+            list.appendChild(li)
+        })
+
+        bibliographyBlock.innerHTML = ''
+        const title = document.createElement('h2')
+        title.textContent = 'References'
+        bibliographyBlock.appendChild(title)
+        bibliographyBlock.appendChild(list)
+    }
+}
+
 
 function processInlineLatex(doc: Document) {
     const walker = document.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null)

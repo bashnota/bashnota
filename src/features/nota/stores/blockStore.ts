@@ -36,9 +36,9 @@ export const useBlockStore = defineStore('blocks', {
         logger.info('No block structure found for nota:', notaId)
         return []
       }
-      
+
       logger.info('Getting blocks for structure:', structure)
-      
+
       const blocks = structure.blockOrder
         .map(compositeId => {
           const block = state.blocks.get(compositeId)
@@ -50,7 +50,7 @@ export const useBlockStore = defineStore('blocks', {
         })
         .filter((block): block is Block => block !== undefined)
         .sort((a, b) => a.order - b.order)
-      
+
       logger.info('Returning blocks:', blocks.length, blocks.map(b => ({ id: b.id, type: b.type, order: b.order })))
       return blocks
     },
@@ -75,12 +75,12 @@ export const useBlockStore = defineStore('blocks', {
     getNextBlockOrder: (state) => (notaId: string): number => {
       const structure = state.blockStructures.get(notaId)
       if (!structure || structure.blockOrder.length === 0) return 0
-      
+
       const maxOrder = Math.max(...structure.blockOrder.map(cid => {
         const block = state.blocks.get(cid)
         return block?.order || 0
       }))
-      
+
       return maxOrder + 1
     },
   },
@@ -96,11 +96,11 @@ export const useBlockStore = defineStore('blocks', {
         version: structure.version,
         lastModified: structure.lastModified.toISOString(),
       }
-      
+
       if (structure.id) {
         serialized.id = structure.id
       }
-      
+
       return serialized
     },
 
@@ -123,10 +123,10 @@ export const useBlockStore = defineStore('blocks', {
     async saveBlockStructure(structure: NotaBlockStructure): Promise<void> {
       const serialized = this.serializeBlockStructure(structure)
       logger.info('Saving block structure:', serialized)
-      
+
       const sanitizedSerialized = JSON.parse(JSON.stringify(serialized))
       logger.info('Sanitized block structure:', sanitizedSerialized)
-      
+
       if (structure.id) {
         await db.blockStructures.put(sanitizedSerialized)
         logger.info('Updated existing block structure:', structure.id)
@@ -152,7 +152,7 @@ export const useBlockStore = defineStore('blocks', {
             logger.warn('subNotaLink block missing targetNotaTitle')
           }
         }
-        
+
         const block = {
           ...blockData,
           createdAt: new Date(),
@@ -162,7 +162,7 @@ export const useBlockStore = defineStore('blocks', {
 
         // Save to database first to get the auto-generated numeric ID per-table
         const savedBlockId = await db.saveBlock(block)
-        
+
         // Update the block with the generated ID
         const savedBlock = { ...block, id: savedBlockId } as Block
         const compositeId = toCompositeId({ id: (savedBlock as any).id, type: (savedBlock as any).type })
@@ -349,11 +349,11 @@ export const useBlockStore = defineStore('blocks', {
             lastModified: new Date(),
           }
         }
-        
+
         // Load individual blocks from all block tables
         const blocks = await db.getAllBlocksForNota(notaId)
         logger.info('Loaded blocks from DB:', blocks)
-        
+
         // Log subNotaLink blocks specifically
         const subNotaLinkBlocks = blocks.filter(block => block.type === 'subNotaLink')
         if (subNotaLinkBlocks.length > 0) {
@@ -361,7 +361,7 @@ export const useBlockStore = defineStore('blocks', {
         } else {
           logger.info('No subNotaLink blocks found in DB for nota:', notaId)
         }
-        
+
         // Index blocks in memory by composite id
         this.blocks.clear()
         for (const block of blocks) {
@@ -383,7 +383,7 @@ export const useBlockStore = defineStore('blocks', {
           structure.lastModified = new Date()
           await this.saveBlockStructure(structure)
         }
-        
+
         // Ensure blockOrder is populated even if migration wasn't needed
         if (structure.blockOrder.length === 0 && this.blocks.size > 0) {
           logger.info('BlockOrder is empty but blocks exist, rebuilding order for nota:', notaId)
@@ -395,7 +395,7 @@ export const useBlockStore = defineStore('blocks', {
           structure.lastModified = new Date()
           await this.saveBlockStructure(structure)
         }
-        
+
         // Log the final structure for debugging
         logger.info('Final block structure for nota:', notaId, {
           blockOrderLength: structure.blockOrder.length,
@@ -428,7 +428,7 @@ export const useBlockStore = defineStore('blocks', {
           version: 1,
           lastModified: new Date(),
         }
-        
+
         await this.saveBlockStructure(structure)
 
         // Add to memory
@@ -476,7 +476,7 @@ export const useBlockStore = defineStore('blocks', {
         blockOrderLength: structure?.blockOrder?.length || 0,
         blocksSize: this.blocks.size
       })
-      
+
       // Fallback: if blockOrder is empty but blocks exist, try to rebuild the order
       if (structure && structure.blockOrder.length === 0 && this.blocks.size > 0) {
         logger.info('BlockOrder is empty but blocks exist, attempting to rebuild order for nota:', notaId)
@@ -485,16 +485,16 @@ export const useBlockStore = defineStore('blocks', {
           const allBlocks = Array.from(this.blocks.values())
             .filter(block => block.notaId === notaId)
             .sort((a, b) => a.order - b.order)
-          
+
           if (allBlocks.length > 0) {
             // Rebuild the blockOrder
             structure.blockOrder = allBlocks.map(block => toCompositeId(block as any))
             structure.version++
             structure.lastModified = new Date()
-            
+
             // Save the updated structure
             this.saveBlockStructure(structure)
-            
+
             logger.info('Successfully rebuilt blockOrder for nota:', notaId, {
               newBlockOrderLength: structure.blockOrder.length,
               blockTypes: allBlocks.map(b => b.type)
@@ -504,38 +504,38 @@ export const useBlockStore = defineStore('blocks', {
           logger.error('Failed to rebuild blockOrder for nota:', notaId, error)
         }
       }
-      
+
       if (!structure || structure.blockOrder.length === 0) {
         logger.warn('No block structure or empty blockOrder for nota:', notaId)
         return null
       }
-      
+
       const blocks = structure.blockOrder
         .map(cid => this.blocks.get(cid))
         .filter((block): block is Block => block !== undefined)
         .sort((a, b) => a.order - b.order)
-      
+
       logger.info('Converted blocks for Tiptap:', {
         requestedBlocks: structure.blockOrder.length,
         foundBlocks: blocks.length,
         blockTypes: blocks.map(b => b.type)
       })
-      
+
       if (blocks.length === 0) {
         logger.warn('No blocks found after conversion for nota:', notaId)
         return null
       }
-      
+
       const content = {
         type: 'doc',
         content: blocks.map(block => this.convertBlockToTiptap(block))
       }
-      
+
       logger.info('Generated Tiptap content for nota:', notaId, {
         contentLength: content.content.length,
         firstBlockType: content.content[0]?.type
       })
-      
+
       return content
     },
 
@@ -555,30 +555,37 @@ export const useBlockStore = defineStore('blocks', {
             attrs: { level: (block as any).level || 1 },
             content: [{ type: 'text', text: ensureTextContent((block as any).content) }]
           }
-        
+
         case 'text':
+          const content = (block as any).content
+          if (Array.isArray(content)) {
+            return {
+              type: 'paragraph',
+              content: content
+            }
+          }
           return {
             type: 'paragraph',
-            content: [{ type: 'text', text: ensureTextContent((block as any).content) }]
+            content: [{ type: 'text', text: ensureTextContent(content) }]
           }
-        
+
         case 'code':
           return {
             type: 'codeBlock',
             attrs: { language: (block as any).language || 'text' },
             content: [{ type: 'text', text: ensureTextContent((block as any).content) }]
           }
-        
+
         case 'math':
           return {
             type: 'math',
-            attrs: { 
+            attrs: {
               displayMode: (block as any).displayMode || false,
               latex: (block as any).latex || ''
             },
             content: [{ type: 'text', text: ensureTextContent((block as any).latex) }]
           }
-        
+
         case 'table':
           return {
             type: 'table',
@@ -601,7 +608,7 @@ export const useBlockStore = defineStore('blocks', {
               })) || [])
             ]
           }
-        
+
         case 'image':
           return {
             type: 'image',
@@ -611,13 +618,13 @@ export const useBlockStore = defineStore('blocks', {
               title: (block as any).caption || ''
             }
           }
-        
+
         case 'quote':
           return {
             type: 'blockquote',
             content: [{ type: 'paragraph', content: [{ type: 'text', text: ensureTextContent((block as any).content) }] }]
           }
-        
+
         case 'list':
           const listType = (block as any).listType === 'ordered' ? 'orderedList' : 'bulletList'
           return {
@@ -627,77 +634,77 @@ export const useBlockStore = defineStore('blocks', {
               content: [{ type: 'paragraph', content: [{ type: 'text', text: ensureTextContent(item) }] }]
             }))
           }
-        
+
         case 'horizontalRule':
           return { type: 'horizontalRule' }
-        
+
         case 'youtube':
           return {
             type: 'youtube',
-            attrs: { 
-              videoId: (block as any).videoId || '', 
-              title: (block as any).title || '' 
+            attrs: {
+              videoId: (block as any).videoId || '',
+              title: (block as any).title || ''
             }
           }
-        
+
         case 'drawio':
           return {
             type: 'drawio',
-            attrs: { 
+            attrs: {
               diagramData: (block as any).diagramData || '',
               width: (block as any).width,
               height: (block as any).height
             }
           }
-        
+
         case 'citation':
           return {
             type: 'citation',
-            attrs: { 
+            attrs: {
               citationKey: (block as any).citationKey || '',
               citationData: (block as any).citationData || {}
             }
           }
-        
+
         case 'bibliography':
           return {
             type: 'bibliography',
             attrs: { citations: (block as any).citations || [] }
           }
-        
+
         case 'subfigure':
           return {
             type: 'subfigure',
-            attrs: { 
+            attrs: {
               images: (block as any).images || [],
               layout: (block as any).layout || 'horizontal'
             }
           }
-        
+
         case 'notaTable':
           return {
             type: 'notaTable',
-            attrs: { 
+            attrs: {
               tableData: (block as any).tableData || [],
               columns: (block as any).columns || []
             }
           }
-        
+
         case 'aiGeneration':
           return {
             type: 'aiGeneration',
-            attrs: { 
+            attrs: {
               prompt: (block as any).prompt || '',
               model: (block as any).model || '',
               timestamp: (block as any).timestamp
             },
             content: [{ type: 'text', text: ensureTextContent((block as any).generatedContent) }]
           }
-        
+
         case 'executableCodeBlock':
           return {
             type: 'executableCodeBlock',
-            attrs: { 
+            attrs: {
               language: (block as any).language || 'text',
               output: (block as any).output,
               sessionId: (block as any).sessionId,
@@ -708,11 +715,11 @@ export const useBlockStore = defineStore('blocks', {
             },
             content: [{ type: 'text', text: ensureTextContent((block as any).content) }]
           }
-        
+
         case 'confusionMatrix':
           return {
             type: 'confusionMatrix',
-            attrs: { 
+            attrs: {
               matrixData: (block as any).matrixData,
               title: (block as any).title || 'Confusion Matrix',
               source: (block as any).source || 'upload',
@@ -720,11 +727,11 @@ export const useBlockStore = defineStore('blocks', {
               stats: (block as any).stats
             }
           }
-        
+
         case 'theorem':
           return {
             type: 'theorem',
-            attrs: { 
+            attrs: {
               title: (block as any).title || 'Theorem',
               type: (block as any).theoremType || 'theorem',
               number: (block as any).number,
@@ -733,11 +740,11 @@ export const useBlockStore = defineStore('blocks', {
               proof: (block as any).proof || ''
             }
           }
-        
+
         case 'pipeline':
           return {
             type: 'pipeline',
-            attrs: { 
+            attrs: {
               title: (block as any).title || 'Pipeline',
               description: (block as any).description,
               nodes: (block as any).nodes || [],
@@ -745,11 +752,11 @@ export const useBlockStore = defineStore('blocks', {
               config: (block as any).config
             }
           }
-        
+
         case 'mermaid':
           return {
             type: 'mermaid',
-            attrs: { 
+            attrs: {
               content: (block as any).content || '',
               title: (block as any).title,
               theme: (block as any).theme || 'default',
@@ -948,7 +955,7 @@ export const useBlockStore = defineStore('blocks', {
                 blockData.targetNotaTitle = node.attrs?.targetNotaTitle || 'Untitled Nota'
                 blockData.displayText = node.attrs?.displayText || node.attrs?.targetNotaTitle || 'Untitled Nota'
                 blockData.linkStyle = node.attrs?.linkStyle || 'inline'
-                
+
                 // Validate imported subNotaLink blocks
                 if (!blockData.targetNotaId) {
                   logger.warn('Imported subNotaLink block missing targetNotaId')

@@ -6,10 +6,10 @@ import type { CitationEntry } from '@/features/nota/types/nota'
 
 export const useCitationStore = defineStore('citation', () => {
   const publicCitations = ref<CitationEntry[]>([])
-  
+
   // Lazy getter for notaStore
   const getNotaStore = () => useNotaStore()
-  
+
   // Add a new citation
   const addCitation = (notaId: string, citation: Omit<CitationEntry, 'id' | 'createdAt'>) => {
     const nota = getNotaStore().getCurrentNota(notaId)
@@ -21,9 +21,9 @@ export const useCitationStore = defineStore('citation', () => {
       id,
       createdAt: new Date()
     }
-    
+
     const updatedCitations = [...(nota.citations || []), newCitation]
-    getNotaStore().updateNota(notaId, { citations: updatedCitations })
+    getNotaStore().saveNota({ id: notaId, citations: updatedCitations })
     return newCitation
   }
 
@@ -40,7 +40,7 @@ export const useCitationStore = defineStore('citation', () => {
     const updatedCitations = [...citations]
     updatedCitations[citationIndex] = updatedCitation
 
-    getNotaStore().updateNota(notaId, { citations: updatedCitations })
+    getNotaStore().saveNota({ id: notaId, citations: updatedCitations })
     return updatedCitation
   }
 
@@ -51,8 +51,8 @@ export const useCitationStore = defineStore('citation', () => {
 
     const citations = nota.citations || []
     const updatedCitations = citations.filter(c => c.id !== citationId)
-    
-    getNotaStore().updateNota(notaId, { citations: updatedCitations })
+
+    getNotaStore().saveNota({ id: notaId, citations: updatedCitations })
     return true
   }
 
@@ -92,10 +92,3 @@ export const useCitationStore = defineStore('citation', () => {
     setPublicCitations
   }
 }) 
-
-
-
-
-
-
-

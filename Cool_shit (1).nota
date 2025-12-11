@@ -1,0 +1,218 @@
+{
+  "version": "1.0",
+  "exportedAt": "2025-12-11T22:16:20.965Z",
+  "nota": {
+    "id": "eKRtgW3Ws1Bnecy-2YYbg",
+    "title": "Cool shit",
+    "parentId": null,
+    "tags": [],
+    "createdAt": "2025-12-11T20:08:36.240Z",
+    "updatedAt": "2025-12-11T22:15:35.260Z",
+    "blockStructure": {
+      "notaId": "eKRtgW3Ws1Bnecy-2YYbg",
+      "blockOrder": [],
+      "version": 1,
+      "lastModified": "2025-12-11T20:08:36.240Z"
+    },
+    "config": {
+      "kernelPreferences": {},
+      "savedSessions": [],
+      "sharedSessionMode": false,
+      "sharedSessionId": "session-1746165110785-9z2oy3v22nq"
+    },
+    "citations": [
+      {
+        "id": "895b8bd7-3180-449e-86fc-9842efac12a6",
+        "key": "feng2022language",
+        "title": "Language-agnostic BERT sentence embedding",
+        "authors": [
+          "Feng",
+          "Fangxiaoyu",
+          "Yang",
+          "Yinfei",
+          "Cer",
+          "Daniel",
+          "Arivazhagan",
+          "Naveen",
+          "Wang",
+          "Wei"
+        ],
+        "year": "2022",
+        "journal": "",
+        "volume": "",
+        "number": "",
+        "pages": "878--891",
+        "publisher": "",
+        "url": "",
+        "doi": "",
+        "createdAt": "2025-12-11T20:11:32.238Z"
+      }
+    ],
+    "versions": [],
+    "content": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "This is a test of how good is the new system"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "are we really there or are we gone"
+            }
+          ]
+        },
+        {
+          "type": "math",
+          "attrs": {
+            "displayMode": false,
+            "latex": "ⵟ(a,b) = \\frac{(a \\cdot b)^2}{||a - b||^2}, \\forall a,b \\in \\mathbb{R}^n, a \\neq b"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "ⵟ(a,b) = \\frac{(a \\cdot b)^2}{||a - b||^2}, \\forall a,b \\in \\mathbb{R}^n, a \\neq b"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": " "
+            }
+          ]
+        },
+        {
+          "type": "theorem",
+          "attrs": {
+            "title": "Theorem",
+            "type": "theorem",
+            "number": null,
+            "tags": [],
+            "content": "Let $f: \\mathbb{R} \\to \\mathbb{R}$ be a function. Then...",
+            "proof": "We can prove this by..."
+          }
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": " "
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "this is cool"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": " "
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "fdsf"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": " "
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": " "
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": " "
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": " "
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": " "
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": " "
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": " "
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": " "
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "subnotas": []
+}

@@ -19,7 +19,7 @@ export interface BaseBlock {
  */
 export interface TextBlock extends BaseBlock {
   type: 'text'
-  content: string
+  content: string | any[]
   marks?: Mark[]
 }
 
@@ -272,7 +272,7 @@ export interface SubNotaLinkBlock extends BaseBlock {
 /**
  * Union type for all block types
  */
-export type Block = 
+export type Block =
   | TextBlock
   | HeadingBlock
   | CodeBlock

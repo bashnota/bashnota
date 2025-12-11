@@ -9,6 +9,7 @@ import { Search, SortAsc, SortDesc, Filter, Copy, FileText, ChevronDown, Chevron
 import { toast } from 'vue-sonner'
 import { logger } from '@/services/logger'
 import type { CitationEntry } from '@/features/nota/types/nota'
+import { getOrderedCitationKeys } from '@/features/editor/services/citationService'
 
 const props = defineProps({
   node: {
@@ -32,6 +33,7 @@ const props = defineProps({
 const router = useRouter()
 const citationStore = useCitationStore()
 const isExpanded = ref(false)
+const orderedCitationKeys = ref<string[]>([])
 
 // Get the current nota ID from the route
 const notaId = computed(() => {
@@ -145,14 +147,22 @@ const sortedCitations = computed(() => {
       
     default:
       // Sort by citation number (order they appear in the document)
-      return sorted
+      return sorted.sort((a, b) => {
+        const indexA = orderedCitationKeys.value.indexOf(a.key)
+        const indexB = orderedCitationKeys.value.indexOf(b.key)
+        
+        // Handle missing keys (put at end)
+        if (indexA === -1) return 1
+        if (indexB === -1) return -1
+        
+        return indexA - indexB
+      })
   }
 })
 
 // Get the citation number as it appears in the document
 const getCitationNumber = (citationKey: string) => {
-  const allCitations = citationStore.getCitationsByNotaId(notaId.value)
-  const index = allCitations.findIndex(c => c.key === citationKey)
+  const index = orderedCitationKeys.value.indexOf(citationKey)
   return index >= 0 ? index + 1 : null
 }
 
@@ -208,11 +218,17 @@ const refreshBibliography = () => {
           }
           return true
         })
+
+        // Also update ordered keys directly here for reactivity
+        orderedCitationKeys.value = getOrderedCitationKeys(props.editor)
         
         // Only update if we found the node
         if (foundPos !== null) {
           tr.setNodeMarkup(foundPos, undefined, props.node.attrs)
         }
+        
+        // Update ordered keys
+        orderedCitationKeys.value = getOrderedCitationKeys(editor)
         
         return true
       })
