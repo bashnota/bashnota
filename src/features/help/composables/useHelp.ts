@@ -1,7 +1,8 @@
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref } from 'vue'
 
 const isHelpOpen = ref(false)
 const currentTopicId = ref<string | undefined>()
+let isListenerAttached = false
 
 export function useHelp() {
   function openHelp(topicId?: string) {
@@ -18,7 +19,7 @@ export function useHelp() {
     isHelpOpen.value = !isHelpOpen.value
   }
 
-  // Setup keyboard shortcut (F1) for help
+  // Setup keyboard shortcut (F1) for help - only once globally
   function handleKeyPress(event: KeyboardEvent) {
     if (event.key === 'F1') {
       event.preventDefault()
@@ -26,13 +27,11 @@ export function useHelp() {
     }
   }
 
-  onMounted(() => {
+  // Attach listener only once globally
+  if (!isListenerAttached) {
     window.addEventListener('keydown', handleKeyPress)
-  })
-
-  onUnmounted(() => {
-    window.removeEventListener('keydown', handleKeyPress)
-  })
+    isListenerAttached = true
+  }
 
   return {
     isHelpOpen,

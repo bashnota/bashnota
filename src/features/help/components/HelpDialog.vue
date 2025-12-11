@@ -22,7 +22,7 @@
                 v-model="searchQuery"
                 placeholder="Search help..."
                 class="pl-8 h-9"
-                @input="handleSearch"
+                @input="debouncedSearch"
               />
             </div>
           </div>
@@ -118,6 +118,12 @@ const searchQuery = ref('')
 const searchResults = ref<HelpTopic[]>([])
 const selectedTopicId = ref(props.defaultTopicId ?? 'welcome')
 
+// Configure marked once
+marked.setOptions({
+  breaks: true,
+  gfm: true,
+})
+
 watch(() => props.open, (newValue) => {
   isOpen.value = newValue ?? false
 })
@@ -138,15 +144,20 @@ const selectedTopic = computed(() => {
 
 const renderedContent = computed(() => {
   if (!selectedTopic.value) return ''
-  
-  // Configure marked for better rendering
-  marked.setOptions({
-    breaks: true,
-    gfm: true,
-  })
-  
   return marked(selectedTopic.value.content)
 })
+
+// Debounce search function
+let searchTimeout: NodeJS.Timeout | null = null
+function debouncedSearch() {
+  if (searchTimeout) {
+    clearTimeout(searchTimeout)
+  }
+  
+  searchTimeout = setTimeout(() => {
+    handleSearch()
+  }, 300) // 300ms debounce delay
+}
 
 function handleSearch() {
   if (searchQuery.value.trim()) {
