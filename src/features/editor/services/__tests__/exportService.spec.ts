@@ -27,9 +27,9 @@ vi.mock('katex', () => ({
 }))
 
 // Mock Extensions
-vi.mock('@/features/editor/components/extensions', () => {
-    const { Node } = require('@tiptap/core')
-    const StarterKit = require('@tiptap/starter-kit').default
+vi.mock('@/features/editor/components/extensions', async () => {
+    const { Node } = await import('@tiptap/core')
+    const StarterKit = (await import('@tiptap/starter-kit')).default
 
     return {
         getEditorExtensions: () => [
@@ -71,10 +71,17 @@ vi.mock('@/features/editor/components/extensions', () => {
             Node.create({
                 name: 'theorem',
                 group: 'block',
-                content: 'block+',
-                addAttributes() { return { title: { default: '' }, content: { default: '' } } },
+                atom: true, // Matches real extension
+                addAttributes() { return { title: { default: '' }, content: { default: '' }, proof: { default: '' }, type: { default: 'theorem' }, number: { default: null } } },
                 renderHTML({ node }) {
-                    return ['div', { 'data-type-theorem': '', 'data-title': node.attrs.title }, 0]
+                    return ['div', {
+                        'data-type-theorem': '',
+                        'data-title': node.attrs.title,
+                        'data-content': node.attrs.content,
+                        'data-proof': node.attrs.proof,
+                        'data-theorem-type': node.attrs.type,
+                        'data-number': node.attrs.number
+                    }]
                 }
             }),
             // NEW BLOCKS FOR TDD
@@ -110,6 +117,38 @@ vi.mock('@/features/editor/components/extensions', () => {
                 atom: true,
                 renderHTML() {
                     return ['div', { 'class': 'drawio-diagram' }] // Simplified mock
+                }
+            }),
+            Node.create({
+                name: 'youtube',
+                group: 'block',
+                atom: true,
+                addAttributes() { return { videoId: { default: null }, url: { default: null } } },
+                renderHTML({ node }) {
+                    return ['div', { 'data-type': 'youtube', 'videoId': node.attrs.videoId }]
+                }
+            }),
+            Node.create({
+                name: 'mermaid',
+                group: 'block',
+                atom: true,
+                renderHTML() {
+                    return ['div', { 'data-type': 'mermaid' }]
+                }
+            }),
+            Node.create({
+                name: 'taskList',
+                group: 'block',
+                content: 'taskItem+',
+                renderHTML() { return ['ul', { 'data-type': 'taskList' }, 0] }
+            }),
+            Node.create({
+                name: 'taskItem',
+                group: 'block',
+                content: 'paragraph',
+                addAttributes() { return { checked: { default: false } } },
+                renderHTML({ node }) {
+                    return ['li', { 'data-type': 'taskItem', 'data-checked': node.attrs.checked }, 0]
                 }
             })
         ]
@@ -216,9 +255,88 @@ describe('Export Service', () => {
         // We expect the bibliography div to be replaced/filled with a list
         expect(indexHtmlCall[1]).toContain('<ul class="bibliography-list"')
         expect(indexHtmlCall[1]).toContain('[1] ref1') // Should list the citation
-        // Ideally it would contain the citation details, but our mock citation doesn't have details in this test setup. 
-        // We might need to mock citation details or just check structure.
-        // For now, checking that the bibliography block renders *something* structure-wise is good.
+    })
+
+    it('should transform youtube block to iframe', async () => {
+        const content = {
+            type: 'doc',
+            content: [
+                { type: 'youtube', attrs: { videoId: 'abc12345', url: 'https://youtu.be/abc12345' } }
+            ]
+        }
+
+        await exportNotaToHtml({ title: 'YT Doc', content, fetchNota: vi.fn() as any })
+
+        const indexHtmlCall = zipMock.file.mock.calls.find((c: any) => c[0] === 'index.html')
+        expect(indexHtmlCall[1]).toContain('<iframe')
+        expect(indexHtmlCall[1]).toContain('src="https://www.youtube.com/embed/abc12345"')
+        expect(indexHtmlCall[1]).not.toContain('data-type="youtube"') // Should replace the div
+    })
+
+    it('should generate mermaid placeholder', async () => {
+        const content = {
+            type: 'doc',
+            content: [
+                { type: 'mermaid', attrs: {} }
+            ]
+        }
+
+        await exportNotaToHtml({ title: 'Mermaid Doc', content, fetchNota: vi.fn() as any })
+
+        const indexHtmlCall = zipMock.file.mock.calls.find((c: any) => c[0] === 'index.html')
+        expect(indexHtmlCall[1]).toContain('class="mermaid-placeholder"')
+        expect(indexHtmlCall[1]).toContain('Interactive Only')
+    })
+
+    it('should transform theorem and math blocks correctly', async () => {
+        const content = {
+            type: 'doc',
+            content: [
+                {
+                    type: 'theorem',
+                    attrs: {
+                        title: 'Pythagoras',
+                        content: 'a^2 + b^2 = c^2',
+                        proof: 'Visual proof',
+                        type: 'theorem',
+                        number: 1
+                    }
+                },
+                {
+                    type: 'math',
+                    attrs: { latex: 'E=mc^2' }
+                }
+            ]
+        }
+
+        await exportNotaToHtml({ title: 'Math Doc', content, fetchNota: vi.fn() as any })
+
+        const indexHtmlCall = zipMock.file.mock.calls.find((c: any) => c[0] === 'index.html')
+
+        // Check Theorem
+        expect(indexHtmlCall[1]).toContain('class="theorem"')
+        expect(indexHtmlCall[1]).toContain('Theorem 1: Pythagoras')
+        expect(indexHtmlCall[1]).toContain('a^2 + b^2 = c^2')
+        expect(indexHtmlCall[1]).toContain('Visual proof')
+
+        // Check Math
+        expect(indexHtmlCall[1]).toContain('<span class="katex">E=mc^2</span>')
+    })
+
+    it('should process inline latex in text', async () => {
+        const content = {
+            type: 'doc',
+            content: [
+                { type: 'paragraph', content: [{ type: 'text', text: 'The energy is $E=mc^2$ in theory.' }] }
+            ]
+        }
+
+        await exportNotaToHtml({ title: 'Inline Math', content, fetchNota: vi.fn() as any })
+
+        const indexHtmlCall = zipMock.file.mock.calls.find((c: any) => c[0] === 'index.html')
+        expect(indexHtmlCall[1]).toContain('The energy is ')
+        expect(indexHtmlCall[1]).toContain('<span class="katex">E=mc^2</span>')
+        expect(indexHtmlCall[1]).toContain(' in theory.')
     })
 
 })

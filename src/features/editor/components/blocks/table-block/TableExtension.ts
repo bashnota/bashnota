@@ -20,6 +20,14 @@ export interface TableData {
   }>
 }
 
+declare module '@tiptap/core' {
+  interface Commands<ReturnType> {
+    notaTable: {
+      insertNotaTable: (notaId: string) => ReturnType
+    }
+  }
+}
+
 export const TableExtension = Node.create({
   name: 'notaTable',
   group: 'block',
@@ -66,37 +74,37 @@ export const TableExtension = Node.create({
     return {
       insertNotaTable:
         (notaId: string) =>
-        ({ chain }) => {
-          const tableId = uuidv4()
-          const columnId = uuidv4()
+          ({ chain }) => {
+            const tableId = uuidv4()
+            const columnId = uuidv4()
 
-          return chain()
-            .insertContent({
-              type: this.name,
-              attrs: {
-                tableData: {
-                  id: tableId,
-                  name: 'Untitled',
-                  columns: [
-                    {
-                      id: columnId,
-                      title: 'Title',
-                      type: 'text',
-                    },
-                  ],
-                  rows: [
-                    {
-                      id: uuidv4(),
-                      cells: {
-                        [columnId]: '',
+            return chain()
+              .insertContent({
+                type: this.name,
+                attrs: {
+                  tableData: {
+                    id: tableId,
+                    name: 'Untitled',
+                    columns: [
+                      {
+                        id: columnId,
+                        title: 'Title',
+                        type: 'text',
                       },
-                    },
-                  ],
-                }
-              },
-            })
-            .run()
-        },
+                    ],
+                    rows: [
+                      {
+                        id: uuidv4(),
+                        cells: {
+                          [columnId]: '',
+                        },
+                      },
+                    ],
+                  }
+                },
+              })
+              .run()
+          },
     }
   },
 })

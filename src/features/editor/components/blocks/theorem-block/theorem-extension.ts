@@ -12,7 +12,7 @@ declare module '@tiptap/core' {
       /**
        * Add a theorem block
        */
-      setTheorem: (options?: { 
+      setTheorem: (options?: {
         title?: string,
         content?: string,
         proof?: string,
@@ -25,13 +25,13 @@ declare module '@tiptap/core' {
 
 export const TheoremExtension = Node.create<TheoremOptions>({
   name: 'theorem',
-  
+
   group: 'block',
-  
+
   atom: true,
-  
+
   draggable: true,
-  
+
   isolating: true,
 
   addOptions() {
@@ -103,7 +103,7 @@ export const TheoremExtension = Node.create<TheoremOptions>({
             content: element.getAttribute('data-content') || '',
             proof: element.getAttribute('data-proof') || '',
             type: element.getAttribute('data-theorem-type') || 'theorem',
-            number: element.getAttribute('data-number') 
+            number: element.getAttribute('data-number')
               ? parseInt(element.getAttribute('data-number') || '0', 10)
               : null
           }
@@ -114,14 +114,15 @@ export const TheoremExtension = Node.create<TheoremOptions>({
 
   renderHTML({ HTMLAttributes }) {
     return ['div', mergeAttributes(
-      this.options.HTMLAttributes, 
-      HTMLAttributes, 
-      { 
+      this.options.HTMLAttributes,
+      HTMLAttributes,
+      {
         'data-type-theorem': '',
         'data-theorem-type': HTMLAttributes.type || 'theorem'
       }
-    ), 0]
+    )]
   },
+
 
   addCommands() {
     return {

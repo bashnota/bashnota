@@ -24,6 +24,8 @@ import AppMenubar from '@/components/AppMenubar.vue'
 import ExportDialog from '@/features/editor/components/dialogs/ExportDialog.vue'
 import { toast } from 'vue-sonner'
 
+import { Button } from '@/components/ui/button'
+import { Download } from 'lucide-vue-next'
 import { useLayoutStore } from '@/stores/layoutStore'
 
 // NEW: Feature flag support for gradual migration
@@ -361,13 +363,22 @@ onMounted(async () => {
             
             <!-- Right: Status & Primary Actions -->
             <div class="flex items-center gap-3 text-sm flex-shrink-0">
-               <!-- Word Count -->
-              <div v-if="wordCount" class="text-muted-foreground text-xs hidden md:block">
-                {{ wordCount }} words
+              <div class="flex items-center gap-2">
+                <div v-if="wordCount" class="text-muted-foreground text-xs hidden md:block mr-2">
+                  {{ wordCount }} words
+                </div>
+                
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  class="h-8 gap-2 hidden sm:flex"
+                  @click="handleExportNota"
+                  :disabled="!activeNota"
+                >
+                  <Download class="w-3.5 h-3.5" />
+                  Export HTML
+                </Button>
               </div>
-              
-              <!-- Save Status (Simple indicator) -->
-              <!-- TODO: Extract status component or keep simple -->
               
             </div>
           </div>

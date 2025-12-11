@@ -19,13 +19,13 @@ declare module '@tiptap/core' {
 
 export const MathExtension = Node.create<MathOptions>({
   name: 'math',
-  
+
   group: 'block',
-  
+
   atom: true,
-  
+
   draggable: true,
-  
+
   isolating: true,
 
   addOptions() {
@@ -64,7 +64,8 @@ export const MathExtension = Node.create<MathOptions>({
   },
 
   renderHTML({ HTMLAttributes }) {
-    return ['div', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, { 'data-type': 'math' }), 0]
+    return ['div', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, { 'data-type': 'math' })]
+
   },
 
   addCommands() {
@@ -83,7 +84,7 @@ export const MathExtension = Node.create<MathOptions>({
   },
 })
 
-export default MathExtension 
+export default MathExtension
 
 
 

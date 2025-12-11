@@ -44,9 +44,9 @@
               />
             </div>
             <div class="flex-1">
-              <div class="font-medium">Web Page (.html)</div>
+              <div class="font-medium">Web Site (.zip)</div>
               <div class="text-sm text-muted-foreground">
-                Standalone web page with styling
+                Complete website with pages and assets
               </div>
             </div>
             <Globe class="h-4 w-4 text-muted-foreground" />
@@ -120,6 +120,7 @@ import { useNotaStore } from '@/features/nota/stores/nota'
 import { useBlockStore } from '@/features/nota/stores/blockStore'
 import { Editor } from '@tiptap/vue-3'
 import { getEditorExtensions } from '@/features/editor/components/extensions'
+import { exportNotaToHtml } from '@/features/editor/services/exportService'
 
 interface Props {
   open: boolean
@@ -418,185 +419,43 @@ const exportDocument = async () => {
       }
       
     case 'html':
-      // Export as HTML - convert Tiptap content to HTML
-      let htmlContent = ''
-      
-      if (tiptapContent) {
-        try {
-          // Create a temporary editor to convert Tiptap JSON to HTML
-          const tempEditor = new Editor({
-            extensions: getEditorExtensions(),
-            content: tiptapContent,
-          })
-          
-          // Get the HTML content
-          htmlContent = tempEditor.getHTML()
-          
-          // Clean up the temporary editor
-          tempEditor.destroy()
-        } catch (error) {
-          console.error('Error converting Tiptap to HTML:', error)
-          // Fallback to JSON string if conversion fails
-          htmlContent = JSON.stringify(tiptapContent, null, 2)
-        }
+      // Export as HTML using the recursive export service
+      try {
+        await exportNotaToHtml({
+          title: title,
+          content: tiptapContent,
+          rootNotaId: props.nota.id,
+          fetchNota: async (id: string) => {
+            // Avoid refetching current nota if requested
+            if (id === props.nota.id) {
+                return { title: title, content: tiptapContent }
+            }
+            // Get metadata
+            let targetNota = notaStore.getItem(id)
+            if (!targetNota) {
+                targetNota = await notaStore.loadNota(id) as any
+            }
+            if (!targetNota) return null
+            
+            // Get content
+            const notaContent = await notaStore.getNotaContentAsTiptap(id)
+            return { title: targetNota.title, content: notaContent }
+          }
+        })
+        
+        toast('Export completed', {
+          description: `"${title}" has been exported to ZIP archive.`,
+          duration: 3000
+        })
+      } catch (error) {
+        console.error('HTML Export failed', error)
+        toast('Export failed', {
+          description: 'Failed to export HTML package.',
+          duration: 3000
+        })
       }
-      
-      const fullHtmlContent = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${title}</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; line-height: 1.6; }
-        h1, h2, h3, h4, h5, h6 { color: #333; }
-        code { background: #f5f5f5; padding: 2px 4px; border-radius: 3px; }
-        pre { background: #f5f5f5; padding: 16px; border-radius: 6px; overflow-x: auto; }
-        blockquote { border-left: 4px solid #ddd; margin: 0; padding-left: 16px; color: #666; }
-        
-        /* Custom block styling */
-        .code-block { background: #f5f5f5; padding: 16px; border-radius: 6px; margin: 16px 0; }
-        .math-block { text-align: center; margin: 16px 0; padding: 16px; background: #f8f9fa; border-radius: 6px; }
-        .data-table { width: 100%; border-collapse: collapse; margin: 16px 0; }
-        .data-table th, .data-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        .data-table th { background-color: #f5f5f5; }
-        .nota-link { color: #0066cc; text-decoration: none; }
-        .nota-link:hover { text-decoration: underline; }
-        .tight { margin: 0; }
-        
-        /* Custom block placeholders */
-        [data-type="confusionMatrix"] { 
-            background: #f0f8ff; 
-            border: 1px solid #b3d9ff; 
-            border-radius: 6px; 
-            padding: 16px; 
-            margin: 16px 0; 
-            text-align: center; 
-        }
-        [data-type="theorem"] { 
-            background: #fff8f0; 
-            border: 1px solid #ffd9b3; 
-            border-radius: 6px; 
-            padding: 16px; 
-            margin: 16px 0; 
-        }
-        [data-type="pipeline"] { 
-            background: #f0fff0; 
-            border: 1px solid #b3ffb3; 
-            border-radius: 6px; 
-            padding: 16px; 
-            margin: 16px 0; 
-            text-align: center; 
-        }
-        [data-type="mermaid"] { 
-            background: #f8f0ff; 
-            border: 1px solid #e6b3ff; 
-            border-radius: 6px; 
-            padding: 16px; 
-            margin: 16px 0; 
-            text-align: center; 
-        }
-        [data-type="subNotaLink"] { 
-            background: #fff0f0; 
-            border: 1px solid #ffb3b3; 
-            border-radius: 6px; 
-            padding: 12px; 
-            margin: 16px 0; 
-            display: inline-block; 
-        }
-        [data-type="youtube"] { 
-            background: #fff0f0; 
-            border: 1px solid #ffb3b3; 
-            border-radius: 6px; 
-            padding: 16px; 
-            margin: 16px 0; 
-            text-align: center; 
-        }
-        [data-type="drawio"] { 
-            background: #f0f0ff; 
-            border: 1px solid #b3b3ff; 
-            border-radius: 6px; 
-            padding: 16px; 
-            margin: 16px 0; 
-            text-align: center; 
-        }
-        [data-type="citation"] { 
-            background: #f0ffff; 
-            border: 1px solid #b3ffff; 
-            border-radius: 6px; 
-            padding: 8px 12px; 
-            margin: 8px 0; 
-            display: inline-block; 
-        }
-        [data-type="bibliography"] { 
-            background: #fffff0; 
-            border: 1px solid #ffffb3; 
-            border-radius: 6px; 
-            padding: 16px; 
-            margin: 16px 0; 
-        }
-        [data-type="subfigure"] { 
-            background: #f0f0f0; 
-            border: 1px solid #d0d0d0; 
-            border-radius: 6px; 
-            padding: 16px; 
-            margin: 16px 0; 
-            text-align: center; 
-        }
-        [data-type="notaTable"] { 
-            background: #f8f8f8; 
-            border: 1px solid #d8d8d8; 
-            border-radius: 6px; 
-            padding: 16px; 
-            margin: 16px 0; 
-        }
-        [data-type="aiGeneration"] { 
-            background: #f0fff8; 
-            border: 1px solid #b3ffd9; 
-            border-radius: 6px; 
-            padding: 16px; 
-            margin: 16px 0; 
-        }
-        
-        /* Image styling */
-        img { max-width: 100%; height: auto; border-radius: 6px; margin: 16px 0; }
-        
-        /* List styling */
-        ul, ol { margin: 16px 0; padding-left: 24px; }
-        li { margin: 8px 0; }
-        
-        /* Horizontal rule */
-        hr { border: none; border-top: 1px solid #ddd; margin: 24px 0; }
-        
-        /* Link styling */
-        a { color: #0066cc; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        
-        /* Code highlighting */
-        .language-python { color: #306998; }
-        .language-javascript { color: #f7df1e; }
-        .language-typescript { color: #3178c6; }
-        .language-html { color: #e34c26; }
-        .language-css { color: #1572b6; }
-        .language-json { color: #000; }
-        .language-markdown { color: #000; }
-    </style>
-</head>
-<body>
-    <h1>${title}</h1>
-    <div class="content">
-        ${htmlContent}
-    </div>
-    <footer style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; font-size: 0.9em; color: #666;">
-        <p>Exported from Bashnota on ${new Date().toLocaleDateString()}</p>
-    </footer>
-</body>
-</html>`
-      
-      blob = new Blob([fullHtmlContent], { type: 'text/html' })
-      filename = `${title}.html`
-      description = 'exported as HTML document'
-      break
+      closeDialog()
+      return // exportNotaToHtml handles the download
       
     case 'markdown':
       // Export as Markdown - convert Tiptap content to markdown

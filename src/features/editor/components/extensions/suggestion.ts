@@ -33,6 +33,12 @@ import {
 import { toast } from 'vue-sonner'
 import { logger } from '@/services/logger'
 
+declare module '@tiptap/core' {
+  interface EditorEvents {
+    'toggle-ai-sidebar': any
+  }
+}
+
 /**
  * Type definitions for improved type safety
  */
@@ -68,8 +74,8 @@ class PopupManager {
    * Creates a tippy popup with proper lifecycle management
    */
   createPopup(
-    component: any, 
-    props: Record<string, any>, 
+    component: any,
+    props: Record<string, any>,
     editor: Editor,
     getBoundingRect: () => DOMRect,
     options: Partial<Props> = {}
@@ -117,7 +123,7 @@ class PopupManager {
     // Create tippy instance
     // @ts-ignore - Tippy typing issues
     this.instance = tippy('body', tippyOptions);
-    
+
     return this.instance;
   }
 
@@ -142,7 +148,7 @@ class PopupManager {
    */
   hide(): void {
     if (this.isDestroying) return;
-    
+
     try {
       if (this.instance && typeof this.instance.hide === 'function') {
         this.instance.hide();
@@ -164,9 +170,9 @@ class PopupManager {
    */
   cleanup(): void {
     if (this.isDestroying) return;
-    
+
     this.isDestroying = true;
-    
+
     try {
       // Run cleanup callbacks
       for (const callback of this.cleanupCallbacks) {
@@ -176,16 +182,16 @@ class PopupManager {
           logger.warn('Error in cleanup callback:', e);
         }
       }
-      
+
       // Store references locally to avoid null issues
       const currentInstance = this.instance;
       const currentRenderer = this.renderer;
-      
+
       // Clear references immediately
       this.instance = null;
       this.renderer = null;
       this.cleanupCallbacks = [];
-      
+
       // Cleanup tippy instance
       if (currentInstance) {
         try {
@@ -200,7 +206,7 @@ class PopupManager {
           logger.warn('Error destroying tippy instance:', e);
         }
       }
-      
+
       // Cleanup renderer
       if (currentRenderer) {
         try {
@@ -233,7 +239,7 @@ function getCursorCoords(editor: Editor, range: Range): () => DOMRect {
         );
       }
     }
-    
+
     // Fallback to editor element position
     return editor.view.dom.getBoundingClientRect();
   };
@@ -291,12 +297,12 @@ function safeInsertContent(editor: Editor, range: Range, content: any, contentTy
     // Validate range before proceeding
     const { from, to } = range;
     const docSize = editor.state.doc.content.size;
-    
+
     if (from < 0 || to > docSize || from > to) {
       console.warn(`Invalid range for ${contentType} insertion:`, range, 'Document size:', docSize);
       return false;
     }
-    
+
     return editor
       .chain()
       .focus()
@@ -423,8 +429,8 @@ function createAdvancedCommands(): CommandItem[] {
           .chain()
           .focus()
           .deleteRange(range)
-          .setMath({ 
-            latex: 'ⵟ(a,b) = \\frac{(a \\cdot b)^2}{||a - b||^2}, \\forall a,b \\in \\mathbb{R}^n, a \\neq b' 
+          .setMath({
+            latex: 'ⵟ(a,b) = \\frac{(a \\cdot b)^2}{||a - b||^2}, \\forall a,b \\in \\mathbb{R}^n, a \\neq b'
           })
           .run();
       },
@@ -459,10 +465,10 @@ function createAdvancedCommands(): CommandItem[] {
         // Get current nota ID from router
         const currentRoute = router.currentRoute.value
         const notaId = currentRoute.params.id as string
-        
+
         // Use the citation picker composable
         const { openCitationPicker } = useCitationPicker()
-        
+
         openCitationPicker(
           notaId,
           (citation: CitationEntry, index: number) => {
@@ -614,12 +620,12 @@ function createAdvancedCommands(): CommandItem[] {
           // Validate range before proceeding
           const { from, to } = range;
           const docSize = editor.state.doc.content.size;
-          
+
           if (from < 0 || to > docSize || from > to) {
             console.warn('Invalid range for pipeline insertion:', range, 'Document size:', docSize);
             return;
           }
-          
+
           // Use a safer approach by setting selection first
           editor
             .chain()
@@ -653,7 +659,7 @@ function createAdvancedCommands(): CommandItem[] {
       description: 'Open AI assistant for content generation and help',
       command: ({ editor, range }: CommandArgs) => {
         // Emit a custom event to toggle the AI sidebar
-        editor.emit('toggle-ai-sidebar', () => {})
+        editor.emit('toggle-ai-sidebar', () => { })
         editor.chain().focus().deleteRange(range).run()
       },
     },
@@ -669,19 +675,19 @@ function createAdvancedCommands(): CommandItem[] {
         // Get the current nota ID from the router
         const currentRoute = router.currentRoute.value;
         let parentId: string | null = null;
-        
+
         if (currentRoute.params.id && typeof currentRoute.params.id === 'string') {
           parentId = currentRoute.params.id;
         }
-        
+
         // Create popup manager
         const popupManager = new PopupManager();
-        
+
         // Handle sub nota creation success
         const handleSuccess = (newNotaId: string, title: string) => {
           // Hide popup first (will trigger cleanup)
           popupManager.hide();
-          
+
           // Wait a tick to ensure cleanup is complete before modifying editor
           setTimeout(() => {
             // Insert the sub-nota link using the proper command
@@ -696,26 +702,26 @@ function createAdvancedCommands(): CommandItem[] {
                 linkStyle: 'inline'
               })
               .run();
-            
+
             // Trigger content save
             const transaction = editor.state.tr;
             editor.view.dispatch(transaction);
-            
+
             // Show success message
-            const parentContext = document.querySelector(`#nota-${parentId}`) 
-              ? ` under "${document.querySelector(`#nota-${parentId} .nota-title`)?.textContent?.trim() || ''}"` 
+            const parentContext = document.querySelector(`#nota-${parentId}`)
+              ? ` under "${document.querySelector(`#nota-${parentId} .nota-title`)?.textContent?.trim() || ''}"`
               : '';
-            
+
             toast(`"${title}" created successfully${parentContext}`);
-            
+
             // Highlight the newly created link
             highlightElement(`span[data-target-nota-id="${newNotaId}"]`);
           }, 20);
         };
-        
+
         // Use the subnota dialog composable
         const { openSubNotaDialog } = useSubNotaDialog()
-        
+
         if (parentId) {
           openSubNotaDialog(
             parentId,
@@ -737,8 +743,8 @@ function createAdvancedCommands(): CommandItem[] {
       description: 'Insert and validate markdown content with block preview',
       command: ({ editor, range }: CommandArgs) => {
         // Dispatch a custom event to open the markdown input dialog
-        const event = new CustomEvent('open-markdown-input', { 
-          detail: { editor, range } 
+        const event = new CustomEvent('open-markdown-input', {
+          detail: { editor, range }
         })
         document.dispatchEvent(event)
         editor.chain().focus().deleteRange(range).run()
@@ -757,23 +763,23 @@ export default {
       ...createBasicCommands(),
       ...createAdvancedCommands(),
     ];
-    
+
     // Return all items if no query
     if (!query) {
       return commands;
     }
-    
+
     // Filter by query
     const normalizedQuery = query.toLowerCase().trim();
-    
+
     return commands.filter(item => {
       // Check title
       if (item.title.toLowerCase().includes(normalizedQuery)) {
         return true;
       }
-      
+
       // Check keywords
-      return item.keywords.some(keyword => 
+      return item.keywords.some(keyword =>
         keyword.toLowerCase().includes(normalizedQuery)
       );
     });
@@ -822,7 +828,7 @@ export default {
         if (component?.ref && typeof component.ref.onKeyDown === 'function') {
           return component.ref.onKeyDown(props.event);
         }
-        
+
         return false;
       },
 
@@ -847,7 +853,7 @@ export default {
         },
       ]
     },
-    
+
     render: () => {
       return {
         onStart: (props: any) => {
@@ -872,7 +878,7 @@ export default {
         },
       }
     },
-    
+
     command: ({ editor, range, props }: CommandArgs) => {
       editor
         .chain()
