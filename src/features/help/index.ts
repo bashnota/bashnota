@@ -1,0 +1,5 @@
+export { default as HelpDialog } from './components/HelpDialog.vue'
+export { default as HelpButton } from './components/HelpButton.vue'
+export { useHelp } from './composables/useHelp'
+export * from './types'
+export * from './data/helpContent'
