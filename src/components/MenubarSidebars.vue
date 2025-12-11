@@ -19,6 +19,7 @@ import {
   Layers,
   Pin,
   PinOff,
+  HelpCircle,
 } from 'lucide-vue-next'
 import { useSidebarManager } from '@/composables/useSidebarManager'
 
@@ -32,6 +33,11 @@ const {
   closeAllSidebars,
   toggleSidebarPin,
 } = useSidebarManager()
+
+// Emit event for opening help
+const emit = defineEmits<{
+  'open-help': []
+}>()
 
 // Icon mapping
 const iconMap = {
@@ -145,6 +151,27 @@ const categoryIcons = {
             class="text-muted-foreground"
           >
             Close All Sidebars
+          </MenubarItem>
+        </MenubarContent>
+      </MenubarMenu>
+
+      <!-- Help Menu -->
+      <MenubarMenu>
+        <MenubarTrigger class="flex items-center gap-2">
+          <HelpCircle class="h-4 w-4" />
+          Help
+        </MenubarTrigger>
+        <MenubarContent>
+          <MenubarItem @click="emit('open-help')">
+            Documentation
+            <span class="ml-auto text-xs text-muted-foreground">F1</span>
+          </MenubarItem>
+          <MenubarSeparator />
+          <MenubarItem as="a" href="https://github.com/bashnota/bashnota" target="_blank">
+            GitHub Repository
+          </MenubarItem>
+          <MenubarItem as="a" href="https://github.com/bashnota/bashnota/issues" target="_blank">
+            Report an Issue
           </MenubarItem>
         </MenubarContent>
       </MenubarMenu>

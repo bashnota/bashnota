@@ -342,7 +342,7 @@ onMounted(async () => {
               <PinnedSidebars />
               
               <!-- Sidebar Menubar -->
-              <MenubarSidebars />
+              <MenubarSidebars @open-help="openHelp()" />
             </div>
             
             <!-- Actions and Editor Toolbar -->
