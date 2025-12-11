@@ -33,7 +33,12 @@ import ThreePanelLayout from '@/components/ThreePanelLayout.vue'
 import SimplifiedMenubar from '@/components/SimplifiedMenubar.vue'
 import CommandPalette from '@/components/CommandPalette.vue'
 
+// Help system
+import { HelpDialog } from '@/features/help'
+import { useHelp } from '@/features/help'
+
 const { useSimplifiedNavigation } = useFeatureFlags()
+const { isHelpOpen, currentTopicId, openHelp } = useHelp()
 
 const authStore = useAuthStore()
 const jupyterStore = useJupyterStore()
@@ -300,7 +305,7 @@ onMounted(async () => {
       {{ useSimplifiedNavigation ? 'Simplified navigation active' : 'Legacy navigation active' }}
     </div>
     <template v-if="useSimplifiedNavigation">
-      <SimplifiedMenubar />
+      <SimplifiedMenubar @open-help="openHelp()" />
       <ThreePanelLayout>
         <template #documents>
           <AppSidebar />
@@ -320,6 +325,7 @@ onMounted(async () => {
       <CitationPicker />
       <SubNotaDialog />
       <ExportDialog v-model:open="showExportDialog" :nota="exportTargetNota" />
+      <HelpDialog v-model:open="isHelpOpen" :default-topic-id="currentTopicId" />
     </template>
 
     <!-- LEGACY: Original 7-Sidebar Navigation -->
@@ -336,7 +342,7 @@ onMounted(async () => {
               <PinnedSidebars />
               
               <!-- Sidebar Menubar -->
-              <MenubarSidebars />
+              <MenubarSidebars @open-help="openHelp()" />
             </div>
             
             <!-- Actions and Editor Toolbar -->
@@ -382,6 +388,9 @@ onMounted(async () => {
       
       <!-- Export Dialog -->
       <ExportDialog v-model:open="showExportDialog" :nota="exportTargetNota" />
+      
+      <!-- Help Dialog -->
+      <HelpDialog v-model:open="isHelpOpen" :default-topic-id="currentTopicId" />
     </SidebarProvider>
   </TooltipProvider>
 </template>
