@@ -148,7 +148,9 @@ const renderedContent = computed(() => {
 })
 
 // Debounce search function
-let searchTimeout: NodeJS.Timeout | null = null
+let searchTimeout: number | null = null
+const SEARCH_DEBOUNCE_DELAY = 300 // milliseconds
+
 function debouncedSearch() {
   if (searchTimeout) {
     clearTimeout(searchTimeout)
@@ -156,7 +158,7 @@ function debouncedSearch() {
   
   searchTimeout = setTimeout(() => {
     handleSearch()
-  }, 300) // 300ms debounce delay
+  }, SEARCH_DEBOUNCE_DELAY)
 }
 
 function handleSearch() {
