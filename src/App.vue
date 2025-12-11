@@ -17,11 +17,10 @@ import { useEditorStore } from '@/features/editor/stores/editorStore'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useBlockEditor } from '@/features/nota/composables/useBlockEditor'
 
-import MenubarSidebars from '@/components/MenubarSidebars.vue'
-import PinnedSidebars from '@/components/PinnedSidebars.vue'
+
 import { useSidebarManager } from '@/composables/useSidebarManager'
 import RightSidebarContainer from '@/components/RightSidebarContainer.vue'
-import EditorToolbar from '@/features/editor/components/ui/EditorToolbar.vue'
+import AppMenubar from '@/components/AppMenubar.vue'
 import ExportDialog from '@/features/editor/components/dialogs/ExportDialog.vue'
 import { toast } from 'vue-sonner'
 
@@ -334,35 +333,25 @@ onMounted(async () => {
       <SidebarInset class="h-full">
         <!-- Top Bar -->
         <div class="sticky top-0 z-10 border-b bg-background text-foreground backdrop-blur-sm">
-          <div class="flex items-center justify-between px-4 h-14">
-            <div class="flex items-center gap-4">
-              <SidebarTrigger />
-              
-              <!-- Pinned Sidebars -->
-              <PinnedSidebars />
-              
-              <!-- Sidebar Menubar -->
-              <MenubarSidebars @open-help="openHelp()" />
-            </div>
+          <div class="flex items-center px-4 h-14 gap-2">
+            <SidebarTrigger />
             
-            <!-- Actions and Editor Toolbar -->
-            <div class="flex items-center gap-2">
-              <!-- Editor Toolbar Navigation Menu -->
-              <EditorToolbar
-                :can-run-all="canRunAll"
-                :is-executing-all="false"
-                :is-favorite="activeNota?.favorite || false"
-                :word-count="wordCount"
-                @run-all="handleRunAll"
-                @toggle-favorite="handleToggleFavorite"
-                @share="handleShare"
-                @open-config="handleOpenConfig"
-                @export-nota="handleExportNota"
-                @save-version="handleSaveVersion"
-                @open-history="handleOpenHistory"
-                @toggle-sidebar="handleToggleSidebar"
-              />
-            </div>
+            <AppMenubar
+              class="flex-1"
+              :can-run-all="canRunAll"
+              :is-executing-all="false"
+              :is-favorite="activeNota?.favorite || false"
+              :word-count="wordCount"
+              @run-all="handleRunAll"
+              @toggle-favorite="handleToggleFavorite"
+              @share="handleShare"
+              @open-config="handleOpenConfig"
+              @export-nota="handleExportNota"
+              @save-version="handleSaveVersion"
+              @open-history="handleOpenHistory"
+              @toggle-sidebar="handleToggleSidebar"
+              @open-help="openHelp()"
+            />
           </div>
         </div>
 

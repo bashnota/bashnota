@@ -117,29 +117,7 @@ const navigationItems = [
   }
 ]
 
-// Documentation menu items
-const documentationItems = [
-  {
-    title: "Getting Started",
-    icon: BookOpen,
-    url: "/docs/getting-started"
-  },
-  {
-    title: "Keyboard Shortcuts",
-    icon: Keyboard,
-    action: () => { showShortcutsDialog.value = true }
-  },
-  {
-    title: "API Reference",
-    icon: Code2,
-    url: "/docs/api"
-  },
-  {
-    title: "Help & Support",
-    icon: HelpCircle,
-    url: "/help"
-  }
-]
+
 
 // Settings menu items
 const settingsItems = [
@@ -584,49 +562,7 @@ const handleNotaDeleted = async (notaId: string) => {
             </SidebarGroup>
           </Collapsible>
 
-          <!-- Documentation Section -->
-          <Collapsible v-model:open="docsOpen" class="group/collapsible">
-            <SidebarGroup>
-              <SidebarGroupLabel asChild>
-                <CollapsibleTrigger 
-                  class="flex w-full items-center justify-between p-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md px-2 py-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:mx-auto"
-                  :title="sidebarState === 'collapsed' ? 'Documentation' : undefined"
-                >
-                  <span class="flex items-center gap-2">
-                    <BookOpen class="h-4 w-4" />
-                    <span class="group-data-[collapsible=icon]:hidden">Documentation</span>
-                  </span>
-                  <ChevronDown class="h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180 group-data-[collapsible=icon]:hidden" />
-                </CollapsibleTrigger>
-              </SidebarGroupLabel>
-              <CollapsibleContent>
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    <SidebarMenuItem v-for="item in documentationItems" :key="item.title">
-                      <SidebarMenuButton 
-                        v-if="item.url"
-                        asChild
-                        class="w-full group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center"
-                      >
-                        <RouterLink :to="item.url" class="flex items-center gap-2">
-                          <component :is="item.icon" class="h-4 w-4 flex-shrink-0" />
-                          <span class="group-data-[collapsible=icon]:hidden">{{ item.title }}</span>
-                        </RouterLink>
-                      </SidebarMenuButton>
-                      <SidebarMenuButton 
-                        v-else
-                        @click="item.action"
-                        class="flex items-center gap-2 w-full group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center"
-                      >
-                        <component :is="item.icon" class="h-4 w-4 flex-shrink-0" />
-                        <span class="group-data-[collapsible=icon]:hidden">{{ item.title }}</span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </CollapsibleContent>
-            </SidebarGroup>
-          </Collapsible>
+
 
           <!-- Settings Section -->
           <Collapsible v-model:open="settingsOpen" class="group/collapsible">
