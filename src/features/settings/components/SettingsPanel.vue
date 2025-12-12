@@ -54,7 +54,10 @@ const componentMap = {
   'NavigationShortcutsSettings': defineAsyncComponent(() => import('@/features/settings/components/keyboard/NavigationShortcutsSettings.vue')),
   'GlobalShortcutsSettings': defineAsyncComponent(() => import('@/features/settings/components/keyboard/GlobalShortcutsSettings.vue')),
   
-  // Advanced Settings
+  // Advanced Settings - New Unified Components
+  'UnifiedAdvancedSettings': defineAsyncComponent(() => import('@/features/settings/components/advanced/UnifiedAdvancedSettings.vue')),
+  
+  // Advanced Settings - Individual Components
   'PerformanceSettings': defineAsyncComponent(() => import('@/features/settings/components/advanced/PerformanceSettings.vue')),
   'DataManagementSettings': defineAsyncComponent(() => import('@/features/settings/components/advanced/DataManagementSettings.vue')),
   'StorageModeSettings': defineAsyncComponent(() => import('@/features/settings/components/advanced/StorageModeSettings.vue')),
