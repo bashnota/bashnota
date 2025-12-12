@@ -231,6 +231,12 @@ export class StorageService {
         // Try to initialize
         await backend.initialize()
         this.backend = backend
+        
+        // Warn if we fell back from the preferred backend
+        if (preferredBackend && backend.type !== preferredBackend) {
+          logger.warn(`[StorageService] Could not use preferred backend '${preferredBackend}', using '${backend.type}' instead`)
+        }
+        
         logger.info(`[StorageService] Initialized with ${backend.type} backend`)
         return
       } catch (error) {

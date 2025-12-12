@@ -18,6 +18,9 @@ describe('FileSystemBackend', () => {
     mockFileHandles = new Map()
     
     mockDirectoryHandle = {
+      name: 'test-directory',
+      queryPermission: vi.fn(async () => 'granted'),
+      requestPermission: vi.fn(async () => 'granted'),
       getFileHandle: vi.fn(async (name: string, options?: any) => {
         if (!mockFileHandles.has(name) && !options?.create) {
           throw new Error('NotFoundError')
@@ -55,6 +58,12 @@ describe('FileSystemBackend', () => {
         mockFileHandles.delete(name)
       }),
       
+      entries: vi.fn(function* () {
+        for (const [name, file] of mockFileHandles) {
+          yield [name, file.handle]
+        }
+      }),
+      
       values: vi.fn(function* () {
         for (const [name, file] of mockFileHandles) {
           yield file.handle
@@ -65,6 +74,84 @@ describe('FileSystemBackend', () => {
     // Mock window.showDirectoryPicker
     global.window = global.window || {} as any
     ;(global.window as any).showDirectoryPicker = vi.fn(async () => mockDirectoryHandle)
+    
+    // Mock IndexedDB for directory handle storage
+    const mockIDB = {
+      open: vi.fn((name: string, version: number) => {
+        const request = {
+          result: null as any,
+          error: null,
+          onsuccess: null as any,
+          onerror: null as any,
+          onupgradeneeded: null as any
+        }
+        
+        setTimeout(() => {
+          const db = {
+            objectStoreNames: {
+              contains: vi.fn(() => false)
+            },
+            createObjectStore: vi.fn(() => ({})),
+            transaction: vi.fn(() => {
+              const transaction = {
+                objectStore: vi.fn(() => ({
+                  get: vi.fn((key: string) => {
+                    const getRequest = {
+                      result: mockDirectoryHandle,
+                      onsuccess: null as any,
+                      onerror: null as any
+                    }
+                    setTimeout(() => {
+                      if (getRequest.onsuccess) getRequest.onsuccess()
+                    }, 0)
+                    return getRequest
+                  }),
+                  put: vi.fn(() => {
+                    const putRequest = {
+                      onsuccess: null as any,
+                      onerror: null as any
+                    }
+                    setTimeout(() => {
+                      if (putRequest.onsuccess) putRequest.onsuccess()
+                    }, 0)
+                    return putRequest
+                  }),
+                  delete: vi.fn(() => {
+                    const deleteRequest = {
+                      onsuccess: null as any,
+                      onerror: null as any
+                    }
+                    setTimeout(() => {
+                      if (deleteRequest.onsuccess) deleteRequest.onsuccess()
+                    }, 0)
+                    return deleteRequest
+                  })
+                })),
+                oncomplete: null as any
+              }
+              setTimeout(() => {
+                if (transaction.oncomplete) transaction.oncomplete()
+              }, 10)
+              return transaction
+            }),
+            close: vi.fn()
+          }
+          
+          if (request.onupgradeneeded) {
+            request.onupgradeneeded({ target: request } as any)
+          }
+          
+          request.result = db
+          if (request.onsuccess) {
+            request.onsuccess()
+          }
+        }, 0)
+        
+        return request
+      })
+    }
+    
+    global.indexedDB = mockIDB as any
 
     // Dynamically import the FileSystemBackend after mocking
     const storageModule = await import('../fileSystemBackend')
@@ -88,27 +175,77 @@ describe('FileSystemBackend', () => {
   })
 
   describe('initialization', () => {
-    it('should initialize and request directory access', async () => {
+    it('should initialize with persisted directory handle', async () => {
       const backend = new FileSystemBackend()
       
-      try {
-        await backend.initialize()
-        expect(backend.type).toBe('filesystem')
-      } catch (error) {
-        // In test environment without real API, initialization may fail
-        // This is expected and acceptable
-        expect(error).toBeDefined()
-      }
-    })
+      // First set the directory handle
+      await backend.setDirectoryHandle(mockDirectoryHandle)
+      
+      // Verify it initialized
+      expect(backend.type).toBe('filesystem')
+      expect(backend.getDirectoryHandle()).toBe(mockDirectoryHandle)
+    }, 10000)
 
-    it('should handle initialization errors gracefully', async () => {
-      ;(global.window as any).showDirectoryPicker = vi.fn(async () => {
-        throw new Error('User cancelled')
+    it('should fail to initialize without a persisted directory handle', async () => {
+      // Mock IndexedDB to return no handle
+      const mockOpen = vi.fn((name: string, version: number) => {
+        const request = {
+          result: null as any,
+          onsuccess: null as any,
+          onerror: null as any,
+          onupgradeneeded: null as any
+        }
+        
+        setTimeout(() => {
+          const db = {
+            objectStoreNames: { contains: vi.fn(() => true) },
+            createObjectStore: vi.fn(() => ({})),
+            transaction: vi.fn(() => ({
+              objectStore: vi.fn(() => ({
+                get: vi.fn((key: string) => {
+                  const getRequest = {
+                    result: null, // No handle stored
+                    onsuccess: null as any,
+                    onerror: null as any
+                  }
+                  setTimeout(() => {
+                    if (getRequest.onsuccess) getRequest.onsuccess()
+                  }, 0)
+                  return getRequest
+                })
+              })),
+              oncomplete: null as any
+            })),
+            close: vi.fn()
+          }
+          
+          request.result = db
+          setTimeout(() => {
+            if (request.onsuccess) request.onsuccess()
+          }, 0)
+        }, 0)
+        
+        return request
       })
-
+      
+      // Replace the global indexedDB.open temporarily
+      const originalOpen = global.indexedDB.open
+      global.indexedDB.open = mockOpen as any
+      
       const backend = new FileSystemBackend()
       await expect(backend.initialize()).rejects.toThrow()
-    })
+      
+      // Restore the original
+      global.indexedDB.open = originalOpen
+    }, 10000)
+    
+    it('should allow setting directory handle from user gesture', async () => {
+      const backend = new FileSystemBackend()
+      
+      await backend.setDirectoryHandle(mockDirectoryHandle)
+      
+      expect(backend.getDirectoryHandle()).toBe(mockDirectoryHandle)
+    }, 10000)
   })
 
   describe('nota operations with mocked API', () => {

@@ -10,6 +10,7 @@ import { toast } from 'vue-sonner'
 import { useStorageMode } from '@/composables/useStorageMode'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { logger } from '@/services/logger'
+import { saveDirectoryHandle } from '@/services/directoryHandleStorage'
 
 const settingsStore = useSettingsStore()
 const {
@@ -72,6 +73,9 @@ const handleStorageModeChange = async (newMode: 'indexeddb' | 'filesystem') => {
         })
         
         logger.info('[StorageMode] Directory selected:', directoryHandle.name)
+        
+        // Persist the directory handle for future use
+        await saveDirectoryHandle(directoryHandle)
         
         await switchToFilesystem()
         

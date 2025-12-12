@@ -8,6 +8,7 @@
 import type { Nota } from '@/features/nota/types/nota'
 import { logger } from './logger'
 import type { IStorageBackend, StorageBackendType } from './storageService'
+import * as DirectoryStorage from './directoryHandleStorage'
 
 // Version of the .nota file format
 const NOTA_FILE_FORMAT_VERSION = '1.0'
@@ -26,23 +27,38 @@ export class FileSystemBackend implements IStorageBackend {
   }
 
   /**
-   * Initialize the backend and request directory access from user
+   * Initialize the backend using a persisted directory handle
+   * 
+   * This method attempts to retrieve and verify a previously stored directory handle.
+   * It does NOT prompt the user for directory access - that should be done separately
+   * via setDirectoryHandle() which must be called from a user gesture.
    */
   async initialize(): Promise<void> {
     try {
-      logger.info('[FileSystemBackend] Requesting directory access...')
+      logger.info('[FileSystemBackend] Attempting to initialize with persisted handle...')
 
-      // Request directory access from user
-      this.directoryHandle = await (window as any).showDirectoryPicker({
-        mode: 'readwrite',
-        startIn: 'documents'
-      })
+      // Try to retrieve the persisted directory handle
+      const handle = await DirectoryStorage.getDirectoryHandle()
+      
+      if (!handle) {
+        logger.warn('[FileSystemBackend] No persisted directory handle found')
+        throw new Error('No directory handle available. User must select a directory first.')
+      }
 
+      // Verify we still have permission to access the directory
+      const hasPermission = await DirectoryStorage.verifyHandlePermission(handle)
+      
+      if (!hasPermission) {
+        logger.warn('[FileSystemBackend] Permission denied for persisted directory handle')
+        throw new Error('Permission denied for directory. User must grant access again.')
+      }
+
+      this.directoryHandle = handle
       this.initialized = true
-      logger.info('[FileSystemBackend] Initialized successfully')
+      logger.info('[FileSystemBackend] Initialized successfully with persisted handle')
     } catch (error) {
       logger.error('[FileSystemBackend] Failed to initialize:', error)
-      throw new Error('Failed to initialize FileSystemBackend: User may have denied access')
+      throw error
     }
   }
 
@@ -268,5 +284,33 @@ export class FileSystemBackend implements IStorageBackend {
    */
   getDirectoryHandle(): FileSystemDirectoryHandle | null {
     return this.directoryHandle
+  }
+
+  /**
+   * Set a directory handle (must be called from a user gesture)
+   * 
+   * This method should be called after the user selects a directory via showDirectoryPicker().
+   * It persists the handle in IndexedDB for future use.
+   */
+  async setDirectoryHandle(handle: FileSystemDirectoryHandle): Promise<void> {
+    try {
+      // Verify we have permission
+      const hasPermission = await DirectoryStorage.verifyHandlePermission(handle)
+      
+      if (!hasPermission) {
+        throw new Error('Permission denied for directory')
+      }
+
+      // Save the handle to IndexedDB
+      await DirectoryStorage.saveDirectoryHandle(handle)
+      
+      this.directoryHandle = handle
+      this.initialized = true
+      
+      logger.info('[FileSystemBackend] Directory handle set and persisted')
+    } catch (error) {
+      logger.error('[FileSystemBackend] Failed to set directory handle:', error)
+      throw error
+    }
   }
 }
