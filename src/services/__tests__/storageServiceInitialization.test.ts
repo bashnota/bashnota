@@ -16,7 +16,7 @@ describe('StorageService Initialization (Runtime Behavior)', () => {
     // Save original indexedDB
     originalIndexedDB = global.indexedDB
 
-    // Mock IndexedDB to be unavailable (simulating a runtime environment where it might fail)
+    // Mock IndexedDB to simulate no persisted directory handle
     mockIndexedDB = {
       open: vi.fn((name: string, version: number) => {
         const request = {
