@@ -93,11 +93,14 @@ try {
 }
 
 // Initialize storage
-initializeDatabaseAdapter(useNewStorage.value, preferredBackend)
+// Enable new storage if filesystem mode is selected
+const shouldUseNewStorage = useNewStorage.value || preferredBackend === 'filesystem'
+initializeDatabaseAdapter(shouldUseNewStorage, preferredBackend)
   .then(adapter => {
     app.provide('dbAdapter', adapter)
     console.log('[Storage] Database adapter initialized:', {
-      usingNewStorage: adapter.isUsingNewStorage()
+      usingNewStorage: adapter.isUsingNewStorage(),
+      backend: preferredBackend || 'default'
     })
   })
   .catch(error => {

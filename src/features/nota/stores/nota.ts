@@ -11,6 +11,7 @@ import { statisticsService } from '@/features/bashhub/services/statisticsService
 import { logger } from '@/services/logger'
 import { FILE_EXTENSIONS, ERROR_MESSAGES, SUCCESS_MESSAGES } from '@/constants/app'
 import { useBlockStore } from './blockStore'
+import { useDatabaseAdapter } from '@/services/databaseAdapter'
 
 // Helper functions to convert dates and ensure data is serializable
 const serializeNota = (nota: Partial<Nota> & { id: string }): any => {
@@ -98,6 +99,27 @@ const deserializeNota = (nota: any): Nota => ({
     nota: version.nota ? deserializeNota(version.nota) : undefined,
   })) : [],
 })
+
+// Cache for database adapter - initialized once
+let cachedAdapter: ReturnType<typeof useDatabaseAdapter> | null | undefined = undefined
+
+// Helper function to get database adapter or fallback to db
+function getDb() {
+  // Return cached result if we've already checked
+  if (cachedAdapter !== undefined) {
+    return cachedAdapter
+  }
+  
+  try {
+    cachedAdapter = useDatabaseAdapter()
+    return cachedAdapter
+  } catch (error) {
+    // If adapter not initialized yet, cache null to use old db
+    logger.warn('[NotaStore] DatabaseAdapter not initialized, using legacy db')
+    cachedAdapter = null
+    return null
+  }
+}
 
 export const useNotaStore = defineStore('nota', {
   state: () => ({
@@ -205,8 +227,15 @@ export const useNotaStore = defineStore('nota', {
         },
       }
 
-      const serialized = serializeNota(nota)
-      await db.notas.add(serialized)
+      // Use database adapter if available, otherwise fallback to direct db
+      const adapter = getDb()
+      if (adapter) {
+        await adapter.saveNota(nota)
+      } else {
+        const serialized = serializeNota(nota)
+        await db.notas.add(serialized)
+      }
+      
       this.items.push(nota)
 
       toast(`Nota "${title}" created successfully`)
@@ -223,9 +252,14 @@ export const useNotaStore = defineStore('nota', {
       // Update timestamps
       nota.updatedAt = new Date()
 
-      // Update in database with serialized data
-      const serialized = serializeNota(nota)
-      await db.notas.update(nota.id, serialized)
+      // Use database adapter if available, otherwise fallback to direct db
+      const adapter = getDb()
+      if (adapter) {
+        await adapter.saveNota(nota)
+      } else {
+        const serialized = serializeNota(nota)
+        await db.notas.update(nota.id, serialized)
+      }
 
       // Update in state
       const index = this.items.findIndex((n) => n.id === nota.id)
@@ -239,8 +273,14 @@ export const useNotaStore = defineStore('nota', {
     async loadNotas() {
       this.loading = true
       try {
-        const results = await db.notas.toArray()
-        this.items = results.map(deserializeNota)
+        const adapter = getDb()
+        if (adapter) {
+          const results = await adapter.getAllNotas()
+          this.items = results.map(deserializeNota)
+        } else {
+          const results = await db.notas.toArray()
+          this.items = results.map(deserializeNota)
+        }
       } catch (e) {
         logger.error(e)
         this.error = 'Failed to load notas'
@@ -255,10 +295,7 @@ export const useNotaStore = defineStore('nota', {
       if (item) {
         item.title = newTitle
         item.updatedAt = new Date()
-        await db.notas.update(id, {
-          title: newTitle,
-          updatedAt: new Date().toISOString(),
-        })
+        await this.saveItem(item)
       }
     },
 
@@ -267,16 +304,7 @@ export const useNotaStore = defineStore('nota', {
       if (item) {
         item.title = newTitle
         item.updatedAt = new Date()
-        await db.notas.update(id, {
-          title: newTitle,
-          updatedAt: new Date().toISOString(),
-        })
-        
-        // Update the item in state
-        const index = this.items.findIndex((n) => n.id === id)
-        if (index !== -1) {
-          this.items[index] = { ...item }
-        }
+        await this.saveItem(item)
         
         return item
       }
@@ -295,7 +323,12 @@ export const useNotaStore = defineStore('nota', {
       if (!item) return
 
       // Then delete the item itself
-      await db.notas.delete(id)
+      const adapter = getDb()
+      if (adapter) {
+        await adapter.deleteNota(id)
+      } else {
+        await db.notas.delete(id)
+      }
       this.items = this.items.filter((i) => i.id !== id)
 
       toast(`Nota "${item.title}" deleted successfully`)
@@ -315,7 +348,12 @@ export const useNotaStore = defineStore('nota', {
           ...nota,
           updatedAt: now,
         }
-        await db.notas.update(nota.id, notaToStore)
+        const adapter = getDb()
+        if (adapter) {
+          await adapter.saveNota(this.items[index])
+        } else {
+          await db.notas.update(nota.id, notaToStore)
+        }
       }
     },
 
@@ -347,7 +385,13 @@ export const useNotaStore = defineStore('nota', {
     async loadNota(id: string) {
       try {
         if (!this.getCurrentNota(id)) {
-          const nota = await db.notas.get(id)
+          const adapter = getDb()
+          let nota
+          if (adapter) {
+            nota = await adapter.getNota(id)
+          } else {
+            nota = await db.notas.get(id)
+          }
           if (nota) {
             const deserialized = deserializeNota(nota)
             // Ensure tags is initialized when loading
@@ -514,7 +558,15 @@ export const useNotaStore = defineStore('nota', {
                     createdAt: existingNota.createdAt,
                     updatedAt: new Date()
                 });
-                await db.notas.put(serializeNota(mergedNota));
+                
+                // Use database adapter if available
+                const adapter = getDb()
+                if (adapter) {
+                  await adapter.saveNota(mergedNota)
+                } else {
+                  await db.notas.put(serializeNota(mergedNota))
+                }
+                
                 const index = this.items.findIndex((n) => n.id === mergedNota.id)
                 if (index !== -1) {
                   this.items[index] = mergedNota
@@ -535,7 +587,15 @@ export const useNotaStore = defineStore('nota', {
                     createdAt: notaToSave.createdAt ? new Date(notaToSave.createdAt) : new Date(),
                     updatedAt: new Date()
                 });
-                await db.notas.add(serializeNota(newNota))
+                
+                // Use database adapter if available
+                const adapter = getDb()
+                if (adapter) {
+                  await adapter.saveNota(newNota)
+                } else {
+                  await db.notas.add(serializeNota(newNota))
+                }
+                
                 this.items.push(newNota)
                 successfullyImportedNotas.push(newNota);
                 // Populate blocks if inline content present

@@ -9,6 +9,9 @@ import type { Nota } from '@/features/nota/types/nota'
 import { logger } from './logger'
 import type { IStorageBackend, StorageBackendType } from './storageService'
 
+// Version of the .nota file format
+const NOTA_FILE_FORMAT_VERSION = '1.0'
+
 export class FileSystemBackend implements IStorageBackend {
   readonly type: StorageBackendType = 'filesystem'
   
@@ -105,8 +108,15 @@ export class FileSystemBackend implements IStorageBackend {
       // Create writable stream
       const writable = await fileHandle.createWritable()
       
+      // Wrap nota in the standard .nota file format
+      const exportData = {
+        version: NOTA_FILE_FORMAT_VERSION,
+        exportedAt: new Date().toISOString(),
+        nota: nota
+      }
+      
       // Write nota as JSON
-      const content = JSON.stringify(nota, null, 2)
+      const content = JSON.stringify(exportData, null, 2)
       await writable.write(content)
       await writable.close()
       

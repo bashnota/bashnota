@@ -122,7 +122,7 @@ describe('FileSystemBackend', () => {
       backend.initialized = true
     })
 
-    it('should write a nota as JSON file', async () => {
+    it('should write a nota as JSON file with proper wrapper format', async () => {
       const testNota: Nota = {
         id: 'test-nota-1',
         title: 'Test File System Nota',
@@ -135,15 +135,21 @@ describe('FileSystemBackend', () => {
 
       await backend.writeNota(testNota)
 
-      const fileHandle = await mockDirectoryHandle.getFileHandle('test-nota-1.json', { create: false })
+      const fileHandle = await mockDirectoryHandle.getFileHandle('test-nota-1.nota', { create: false })
       expect(fileHandle).toBeDefined()
       
       const file = await fileHandle.getFile()
       const content = await file.text()
       const parsed = JSON.parse(content)
       
-      expect(parsed.id).toBe('test-nota-1')
-      expect(parsed.title).toBe('Test File System Nota')
+      // Check wrapper format
+      expect(parsed.version).toBe('1.0')
+      expect(parsed.exportedAt).toBeDefined()
+      expect(parsed.nota).toBeDefined()
+      
+      // Check nota content
+      expect(parsed.nota.id).toBe('test-nota-1')
+      expect(parsed.nota.title).toBe('Test File System Nota')
     })
 
     it('should read a nota from JSON file', async () => {
