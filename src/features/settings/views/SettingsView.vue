@@ -115,6 +115,7 @@ const settingsCategories = ref([
     icon: Settings,
     expanded: false,
     subcategories: [
+      { id: 'storage-mode', title: 'Storage Mode', component: 'StorageModeSettings', badge: undefined },
       { id: 'performance', title: 'Performance', component: 'PerformanceSettings', badge: undefined },
       { id: 'data-management', title: 'Data Management', component: 'DataManagementSettings', badge: undefined },
       { id: 'system-info', title: 'System Information', component: 'SystemInfoSettings', badge: undefined }

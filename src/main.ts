@@ -77,11 +77,23 @@ app.use(pinia)
 app.use(router)
 app.use(head)
 
-// Initialize database adapter based on feature flag
+// Initialize database adapter based on feature flag and storage mode
 const { useNewStorage, useConsolidatedSettings } = useFeatureFlags()
 
+// Load storage mode preference
+let preferredBackend: 'indexeddb' | 'filesystem' | undefined
+try {
+  const storageModeConfig = localStorage.getItem('bashnota-storage-mode')
+  if (storageModeConfig) {
+    const config = JSON.parse(storageModeConfig)
+    preferredBackend = config.mode
+  }
+} catch (error) {
+  console.error('[Storage] Failed to load storage mode preference:', error)
+}
+
 // Initialize storage
-initializeDatabaseAdapter(useNewStorage.value)
+initializeDatabaseAdapter(useNewStorage.value, preferredBackend)
   .then(adapter => {
     app.provide('dbAdapter', adapter)
     console.log('[Storage] Database adapter initialized:', {

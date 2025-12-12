@@ -168,20 +168,20 @@ export class StorageService {
   private initPromise: Promise<void> | null = null
 
   /**
-   * Initialize the storage service and select best backend
+   * Initialize the storage service with optional preferred backend
    */
-  async initialize(): Promise<void> {
+  async initialize(preferredBackend?: StorageBackendType): Promise<void> {
     // Prevent multiple simultaneous initializations
     if (this.initPromise) {
       return this.initPromise
     }
 
-    this.initPromise = this.doInitialize()
+    this.initPromise = this.doInitialize(preferredBackend)
     return this.initPromise
   }
 
-  private async doInitialize(): Promise<void> {
-    logger.info('[StorageService] Initializing...')
+  private async doInitialize(preferredBackend?: StorageBackendType): Promise<void> {
+    logger.info('[StorageService] Initializing...', { preferredBackend })
 
     // Dynamically import FileSystemBackend to avoid issues in test environment
     let FileSystemBackend: any = null
@@ -192,12 +192,30 @@ export class StorageService {
       logger.debug('[StorageService] FileSystemBackend not available')
     }
 
-    // Try backends in order of preference
-    const backends = [
-      FileSystemBackend,  // Preferred: File System Access API
-      IndexedDBBackend,   // Fallback: IndexedDB
-      MemoryBackend       // Last resort: In-memory
-    ].filter(Boolean)  // Remove null entries
+    // Determine backend order based on preference
+    let backends: any[]
+    
+    if (preferredBackend === 'filesystem' && FileSystemBackend) {
+      // User explicitly wants filesystem mode
+      backends = [
+        FileSystemBackend,  // Try filesystem first
+        IndexedDBBackend,   // Fallback: IndexedDB
+        MemoryBackend       // Last resort: In-memory
+      ].filter(Boolean)
+    } else if (preferredBackend === 'indexeddb') {
+      // User explicitly wants IndexedDB mode
+      backends = [
+        IndexedDBBackend,   // Use IndexedDB
+        MemoryBackend       // Last resort: In-memory
+      ].filter(Boolean)
+    } else {
+      // Auto-select (default behavior)
+      backends = [
+        FileSystemBackend,  // Preferred: File System Access API
+        IndexedDBBackend,   // Fallback: IndexedDB
+        MemoryBackend       // Last resort: In-memory
+      ].filter(Boolean)
+    }
 
     for (const BackendClass of backends) {
       try {

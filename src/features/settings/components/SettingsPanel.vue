@@ -57,6 +57,7 @@ const componentMap = {
   // Advanced Settings
   'PerformanceSettings': defineAsyncComponent(() => import('@/features/settings/components/advanced/PerformanceSettings.vue')),
   'DataManagementSettings': defineAsyncComponent(() => import('@/features/settings/components/advanced/DataManagementSettings.vue')),
+  'StorageModeSettings': defineAsyncComponent(() => import('@/features/settings/components/advanced/StorageModeSettings.vue')),
   'SystemInfoSettings': defineAsyncComponent(() => import('@/features/settings/components/advanced/SystemInfoSettings.vue'))
 }
 

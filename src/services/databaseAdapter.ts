@@ -103,10 +103,17 @@ export let dbAdapter: DatabaseAdapter | null = null
  * Initialize the database adapter
  */
 export async function initializeDatabaseAdapter(
-  useNewStorage = false
+  useNewStorage = false,
+  preferredBackend?: 'indexeddb' | 'filesystem'
 ): Promise<DatabaseAdapter> {
   const storage = new StorageService()
-  await storage.initialize()
+  
+  // If preferredBackend is specified, use it; otherwise use feature flag
+  if (preferredBackend) {
+    await storage.initialize(preferredBackend)
+  } else {
+    await storage.initialize()
+  }
   
   dbAdapter = new DatabaseAdapter(storage, useNewStorage)
   return dbAdapter
