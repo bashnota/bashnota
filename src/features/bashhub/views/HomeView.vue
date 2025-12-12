@@ -14,6 +14,7 @@ import HomeNotaList from '@/features/bashhub/components/HomeNotaList.vue'
 // Composables
 import { useHomePreferences } from '@/features/bashhub/composables/useHomePreferences'
 import { useNotaActions } from '@/features/nota/composables/useNotaActions'
+import { useFilesystemNotas } from '@/features/bashhub/composables/useFilesystemNotas'
 import { toast } from 'vue-sonner'
 
 // Store
@@ -39,7 +40,31 @@ const {
   createNewNota
 } = useNotaActions()
 
-const hasNotas = computed(() => store.rootItems.length > 0)
+// Filesystem notas
+const {
+  filesystemNotas,
+  isLoadingFilesystem,
+  hasDirectoryAccess,
+  directoryName,
+  isFilesystemMode,
+  checkDirectoryAccess,
+  loadFilesystemNotas,
+  selectDirectory,
+  getFilesystemOnlyNotas
+} = useFilesystemNotas()
+
+const hasNotas = computed(() => store.rootItems.length > 0 || filesystemNotas.value.length > 0)
+
+// Combined notas from database and filesystem
+const allNotas = computed(() => {
+  if (!isFilesystemMode.value) {
+    return store.rootItems
+  }
+  
+  // In filesystem mode, combine database notas with filesystem-only notas
+  const filesystemOnlyNotas = getFilesystemOnlyNotas(store.rootItems)
+  return [...store.rootItems, ...filesystemOnlyNotas]
+})
 
 // Enhanced loading and error handling
 const loadNotas = async (showToast = false) => {
@@ -52,6 +77,13 @@ const loadNotas = async (showToast = false) => {
     }
     
     await store.loadNotas()
+    
+    // Also load filesystem notas if in filesystem mode
+    if (isFilesystemMode.value) {
+      await checkDirectoryAccess()
+      await loadFilesystemNotas()
+    }
+    
     retryCount.value = 0
     
     if (showToast) {
@@ -80,6 +112,14 @@ const handleRetry = () => {
 
 const handleRefresh = () => {
   loadNotas(true)
+}
+
+const handleSelectDirectory = async () => {
+  const success = await selectDirectory()
+  if (success) {
+    // Refresh to show new notas
+    await loadNotas(true)
+  }
 }
 
 // Lifecycle
@@ -123,6 +163,10 @@ onUnmounted(() => {
             <div class="flex-1 lg:overflow-y-auto lg:overflow-x-hidden lg:scrollbar-thin lg:scrollbar-thumb-muted lg:scrollbar-track-background w-full">
               <HomeHeader 
                 @create-nota="createNewNota"
+                @select-directory="handleSelectDirectory"
+                :is-filesystem-mode="isFilesystemMode"
+                :has-directory-access="hasDirectoryAccess"
+                :directory-name="directoryName"
               />
             </div>
           </div>
@@ -150,12 +194,15 @@ onUnmounted(() => {
             <!-- HomeNotaList -->
             <div class="flex flex-col h-auto lg:h-full w-full min-w-0">
               <HomeNotaList
-                :is-loading="isLoading"
+                :is-loading="isLoading || isLoadingFilesystem"
                 :view-type="viewType"
                 :show-favorites="showFavorites"
                 :search-query="searchQuery"
                 :selected-tag="selectedTag"
-                :notas="store.rootItems"
+                :notas="allNotas"
+                :filesystem-notas="filesystemNotas"
+                :is-filesystem-mode="isFilesystemMode"
+                :has-directory-access="hasDirectoryAccess"
                 @create-nota="createNewNota"
                 @update:selectedTag="selectedTag = $event"
                 @update:viewType="viewType = $event"

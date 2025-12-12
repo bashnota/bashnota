@@ -35,6 +35,7 @@ interface Props {
   mode?: 'list' | 'search' // Different modes for different layouts
   formatDate: (date: string | Date) => string
   isNotaSelected: (id: string) => boolean
+  isFilesystemNota?: (id: string) => boolean // New prop to identify filesystem notas
 }
 
 interface Emits {
@@ -128,6 +129,13 @@ const headerClass = computed(() =>
             <FileText class="h-4 w-4 text-muted-foreground flex-shrink-0" />
             <span class="truncate">{{ nota.title }}</span>
             <Star v-if="nota.favorite" class="h-3 w-3 text-yellow-500 fill-current flex-shrink-0" />
+            <Badge 
+              v-if="isFilesystemNota && isFilesystemNota(nota.id)" 
+              variant="outline" 
+              class="text-xs bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20 flex-shrink-0"
+            >
+              Filesystem
+            </Badge>
           </div>
         </TableCell>
         <TableCell>
