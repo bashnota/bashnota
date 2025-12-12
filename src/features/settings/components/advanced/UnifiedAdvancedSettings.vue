@@ -104,8 +104,16 @@ const handleStorageModeChange = async (newMode: StorageMode) => {
         return
       }
 
-      // Request directory access
+      // Request directory access immediately
       try {
+        // Prompt user to select a directory
+        const directoryHandle = await (window as any).showDirectoryPicker({
+          mode: 'readwrite',
+          startIn: 'documents'
+        })
+        
+        logger.info('[StorageMode] Directory selected:', directoryHandle.name)
+        
         await switchToFilesystem()
         
         // Update settings store
@@ -114,14 +122,22 @@ const handleStorageModeChange = async (newMode: StorageMode) => {
         })
 
         toast.success('Filesystem Mode Enabled', {
-          description: 'Please reload the page to apply changes. You will be prompted to select a directory for storing .nota files.'
+          description: `Directory "${directoryHandle.name}" selected. Please reload the page to complete the switch.`
         })
         showReloadPrompt.value = true
-      } catch (error) {
+      } catch (error: any) {
         logger.error('Failed to enable filesystem mode:', error)
-        toast.error('Failed to Enable Filesystem Mode', {
-          description: 'Could not access the file system. Please check your browser permissions.'
-        })
+        
+        // Handle user cancellation gracefully
+        if (error.name === 'AbortError') {
+          toast.info('Directory Selection Cancelled', {
+            description: 'You need to select a directory to use File System mode.'
+          })
+        } else {
+          toast.error('Failed to Enable Filesystem Mode', {
+            description: 'Could not access the file system. Please check your browser permissions.'
+          })
+        }
       }
     } else {
       switchToIndexedDB()
