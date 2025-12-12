@@ -113,10 +113,10 @@ const settingsCategories = ref([
     id: 'advanced',
     title: 'Advanced',
     icon: Settings,
-    expanded: false,
+    expanded: true,
     subcategories: [
+      { id: 'unified-advanced', title: 'All Settings', component: 'UnifiedAdvancedSettings', badge: 'Recommended' as const },
       { id: 'storage-mode', title: 'Storage Mode', component: 'StorageModeSettings', badge: undefined },
-      { id: 'performance', title: 'Performance', component: 'PerformanceSettings', badge: undefined },
       { id: 'data-management', title: 'Data Management', component: 'DataManagementSettings', badge: undefined },
       { id: 'system-info', title: 'System Information', component: 'SystemInfoSettings', badge: undefined }
     ]
