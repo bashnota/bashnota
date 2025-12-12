@@ -38,6 +38,10 @@ const {
   switchToIndexedDB
 } = useStorageMode()
 
+// Type aliases for better type safety
+type StorageMode = 'indexeddb' | 'filesystem'
+type LogLevel = 'debug' | 'info' | 'warn' | 'error'
+
 // Local state for UI
 const isChanging = ref(false)
 const showReloadPrompt = ref(false)
@@ -87,7 +91,7 @@ watch(clearCacheOnStartup, (value) => {
 })
 
 // Handle storage mode change
-const handleStorageModeChange = async (newMode: 'indexeddb' | 'filesystem') => {
+const handleStorageModeChange = async (newMode: StorageMode) => {
   if (newMode === storageMode.value) return
 
   isChanging.value = true
@@ -207,11 +211,7 @@ defineExpose({ resetToDefaults })
           <Label>Storage Backend</Label>
           <Select 
             :model-value="storageMode" 
-            @update:model-value="(value: any) => {
-              if (value === 'indexeddb' || value === 'filesystem') {
-                handleStorageModeChange(value)
-              }
-            }"
+            @update:model-value="(value: StorageMode) => handleStorageModeChange(value)"
             :disabled="isChanging"
           >
             <SelectTrigger class="w-full">
@@ -366,7 +366,7 @@ defineExpose({ resetToDefaults })
             <Label>Log Level</Label>
             <Select 
               :model-value="logLevel" 
-              @update:model-value="(value: any) => logLevel = value"
+              @update:model-value="(value: LogLevel) => logLevel = value"
             >
               <SelectTrigger class="w-full">
                 <SelectValue />
