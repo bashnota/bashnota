@@ -135,7 +135,9 @@ const isFilesystemNota = (notaId: string): boolean => {
   // Check if nota exists in filesystem
   const existsInFilesystem = props.filesystemNotas.some(n => n.id === notaId)
   
-  // Check if nota exists in database (store items)
+  // Check if nota exists in the current props.notas (which includes database notas)
+  // A nota is "filesystem only" if it exists in filesystem but was added from filesystem
+  // We can check this by seeing if it exists in the store's items
   const existsInDatabase = notaStore.items.some(n => n.id === notaId)
   
   // A nota is "filesystem only" if it exists in filesystem but not in database

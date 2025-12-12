@@ -132,7 +132,7 @@ const headerClass = computed(() =>
             <Badge 
               v-if="isFilesystemNota && isFilesystemNota(nota.id)" 
               variant="outline" 
-              class="text-xs bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20 flex-shrink-0"
+              class="text-xs flex-shrink-0 bg-primary/10 text-primary border-primary/20"
             >
               Filesystem
             </Badge>

@@ -6,6 +6,14 @@ import { saveDirectoryHandle } from '@/services/directoryHandleStorage'
 import type { Nota } from '@/features/nota/types/nota'
 import { toast } from 'vue-sonner'
 
+// Type declaration for File System Access API
+interface WindowWithFileSystemAPI extends Window {
+  showDirectoryPicker(options?: {
+    mode?: 'read' | 'readwrite'
+    startIn?: 'desktop' | 'documents' | 'downloads' | 'music' | 'pictures' | 'videos'
+  }): Promise<FileSystemDirectoryHandle>
+}
+
 /**
  * Composable for managing filesystem notas in the home view
  */
@@ -86,8 +94,16 @@ export function useFilesystemNotas() {
     }
     
     try {
+      // Check if showDirectoryPicker is available
+      if (!('showDirectoryPicker' in window)) {
+        toast.error('File System Access API not supported', {
+          description: 'Your browser does not support this feature'
+        })
+        return false
+      }
+      
       // Prompt user to select a directory
-      const directoryHandle = await (window as any).showDirectoryPicker({
+      const directoryHandle = await (window as WindowWithFileSystemAPI).showDirectoryPicker({
         mode: 'readwrite',
         startIn: 'documents'
       })
