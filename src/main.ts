@@ -98,10 +98,17 @@ const shouldUseNewStorage = useNewStorage.value || preferredBackend === 'filesys
 initializeDatabaseAdapter(shouldUseNewStorage, preferredBackend)
   .then(adapter => {
     app.provide('dbAdapter', adapter)
+    const actualBackend = adapter.getStorageService().getBackendType()
     console.log('[Storage] Database adapter initialized:', {
       usingNewStorage: adapter.isUsingNewStorage(),
-      backend: preferredBackend || 'default'
+      backend: actualBackend
     })
+    
+    // Warn if filesystem was preferred but we fell back to a different backend
+    if (preferredBackend === 'filesystem' && actualBackend !== 'filesystem') {
+      console.warn('[Storage] Could not initialize filesystem backend, fell back to', actualBackend)
+      console.warn('[Storage] You may need to select a directory again in Settings > Advanced > Storage Mode')
+    }
   })
   .catch(error => {
     console.error('[Storage] Failed to initialize database adapter:', error)
