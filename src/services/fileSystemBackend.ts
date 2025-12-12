@@ -20,6 +20,19 @@ export class FileSystemBackend implements IStorageBackend {
   private initialized = false
 
   /**
+   * Check if a persisted directory handle exists
+   * This is a static method that can be called without instantiating the backend
+   */
+  static async hasPersistedHandle(): Promise<boolean> {
+    try {
+      const handle = await DirectoryStorage.getDirectoryHandle()
+      return handle !== null
+    } catch (error) {
+      return false
+    }
+  }
+
+  /**
    * Check if File System Access API is available
    */
   async isAvailable(): Promise<boolean> {
