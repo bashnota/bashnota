@@ -11,6 +11,10 @@ export interface AdvancedSettings {
   maxBackups: number[]
   clearCacheOnStartup: boolean
   
+  // Storage Mode
+  storageMode: 'indexeddb' | 'filesystem'
+  filesystemAutoWatch: boolean
+  
   // System Info (read-only)
   systemInfo?: {
     platform: string
@@ -28,5 +32,7 @@ export const advancedSettingsDefaults: AdvancedSettings = {
   autoBackup: true,
   backupInterval: [30],
   maxBackups: [10],
-  clearCacheOnStartup: false
+  clearCacheOnStartup: false,
+  storageMode: 'indexeddb',
+  filesystemAutoWatch: true
 }

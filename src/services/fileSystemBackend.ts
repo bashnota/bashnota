@@ -44,31 +44,47 @@ export class FileSystemBackend implements IStorageBackend {
   }
 
   /**
-   * Read a nota from a JSON file
+   * Read a nota from a .nota or .json file
    */
   async readNota(notaId: string): Promise<Nota | null> {
     this.ensureInitialized()
 
     try {
-      const fileName = this.getNotaFileName(notaId)
-      const fileHandle = await this.directoryHandle!.getFileHandle(fileName, { create: false })
+      // Try .nota extension first, then fall back to .json
+      const extensions = ['.nota', '.json']
       
-      const file = await fileHandle.getFile()
-      const content = await file.text()
-      
-      const nota = JSON.parse(content)
-      
-      // Convert date strings back to Date objects
-      if (nota.createdAt) nota.createdAt = new Date(nota.createdAt)
-      if (nota.updatedAt) nota.updatedAt = new Date(nota.updatedAt)
-      
-      logger.debug(`[FileSystemBackend] Read nota: ${notaId}`)
-      return nota
-    } catch (error: any) {
-      if (error.name === 'NotFoundError' || error.message?.includes('NotFoundError')) {
-        return null
+      for (const ext of extensions) {
+        try {
+          const sanitized = notaId.replace(/[^a-zA-Z0-9-_]/g, '_')
+          const fileName = `${sanitized}${ext}`
+          const fileHandle = await this.directoryHandle!.getFileHandle(fileName, { create: false })
+          
+          const file = await fileHandle.getFile()
+          const content = await file.text()
+          
+          const data = JSON.parse(content)
+          
+          // Handle both exported .nota format and direct nota format
+          const nota = data.nota || data
+          
+          // Convert date strings back to Date objects
+          if (nota.createdAt) nota.createdAt = new Date(nota.createdAt)
+          if (nota.updatedAt) nota.updatedAt = new Date(nota.updatedAt)
+          
+          logger.debug(`[FileSystemBackend] Read nota: ${notaId} from ${fileName}`)
+          return nota
+        } catch (error: any) {
+          if (error.name === 'NotFoundError' || error.message?.includes('NotFoundError')) {
+            // Try next extension
+            continue
+          }
+          throw error
+        }
       }
       
+      // File not found with any extension
+      return null
+    } catch (error: any) {
       logger.error(`[FileSystemBackend] Failed to read nota ${notaId}:`, error)
       return null
     }
@@ -102,22 +118,35 @@ export class FileSystemBackend implements IStorageBackend {
   }
 
   /**
-   * Delete a nota file
+   * Delete a nota file (tries both .nota and .json extensions)
    */
   async deleteNota(notaId: string): Promise<void> {
     this.ensureInitialized()
 
     try {
-      const fileName = this.getNotaFileName(notaId)
-      await this.directoryHandle!.removeEntry(fileName)
+      const sanitized = notaId.replace(/[^a-zA-Z0-9-_]/g, '_')
+      const extensions = ['.nota', '.json']
+      let deleted = false
       
-      logger.debug(`[FileSystemBackend] Deleted nota: ${notaId}`)
-    } catch (error: any) {
-      if (error.name === 'NotFoundError' || error.message?.includes('NotFoundError')) {
-        // File doesn't exist, that's fine
-        return
+      for (const ext of extensions) {
+        try {
+          const fileName = `${sanitized}${ext}`
+          await this.directoryHandle!.removeEntry(fileName)
+          logger.debug(`[FileSystemBackend] Deleted nota: ${notaId} (${fileName})`)
+          deleted = true
+        } catch (error: any) {
+          if (error.name === 'NotFoundError' || error.message?.includes('NotFoundError')) {
+            // File doesn't exist with this extension, try next one
+            continue
+          }
+          throw error
+        }
       }
       
+      if (!deleted) {
+        logger.debug(`[FileSystemBackend] Nota file not found: ${notaId} (already deleted or never existed)`)
+      }
+    } catch (error: any) {
       logger.error(`[FileSystemBackend] Failed to delete nota ${notaId}:`, error)
       throw error
     }
@@ -136,12 +165,15 @@ export class FileSystemBackend implements IStorageBackend {
       // Type assertion needed as FileSystemDirectoryHandle.entries() is not in all type definitions
       const handle = this.directoryHandle as any
       for await (const [name, entry] of handle.entries()) {
-        if (entry.kind === 'file' && name.endsWith('.json')) {
+        if (entry.kind === 'file' && (name.endsWith('.nota') || name.endsWith('.json'))) {
           try {
             const fileHandle = entry as FileSystemFileHandle
             const file = await fileHandle.getFile()
             const content = await file.text()
-            const nota = JSON.parse(content)
+            const data = JSON.parse(content)
+            
+            // Handle both exported .nota format and direct nota format
+            const nota = data.nota || data
             
             // Convert date strings back to Date objects
             if (nota.createdAt) nota.createdAt = new Date(nota.createdAt)
@@ -177,6 +209,54 @@ export class FileSystemBackend implements IStorageBackend {
   private getNotaFileName(notaId: string): string {
     // Sanitize the ID to ensure it's a valid filename
     const sanitized = notaId.replace(/[^a-zA-Z0-9-_]/g, '_')
-    return `${sanitized}.json`
+    return `${sanitized}.nota`
+  }
+
+  /**
+   * Watch for changes to .nota files in the directory
+   */
+  async watchDirectory(callback: (notaId: string) => void): Promise<void> {
+    this.ensureInitialized()
+
+    try {
+      // Note: File System Access API doesn't have built-in watch functionality
+      // This is a placeholder for future implementation using alternative approaches
+      logger.info('[FileSystemBackend] Directory watching not yet implemented')
+      // TODO: Implement file watching using polling or other mechanisms
+    } catch (error) {
+      logger.error('[FileSystemBackend] Failed to watch directory:', error)
+    }
+  }
+
+  /**
+   * Read a .nota file by path (for direct file access)
+   */
+  async readNotaFile(fileHandle: FileSystemFileHandle): Promise<Nota | null> {
+    try {
+      const file = await fileHandle.getFile()
+      const content = await file.text()
+      
+      const data = JSON.parse(content)
+      
+      // Handle both exported .nota format and direct nota format
+      const nota = data.nota || data
+      
+      // Convert date strings back to Date objects
+      if (nota.createdAt) nota.createdAt = new Date(nota.createdAt)
+      if (nota.updatedAt) nota.updatedAt = new Date(nota.updatedAt)
+      
+      logger.debug(`[FileSystemBackend] Read .nota file: ${nota.id}`)
+      return nota
+    } catch (error) {
+      logger.error('[FileSystemBackend] Failed to read .nota file:', error)
+      return null
+    }
+  }
+
+  /**
+   * Get the directory handle (for advanced operations)
+   */
+  getDirectoryHandle(): FileSystemDirectoryHandle | null {
+    return this.directoryHandle
   }
 }

@@ -21,6 +21,8 @@ BashNota combines rich text editing with executable code blocks, AI assistance, 
 - 📊 LaTeX math & Mermaid diagrams
 - 🔗 Jupyter notebook integration
 - 🌙 Dark/light themes
+- 💾 **Dual storage modes**: IndexedDB or direct file system access
+- 🔄 **Real-time file watching**: Edit .nota files with any text editor
 
 ## Quick Start
 
@@ -79,6 +81,19 @@ src/
 ├── ui/               # UI components
 └── stores/           # State management
 ```
+
+## Storage Modes
+
+BashNota supports two storage modes for maximum flexibility:
+
+- **IndexedDB Mode** (default): Browser-based storage for quick setup
+- **File System Mode**: Direct file system access for .nota files
+  - Edit notes with any text editor
+  - Real-time synchronization
+  - Easy backup and version control
+  - Works with git
+
+See [FILE_SYSTEM_MODE.md](docs/FILE_SYSTEM_MODE.md) for detailed documentation.
 
 ## Contributing
 
