@@ -157,9 +157,9 @@ const settingsItems = [
     url: "/settings/system-info"
   },
   {
-    title: "Performance",
+    title: "Advanced Settings",
     icon: Code2,
-    url: "/settings/performance"
+    url: "/settings/unified-advanced"
   }
 ]
 
