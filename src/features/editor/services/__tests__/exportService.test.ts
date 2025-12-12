@@ -37,7 +37,7 @@ describe('exportService', () => {
         const mockContent = { type: 'doc', content: [] }
 
         const mockCitations = [
-            { key: 'test2023', title: 'Test Citation', authors: [{ family: 'Doe', given: 'John' }], year: 2023 },
+            { key: 'test2023', title: 'Test Citation', authors: ['Doe, John', 'Smith, Bob'], year: 2023 },
             { key: 'another2024', title: 'Another Citation', authors: [{ family: 'Smith', given: 'Jane' }], year: 2024 }
         ]
 

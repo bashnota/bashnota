@@ -113,7 +113,7 @@ ${EXPORT_STYLES}
 
                     try {
                         const data = JSON.parse(dataStr);
-                        const authors = data.authors ? data.authors.map(a => \`\${a.given} \${a.family}\`).join(', ') : 'Unknown Author';
+                        const authors = data.authors ? data.authors.map(a => typeof a === 'string' ? a : \`\${a.given} \${a.family}\`).join(', ') : 'Unknown Author';
                         
                         let metaHtml = '<div class="tooltip-meta">';
                         if (data.year) metaHtml += \`<div class="tooltip-label">Year</div><div>\${data.year}</div>\`;

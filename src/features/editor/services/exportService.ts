@@ -379,7 +379,10 @@ function processCitations(doc: Document, citations: any[]) {
             let text = `[${num}] ${key}`
             if (data) {
                 // Formatting logic (simplified APA-ish)
-                const authors = data.authors?.map((a: any) => `${a.family}, ${a.given}`).join(' & ') || 'Unknown Author'
+                const authors = data.authors?.map((a: any) => {
+                    if (typeof a === 'string') return a
+                    return `${a.family}, ${a.given}`
+                }).join(' & ') || 'Unknown Author'
                 const title = data.title || 'Untitled'
                 const year = data.year || 'n.d.'
                 text = `[${num}] ${authors} (${year}). ${title}.`
