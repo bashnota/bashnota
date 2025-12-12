@@ -131,21 +131,33 @@ export async function clearDirectoryHandle(): Promise<void> {
 }
 
 /**
+ * Extended FileSystemDirectoryHandle interface with permission methods
+ * These methods are part of the File System Access API but may not be
+ * in all TypeScript definitions
+ */
+interface FileSystemDirectoryHandleWithPermissions extends FileSystemDirectoryHandle {
+  queryPermission(descriptor?: { mode: 'read' | 'readwrite' }): Promise<PermissionState>
+  requestPermission(descriptor?: { mode: 'read' | 'readwrite' }): Promise<PermissionState>
+}
+
+/**
  * Check if we have permission to access a directory handle
  */
 export async function verifyHandlePermission(
   handle: FileSystemDirectoryHandle
 ): Promise<boolean> {
   try {
+    const handleWithPerms = handle as FileSystemDirectoryHandleWithPermissions
+    
     // Check if we have permission
-    const permission = await (handle as any).queryPermission({ mode: 'readwrite' })
+    const permission = await handleWithPerms.queryPermission({ mode: 'readwrite' })
     
     if (permission === 'granted') {
       return true
     }
     
     // Try to request permission (will only work if triggered by user gesture)
-    const requestedPermission = await (handle as any).requestPermission({ mode: 'readwrite' })
+    const requestedPermission = await handleWithPerms.requestPermission({ mode: 'readwrite' })
     return requestedPermission === 'granted'
   } catch (error) {
     logger.warn('[DirectoryHandleStorage] Failed to verify permission:', error)

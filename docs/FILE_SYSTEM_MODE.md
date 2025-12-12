@@ -38,6 +38,13 @@ BashNota now supports two storage modes:
 - Uses the File System Access API to read/write `.nota` files
 - Supports both `.nota` and `.json` file extensions
 - Handles file operations: read, write, delete, list
+- Persists directory handle in IndexedDB for seamless re-initialization
+
+#### 1.5. DirectoryHandleStorage (`src/services/directoryHandleStorage.ts`)
+- Utility for persisting FileSystemDirectoryHandle in IndexedDB
+- Allows directory access to persist across page reloads
+- Verifies permissions before using cached handles
+- Prevents security violations from automatic picker calls
 
 #### 2. FileWatcherService (`src/services/fileWatcherService.ts`)
 - Polling-based file change detection
@@ -61,11 +68,19 @@ BashNota now supports two storage modes:
 ### Data Flow
 
 ```
-User selects File System Mode
+User clicks to enable File System Mode in Settings
+    ↓
+User selects directory via showDirectoryPicker() (user gesture)
+    ↓
+Directory handle is saved to IndexedDB
+    ↓
+Page reloads
     ↓
 StorageService initializes with FileSystemBackend
     ↓
-User grants directory access via File System Access API
+FileSystemBackend retrieves persisted handle from IndexedDB
+    ↓
+Permission is verified for the handle
     ↓
 FileSystemBackend reads/writes .nota files
     ↓
@@ -123,9 +138,10 @@ The UI automatically detects browser support and disables File System Mode if no
 
 1. Navigate to **Settings → Advanced → Storage Mode**
 2. Select "File System (.nota files)" from the dropdown
-3. Click "Reload Now" when prompted
-4. On next page load, grant directory access when prompted
-5. Select a directory where your `.nota` files will be stored
+3. A file picker will appear - select a directory where your `.nota` files will be stored
+4. The directory handle is saved automatically
+5. Click "Reload Now" when prompted
+6. On next page load, the app will use the previously selected directory (no picker shown)
 
 ### Using Auto-Watch
 
@@ -157,10 +173,12 @@ Since the File System Access API doesn't provide native file watching, we use a 
 - Minimal performance impact
 
 ### Security Considerations
-- Users must explicitly grant directory access
-- Access is per-session (lost on page reload unless re-granted)
-- No automatic access to file system
+- Users must explicitly grant directory access via user gesture (e.g., clicking a button)
+- Directory handle is persisted in IndexedDB for subsequent page loads
+- Permission is verified on each initialization
+- No automatic calls to `showDirectoryPicker()` during page load
 - Files are only accessed in the granted directory
+- Users can revoke access by clearing browser data or selecting a different directory
 
 ## Future Enhancements
 
@@ -186,9 +204,11 @@ Since the File System Access API doesn't provide native file watching, we use a 
 - Check browser console for errors
 
 ### Permission denied
-- Grant directory access when prompted
+- Grant directory access when prompted during the initial setup
+- If permission is lost, switch to File System mode again to re-select the directory
 - Check that the directory is writable
 - Try selecting a different directory
+- Clear browser data and re-grant permission if issues persist
 
 ## API Reference
 

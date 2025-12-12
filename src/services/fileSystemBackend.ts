@@ -8,11 +8,7 @@
 import type { Nota } from '@/features/nota/types/nota'
 import { logger } from './logger'
 import type { IStorageBackend, StorageBackendType } from './storageService'
-import { 
-  getDirectoryHandle, 
-  saveDirectoryHandle, 
-  verifyHandlePermission 
-} from './directoryHandleStorage'
+import * as DirectoryStorage from './directoryHandleStorage'
 
 // Version of the .nota file format
 const NOTA_FILE_FORMAT_VERSION = '1.0'
@@ -42,7 +38,7 @@ export class FileSystemBackend implements IStorageBackend {
       logger.info('[FileSystemBackend] Attempting to initialize with persisted handle...')
 
       // Try to retrieve the persisted directory handle
-      const handle = await getDirectoryHandle()
+      const handle = await DirectoryStorage.getDirectoryHandle()
       
       if (!handle) {
         logger.warn('[FileSystemBackend] No persisted directory handle found')
@@ -50,7 +46,7 @@ export class FileSystemBackend implements IStorageBackend {
       }
 
       // Verify we still have permission to access the directory
-      const hasPermission = await verifyHandlePermission(handle)
+      const hasPermission = await DirectoryStorage.verifyHandlePermission(handle)
       
       if (!hasPermission) {
         logger.warn('[FileSystemBackend] Permission denied for persisted directory handle')
@@ -299,14 +295,14 @@ export class FileSystemBackend implements IStorageBackend {
   async setDirectoryHandle(handle: FileSystemDirectoryHandle): Promise<void> {
     try {
       // Verify we have permission
-      const hasPermission = await verifyHandlePermission(handle)
+      const hasPermission = await DirectoryStorage.verifyHandlePermission(handle)
       
       if (!hasPermission) {
         throw new Error('Permission denied for directory')
       }
 
       // Save the handle to IndexedDB
-      await saveDirectoryHandle(handle)
+      await DirectoryStorage.saveDirectoryHandle(handle)
       
       this.directoryHandle = handle
       this.initialized = true
