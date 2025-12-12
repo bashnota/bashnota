@@ -137,6 +137,11 @@ const settingsItems = [
     url: "/settings/text-editing"
   },
   {
+    title: "Storage Mode",
+    icon: Database,
+    url: "/settings/storage-mode"
+  },
+  {
     title: "Keyboard Shortcuts",
     icon: Keyboard,
     url: "/settings/editor-shortcuts"
@@ -148,12 +153,12 @@ const settingsItems = [
   },
   {
     title: "System Info",
-    icon: Database,
+    icon: Terminal,
     url: "/settings/system-info"
   },
   {
     title: "Performance",
-    icon: Terminal,
+    icon: Code2,
     url: "/settings/performance"
   }
 ]
