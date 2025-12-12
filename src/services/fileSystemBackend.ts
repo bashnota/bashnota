@@ -105,8 +105,15 @@ export class FileSystemBackend implements IStorageBackend {
       // Create writable stream
       const writable = await fileHandle.createWritable()
       
+      // Wrap nota in the standard .nota file format
+      const exportData = {
+        version: '1.0',
+        exportedAt: new Date().toISOString(),
+        nota: nota
+      }
+      
       // Write nota as JSON
-      const content = JSON.stringify(nota, null, 2)
+      const content = JSON.stringify(exportData, null, 2)
       await writable.write(content)
       await writable.close()
       
