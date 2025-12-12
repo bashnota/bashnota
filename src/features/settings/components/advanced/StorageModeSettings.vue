@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { AlertCircle, Database, FolderOpen, HardDrive, RefreshCw } from 'lucide-vue-next'
+import { AlertCircle, Database, FolderOpen, HardDrive, RefreshCw, Eye, EyeOff } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { useStorageMode } from '@/composables/useStorageMode'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -18,6 +18,7 @@ const {
   isFilesystemSupported,
   isFilesystemMode,
   isIndexedDBMode,
+  isWatchingFiles,
   getModeDescription,
   switchToFilesystem,
   switchToIndexedDB
@@ -205,6 +206,14 @@ const getStorageModeDisplayName = computed(() => {
             :checked="autoWatch" 
             @update:checked="handleAutoWatchChange"
           />
+        </div>
+
+        <!-- File Watcher Status -->
+        <div v-if="autoWatch" class="flex items-center gap-2 p-2 bg-muted rounded-md">
+          <component :is="isWatchingFiles ? Eye : EyeOff" class="w-4 h-4" :class="isWatchingFiles ? 'text-green-600 dark:text-green-400' : 'text-gray-400'" />
+          <span class="text-sm" :class="isWatchingFiles ? 'text-green-700 dark:text-green-300' : 'text-muted-foreground'">
+            File watcher is {{ isWatchingFiles ? 'active' : 'inactive' }}
+          </span>
         </div>
 
         <div class="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">

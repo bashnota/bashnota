@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
 import { logger } from '@/services/logger'
+import { getFileWatcher, type FileWatcherService } from '@/services/fileWatcherService'
 
 /**
  * Storage mode types
@@ -17,6 +18,9 @@ interface StorageModeConfig {
 
 // Storage key for persistence
 const STORAGE_KEY = 'bashnota-storage-mode'
+
+// File watcher instance
+let fileWatcher: FileWatcherService | null = null
 
 // Load initial configuration from localStorage
 function loadStorageConfig(): StorageModeConfig {
@@ -81,6 +85,17 @@ export function useStorageMode() {
       config.value.autoWatch = value
       saveStorageConfig(config.value)
       logger.info('[StorageMode] Auto-watch changed to:', value)
+      
+      // Update file watcher
+      if (fileWatcher) {
+        if (value && config.value.mode === 'filesystem') {
+          fileWatcher.start().catch(error => {
+            logger.error('[StorageMode] Failed to start file watcher:', error)
+          })
+        } else {
+          fileWatcher.stop()
+        }
+      }
     }
   })
 
@@ -95,6 +110,11 @@ export function useStorageMode() {
   // Check if currently using IndexedDB mode
   const isIndexedDBMode = computed(() => config.value.mode === 'indexeddb')
 
+  // Check if file watcher is active
+  const isWatchingFiles = computed(() => {
+    return fileWatcher?.isActive() || false
+  })
+
   // Switch to filesystem mode
   const switchToFilesystem = async () => {
     if (!isFilesystemSupported.value) {
@@ -108,6 +128,12 @@ export function useStorageMode() {
   // Switch to IndexedDB mode
   const switchToIndexedDB = () => {
     storageMode.value = 'indexeddb'
+    
+    // Stop file watcher if running
+    if (fileWatcher) {
+      fileWatcher.stop()
+    }
+    
     logger.info('[StorageMode] Switched to IndexedDB mode')
   }
 
@@ -120,6 +146,43 @@ export function useStorageMode() {
   // Get directory handle
   const getDirectoryHandle = () => {
     return config.value.directoryHandle
+  }
+
+  // Initialize file watcher with backend
+  const initializeFileWatcher = (backend: any, callbacks?: {
+    onFileChanged?: (notaId: string, content: any) => void
+    onFileAdded?: (notaId: string, content: any) => void
+    onFileDeleted?: (notaId: string) => void
+  }) => {
+    if (!fileWatcher) {
+      fileWatcher = getFileWatcher({
+        pollInterval: 2000,
+        onFileChanged: callbacks?.onFileChanged,
+        onFileAdded: callbacks?.onFileAdded,
+        onFileDeleted: callbacks?.onFileDeleted,
+        onError: (error) => {
+          logger.error('[StorageMode] File watcher error:', error)
+        }
+      })
+    }
+    
+    fileWatcher.setBackend(backend)
+    
+    // Start watching if in filesystem mode and auto-watch is enabled
+    if (config.value.mode === 'filesystem' && config.value.autoWatch) {
+      fileWatcher.start().catch(error => {
+        logger.error('[StorageMode] Failed to start file watcher:', error)
+      })
+    }
+    
+    return fileWatcher
+  }
+
+  // Stop file watcher
+  const stopFileWatcher = () => {
+    if (fileWatcher) {
+      fileWatcher.stop()
+    }
   }
 
   // Get storage mode description
@@ -143,12 +206,15 @@ export function useStorageMode() {
     isFilesystemSupported,
     isFilesystemMode,
     isIndexedDBMode,
+    isWatchingFiles,
     getModeDescription,
     
     // Actions
     switchToFilesystem,
     switchToIndexedDB,
     setDirectoryHandle,
-    getDirectoryHandle
+    getDirectoryHandle,
+    initializeFileWatcher,
+    stopFileWatcher
   }
 }
