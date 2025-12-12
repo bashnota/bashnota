@@ -100,13 +100,23 @@ const deserializeNota = (nota: any): Nota => ({
   })) : [],
 })
 
+// Cache for database adapter - initialized once
+let cachedAdapter: ReturnType<typeof useDatabaseAdapter> | null | undefined = undefined
+
 // Helper function to get database adapter or fallback to db
 function getDb() {
+  // Return cached result if we've already checked
+  if (cachedAdapter !== undefined) {
+    return cachedAdapter
+  }
+  
   try {
-    return useDatabaseAdapter()
+    cachedAdapter = useDatabaseAdapter()
+    return cachedAdapter
   } catch (error) {
-    // If adapter not initialized yet, return null to use old db
+    // If adapter not initialized yet, cache null to use old db
     logger.warn('[NotaStore] DatabaseAdapter not initialized, using legacy db')
+    cachedAdapter = null
     return null
   }
 }
@@ -548,7 +558,15 @@ export const useNotaStore = defineStore('nota', {
                     createdAt: existingNota.createdAt,
                     updatedAt: new Date()
                 });
-                await db.notas.put(serializeNota(mergedNota));
+                
+                // Use database adapter if available
+                const adapter = getDb()
+                if (adapter) {
+                  await adapter.saveNota(mergedNota)
+                } else {
+                  await db.notas.put(serializeNota(mergedNota))
+                }
+                
                 const index = this.items.findIndex((n) => n.id === mergedNota.id)
                 if (index !== -1) {
                   this.items[index] = mergedNota
@@ -569,7 +587,15 @@ export const useNotaStore = defineStore('nota', {
                     createdAt: notaToSave.createdAt ? new Date(notaToSave.createdAt) : new Date(),
                     updatedAt: new Date()
                 });
-                await db.notas.add(serializeNota(newNota))
+                
+                // Use database adapter if available
+                const adapter = getDb()
+                if (adapter) {
+                  await adapter.saveNota(newNota)
+                } else {
+                  await db.notas.add(serializeNota(newNota))
+                }
+                
                 this.items.push(newNota)
                 successfullyImportedNotas.push(newNota);
                 // Populate blocks if inline content present
