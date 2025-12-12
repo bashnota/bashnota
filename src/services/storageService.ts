@@ -210,8 +210,19 @@ export class StorageService {
       ].filter(Boolean)
     } else {
       // Auto-select (default behavior)
+      // Only try FileSystemBackend if a persisted handle exists
+      let shouldTryFileSystem = false
+      if (FileSystemBackend) {
+        try {
+          shouldTryFileSystem = await FileSystemBackend.hasPersistedHandle()
+          logger.debug('[StorageService] FileSystemBackend persisted handle check:', shouldTryFileSystem)
+        } catch (error) {
+          logger.debug('[StorageService] Failed to check for persisted handle:', error)
+        }
+      }
+      
       backends = [
-        FileSystemBackend,  // Preferred: File System Access API
+        shouldTryFileSystem ? FileSystemBackend : null,  // Try filesystem only if handle exists
         IndexedDBBackend,   // Fallback: IndexedDB
         MemoryBackend       // Last resort: In-memory
       ].filter(Boolean)

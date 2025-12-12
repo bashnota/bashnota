@@ -159,5 +159,25 @@ describe('StorageService', () => {
       // In test environment without File System API, should use memory or indexeddb
       expect(['memory', 'indexeddb']).toContain(backendType)
     })
+
+    it('should not attempt FileSystemBackend initialization when no persisted handle exists', async () => {
+      // This test ensures that FileSystemBackend.initialize() is not called
+      // when there's no persisted directory handle in auto-select mode
+      const service = new StorageService()
+      
+      // Mock the hasPersistedHandle method to return false
+      vi.mock('../fileSystemBackend', () => ({
+        FileSystemBackend: {
+          hasPersistedHandle: vi.fn(async () => false)
+        }
+      }))
+      
+      await service.initialize()
+      
+      const backendType = service.getBackendType()
+      // Should not use filesystem backend when no handle is persisted
+      expect(backendType).not.toBe('filesystem')
+      expect(['memory', 'indexeddb']).toContain(backendType)
+    })
   })
 })

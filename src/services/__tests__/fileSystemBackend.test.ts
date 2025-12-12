@@ -172,6 +172,14 @@ describe('FileSystemBackend', () => {
       const available = await backend.isAvailable()
       expect(typeof available).toBe('boolean')
     })
+
+    it('should check for persisted handle availability', async () => {
+      // Test the static method that checks if a persisted handle exists
+      const hasHandle = await FileSystemBackend.hasPersistedHandle()
+      
+      // Should return a boolean value
+      expect(typeof hasHandle).toBe('boolean')
+    })
   })
 
   describe('initialization', () => {
