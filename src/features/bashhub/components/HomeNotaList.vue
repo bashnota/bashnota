@@ -47,6 +47,9 @@ interface Props {
   selectedTag: string
   notas: Nota[]
   totalCount?: number
+  filesystemNotas?: Nota[]
+  isFilesystemMode?: boolean
+  hasDirectoryAccess?: boolean
 }
 
 interface Emits {
@@ -122,6 +125,24 @@ const {
 const quickPreviewNota = ref<Nota | null>(null)
 const showQuickPreview = ref(false)
 const showFilters = ref(false)
+
+// Helper function to check if a nota is from filesystem only
+const isFilesystemNota = (notaId: string): boolean => {
+  if (!props.isFilesystemMode || !props.filesystemNotas) {
+    return false
+  }
+  
+  // Check if nota exists in filesystem
+  const existsInFilesystem = props.filesystemNotas.some(n => n.id === notaId)
+  
+  // Check if nota exists in the current props.notas (which includes database notas)
+  // A nota is "filesystem only" if it exists in filesystem but was added from filesystem
+  // We can check this by seeing if it exists in the store's items
+  const existsInDatabase = notaStore.items.some(n => n.id === notaId)
+  
+  // A nota is "filesystem only" if it exists in filesystem but not in database
+  return existsInFilesystem && !existsInDatabase
+}
 
 // Override the composable's clearAllFilters to include emit calls
 const clearAllFiltersLocal = () => {
@@ -417,6 +438,7 @@ watch(() => props.showFavorites, (newValue) => {
             :is-indeterminate="isIndeterminate"
             :format-date="formatDate"
             :is-nota-selected="isNotaSelected"
+            :is-filesystem-nota="isFilesystemMode ? isFilesystemNota : undefined"
             mode="list"
             @sort="handleSort"
             @select-all="handleSelectAll"

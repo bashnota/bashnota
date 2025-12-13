@@ -9,7 +9,8 @@ import {
   FileUp,
   ChevronDown,
   Twitter,
-  Mail
+  Mail,
+  FolderOpen
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/features/auth/stores/auth'
 import { useRouter } from 'vue-router'
@@ -23,6 +24,14 @@ import NewsletterModal from './NewsletterModal.vue'
 // Emits
 const emit = defineEmits<{
   (e: 'create-nota'): void
+  (e: 'select-directory'): void
+}>()
+
+// Props
+const props = defineProps<{
+  isFilesystemMode?: boolean
+  hasDirectoryAccess?: boolean
+  directoryName?: string | null
 }>()
 
 const authStore = useAuthStore()
@@ -98,6 +107,10 @@ const handleImportNota = async () => {
 
 const handleImportIpynb = async () => {
   await importJupyterNotebook()
+}
+
+const handleSelectDirectory = () => {
+  emit('select-directory')
 }
 
 const greeting = computed(() => {
@@ -185,12 +198,29 @@ onMounted(() => {
           <span class="font-medium">Sign In</span>
         </Button>
 
+        <!-- Filesystem Directory Selector (when in filesystem mode) -->
+        <Button 
+          v-if="isFilesystemMode"
+          @click="handleSelectDirectory"
+          variant="outline"
+          :class="authStore.isAuthenticated ? 'flex-1' : 'flex-[0.8]'"
+          class="h-12 hover:bg-muted/50 transition-colors"
+        >
+          <FolderOpen class="h-4 w-4 mr-2" />
+          <span class="font-medium" v-if="hasDirectoryAccess && directoryName">
+            {{ directoryName }}
+          </span>
+          <span class="font-medium" v-else>
+            Select Directory
+          </span>
+        </Button>
+
         <!-- Import Dropdown -->
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button 
               variant="outline"
-              :class="authStore.isAuthenticated ? 'flex-1' : 'flex-[0.6]'"
+              :class="isFilesystemMode ? 'flex-[0.6]' : (authStore.isAuthenticated ? 'flex-1' : 'flex-[0.6]')"
               class="h-12 hover:bg-muted/50 transition-colors"
               :disabled="isImporting"
             >
