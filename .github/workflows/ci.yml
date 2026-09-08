@@ -36,6 +36,8 @@ jobs:
         run: npm run release:sbom -- --output sbom.cdx.json
       - name: Generate dependency license report
         run: npm run release:licenses -- --output dependency-licenses.json
+      - name: Fetch pinned release provenance refs
+        run: node scripts/release/fetch-pinned-history-refs.mjs
       - name: Validate release policies and provenance
         run: npm run release:self-test
       - name: Upload supply-chain reports
