@@ -2,7 +2,8 @@
 import { computed } from 'vue'
 import {
   Play,
-  Loader2,
+  Square,
+  X,
   Settings,
   Eye,
   EyeOff,
@@ -10,7 +11,7 @@ import {
   Copy,
   Save,
   Sparkles,
-  Trash2
+  Trash2,
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -32,6 +33,8 @@ interface Props {
 
 interface Emits {
   'execute-code': []
+  'interrupt-execution': []
+  'cancel-execution': []
   'toggle-code-visibility': []
   'toggle-fullscreen': []
   'copy-code': []
@@ -54,8 +57,10 @@ const configurationStatus = computed(() => {
 
 <template>
   <div
-    v-if="isVisible"
     class="absolute right-2 top-2 flex flex-col gap-1 bg-background/95 backdrop-blur-sm border rounded-lg shadow-lg p-1 z-10 transition-all duration-200"
+    :class="{
+      'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto': !isVisible,
+    }"
   >
     <!-- Execute Button -->
     <Tooltip v-if="!isReadOnly">
@@ -63,21 +68,38 @@ const configurationStatus = computed(() => {
         <Button
           variant="ghost"
           size="sm"
-          @click="emit('execute-code')"
+          :aria-label="isExecuting ? 'Interrupt execution' : 'Run code'"
+          @click="isExecuting ? emit('interrupt-execution') : emit('execute-code')"
           class="h-8 w-8 p-0"
-          :disabled="!isReadyToExecute"
+          :disabled="!isExecuting && !isReadyToExecute"
           :class="{
             'bg-primary text-primary-foreground': !isExecuting && isReadyToExecute,
-            'opacity-50': !isReadyToExecute
+            'text-destructive hover:text-destructive': isExecuting,
+            'opacity-50': !isExecuting && !isReadyToExecute
           }"
         >
-          <Loader2 v-if="isExecuting" class="w-4 h-4 animate-spin" />
+          <Square v-if="isExecuting" class="w-4 h-4 fill-current" />
           <Play v-else class="w-4 h-4" />
         </Button>
       </TooltipTrigger>
       <TooltipContent side="left">
-        {{ isExecuting ? 'Executing...' : 'Run Code' }}
+        {{ isExecuting ? 'Interrupt execution' : 'Run Code' }}
       </TooltipContent>
+    </Tooltip>
+
+    <Tooltip v-if="!isReadOnly && isExecuting">
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-label="Cancel execution"
+          class="h-8 w-8 p-0 text-muted-foreground"
+          @click="emit('cancel-execution')"
+        >
+          <X class="h-4 w-4" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="left">Cancel locally without waiting for the kernel</TooltipContent>
     </Tooltip>
 
     <!-- Configuration Button -->
@@ -86,6 +108,7 @@ const configurationStatus = computed(() => {
         <Button
           variant="ghost"
           size="sm"
+          aria-label="Configure Jupyter execution"
           class="h-8 w-8 p-0"
           :class="{
             'bg-warning/20 text-warning-foreground': isConfigurationIncomplete,
@@ -110,6 +133,7 @@ const configurationStatus = computed(() => {
         <Button
           variant="ghost"
           size="sm"
+          aria-label="Open AI assistant"
           class="h-8 w-8 p-0"
           @click="emit('show-ai-assistant')"
         >
@@ -129,6 +153,7 @@ const configurationStatus = computed(() => {
         <Button
           variant="ghost"
           size="sm"
+          :aria-label="isCodeVisible ? 'Hide code' : 'Show code'"
           class="h-8 w-8 p-0"
           @click="emit('toggle-code-visibility')"
         >
@@ -146,6 +171,7 @@ const configurationStatus = computed(() => {
         <Button
           variant="ghost"
           size="sm"
+          aria-label="Open code block in full screen"
           class="h-8 w-8 p-0"
           @click="emit('toggle-fullscreen')"
           :disabled="isExecuting && !isPublished"
@@ -166,6 +192,7 @@ const configurationStatus = computed(() => {
         <Button
           variant="ghost"
           size="sm"
+          aria-label="Copy code"
           @click="emit('copy-code')"
           class="h-8 w-8 p-0"
         >
@@ -183,6 +210,7 @@ const configurationStatus = computed(() => {
         <Button
           variant="ghost"
           size="sm"
+          aria-label="Clear output"
           @click="emit('clear-output')"
           class="h-8 w-8 p-0 text-destructive hover:text-destructive"
           :disabled="isExecuting"
@@ -200,6 +228,7 @@ const configurationStatus = computed(() => {
         <Button
           variant="ghost"
           size="sm"
+          aria-label="Save code changes"
           @click="emit('save-changes')"
           class="h-8 w-8 p-0"
         >

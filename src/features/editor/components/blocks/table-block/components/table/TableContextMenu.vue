@@ -1,11 +1,6 @@
 <script setup lang="ts">
 import { Copy, Clipboard, AlignLeft, AlignCenter, AlignRight } from 'lucide-vue-next'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu'
+import { DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 
 const props = defineProps<{
   hasClipboard: boolean

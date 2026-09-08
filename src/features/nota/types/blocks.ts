@@ -1,10 +1,36 @@
-import type { Mark } from '@tiptap/core'
+import type { Mark } from 'prosemirror-model'
+
+export type BlockKey = string | number
+
+export interface ProseMirrorMarkJSON {
+  type: string
+  attrs?: Record<string, unknown>
+}
+
+export interface ProseMirrorNodeJSON {
+  type: string
+  attrs?: Record<string, unknown>
+  content?: ProseMirrorNodeJSON[]
+  marks?: ProseMirrorMarkJSON[]
+  text?: string
+}
+
+/**
+ * Authoritative rich-content payload for newly written blocks. Legacy typed
+ * fields remain readable for old clients and old rows; version 1 clients use
+ * this exact node snapshot whenever it is present and fail closed if invalid.
+ */
+export interface PersistedProseMirrorNode {
+  format: 'prosemirror-node'
+  version: 1
+  value: ProseMirrorNodeJSON
+}
 
 /**
  * Base interface for all blocks
  */
 export interface BaseBlock {
-  id?: string // Optional since Dexie will auto-generate with ++id
+  id?: BlockKey // Optional since Dexie will auto-generate a numeric ++id
   type: string
   order: number
   notaId: string
@@ -12,6 +38,7 @@ export interface BaseBlock {
   updatedAt: Date
   version: number
   metadata?: Record<string, any>
+  proseMirrorNode?: PersistedProseMirrorNode
 }
 
 /**
@@ -96,6 +123,8 @@ export interface ListBlock extends BaseBlock {
   type: 'list'
   listType: 'ordered' | 'unordered' | 'task'
   items: string[]
+  /** Optional legacy task state; versioned ProseMirror snapshots remain authoritative. */
+  checked?: boolean[]
   marks?: Mark[]
 }
 
@@ -300,7 +329,7 @@ export type Block =
  * Block order and structure for a nota
  */
 export interface NotaBlockStructure {
-  id?: string // Optional for new structures, will be set by database
+  id?: BlockKey // Optional for new structures, will be set by database
   notaId: string
   blockOrder: string[] // Array of block IDs in order
   // blocks property removed - blocks are stored separately in the blocks table

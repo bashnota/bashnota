@@ -26,13 +26,8 @@ defineEmits<{
       Add Your First Reference
     </Button>
     
-    <div class="mt-6 text-xs text-muted-foreground text-center">
-      <p class="mb-1">You can add references by:</p>
-      <ul class="space-y-1">
-        <li>• Manual entry</li>
-        <li>• BibTeX import</li>
-        <li>• DOI lookup</li>
-      </ul>
-    </div>
+    <p class="mt-6 text-xs text-muted-foreground text-center">
+      Enter one manually, look up a DOI, or import BibTeX.
+    </p>
   </div>
-</template> 
+</template>

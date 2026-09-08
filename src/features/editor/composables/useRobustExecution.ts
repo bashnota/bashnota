@@ -4,6 +4,7 @@ import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
 import { useSharedSession } from './useSharedSession'
 import { logger } from '@/services/logger'
 import type { JupyterServer } from '@/features/jupyter/types/jupyter'
+import { showJupyterExecutionGuidance } from '@/features/jupyter/services/jupyterExecutionGuidance'
 
 /**
  * Configuration interface for code execution
@@ -154,6 +155,7 @@ export function useRobustExecution() {
       const availableServers = jupyterStore.jupyterServers
       
       if (!availableServers.length) {
+        showJupyterExecutionGuidance()
         return {
           success: false,
           error: 'No Jupyter servers configured. Please add a server in settings.'
@@ -210,7 +212,7 @@ export function useRobustExecution() {
       // Auto-configure if needed
       const configResult = await autoConfigureExecution({ cellId, code })
       if (!configResult.success) {
-        logger.error(`[RobustExecution] Configuration failed: ${configResult.error}`)
+        logger.info(`[RobustExecution] Configuration required: ${configResult.error}`)
         return false
       }
       

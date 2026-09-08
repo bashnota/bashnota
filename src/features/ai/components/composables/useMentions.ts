@@ -1,4 +1,4 @@
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, nextTick } from 'vue';
 import { logger } from '@/services/logger'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useBlockEditor } from '@/features/nota/composables/useBlockEditor'

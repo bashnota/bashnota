@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineEmits, defineProps } from 'vue'
+import { computed } from 'vue'
 import {
   Play,
   Loader2,
@@ -17,7 +17,6 @@ import {
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 // ButtonGroup functionality will be replaced with flex grouping
-import KernelConfigurationModal from './KernelConfigurationModal.vue'
 import type { JupyterServer, KernelSpec } from '@/features/jupyter/types/jupyter'
 
 interface Session {

@@ -1,20 +1,13 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { 
-  MessageSquare, 
-  ThumbsUp, 
-  ThumbsDown, 
-  MoreVertical, 
-  Trash2, 
-  X
-} from 'lucide-vue-next'
+import { MessageSquare, ThumbsUp, ThumbsDown, MoreVertical, Trash2 } from 'lucide-vue-next';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useAuthStore } from '@/features/auth/stores/auth'
-import { commentService } from '@/features/nota/services/commentService'
+import { communityCommentService as commentService } from '@/features/nota/services/communityCommentService'
 import { formatDate } from '@/lib/utils'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import { logger } from '@/services/logger'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import CommentForm from './CommentForm.vue'
@@ -40,28 +33,30 @@ const replies = ref<Comment[]>([])
 const isLoadingReplies = ref(false)
 const confirmDeleteDialog = ref(false)
 const isDeleting = ref(false)
+const replyCount = ref(props.comment.replyCount || 0)
 
 // Vote counts
 const likeCount = ref(props.comment.likeCount || 0)
 const dislikeCount = ref(props.comment.dislikeCount || 0)
-const userVote = ref<'like' | 'dislike' | null>(null)
+const userVote = ref<'like' | 'dislike' | null>(props.comment.userVote ?? null)
 
-// Get user's vote on this comment
-onMounted(async () => {
-  if (authStore.isAuthenticated && authStore.currentUser?.uid) {
-    try {
-      userVote.value = await commentService.getUserVote(props.comment.id, authStore.currentUser.uid)
-    } catch (error) {
-      logger.error('Error fetching user vote:', error)
-    }
-  }
-})
+watch(
+  () => [props.comment.likeCount, props.comment.dislikeCount, props.comment.replyCount, props.comment.userVote] as const,
+  ([nextLikes, nextDislikes, nextReplies, nextVote]) => {
+    likeCount.value = nextLikes || 0
+    dislikeCount.value = nextDislikes || 0
+    replyCount.value = nextReplies || 0
+    userVote.value = nextVote ?? null
+  },
+  { immediate: true },
+)
 
 // Computed property to check if the current user is the comment author
 const isAuthor = computed(() => {
-  return authStore.isAuthenticated && 
-         authStore.currentUser?.uid === props.comment.authorId
+  return authStore.isAuthenticated && (props.comment.isOwner === true ||
+         authStore.currentUser?.uid === props.comment.authorId)
 })
+const canDelete = computed(() => props.comment.canDelete === true || isAuthor.value)
 
 // Handle voting on comments
 const handleVote = async (voteType: 'like' | 'dislike') => {
@@ -100,7 +95,7 @@ const toggleReplies = async () => {
   showReplies.value = !showReplies.value
   
   // If showing replies and we haven't loaded them yet, load them
-  if (showReplies.value && replies.value.length === 0 && props.comment.replyCount > 0) {
+  if (showReplies.value && replies.value.length === 0 && replyCount.value > 0) {
     await loadReplies()
   }
 }
@@ -111,7 +106,7 @@ const loadReplies = async () => {
   
   try {
     isLoadingReplies.value = true
-    replies.value = await commentService.getComments(props.notaId, props.comment.id)
+    replies.value = (await commentService.getComments(props.notaId, props.comment.id)).items
   } catch (error) {
     logger.error('Error loading replies:', error)
     toast('Failed to load replies')
@@ -129,7 +124,7 @@ const showReply = () => {
   
   showReplyForm.value = true
   // Show replies if they aren't already showing
-  if (!showReplies.value && props.comment.replyCount > 0) {
+  if (!showReplies.value && replyCount.value > 0) {
     toggleReplies()
   }
 }
@@ -142,7 +137,7 @@ const handleReplyAdded = async () => {
   toast('Reply added successfully')
   
   // Update comment reply count and reload replies
-  props.comment.replyCount++
+  replyCount.value += 1
   
   // Make sure replies are visible
   showReplies.value = true
@@ -151,6 +146,12 @@ const handleReplyAdded = async () => {
   await loadReplies()
   
   // Emit event so parent can update
+  emit('comment-updated')
+}
+
+const handleReplyDeleted = (replyId: string) => {
+  replies.value = replies.value.filter(reply => reply.id !== replyId)
+  replyCount.value = Math.max(0, replyCount.value - 1)
   emit('comment-updated')
 }
 
@@ -215,7 +216,7 @@ const goToAuthorProfile = () => {
       </div>
       
       <!-- Comment actions -->
-      <DropdownMenu v-if="isAuthor || (authStore.isAuthenticated && authStore.currentUser?.uid)">
+      <DropdownMenu v-if="canDelete">
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon" class="h-8 w-8">
             <MoreVertical class="h-4 w-4" />
@@ -223,7 +224,8 @@ const goToAuthorProfile = () => {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem 
-            v-if="isAuthor" 
+            v-if="canDelete"
+            data-testid="delete-comment-action"
             @click="confirmDeleteDialog = true"
             class="text-destructive focus:text-destructive cursor-pointer"
           >
@@ -280,13 +282,13 @@ const goToAuthorProfile = () => {
       
       <!-- Show replies button (only if there are replies) -->
       <Button 
-        v-if="comment.replyCount > 0"
+        v-if="replyCount > 0"
         variant="ghost" 
         size="sm"
         class="h-8 px-2 flex items-center gap-1 ml-auto"
         @click="toggleReplies"
       >
-        <span>{{ showReplies ? 'Hide' : 'Show' }} {{ comment.replyCount }} {{ comment.replyCount === 1 ? 'reply' : 'replies' }}</span>
+        <span>{{ showReplies ? 'Hide' : 'Show' }} {{ replyCount }} {{ replyCount === 1 ? 'reply' : 'replies' }}</span>
       </Button>
     </div>
     
@@ -317,7 +319,7 @@ const goToAuthorProfile = () => {
           <CommentItem 
             :comment="reply" 
             :nota-id="notaId"
-            @comment-deleted="loadReplies"
+            @comment-deleted="handleReplyDeleted(reply.id)"
             @comment-updated="loadReplies"
           />
         </div>
@@ -355,10 +357,4 @@ const goToAuthorProfile = () => {
     </Dialog>
   </div>
 </template>
-
-
-
-
-
-
 

@@ -1,0 +1,8 @@
+{
+  "production_cutover": true,
+  "public_config_sha256": "69eeb102bb4ec959e60fbda234c3dcc0ecf01082fdf7914ffb5ad13022391ace",
+  "migration_evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "reconciliation_evidence_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "approved_at": "2026-08-19T00:00:00Z",
+  "approved_by": "local-docker-fixture"
+}

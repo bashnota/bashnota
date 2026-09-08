@@ -73,7 +73,7 @@ import { Button } from '@/components/ui/button'
 import { ServerIcon, CheckIcon, Loader2 } from 'lucide-vue-next'
 import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
 import { JupyterService } from '@/features/jupyter/services/jupyterService'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import { logger } from '@/services/logger'
 import type { JupyterServer } from '@/features/jupyter/types/jupyter'
 

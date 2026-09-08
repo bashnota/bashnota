@@ -19,8 +19,16 @@ import {
   Trash2,
   FileText,
   Calendar,
-  ExternalLink
+  ExternalLink,
+  Ellipsis,
 } from 'lucide-vue-next'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import type { Nota } from '@/features/nota/types/nota'
 import type { SortField } from '@/features/nota/composables/useNotaSorting'
 
@@ -40,7 +48,7 @@ interface Props {
 
 interface Emits {
   (e: 'sort', field: SortField): void
-  (e: 'select-all'): void
+  (e: 'select-all', checked: boolean): void
   (e: 'select-nota', id: string, checked: boolean): void
   (e: 'nota-click', nota: Nota): void
   (e: 'preview-nota', nota: Nota): void
@@ -58,12 +66,6 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<Emits>()
 
-// Compute action button size based on mode
-const actionButtonSize = computed(() => props.mode === 'search' ? 'sm' : 'icon')
-const actionButtonClass = computed(() => 
-  props.mode === 'search' ? '' : 'h-8 w-8'
-)
-
 // Compute header classes based on mode
 const headerClass = computed(() => 
   props.mode === 'search' 
@@ -78,9 +80,9 @@ const headerClass = computed(() =>
       <TableRow>
         <TableHead v-if="showSelection" class="w-12">
           <Checkbox
-            :checked="isAllSelected"
-            :indeterminate="isIndeterminate"
-            @update:checked="emit('select-all')"
+            :model-value="isIndeterminate ? 'indeterminate' : isAllSelected"
+            aria-label="Select all notas on this page"
+            @update:model-value="emit('select-all', $event === true)"
           />
         </TableHead>
         <TableHead class="cursor-pointer" @click="emit('sort', 'title')">
@@ -102,8 +104,8 @@ const headerClass = computed(() =>
             </span>
           </div>
         </TableHead>
-        <TableHead v-if="showActions" :class="mode === 'search' ? 'w-40' : 'w-32'">
-          Actions
+        <TableHead v-if="showActions" :class="mode === 'search' ? 'w-40' : 'w-14 text-right'">
+          <span :class="mode === 'list' ? 'sr-only' : ''">Actions</span>
         </TableHead>
       </TableRow>
     </TableHeader>
@@ -117,8 +119,9 @@ const headerClass = computed(() =>
       >
         <TableCell v-if="showSelection" @click.stop>
           <Checkbox
-            :checked="isNotaSelected(nota.id)"
-            @update:checked="(checked: boolean) => emit('select-nota', nota.id, checked)"
+            :model-value="isNotaSelected(nota.id)"
+            :aria-label="`Select ${nota.title}`"
+            @update:model-value="emit('select-nota', nota.id, $event === true)"
             :class="mode === 'list' ? 
               'transition-opacity duration-200 ' + (isNotaSelected(nota.id) ? 'opacity-100' : 'opacity-60 group-hover:opacity-100') 
               : ''"
@@ -165,12 +168,10 @@ const headerClass = computed(() =>
           </div>
         </TableCell>
         <TableCell v-if="showActions" @click.stop>
-          <div class="flex items-center gap-1">
-            <!-- All modes: Full actions available -->
+          <div v-if="mode === 'search'" class="flex items-center gap-1">
             <Button
               variant="ghost"
-              :size="actionButtonSize"
-              :class="mode === 'list' ? actionButtonClass : ''"
+              size="sm"
               @click="emit('preview-nota', nota)"
               title="Preview"
             >
@@ -178,8 +179,7 @@ const headerClass = computed(() =>
             </Button>
             <Button
               variant="ghost"
-              :size="actionButtonSize"
-              :class="mode === 'list' ? actionButtonClass : ''"
+              size="sm"
               @click="emit('toggle-favorite', nota.id)"
               title="Toggle Favorite"
             >
@@ -189,9 +189,8 @@ const headerClass = computed(() =>
               />
             </Button>
             <Button
-              v-if="mode === 'search'"
               variant="ghost"
-              :size="actionButtonSize"
+              size="sm"
               @click="emit('open-nota', nota.id)"
               title="Open in new tab"
             >
@@ -199,13 +198,46 @@ const headerClass = computed(() =>
             </Button>
             <Button
               variant="ghost"
-              :size="actionButtonSize"
-              :class="(mode === 'list' ? actionButtonClass : '') + ' text-destructive hover:text-destructive'"
+              size="sm"
+              class="text-destructive hover:text-destructive"
               @click="emit('delete-nota', nota.id)"
               title="Delete"
             >
               <Trash2 class="h-4 w-4" />
             </Button>
+          </div>
+
+          <div v-else class="flex justify-end">
+            <DropdownMenu>
+              <DropdownMenuTrigger as-child>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  class="h-8 w-8 text-muted-foreground hover:text-foreground"
+                  :aria-label="`Actions for ${nota.title}`"
+                >
+                  <Ellipsis class="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" class="w-48">
+                <DropdownMenuItem @select="emit('preview-nota', nota)">
+                  <Eye class="h-4 w-4" />
+                  Preview
+                </DropdownMenuItem>
+                <DropdownMenuItem @select="emit('toggle-favorite', nota.id)">
+                  <Star :class="['h-4 w-4', nota.favorite ? 'fill-current text-yellow-500' : '']" />
+                  {{ nota.favorite ? 'Remove favorite' : 'Add to favorites' }}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  class="text-destructive focus:text-destructive"
+                  @select="emit('delete-nota', nota.id)"
+                >
+                  <Trash2 class="h-4 w-4" />
+                  Delete nota
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </TableCell>
       </TableRow>

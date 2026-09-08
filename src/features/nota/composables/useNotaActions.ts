@@ -1,9 +1,7 @@
 import { useRouter } from 'vue-router'
 import { useNotaStore } from '@/features/nota/stores/nota'
-import { useBlockStore } from '@/features/nota/stores/blockStore'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import { ERROR_MESSAGES, SUCCESS_MESSAGES, FILE_EXTENSIONS } from '@/constants/app'
-import { logger } from '@/services/logger'
 
 export function useNotaActions() {
   const router = useRouter()
@@ -13,7 +11,6 @@ export function useNotaActions() {
     try {
       const nota = await store.createItem(title)
       router.push(`/nota/${nota.id}`)
-      toast(SUCCESS_MESSAGES.notas.created)
       return nota.id
     } catch (error) {
       console.error('Failed to create nota:', error)
@@ -25,7 +22,6 @@ export function useNotaActions() {
   const deleteNota = async (id: string): Promise<boolean> => {
     try {
       await store.deleteItem(id)
-      toast(SUCCESS_MESSAGES.notas.deleted)
       return true
     } catch (error) {
       console.error('Failed to delete nota:', error)
@@ -37,7 +33,6 @@ export function useNotaActions() {
   const toggleNotaFavorite = async (id: string): Promise<boolean> => {
     try {
       await store.toggleFavorite(id)
-      toast(SUCCESS_MESSAGES.notas.favoriteToggled)
       return true
     } catch (error) {
       console.error('Failed to toggle favorite:', error)
@@ -48,21 +43,7 @@ export function useNotaActions() {
 
   const duplicateNota = async (id: string): Promise<string | null> => {
     try {
-      const originalNota = store.getItem(id)
-      if (!originalNota) {
-        throw new Error('Original nota not found')
-      }
-
-      const duplicatedNota = await store.createItem(`${originalNota.title} (Copy)`)
-      
-      // Update the duplicated nota with original tags
-      await store.saveNota({
-        ...duplicatedNota,
-        tags: [...(originalNota.tags || [])]
-      })
-
-      // TODO: Implement proper block copying from original nota
-      logger.info('Content copying not yet implemented for block system')
+      const duplicatedNota = await store.cloneLocalNota(id)
 
       toast('Nota duplicated successfully')
       return duplicatedNota.id
@@ -174,8 +155,6 @@ export function useNotaActions() {
     FILE_EXTENSIONS
   }
 } 
-
-
 
 
 

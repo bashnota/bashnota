@@ -3,17 +3,19 @@ import type { Nota } from '@/features/nota/types/nota'
 
 /**
  * Tests for MigrationService
- * 
+ *
  * Handles migration from IndexedDB (Dexie) to FileSystem storage
  */
 describe('MigrationService', () => {
   let MigrationService: any
   let mockSourceBackend: any
   let mockTargetBackend: any
+  let sourceStore: Map<string, Nota>
+  let targetStore: Map<string, Nota>
 
   beforeEach(async () => {
     // Mock source backend (IndexedDB)
-    const sourceStore = new Map<string, Nota>()
+    sourceStore = new Map<string, Nota>()
     mockSourceBackend = {
       type: 'indexeddb',
       readNota: vi.fn(async (id: string) => sourceStore.get(id) || null),
@@ -21,19 +23,23 @@ describe('MigrationService', () => {
       deleteNota: vi.fn(),
       listNotas: vi.fn(async () => Array.from(sourceStore.values())),
       initialize: vi.fn(async () => {}),
-      isAvailable: vi.fn(async () => true)
+      isAvailable: vi.fn(async () => true),
     }
 
     // Mock target backend (FileSystem)
-    const targetStore = new Map<string, Nota>()
+    targetStore = new Map<string, Nota>()
     mockTargetBackend = {
       type: 'filesystem',
       readNota: vi.fn(async (id: string) => targetStore.get(id) || null),
-      writeNota: vi.fn(async (nota: Nota) => { targetStore.set(nota.id, nota) }),
-      deleteNota: vi.fn(async (id: string) => { targetStore.delete(id) }),
+      writeNota: vi.fn(async (nota: Nota) => {
+        targetStore.set(nota.id, nota)
+      }),
+      deleteNota: vi.fn(async (id: string) => {
+        targetStore.delete(id)
+      }),
       listNotas: vi.fn(async () => Array.from(targetStore.values())),
       initialize: vi.fn(async () => {}),
-      isAvailable: vi.fn(async () => true)
+      isAvailable: vi.fn(async () => true),
     }
 
     // Add test data to source
@@ -45,7 +51,7 @@ describe('MigrationService', () => {
         favorite: i === 0,
         createdAt: new Date(),
         updatedAt: new Date(),
-        parentId: null
+        parentId: null,
       }
       sourceStore.set(nota.id, nota)
     }
@@ -57,16 +63,16 @@ describe('MigrationService', () => {
   describe('migration process', () => {
     it('should check if migration is needed', async () => {
       const service = new MigrationService(mockSourceBackend, mockTargetBackend)
-      
+
       const needed = await service.needsMigration()
       expect(typeof needed).toBe('boolean')
     })
 
     it('should migrate all notas from source to target', async () => {
       const service = new MigrationService(mockSourceBackend, mockTargetBackend)
-      
+
       await service.migrate()
-      
+
       // Verify all notas were migrated
       const sourceNotas = await mockSourceBackend.listNotas()
       expect(mockTargetBackend.writeNota).toHaveBeenCalledTimes(sourceNotas.length)
@@ -74,31 +80,31 @@ describe('MigrationService', () => {
 
     it('should track migration progress', async () => {
       const service = new MigrationService(mockSourceBackend, mockTargetBackend)
-      
+
       const progressUpdates: any[] = []
       const onProgress = (progress: any) => progressUpdates.push(progress)
-      
+
       await service.migrate({ onProgress })
-      
+
       expect(progressUpdates.length).toBeGreaterThan(0)
       expect(progressUpdates[progressUpdates.length - 1].current).toBeGreaterThan(0)
     })
 
     it('should handle empty source database', async () => {
       mockSourceBackend.listNotas = vi.fn(async () => [])
-      
+
       const service = new MigrationService(mockSourceBackend, mockTargetBackend)
       await service.migrate()
-      
+
       expect(mockTargetBackend.writeNota).not.toHaveBeenCalled()
     })
 
     it('should verify migration after completion', async () => {
       const service = new MigrationService(mockSourceBackend, mockTargetBackend)
-      
+
       await service.migrate()
       const report = await service.verify()
-      
+
       expect(report.success).toBe(true)
       expect(report.errors).toHaveLength(0)
     })
@@ -107,44 +113,120 @@ describe('MigrationService', () => {
       mockTargetBackend.writeNota = vi.fn(async () => {
         throw new Error('Write failed')
       })
-      
+
       const service = new MigrationService(mockSourceBackend, mockTargetBackend)
-      
+
       // Migration should complete but with errors
       await service.migrate()
-      
+
       const report = await service.verify()
       expect(report.errorCount).toBeGreaterThan(0)
       expect(report.success).toBe(false)
     })
 
+    it('rejects invalid batch sizes instead of entering a non-terminating loop', async () => {
+      const service = new MigrationService(mockSourceBackend, mockTargetBackend)
+
+      await expect(service.migrate({ batchSize: 0 })).rejects.toThrow(
+        'batchSize must be a positive integer',
+      )
+    })
+
+    it('stops deterministically when an in-flight migration is interrupted', async () => {
+      const service = new MigrationService(mockSourceBackend, mockTargetBackend)
+      const controller = new AbortController()
+      const phases: string[] = []
+
+      await expect(
+        service.migrate({
+          batchSize: 1,
+          signal: controller.signal,
+          onProgress(progress: any) {
+            phases.push(progress.phase)
+            if (progress.phase === 'migrating') controller.abort()
+          },
+        }),
+      ).rejects.toMatchObject({ name: 'AbortError' })
+
+      expect(mockTargetBackend.writeNota).toHaveBeenCalledTimes(1)
+      expect(phases).toEqual(['preparing', 'migrating', 'error'])
+    })
+
+    it('records corrupted source data without writing it to the target', async () => {
+      sourceStore.set('corrupt', {
+        id: 'corrupt',
+        title: 'Corrupt timestamps',
+        tags: ['fixture'],
+        favorite: false,
+        createdAt: 'not-a-date',
+        updatedAt: new Date('2024-01-01T00:00:00Z'),
+        parentId: null,
+      })
+      const service = new MigrationService(mockSourceBackend, mockTargetBackend)
+
+      await service.migrate()
+      const report = await service.verify()
+
+      expect(targetStore.has('corrupt')).toBe(false)
+      expect(report.success).toBe(false)
+      expect(report.errors).toContainEqual(
+        expect.objectContaining({
+          notaId: 'corrupt',
+          phase: 'validation',
+        }),
+      )
+    })
+
+    it('detects same-sized targets containing the wrong nota ids', async () => {
+      targetStore.set('unrelated-0', { ...sourceStore.get('migrate-test-0')!, id: 'unrelated-0' })
+      targetStore.set('unrelated-1', { ...sourceStore.get('migrate-test-1')!, id: 'unrelated-1' })
+      targetStore.set('unrelated-2', { ...sourceStore.get('migrate-test-2')!, id: 'unrelated-2' })
+      const service = new MigrationService(mockSourceBackend, mockTargetBackend)
+
+      const report = await service.verify()
+
+      expect(report.sourceCount).toBe(report.targetCount)
+      expect(report.migratedCount).toBe(0)
+      expect(report.success).toBe(false)
+    })
+
     it('should preserve data integrity during migration', async () => {
       const service = new MigrationService(mockSourceBackend, mockTargetBackend)
-      
+
       await service.migrate()
-      
+
       const sourceNotas = await mockSourceBackend.listNotas()
       const targetNotas = await mockTargetBackend.listNotas()
-      
+
       expect(targetNotas).toHaveLength(sourceNotas.length)
-      
+
       // Verify each nota was migrated correctly
       for (const sourceNota of sourceNotas) {
-        const targetNota = targetNotas.find(n => n.id === sourceNota.id)
+        const targetNota = targetNotas.find((n) => n.id === sourceNota.id)
         expect(targetNota).toBeDefined()
         expect(targetNota?.title).toBe(sourceNota.title)
         expect(targetNota?.tags).toEqual(sourceNota.tags)
         expect(targetNota?.favorite).toBe(sourceNota.favorite)
       }
     })
+
+    it('does not expose a stale backup when source preservation is disabled on a later run', async () => {
+      const service = new MigrationService(mockSourceBackend, mockTargetBackend)
+
+      await service.migrate()
+      expect(service.getBackup()).toHaveLength(3)
+
+      await service.migrate({ preserveSource: false })
+      expect(service.getBackup()).toEqual([])
+    })
   })
 
   describe('batch migration', () => {
     it('should support batch size configuration', async () => {
       const service = new MigrationService(mockSourceBackend, mockTargetBackend)
-      
+
       await service.migrate({ batchSize: 2 })
-      
+
       expect(mockTargetBackend.writeNota).toHaveBeenCalled()
     })
 
@@ -159,20 +241,20 @@ describe('MigrationService', () => {
           favorite: false,
           createdAt: new Date(),
           updatedAt: new Date(),
-          parentId: null
+          parentId: null,
         }
         sourceStore.set(nota.id, nota)
       }
       mockSourceBackend.listNotas = vi.fn(async () => Array.from(sourceStore.values()))
-      
+
       const service = new MigrationService(mockSourceBackend, mockTargetBackend)
       const progressUpdates: any[] = []
-      
+
       await service.migrate({
         batchSize: 3,
-        onProgress: (p: any) => progressUpdates.push(p)
+        onProgress: (p: any) => progressUpdates.push(p),
       })
-      
+
       expect(progressUpdates.length).toBeGreaterThan(1)
       expect(mockTargetBackend.writeNota).toHaveBeenCalledTimes(10)
     })
@@ -181,26 +263,61 @@ describe('MigrationService', () => {
   describe('rollback', () => {
     it('should support rollback functionality', async () => {
       const service = new MigrationService(mockSourceBackend, mockTargetBackend)
-      
+
       await service.migrate()
-      
+
       // Rollback should clear target and restore source state
       await service.rollback()
-      
+
       const targetNotas = await mockTargetBackend.listNotas()
       expect(mockTargetBackend.deleteNota).toHaveBeenCalled()
+      expect(targetNotas).toHaveLength(0)
+    })
+
+    it('removes partial writes but preserves unrelated target data', async () => {
+      const unrelated: Nota = {
+        id: 'existing-target',
+        title: 'Do not delete me',
+        tags: [],
+        favorite: false,
+        createdAt: new Date('2024-01-01T00:00:00Z'),
+        updatedAt: new Date('2024-01-01T00:00:00Z'),
+        parentId: null,
+      }
+      targetStore.set(unrelated.id, unrelated)
+      mockTargetBackend.writeNota = vi.fn(async (nota: Nota) => {
+        targetStore.set(nota.id, nota)
+        if (nota.id === 'migrate-test-1') throw new Error('Interrupted after partial write')
+      })
+      const service = new MigrationService(mockSourceBackend, mockTargetBackend)
+
+      await service.migrate()
+      await service.rollback()
+
+      expect(await mockTargetBackend.listNotas()).toEqual([unrelated])
+    })
+
+    it('restores a target nota overwritten by a migration', async () => {
+      const original = { ...sourceStore.get('migrate-test-0')!, title: 'Original target title' }
+      targetStore.set(original.id, original)
+      const service = new MigrationService(mockSourceBackend, mockTargetBackend)
+
+      await service.migrate()
+      await service.rollback()
+
+      expect(await mockTargetBackend.readNota(original.id)).toEqual(original)
     })
   })
 
   describe('progress reporting', () => {
     it('should report migration phases', async () => {
       const service = new MigrationService(mockSourceBackend, mockTargetBackend)
-      
+
       const phases: string[] = []
       await service.migrate({
-        onProgress: (p: any) => phases.push(p.phase)
+        onProgress: (p: any) => phases.push(p.phase),
       })
-      
+
       expect(phases).toContain('preparing')
       expect(phases).toContain('migrating')
       expect(phases).toContain('complete')
@@ -208,14 +325,14 @@ describe('MigrationService', () => {
 
     it('should report current item being migrated', async () => {
       const service = new MigrationService(mockSourceBackend, mockTargetBackend)
-      
+
       const items: string[] = []
       await service.migrate({
         onProgress: (p: any) => {
           if (p.currentItem) items.push(p.currentItem)
-        }
+        },
       })
-      
+
       expect(items.length).toBeGreaterThan(0)
     })
   })

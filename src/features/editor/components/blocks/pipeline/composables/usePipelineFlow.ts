@@ -1,12 +1,5 @@
 import { ref, computed, reactive, nextTick, watch, onUnmounted } from 'vue'
-import { 
-  useVueFlow,
-  type Connection,
-  type Edge,
-  type Node,
-  type GraphNode,
-  type ViewportFunctions
-} from '@vue-flow/core'
+import { useVueFlow, type Connection, type Edge, type Node, type ViewportFunctions, type VueFlowStore } from '@vue-flow/core';
 import { MarkerType } from '@vue-flow/core'
 import { nanoid } from 'nanoid'
 
@@ -52,14 +45,14 @@ export function usePipelineFlow(initialState: PipelineFlowState) {
   const flowInstance = ref<ViewportFunctions | null>(null)
   
   // Reactive state
-  const state = reactive<PipelineFlowState>({
+  const state = reactive({
     nodes: initialState.nodes || [],
     edges: initialState.edges || [],
     isEditMode: initialState.isEditMode ?? true,
     isExecuting: false,
     selectedNodeId: null,
     viewport: initialState.viewport
-  })
+  }) as unknown as PipelineFlowState
 
   // Connection and interaction state
   const isConnecting = ref(false)
@@ -86,12 +79,14 @@ export function usePipelineFlow(initialState: PipelineFlowState) {
     state.nodes.length > 0 && state.nodes.some(node => node.data?.code)
   )
 
-  const selectedNode = computed(() => 
-    state.selectedNodeId ? state.nodes.find(n => n.id === state.selectedNodeId) : null
-  )
+  const selectedNode = computed<Node | null>(() => {
+    const selectedNodeId = state.selectedNodeId
+    if (!selectedNodeId) return null
+    return state.nodes.find(node => node.id === selectedNodeId) ?? null
+  })
 
   // VueFlow composable (only available inside VueFlow component)
-  let vueFlowComposable: ReturnType<typeof useVueFlow> | null = null
+  let vueFlowComposable: VueFlowStore | null = null
 
   // Initialize VueFlow composable
   const initializeVueFlow = () => {
@@ -886,4 +881,4 @@ export function usePipelineFlow(initialState: PipelineFlowState) {
     getNodeDescendants,
     getNodeAncestors
   }
-} 
+}

@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { NodeViewWrapper } from '@tiptap/vue-3'
+import { NodeViewWrapper } from '@/features/editor/pm'
 import { useCitationStore } from '@/features/editor/stores/citationStore'
-import { computed, ref, nextTick, onMounted } from 'vue'
+import { computed, ref, nextTick, onMounted, type PropType } from 'vue'
+import type { Editor } from '@/features/editor/pm'
 import { useRouter } from 'vue-router'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Search, SortAsc, SortDesc, Filter, Copy, FileText, ChevronDown, ChevronUp } from 'lucide-vue-next'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import { logger } from '@/services/logger'
 import type { CitationEntry } from '@/features/nota/types/nota'
 import { getOrderedCitationKeys } from '@/features/editor/services/citationService'
@@ -21,7 +22,7 @@ const props = defineProps({
     required: true,
   },
   editor: {
-    type: Object,
+    type: Object as PropType<Editor>,
     required: true,
   },
   citations: {
@@ -228,7 +229,7 @@ const refreshBibliography = () => {
         }
         
         // Update ordered keys
-        orderedCitationKeys.value = getOrderedCitationKeys(editor)
+        orderedCitationKeys.value = getOrderedCitationKeys(props.editor)
         
         return true
       })
@@ -638,7 +639,6 @@ const toggleReferences = () => {
   @apply transition-all duration-300;
 }
 </style>
-
 
 
 

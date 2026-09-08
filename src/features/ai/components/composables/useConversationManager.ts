@@ -6,7 +6,7 @@
  * while maintaining separation of concerns.
  */
 
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue';
 import { nanoid } from 'nanoid'
 import { aiConversationService } from '@/features/ai/services/aiConversationService'
 import type { ConversationMessage } from './useConversation'

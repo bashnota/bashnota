@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue';
 import type { TableData } from '@/features/editor/components/blocks/table-block/TableExtension'
 
 const props = defineProps<{

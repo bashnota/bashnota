@@ -1,11 +1,37 @@
 import type { NotaConfig } from '@/features/jupyter/types/jupyter'
-import type { Block, NotaBlockStructure } from './blocks'
+import type { NotaBlockStructure } from './blocks';
+import type { CloudPublishedContent } from '@/services/cloud/types'
+
+export interface CanonicalBlockSnapshot {
+  id: string | number
+  type: string
+  order: number
+  notaId: string
+  createdAt: string
+  updatedAt: string
+  version: number
+  [key: string]: unknown
+}
+
+/**
+ * A historical copy of the canonical normalized block records. This deliberately
+ * uses the same records and composite ordering as the live block tables instead
+ * of introducing another editor-JSON content representation.
+ */
+export interface CanonicalNotaContentSnapshot {
+  format: 'normalized-blocks-v1'
+  blockOrder: string[]
+  blocks: CanonicalBlockSnapshot[]
+  structureId?: string | number
+  structureVersion: number
+  capturedAt: string
+}
 
 export interface Nota {
   id: string
   title: string
   // Block-based content structure - store just the ID for efficient lookup
-  blockStructureId?: string
+  blockStructureId?: string | number
   // Block structure for the nota
   blockStructure?: NotaBlockStructure
   parentId: string | null
@@ -23,10 +49,17 @@ export interface Nota {
 export interface NotaVersion {
   id: string
   notaId: string
-  nota: Nota // Store the full nota object instead of just content
+  // Historical metadata only. History and block structure are stored once, in
+  // the containing nota and canonicalContent respectively.
+  nota: Omit<Nota, 'versions' | 'blockStructure'>
+  canonicalContent?: CanonicalNotaContentSnapshot
   versionName: string
   createdAt: Date | string
 }
+
+export type RestoreVersionResult =
+  | { kind: 'canonical'; message: string }
+  | { kind: 'legacy-metadata-only'; message: string }
 export interface FavoriteBlock {
   id: string
   name: string
@@ -39,11 +72,12 @@ export interface FavoriteBlock {
 export interface PublishedNota {
   id: string
   title: string
-  content: any | null // Tiptap JSON content structure
+  content: CloudPublishedContent | null
   updatedAt: string
   publishedAt: string
-  authorId: string
+  authorId?: string
   authorName: string
+  authorTag?: string | null
   isPublic: boolean
   isSubPage?: boolean
   parentId?: string | null
@@ -109,6 +143,9 @@ export interface Comment {
   replyCount: number
   // Map of user votes (userId: 'like' | 'dislike')
   votes?: Record<string, 'like' | 'dislike'>
+  isOwner?: boolean
+  canDelete?: boolean
+  userVote?: 'like' | 'dislike' | null
 }
 
 export interface CommentVote {
@@ -117,12 +154,4 @@ export interface CommentVote {
   voteType: 'like' | 'dislike'
   createdAt: string
 }
-
-
-
-
-
-
-
-
 

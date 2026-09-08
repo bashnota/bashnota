@@ -1,11 +1,11 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNotaStore } from '@/features/nota/stores/nota'
-import { useBlockStore } from '@/features/nota/stores/blockStore'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import { logger } from '@/services/logger'
 import { FILE_EXTENSIONS } from '@/constants/app'
-import { db } from '@/db'
+import { nanoid } from 'nanoid'
+import type { Nota } from '@/features/nota/types/nota'
 
 export interface ImportOptions {
   onSuccess?: (notaId: string) => void
@@ -16,7 +16,6 @@ export interface ImportOptions {
 export function useNotaImport(options: ImportOptions = {}) {
   const router = useRouter()
   const notaStore = useNotaStore()
-  const blockStore = useBlockStore()
   
   // State
   const isImporting = ref(false)
@@ -60,7 +59,7 @@ export function useNotaImport(options: ImportOptions = {}) {
             logger.error('Import failed:', error)
             const errorMessage = error instanceof Error ? error : new Error('Import failed')
             toast('Failed to import notas', {
-              description: 'Import Error'
+              description: errorMessage.message,
             })
             defaultOptions.onError?.(errorMessage)
             resolve(false)
@@ -101,13 +100,9 @@ export function useNotaImport(options: ImportOptions = {}) {
             const fileContent = await readFileAsText(file)
             const notebook = JSON.parse(fileContent)
             
-            // Create a new nota with the extracted title
             const title = extractNotebookTitle(notebook, file.name)
-            const newNota = await notaStore.createItem(title)
-            
-            // Initialize block structure
-            await blockStore.initializeNotaBlocks(newNota.id, title)
-            
+            const notaId = nanoid()
+
             // Convert notebook cells to Nota blocks
             const cells = convertNotebookToNota(notebook)
             const blocks: any[] = []
@@ -115,7 +110,7 @@ export function useNotaImport(options: ImportOptions = {}) {
             for (let i = 0; i < cells.length; i++) {
               const cell = cells[i]
               try {
-                const block = convertNotebookCell(cell, i, newNota.id)
+                const block = convertNotebookCell(cell, i, notaId)
                 if (block) {
                   blocks.push(block)
                 }
@@ -125,28 +120,27 @@ export function useNotaImport(options: ImportOptions = {}) {
                 blocks.push(createTextBlock(
                   `[Failed to convert cell: ${cell.cell_type || 'unknown'}]`,
                   i,
-                  newNota.id
+                  notaId
                 ))
               }
             }
-            
-            // Save all blocks to the database
-            for (const block of blocks) {
-              try {
-                await db.saveBlock(block)
-              } catch (error) {
-                logger.error('Failed to save block:', error, block)
-              }
+
+            const now = new Date()
+            const newNota: Nota = {
+              id: notaId,
+              title,
+              parentId: null,
+              tags: [],
+              createdAt: now,
+              updatedAt: now,
+              blockStructure: {
+                notaId,
+                blockOrder: [],
+                version: 1,
+                lastModified: now,
+              },
             }
-            
-            // Update block structure with the new blocks
-            const structure = await blockStore.getBlockStructure(newNota.id)
-            if (structure) {
-              structure.blockOrder = blocks.map(b => b.id).filter(Boolean)
-              structure.version++
-              structure.lastModified = new Date()
-              await blockStore.saveBlockStructure(structure)
-            }
+            await notaStore.commitPreparedImport([{ nota: newNota, blocks }])
 
             toast(`Notebook "${title}" imported successfully`)
 
@@ -161,7 +155,7 @@ export function useNotaImport(options: ImportOptions = {}) {
             logger.error('Failed to import notebook:', error)
             const errorMessage = error instanceof Error ? error : new Error('Failed to import notebook')
             toast('Failed to import the notebook file', {
-              description: 'Import Failed'
+              description: errorMessage.message,
             })
             defaultOptions.onError?.(errorMessage)
             resolve(false)
@@ -581,4 +575,4 @@ export function useNotaImport(options: ImportOptions = {}) {
     createHeadingBlock,
     createExecutableCodeBlock
   }
-} 
+}

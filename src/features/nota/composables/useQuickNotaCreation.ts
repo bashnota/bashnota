@@ -1,7 +1,6 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNotaStore } from '@/features/nota/stores/nota'
-import { useBlockStore } from '@/features/nota/stores/blockStore'
 import { logger } from '@/services/logger'
 
 export function useQuickNotaCreation() {

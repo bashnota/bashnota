@@ -1,0 +1,17 @@
+.git
+.github
+.dacli
+.codex
+.agents
+.env
+.env.*
+!.env.example
+node_modules
+dist
+coverage
+test-results
+playwright-report
+*.log
+*.tgz
+supabase/.temp
+supabase/.branches

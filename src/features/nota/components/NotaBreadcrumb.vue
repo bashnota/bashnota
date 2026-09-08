@@ -26,25 +26,31 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRouter } from 'vue-router'
 import { useNotaStore } from '@/features/nota/stores/nota'
+import { useNotaNavigation } from '@/features/nota/composables/useNotaNavigation'
+import { toast } from '@/services/toast'
 import { ChevronRight } from 'lucide-vue-next'
-import type { Nota } from '@/features/nota/types/nota'
 
 interface Props {
   notaId: string
 }
 
 const props = defineProps<Props>()
-const router = useRouter()
 const notaStore = useNotaStore()
+const { openNota } = useNotaNavigation()
 
 // Get the hierarchy for the current nota
 const hierarchy = computed(() => notaStore.getNotaHierarchy(props.notaId))
 
 // Navigate to a specific nota
-const navigateToNota = (notaId: string) => {
-  router.push(`/nota/${notaId}`)
+const navigateToNota = async (notaId: string) => {
+  try {
+    await openNota(notaId)
+  } catch (error) {
+    toast.error('Unable to open nota', {
+      description: error instanceof Error ? error.message : 'Please try again.',
+    })
+  }
 }
 </script>
 

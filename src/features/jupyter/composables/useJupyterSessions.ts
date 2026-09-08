@@ -1,7 +1,7 @@
 import { ref, computed } from 'vue'
 import { JupyterService } from '@/features/jupyter/services/jupyterService'
 import type { JupyterServer } from '@/features/jupyter/types/jupyter'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import { logger } from '@/services/logger'
 
 export interface JupyterSession {

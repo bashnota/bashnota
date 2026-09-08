@@ -12,6 +12,17 @@ describe('FileSystemBackend', () => {
   let FileSystemBackend: any
   let mockDirectoryHandle: any
   let mockFileHandles: Map<string, any>
+  const canonicalContent = {
+    capture: vi.fn(async (nota: Nota) => ({
+      format: 'normalized-blocks-v1' as const,
+      blockOrder: [],
+      blocks: [],
+      structureVersion: 1,
+      capturedAt: new Date(nota.updatedAt).toISOString(),
+    })),
+    validate: vi.fn(async () => undefined),
+    hydrate: vi.fn(async () => undefined),
+  }
 
   beforeEach(async () => {
     // Mock File System Access API
@@ -165,7 +176,7 @@ describe('FileSystemBackend', () => {
 
   describe('availability check', () => {
     it('should detect File System Access API availability', async () => {
-      const backend = new FileSystemBackend()
+      const backend = new FileSystemBackend(canonicalContent)
       
       // In test environment, should return false (no real API)
       // In production with mocked API, would return true
@@ -184,7 +195,7 @@ describe('FileSystemBackend', () => {
 
   describe('initialization', () => {
     it('should initialize with persisted directory handle', async () => {
-      const backend = new FileSystemBackend()
+      const backend = new FileSystemBackend(canonicalContent)
       
       // First set the directory handle
       await backend.setDirectoryHandle(mockDirectoryHandle)
@@ -240,7 +251,7 @@ describe('FileSystemBackend', () => {
       const originalOpen = global.indexedDB.open
       global.indexedDB.open = mockOpen as any
       
-      const backend = new FileSystemBackend()
+      const backend = new FileSystemBackend(canonicalContent)
       await expect(backend.initialize()).rejects.toThrow()
       
       // Restore the original
@@ -248,7 +259,7 @@ describe('FileSystemBackend', () => {
     }, 10000)
     
     it('should allow setting directory handle from user gesture', async () => {
-      const backend = new FileSystemBackend()
+      const backend = new FileSystemBackend(canonicalContent)
       
       await backend.setDirectoryHandle(mockDirectoryHandle)
       
@@ -260,7 +271,7 @@ describe('FileSystemBackend', () => {
     let backend: any
 
     beforeEach(async () => {
-      backend = new FileSystemBackend()
+      backend = new FileSystemBackend(canonicalContent)
       
       // Override the initialization to use our mock
       backend.directoryHandle = mockDirectoryHandle
@@ -288,9 +299,15 @@ describe('FileSystemBackend', () => {
       const parsed = JSON.parse(content)
       
       // Check wrapper format
-      expect(parsed.version).toBe('1.0')
+      expect(parsed.format).toBe('bashnota-filesystem-nota')
+      expect(parsed.version).toBe(2)
       expect(parsed.exportedAt).toBeDefined()
       expect(parsed.nota).toBeDefined()
+      expect(parsed.canonicalContent).toEqual(expect.objectContaining({
+        format: 'normalized-blocks-v1',
+        blockOrder: [],
+        blocks: [],
+      }))
       
       // Check nota content
       expect(parsed.nota.id).toBe('test-nota-1')
@@ -381,8 +398,7 @@ describe('FileSystemBackend', () => {
       await writable.write('{ invalid json }')
       await writable.close()
 
-      const nota = await backend.readNota('corrupted')
-      expect(nota).toBeNull()
+      await expect(backend.readNota('corrupted')).rejects.toThrow()
     })
 
     it('should serialize dates correctly', async () => {
@@ -406,7 +422,7 @@ describe('FileSystemBackend', () => {
 
   describe('error handling', () => {
     it('should handle write permission errors', async () => {
-      const backend = new FileSystemBackend()
+      const backend = new FileSystemBackend(canonicalContent)
       backend.directoryHandle = mockDirectoryHandle
       backend.initialized = true
 
@@ -429,9 +445,53 @@ describe('FileSystemBackend', () => {
     })
   })
 
+  describe('complete authority deletion', () => {
+    it('deletes only validated BashNota files and remains empty after reinitialization', async () => {
+      const backend = new FileSystemBackend(canonicalContent)
+      backend.directoryHandle = mockDirectoryHandle
+      backend.initialized = true
+      await backend.writeNota({
+        id: 'delete-me', title: 'Delete me', tags: [], favorite: false,
+        createdAt: new Date(), updatedAt: new Date(), parentId: null,
+      })
+      const unrelated = await mockDirectoryHandle.getFileHandle('personal.json', { create: true })
+      const writable = await unrelated.createWritable()
+      await writable.write(JSON.stringify({ personal: true }))
+      await writable.close()
+
+      expect(await backend.listManagedFileNames()).toEqual(['delete-me.nota'])
+      await backend.clearAll()
+
+      const reloaded = new FileSystemBackend(canonicalContent)
+      reloaded.directoryHandle = mockDirectoryHandle
+      reloaded.initialized = true
+      expect(await reloaded.listManagedFileNames()).toEqual([])
+      expect(mockFileHandles.has('personal.json')).toBe(true)
+    })
+
+    it('restores already removed files when one filesystem removal fails', async () => {
+      const backend = new FileSystemBackend(canonicalContent)
+      backend.directoryHandle = mockDirectoryHandle
+      backend.initialized = true
+      for (const id of ['first', 'second']) {
+        await backend.writeNota({
+          id, title: id, tags: [], favorite: false,
+          createdAt: new Date(), updatedAt: new Date(), parentId: null,
+        })
+      }
+      mockDirectoryHandle.removeEntry.mockImplementation(async (name: string) => {
+        if (name === 'second.nota') throw new Error('disk denied deletion')
+        mockFileHandles.delete(name)
+      })
+
+      await expect(backend.deleteManagedFiles(['first.nota', 'second.nota'])).rejects.toThrow('disk denied deletion')
+      expect(await backend.listManagedFileNames()).toEqual(['first.nota', 'second.nota'])
+    })
+  })
+
   describe('performance', () => {
     it('should handle multiple concurrent operations', async () => {
-      const backend = new FileSystemBackend()
+      const backend = new FileSystemBackend(canonicalContent)
       backend.directoryHandle = mockDirectoryHandle
       backend.initialized = true
 

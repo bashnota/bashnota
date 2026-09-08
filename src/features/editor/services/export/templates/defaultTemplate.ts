@@ -1,12 +1,30 @@
 import { EXPORT_STYLES } from '../styles/defaultStyles'
+import {
+    isFinalizedExportHtml,
+    sanitizeExportHtml,
+    sanitizeExportSourceHtml,
+    type TransformedExportHtml,
+} from '../sanitizeExportHtml'
 
-export function buildHtmlPage(title: string, bodyContent: string): string {
+function escapeHtmlText(value: string): string {
+    const element = document.createElement('div')
+    element.textContent = value
+    return element.innerHTML
+}
+
+export function buildHtmlPage(title: string, bodyContent: string | TransformedExportHtml): string {
+    const safeTitle = escapeHtmlText(title)
+    // A plain string is untrusted at this public template boundary. ExportService
+    // supplies a sealed, post-transform value after it has rendered real KaTeX.
+    const safeBody = isFinalizedExportHtml(bodyContent)
+        ? bodyContent.html
+        : sanitizeExportHtml(sanitizeExportSourceHtml(bodyContent))
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${title}</title>
+    <title>${safeTitle}</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
     <style>
 ${EXPORT_STYLES}
@@ -75,8 +93,8 @@ ${EXPORT_STYLES}
 </head>
 <body>
     <article>
-        <h1>${title}</h1>
-        ${bodyContent}
+        <h1>${safeTitle}</h1>
+        ${safeBody}
     </article>
 
     <!-- Shared Tooltip Element -->
@@ -115,16 +133,29 @@ ${EXPORT_STYLES}
                         const data = JSON.parse(dataStr);
                         const authors = data.authors ? data.authors.map(a => typeof a === 'string' ? a : \`\${a.given} \${a.family}\`).join(', ') : 'Unknown Author';
                         
-                        let metaHtml = '<div class="tooltip-meta">';
-                        if (data.year) metaHtml += \`<div class="tooltip-label">Year</div><div>\${data.year}</div>\`;
-                        if (data.journal) metaHtml += \`<div class="tooltip-label">Journal</div><div>\${data.journal}</div>\`;
-                        metaHtml += '</div>';
+                        const addText = (className, text) => {
+                            const element = document.createElement('div');
+                            element.className = className;
+                            element.textContent = String(text);
+                            tooltip.appendChild(element);
+                        };
+                        tooltip.replaceChildren();
+                        addText('tooltip-title', data.title || 'Untitled');
+                        addText('tooltip-authors', authors);
 
-                        tooltip.innerHTML = \`
-                            <div class="tooltip-title">\${data.title || 'Untitled'}</div>
-                            <div class="tooltip-authors">\${authors}</div>
-                            \${metaHtml}
-                        \`;
+                        const meta = document.createElement('div');
+                        meta.className = 'tooltip-meta';
+                        const addMeta = (label, value) => {
+                            const labelElement = document.createElement('div');
+                            labelElement.className = 'tooltip-label';
+                            labelElement.textContent = label;
+                            const valueElement = document.createElement('div');
+                            valueElement.textContent = String(value);
+                            meta.append(labelElement, valueElement);
+                        };
+                        if (data.year) addMeta('Year', data.year);
+                        if (data.journal) addMeta('Journal', data.journal);
+                        tooltip.appendChild(meta);
 
                         tooltip.classList.add('active');
                         updatePosition(e);

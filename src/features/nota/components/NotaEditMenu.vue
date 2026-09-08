@@ -27,7 +27,7 @@ import {
   Plus
 } from 'lucide-vue-next'
 import type { Nota } from '@/features/nota/types/nota'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import { logger } from '@/services/logger'
 import PublishNotaModal from '@/features/editor/components/dialogs/PublishNotaModal.vue'
 

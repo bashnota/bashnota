@@ -1,17 +1,26 @@
 import axios, { AxiosError } from 'axios'
-import type { 
-  JupyterServer, 
-  ExecutionResult, 
-  KernelSpec, 
+import type {
+  JupyterServer,
+  ExecutionResult,
+  KernelSpec,
   WSMessage,
   ManagedJupyterServer,
   JupyterFile,
   JupyterDirectory,
   JupyterKernel,
-  JupyterSession
+  JupyterSession,
 } from '@\/features\/jupyter\/types\/jupyter'
 import { v4 as uuidv4 } from 'uuid'
 import { logger } from '@/services/logger'
+import {
+  confirmJupyterConnection,
+  confirmJupyterExecution,
+  getJupyterBaseUrl,
+  getJupyterFetchOptions,
+  getJupyterHeaders,
+  getJupyterRequestUrl,
+  getJupyterWebSocketUrl,
+} from './jupyterSecurity'
 
 export class JupyterService {
   private servers: Map<string, ManagedJupyterServer> = new Map()
@@ -58,7 +67,7 @@ export class JupyterService {
    */
   getConnectedServers(): ManagedJupyterServer[] {
     return Array.from(this.connectedServers)
-      .map(id => this.servers.get(id))
+      .map((id) => this.servers.get(id))
       .filter(Boolean) as ManagedJupyterServer[]
   }
 
@@ -80,18 +89,14 @@ export class JupyterService {
 
     try {
       const encodedPath = encodeURIComponent(path)
-      const response = await this.makeRequest(
-        server, 
-        `/contents/${encodedPath}`, 
-        'GET'
-      )
+      const response = await this.makeRequest(server, `/contents/${encodedPath}`, 'GET')
 
       if (!response.ok) {
         throw new Error(`Failed to browse directory: ${response.statusText}`)
       }
 
       const data = await response.json()
-      
+
       if (data.type !== 'directory') {
         throw new Error('Path is not a directory')
       }
@@ -132,18 +137,14 @@ export class JupyterService {
 
     try {
       const encodedPath = encodeURIComponent(filePath)
-      const response = await this.makeRequest(
-        server, 
-        `/contents/${encodedPath}`, 
-        'GET'
-      )
+      const response = await this.makeRequest(server, `/contents/${encodedPath}`, 'GET')
 
       if (!response.ok) {
         throw new Error(`Failed to get file content: ${response.statusText}`)
       }
 
       const data = await response.json()
-      
+
       if (data.type !== 'file') {
         throw new Error('Path is not a file')
       }
@@ -152,7 +153,7 @@ export class JupyterService {
       if (data.format === 'base64') {
         return atob(data.content)
       }
-      
+
       return data.content || ''
     } catch (error) {
       logger.error('Failed to get file content:', error)
@@ -171,9 +172,7 @@ export class JupyterService {
    * Filter files to show only CSV files and directories
    */
   filterCSVFiles(files: JupyterFile[]): JupyterFile[] {
-    return files.filter(file => 
-      file.type === 'directory' || this.isCSVFile(file.name)
-    )
+    return files.filter((file) => file.type === 'directory' || this.isCSVFile(file.name))
   }
 
   /**
@@ -192,9 +191,9 @@ export class JupyterService {
       const result = await this.testConnection({
         ip: server.ip,
         port: server.port,
-        token: server.token
+        token: server.token,
       })
-      
+
       if (result.success) {
         server.status = 'connected'
         this.connectedServers.add(serverId)
@@ -202,7 +201,7 @@ export class JupyterService {
         server.status = 'disconnected'
         this.connectedServers.delete(serverId)
       }
-      
+
       this.servers.set(serverId, { ...server })
       return result.success
     } catch (error) {
@@ -218,27 +217,17 @@ export class JupyterService {
    * Make HTTP request to managed Jupyter server
    */
   private async makeRequest(
-    server: ManagedJupyterServer, 
-    endpoint: string, 
+    server: ManagedJupyterServer,
+    endpoint: string,
     method: 'GET' | 'POST' = 'GET',
-    body?: any
+    body?: any,
   ): Promise<Response> {
-    const baseUrl = server.url || `http://${server.ip}:${server.port}`
-    const url = `${baseUrl.replace(/\/$/, '')}/api${endpoint}`
-    
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    }
-
-    if (server.token) {
-      headers['Authorization'] = `token ${server.token}`
-    }
-
-    const options: RequestInit = {
+    confirmJupyterConnection(server)
+    const url = getJupyterRequestUrl(server, `/api${endpoint}`)
+    const options = getJupyterFetchOptions(server, {
       method,
-      headers,
-      mode: 'cors',
-    }
+      headers: { 'Content-Type': 'application/json' },
+    })
 
     if (body && method === 'POST') {
       options.body = JSON.stringify(body)
@@ -259,9 +248,9 @@ export class JupyterService {
       if (!url.startsWith('http://') && !url.startsWith('https://')) {
         url = `http://${url}`
       }
-      
+
       const urlObj = new URL(url)
-      
+
       // Handle Kaggle Jupyter URLs
       if (urlObj.hostname.includes('kaggle')) {
         // Extract token from query parameters
@@ -270,42 +259,43 @@ export class JupyterService {
           logger.error('No token found in Kaggle URL')
           return null
         }
-        
+
         // For Kaggle, we use the full hostname as the IP
         // and extract the protocol (http/https)
         const protocol = urlObj.protocol
         const ip = `${protocol}//${urlObj.hostname}`
-        
+
         // Kaggle typically uses port 80 for HTTP and 443 for HTTPS
         // but we'll use the port from the URL if it exists
         const port = urlObj.port || (protocol === 'https:' ? '443' : '80')
-        
+
         return {
           ip,
           port,
-          token
+          token,
         }
       }
-      
+
       // Handle standard Jupyter URLs
       const protocol = urlObj.protocol
       const hostname = urlObj.hostname
-      
+
       // For localhost or IP addresses, we can keep just the hostname
       // For other domains, include the protocol
-      const ip = hostname === 'localhost' || this.isIPAddress(hostname) 
-        ? hostname 
-        : `${protocol}//${hostname}`
-      
+      const ip =
+        hostname === 'localhost' || this.isIPAddress(hostname)
+          ? hostname
+          : `${protocol}//${hostname}`
+
       const port = urlObj.port || (protocol === 'https:' ? '443' : '80')
-      
+
       // Extract token from query parameters
       const token = urlObj.searchParams.get('token') || ''
-      
+
       return {
         ip,
         port,
-        token
+        token,
       }
     } catch (error) {
       logger.error('Error parsing Jupyter URL:', error)
@@ -321,19 +311,16 @@ export class JupyterService {
   }
 
   private getBaseUrl(server: JupyterServer): string {
-    // If the IP already has a protocol, use it as is
-    // Otherwise, add http:// protocol for localhost and IP addresses
-    const protocol = server.ip.startsWith('http') ? '' : 'http://'
-    return `${protocol}${server.ip}:${server.port}/api`
+    confirmJupyterConnection(server)
+    return `${getJupyterBaseUrl(server)}/api`
   }
 
   private getUrlWithToken(serverConfig: JupyterServer, endpoint: string): string {
-    const url = `${this.getBaseUrl(serverConfig)}${endpoint}`
+    return `${this.getBaseUrl(serverConfig)}${endpoint}`
+  }
 
-    if (serverConfig.token) {
-      return `${url}?token=${serverConfig.token}`
-    }
-    return url
+  private getAxiosConfig(server: JupyterServer) {
+    return { headers: getJupyterHeaders(server), withCredentials: true }
   }
 
   private handleError(error: unknown, message: string): never {
@@ -353,7 +340,10 @@ export class JupyterService {
 
   async getAvailableKernels(server: JupyterServer) {
     try {
-      const response = await axios.get(this.getUrlWithToken(server, '/kernelspecs'))
+      const response = await axios.get(
+        this.getUrlWithToken(server, '/kernelspecs'),
+        this.getAxiosConfig(server),
+      )
 
       const { kernelspecs } = response.data as Record<string, KernelSpec>
       return Object.entries(kernelspecs).map(([name, spec]: [string, KernelSpec]) => ({
@@ -366,18 +356,7 @@ export class JupyterService {
   }
 
   private getWebSocketUrl(server: JupyterServer, kernelId: string): string {
-    // For IPs with protocol, extract the hostname
-    // Otherwise, use the IP directly (localhost or IP address)
-    let baseUrl = server.ip
-    let protocol = 'ws'
-    
-    if (server.ip.startsWith('http')) {
-      // For URLs with protocol, determine ws/wss based on http/https
-      protocol = server.ip.startsWith('https') ? 'wss' : 'ws'
-      baseUrl = server.ip.replace(/^http(s?):\/\//, '')
-    }
-    
-    return `${protocol}://${baseUrl}:${server.port}/api/kernels/${kernelId}/channels`
+    return getJupyterWebSocketUrl(server, kernelId)
   }
 
   async executeCode(
@@ -386,10 +365,13 @@ export class JupyterService {
     code: string,
   ): Promise<ExecutionResult> {
     try {
+      confirmJupyterExecution(server)
       // Create a new kernel
-      const kernelResponse = await axios.post(this.getUrlWithToken(server, '/kernels'), {
-        name: kernelName,
-      })
+      const kernelResponse = await axios.post(
+        this.getUrlWithToken(server, '/kernels'),
+        { name: kernelName },
+        this.getAxiosConfig(server),
+      )
 
       const kernelId = kernelResponse.data.id
 
@@ -469,7 +451,10 @@ export class JupyterService {
 
   async deleteKernel(server: JupyterServer, kernelId: string): Promise<void> {
     try {
-      await axios.delete(this.getUrlWithToken(server, `/kernels/${kernelId}`))
+      await axios.delete(
+        this.getUrlWithToken(server, `/kernels/${kernelId}`),
+        this.getAxiosConfig(server),
+      )
     } catch (error) {
       this.handleError(error, 'Failed to delete kernel')
     }
@@ -519,63 +504,70 @@ export class JupyterService {
 
   async testConnection(server: JupyterServer): Promise<{ success: boolean; message: string }> {
     try {
-      const protocol = server.ip.startsWith('http') ? '' : 'http://';
-      const baseUrl = `${protocol}${server.ip}:${server.port}`;
-      const url = server.token ? `${baseUrl}/api?token=${server.token}` : `${baseUrl}/api`;
-      
-      logger.log(`Testing connection to Jupyter server at ${baseUrl}`);
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: { Accept: 'application/json' },
-        // Add timeout to prevent long waiting periods
-        signal: AbortSignal.timeout(5000)
-      });
+      confirmJupyterConnection(server)
+      const baseUrl = getJupyterBaseUrl(server)
+      const url = getJupyterRequestUrl(server, '/api')
+
+      logger.log(`Testing connection to Jupyter server at ${baseUrl}`)
+
+      const response = await fetch(
+        url,
+        getJupyterFetchOptions(server, {
+          method: 'GET',
+          headers: { Accept: 'application/json' },
+          // Add timeout to prevent long waiting periods
+          signal: AbortSignal.timeout(5000),
+        }),
+      )
 
       if (!response.ok) {
-        const errorText = await response.text();
-        logger.error(`Connection test failed (${response.status}):`, errorText);
+        const errorText = await response.text()
+        logger.error(`Connection test failed (${response.status}):`, errorText)
         return {
           success: false,
-          message: `Connection failed: ${response.status} ${response.statusText}`
-        };
+          message: `Connection failed: ${response.status} ${response.statusText}`,
+        }
       }
 
-      const data = await response.json();
-      logger.log('Connection test successful', data);
-      
+      const data = await response.json()
+      logger.log('Connection test successful', data)
+
       return {
         success: true,
-        message: 'Connection successful'
-      };
-    } catch (error) {
-      let errorMessage = 'Connection failed';
-      
-      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-        errorMessage = 'Could not connect to server. Please check the server address, port, and ensure the server is running.';
-      } else if (error instanceof DOMException && error.name === 'TimeoutError') {
-        errorMessage = 'Connection timed out. Server might be overloaded or unreachable.';
-      } else if (error instanceof Error) {
-        errorMessage = `Connection error: ${error.message}`;
+        message: 'Connection successful',
       }
-      
-      logger.error('Jupyter connection test error:', error);
+    } catch (error) {
+      let errorMessage = 'Connection failed'
+
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        errorMessage =
+          'Could not connect to server. Please check the server address, port, and ensure the server is running.'
+      } else if (error instanceof DOMException && error.name === 'TimeoutError') {
+        errorMessage = 'Connection timed out. Server might be overloaded or unreachable.'
+      } else if (error instanceof Error) {
+        errorMessage = `Connection error: ${error.message}`
+      }
+
+      logger.error('Jupyter connection test error:', error)
       return {
         success: false,
-        message: errorMessage
-      };
+        message: errorMessage,
+      }
     }
   }
 
   async getRunningKernels(server: JupyterServer): Promise<JupyterKernel[]> {
     try {
-      const response = await axios.get(this.getUrlWithToken(server, '/kernels'))
+      const response = await axios.get(
+        this.getUrlWithToken(server, '/kernels'),
+        this.getAxiosConfig(server),
+      )
       return response.data.map((kernel: any) => ({
         id: kernel.id,
         name: kernel.name,
         lastActivity: kernel.last_activity,
         executionState: kernel.execution_state,
-        connections: kernel.connections
+        connections: kernel.connections,
       }))
     } catch (error) {
       this.handleError(error, 'Failed to get running kernels')
@@ -584,7 +576,10 @@ export class JupyterService {
 
   async getActiveSessions(server: JupyterServer): Promise<JupyterSession[]> {
     try {
-      const response = await axios.get(this.getUrlWithToken(server, '/sessions'))
+      const response = await axios.get(
+        this.getUrlWithToken(server, '/sessions'),
+        this.getAxiosConfig(server),
+      )
       return response.data.map((session: any) => ({
         id: session.id,
         name: session.name || session.path.split('/').pop() || 'Untitled',
@@ -592,8 +587,8 @@ export class JupyterService {
         kernel: {
           id: session.kernel.id,
           name: session.kernel.name,
-          lastActivity: session.kernel.last_activity
-        }
+          lastActivity: session.kernel.last_activity,
+        },
       }))
     } catch (error) {
       this.handleError(error, 'Failed to get active sessions')
@@ -607,10 +602,10 @@ export class JupyterService {
     try {
       const encodedPath = encodeURIComponent(path)
       const url = this.getUrlWithToken(server, `/contents/${encodedPath}`)
-      
-      const response = await axios.get(url)
+
+      const response = await axios.get(url, this.getAxiosConfig(server))
       const data = response.data
-      
+
       if (data.type !== 'directory') {
         throw new Error('Path is not a directory')
       }
@@ -640,10 +635,10 @@ export class JupyterService {
     try {
       const encodedPath = encodeURIComponent(filePath)
       const url = this.getUrlWithToken(server, `/contents/${encodedPath}`)
-      
-      const response = await axios.get(url)
+
+      const response = await axios.get(url, this.getAxiosConfig(server))
       const data = response.data
-      
+
       if (data.type !== 'file') {
         throw new Error('Path is not a file')
       }
@@ -652,7 +647,7 @@ export class JupyterService {
       if (data.format === 'base64') {
         return atob(data.content)
       }
-      
+
       return data.content || ''
     } catch (error) {
       logger.error('Failed to get file content:', error)
@@ -670,12 +665,5 @@ export type {
   JupyterDirectory,
   ManagedJupyterServer,
   JupyterKernel,
-  JupyterSession
+  JupyterSession,
 } from '@\/features\/jupyter\/types\/jupyter'
-
-
-
-
-
-
-

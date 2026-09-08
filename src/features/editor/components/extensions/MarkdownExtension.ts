@@ -1,10 +1,8 @@
-import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey } from 'prosemirror-state'
 import { Decoration, DecorationSet } from 'prosemirror-view'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 import { logger } from '@/services/logger'
-import { inject, ref } from 'vue'
 
 interface Token {
   type: 'katex-display' | 'katex-inline' | 'bold' | 'italic' | 'code'
@@ -56,15 +54,19 @@ export const toggleRenderMathState = (editor: any): void => {
   }
 }
 
-export const MarkdownExtension = Extension.create({
-  name: 'markdownAndKatex',
+/**
+ * Build the markdown + KaTeX decoration plugin.
+ *
+ * Previously wrapped in a TipTap `Extension.create({ addProseMirrorPlugins })`;
+ * now a plain ProseMirror plugin factory. The plugin body is unchanged — the
+ * registration site (extensions/index.ts) wraps this back into the live editor.
+ */
+export function markdownAndKatexPlugin(): Plugin {
+  // Create a plugin key so we can reference this plugin later
+  const pluginKey = new PluginKey('markdownAndKatex')
 
-  addProseMirrorPlugins() {
-    // Create a plugin key so we can reference this plugin later
-    const pluginKey = new PluginKey('markdownAndKatex')
-    
-    // Create the plugin
-    const plugin = new Plugin({
+  // Create the plugin
+  return new Plugin({
       key: pluginKey,
       props: {
         handleDOMEvents: {
@@ -197,10 +199,7 @@ export const MarkdownExtension = Extension.create({
         return null
       },
     })
-
-    return [plugin]
-  },
-})
+}
 
 
 

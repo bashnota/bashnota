@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useNotaStore } from '@/features/nota/stores/nota'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { formatDate } from '@/lib/utils'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import { Trash2 } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { logger } from '@/services/logger'
@@ -27,7 +27,7 @@ const isDeleting = ref(false)
 const selectedVersionId = ref('')
 
 const versions = computed(() => {
-  return notaStore.getNotaVersions(props.notaId).sort((a: { createdAt: Date | string }, b: { createdAt: Date | string }) => {
+  return [...notaStore.getNotaVersions(props.notaId)].sort((a: { createdAt: Date | string }, b: { createdAt: Date | string }) => {
     const dateA = new Date(a.createdAt)
     const dateB = new Date(b.createdAt)
     return dateB.getTime() - dateA.getTime() // Sort newest first
@@ -42,8 +42,12 @@ const restoreVersion = async (versionId: string) => {
   try {
     isRestoring.value = true
     selectedVersionId.value = versionId
-    await notaStore.restoreVersion(props.notaId, versionId)
-    toast('Version restored successfully')
+    const result = await notaStore.restoreVersion(props.notaId, versionId)
+    if (result.kind === 'legacy-metadata-only') {
+      toast.warning(result.message)
+    } else {
+      toast.success(result.message)
+    }
     
     // Emit event for local refresh
     emit('version-restored')
@@ -59,7 +63,7 @@ const restoreVersion = async (versionId: string) => {
     })
   } catch (error) {
     logger.error('Error restoring version:', error)
-    toast('Failed to restore version')
+    toast.error(error instanceof Error ? error.message : 'Failed to restore version')
   } finally {
     isRestoring.value = false
     selectedVersionId.value = ''
@@ -78,7 +82,7 @@ const deleteVersion = async (versionId: string) => {
     toast('Version deleted successfully')
   } catch (error) {
     logger.error('Error deleting version:', error)
-    toast('Failed to delete version')
+    toast.error(error instanceof Error ? error.message : 'Failed to delete version')
   } finally {
     isDeleting.value = false
     selectedVersionId.value = ''
@@ -91,6 +95,9 @@ const deleteVersion = async (versionId: string) => {
     <DialogContent class="sm:max-w-md">
       <DialogHeader>
         <DialogTitle>Version History</DialogTitle>
+        <DialogDescription>
+          Restore or delete a durable snapshot of this nota.
+        </DialogDescription>
       </DialogHeader>
       <div class="space-y-4 max-h-[50vh] overflow-y-auto">
         <div v-if="versions.length === 0" class="text-center py-4 text-muted-foreground">
@@ -122,6 +129,7 @@ const deleteVersion = async (versionId: string) => {
             <Button
               variant="destructive"
               size="sm"
+              :aria-label="`Delete ${version.versionName}`"
               @click="deleteVersion(version.id)"
               :disabled="isRestoring || isDeleting"
               :class="{ 'opacity-50 cursor-not-allowed': isRestoring || isDeleting }"
@@ -138,10 +146,6 @@ const deleteVersion = async (versionId: string) => {
     </DialogContent>
   </Dialog>
 </template> 
-
-
-
-
 
 
 

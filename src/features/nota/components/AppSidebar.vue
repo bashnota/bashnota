@@ -1,34 +1,13 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch, onBeforeUnmount, nextTick } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue';
 import { useRouter } from 'vue-router'
 import { useNotaStore } from '@/features/nota/stores/nota'
-import { useAuthStore } from '@/features/auth/stores/auth'
 import { onKeyStroke } from '@vueuse/core'
 import DarkModeToggle from '@/features/nota/components/DarkModeToggle.vue'
-import {
-  FileText,
-  Settings,
-  Plus,
-  Search,
-  Settings2,
-  ChevronDown,
-  BookOpen,
-  Home,
-  Star,
-  Clock,
-  HelpCircle,
-  Keyboard,
-  Palette,
-  User,
-  Database,
-  Code2,
-  Terminal,
-  X
-} from 'lucide-vue-next'
+import { FileText, Settings, Plus, Search, ChevronDown, Home, Star, Clock } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button'
 import NotaTree from '@/features/nota/components/NotaTree.vue'
 import { RouterLink } from 'vue-router'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { logger } from '@/services/logger'
 import {
@@ -39,34 +18,29 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
-  SidebarMenu,
-  SidebarMenuItem,
   SidebarMenuButton,
   SidebarSeparator,
   useSidebar
 } from '@/components/ui/sidebar'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { Input } from '@/components/ui/input'
 import NewNotaModal from '@/features/nota/components/NewNotaModal.vue'
 import SearchModal from '@/features/nota/components/SearchModal.vue'
 import { useQuickNotaCreation } from '@/features/nota/composables/useQuickNotaCreation'
 import { generateRandomTitle } from '@/utils/randomTitleGenerator'
 import SidebarAuthStatus from '@/features/nota/components/SidebarAuthStatus.vue'
 
-const router = useRouter()
 const notaStore = useNotaStore()
-const authStore = useAuthStore()
+const router = useRouter()
 const { createQuickNota } = useQuickNotaCreation()
 const { state: sidebarState } = useSidebar()
 const newNotaTitle = ref('')
-const searchQuery = ref('')
 const showNewNotaInput = ref<boolean>(false)
 const expandedItems = ref<Set<string>>(new Set())
-const showShortcutsDialog = ref(false)
 const activeView = ref<'all' | 'favorites' | 'recent'>('all')
 const showSearchModal = ref(false)
 const showNewNotaModal = ref(false)
-const searchInput = ref<HTMLInputElement | null>(null)
+const knownNotaIds = new Set<string>()
+const treeReady = ref(false)
 
 // Pagination state
 const currentPage = ref(1)
@@ -74,21 +48,15 @@ const itemsPerPage = ref(15)
 
 // Collapsible sections state
 const notasOpen = ref(true)
-const docsOpen = ref(true)
-const settingsOpen = ref(true)
 
 // Watch sidebar state and collapse all sections when sidebar is collapsed
 watch(sidebarState, (newState) => {
   if (newState === 'collapsed') {
     // Collapse all sections when sidebar is collapsed
     notasOpen.value = false
-    docsOpen.value = false
-    settingsOpen.value = false
   } else if (newState === 'expanded') {
     // Restore previous states when sidebar is expanded
     notasOpen.value = localStorage.getItem('sidebar-notas-collapsed') !== 'true'
-    docsOpen.value = localStorage.getItem('sidebar-docs-collapsed') !== 'true'
-    settingsOpen.value = localStorage.getItem('sidebar-settings-collapsed') !== 'true'
   }
 })
 
@@ -119,53 +87,11 @@ const navigationItems = [
 
 
 
-// Settings menu items
-const settingsItems = [
-  {
-    title: "AI Providers",
-    icon: Settings,
-    url: "/settings/ai-providers"
-  },
-  {
-    title: "Appearance",
-    icon: Palette,
-    url: "/settings/theme"
-  },
-  {
-    title: "Editor",
-    icon: FileText,
-    url: "/settings/text-editing"
-  },
-  {
-    title: "Storage Mode",
-    icon: Database,
-    url: "/settings/storage-mode"
-  },
-  {
-    title: "Keyboard Shortcuts",
-    icon: Keyboard,
-    url: "/settings/editor-shortcuts"
-  },
-  {
-    title: "Account",
-    icon: User,
-    action: () => handleAuthNavigation()
-  },
-  {
-    title: "System Info",
-    icon: Terminal,
-    url: "/settings/system-info"
-  },
-  {
-    title: "Advanced Settings",
-    icon: Code2,
-    url: "/settings/unified-advanced"
-  }
-]
-
 // Load last used view from localStorage
 onMounted(async () => {
   await notaStore.loadNotas()
+  for (const nota of notaStore.items) knownNotaIds.add(nota.id)
+  treeReady.value = true
   const savedView = localStorage.getItem('sidebar-view')
   if (savedView) {
     activeView.value = savedView as 'all' | 'favorites' | 'recent'
@@ -173,33 +99,24 @@ onMounted(async () => {
   
   // Load collapsible states
   notasOpen.value = localStorage.getItem('sidebar-notas-collapsed') !== 'true'
-  docsOpen.value = localStorage.getItem('sidebar-docs-collapsed') !== 'true'
-  settingsOpen.value = localStorage.getItem('sidebar-settings-collapsed') !== 'true'
 })
+
+watch(
+  () => notaStore.items.map(nota => ({ id: nota.id, parentId: nota.parentId ?? null })),
+  (items) => {
+    if (!treeReady.value) return
+    for (const item of items) {
+      if (!knownNotaIds.has(item.id) && item.parentId) expandedItems.value.add(item.parentId)
+      knownNotaIds.add(item.id)
+    }
+  },
+)
 
 // Save collapsible states (only when sidebar is expanded)
 watch(notasOpen, (value) => {
   if (sidebarState.value === 'expanded') {
     localStorage.setItem('sidebar-notas-collapsed', (!value).toString())
   }
-})
-
-watch(docsOpen, (value) => {
-  if (sidebarState.value === 'expanded') {
-    localStorage.setItem('sidebar-docs-collapsed', (!value).toString())
-  }
-})
-
-watch(settingsOpen, (value) => {
-  if (sidebarState.value === 'expanded') {
-    localStorage.setItem('sidebar-settings-collapsed', (!value).toString())
-  }
-})
-
-// Auto-focus search when opened - removed, now handled by SearchModal
-
-onBeforeUnmount(() => {
-  // Cleanup if needed
 })
 
 // Reset pagination when view changes
@@ -314,22 +231,13 @@ onKeyStroke('f', (e: KeyboardEvent) => {
   }
 })
 
-// Show shortcuts dialog
-onKeyStroke('?', (e: KeyboardEvent) => {
-  if (e.shiftKey) {
+// Match the settings shortcut advertised by the command palette and help.
+onKeyStroke(',', (e: KeyboardEvent) => {
+  if (e.metaKey || e.ctrlKey) {
     e.preventDefault()
-    showShortcutsDialog.value = true
+    void router.push('/settings')
   }
 })
-
-// Handle login/profile navigation
-const handleAuthNavigation = () => {
-  if (authStore.isAuthenticated) {
-    router.push('/profile')
-  } else {
-    router.push('/login')
-  }
-}
 
 // Handle nota updated
 const handleNotaUpdated = async (nota: any) => {
@@ -569,49 +477,20 @@ const handleNotaDeleted = async (notaId: string) => {
 
 
 
-          <!-- Settings Section -->
-          <Collapsible v-model:open="settingsOpen" class="group/collapsible">
-            <SidebarGroup>
-              <SidebarGroupLabel asChild>
-                <CollapsibleTrigger 
-                  class="flex w-full items-center justify-between p-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md px-2 py-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:mx-auto"
-                  :title="sidebarState === 'collapsed' ? 'Settings' : undefined"
-                >
-                  <span class="flex items-center gap-2">
-                    <Settings class="h-4 w-4" />
-                    <span class="group-data-[collapsible=icon]:hidden">Settings</span>
-                  </span>
-                  <ChevronDown class="h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180 group-data-[collapsible=icon]:hidden" />
-                </CollapsibleTrigger>
-              </SidebarGroupLabel>
-              <CollapsibleContent>
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    <SidebarMenuItem v-for="item in settingsItems" :key="item.title">
-                      <SidebarMenuButton 
-                        v-if="item.url"
-                        asChild
-                        class="w-full group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center"
-                      >
-                        <RouterLink :to="item.url" class="flex items-center gap-2">
-                          <component :is="item.icon" class="h-4 w-4 flex-shrink-0" />
-                          <span class="group-data-[collapsible=icon]:hidden">{{ item.title }}</span>
-                        </RouterLink>
-                      </SidebarMenuButton>
-                      <SidebarMenuButton 
-                        v-else
-                        @click="item.action"
-                        class="flex items-center gap-2 w-full group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center"
-                      >
-                        <component :is="item.icon" class="h-4 w-4 flex-shrink-0" />
-                        <span class="group-data-[collapsible=icon]:hidden">{{ item.title }}</span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </CollapsibleContent>
-            </SidebarGroup>
-          </Collapsible>
+          <!-- Settings is a destination, not a second navigation tree. -->
+          <SidebarGroup class="border-t">
+            <SidebarMenuButton
+              asChild
+              tooltip="Settings"
+              class="h-9 w-full group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center"
+            >
+              <RouterLink to="/settings" class="flex items-center gap-2">
+                <Settings class="h-4 w-4 flex-shrink-0" />
+                <span class="group-data-[collapsible=icon]:hidden">Settings</span>
+                <span class="ml-auto text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">⌘,</span>
+              </RouterLink>
+            </SidebarMenuButton>
+          </SidebarGroup>
         </div>
       </div>
     </SidebarContent>
@@ -837,11 +716,6 @@ a:focus-visible {
   justify-content: space-between;
 }
 </style>
-
-
-
-
-
 
 
 

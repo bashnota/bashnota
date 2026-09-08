@@ -19,7 +19,8 @@ function loadFlags(): FeatureFlags {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved) {
-      return JSON.parse(saved)
+      const parsed = JSON.parse(saved)
+      return { ...parsed, USE_SIMPLIFIED_NAVIGATION: false }
     }
   } catch (error) {
     console.error('Failed to load feature flags:', error)
@@ -59,9 +60,9 @@ export function useFeatureFlags() {
   })
 
   const useSimplifiedNavigation = computed({
-    get: () => flags.value.USE_SIMPLIFIED_NAVIGATION,
-    set: (value: boolean) => {
-      flags.value.USE_SIMPLIFIED_NAVIGATION = value
+    get: () => false,
+    set: () => {
+      flags.value.USE_SIMPLIFIED_NAVIGATION = false
       saveFlags(flags.value)
     }
   })
@@ -78,7 +79,7 @@ export function useFeatureFlags() {
   const enableAllNewFeatures = () => {
     flags.value = {
       USE_NEW_STORAGE: true,
-      USE_SIMPLIFIED_NAVIGATION: true,
+      USE_SIMPLIFIED_NAVIGATION: false,
       USE_CONSOLIDATED_SETTINGS: true
     }
     saveFlags(flags.value)
@@ -115,7 +116,8 @@ export function useFeatureFlags() {
   const setAllFlags = (newFlags: Partial<FeatureFlags>) => {
     flags.value = {
       ...flags.value,
-      ...newFlags
+      ...newFlags,
+      USE_SIMPLIFIED_NAVIGATION: false,
     }
     saveFlags(flags.value)
   }

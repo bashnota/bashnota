@@ -1,13 +1,11 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref, computed, watch } from 'vue'
 import { Button } from '@/components/ui/button'
-import { X, Play, Loader2, Copy, Check, Eye, EyeOff, Code, FileText, Save, Maximize2 } from 'lucide-vue-next'
+import { X, Play, Loader2, Copy, Check, Eye, EyeOff, Code, FileText, Save } from 'lucide-vue-next';
 import CodeMirror from './CodeMirror.vue'
 import OutputSection from './components/OutputSection.vue'
-import StatusIndicator from './components/StatusIndicator.vue'
 import { useFullscreenCode } from './composables/ui/useFullscreenCode'
 import { useCodeBlockShortcuts } from './composables/ui/useCodeBlockShortcuts'
-import { useCodeExecution } from './composables/core/useCodeExecution'
 
 interface Props {
   code: string

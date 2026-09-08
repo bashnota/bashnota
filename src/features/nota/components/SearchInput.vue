@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, nextTick } from 'vue'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Search, X } from 'lucide-vue-next'
@@ -8,6 +7,7 @@ import { Search, X } from 'lucide-vue-next'
 interface Props {
   modelValue: string
   placeholder?: string
+  ariaLabel?: string
   disabled?: boolean
   size?: 'sm' | 'md' | 'lg'
 }
@@ -19,6 +19,7 @@ interface Emits {
 
 const props = withDefaults(defineProps<Props>(), {
   placeholder: 'Search...',
+  ariaLabel: 'Search notas',
   disabled: false,
   size: 'md'
 })
@@ -90,6 +91,7 @@ defineExpose({
       ref="inputRef"
       :model-value="modelValue"
       :placeholder="placeholder"
+      :aria-label="ariaLabel"
       :disabled="disabled"
       :class="sizeClasses[size]"
       @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)"
@@ -103,6 +105,7 @@ defineExpose({
         clearButtonSizes[size]
       ]"
       @click="handleClear"
+      aria-label="Clear search"
     >
       <X :class="clearIconSizes[size]" />
     </Button>

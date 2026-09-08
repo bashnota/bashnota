@@ -1,7 +1,5 @@
-import type { SubFigure } from '@/features/editor/components/blocks/subfigure-block/subfigure-extension'
-import { fetchAPI } from '@/services/axios'
+import { uploadPublishedImageAsset } from '@/services/cloud/supabaseImageStorage'
 import { logger } from '@/services/logger'
-import { useTableStore } from '@/features/editor/stores/tableStore'
 
 // Regular expression to identify data URLs
 const DATA_URL_REGEX = /data:image\/[^;]+;base64,[a-zA-Z0-9+/]+=*/g
@@ -22,13 +20,35 @@ export const findDataUrls = (content: string) => {
  * @returns {Promise<string>} - The URL of the uploaded image
  */
 export const uploadImage = async (dataUrl: string) => {
-  try {
-    const response = await fetchAPI.post('/image/upload', { dataUrl })
-    return response.data.imageUrl
-  } catch (error) {
-    logger.error('Failed to upload image:', error)
-    throw error
+  return (await uploadPublishedImageAsset(dataUrl)).publicUrl
+}
+
+interface ProcessingContext {
+  publishedSubPages: Set<string>
+  uploadedImagePaths?: string[]
+  uploads: Map<string, Promise<string>>
+}
+
+async function uploadOnce(dataUrl: string, context: ProcessingContext): Promise<string> {
+  let upload = context.uploads.get(dataUrl)
+  if (!upload) {
+    upload = uploadPublishedImageAsset(dataUrl).then((asset) => {
+      context.uploadedImagePaths?.push(asset.path)
+      return asset.publicUrl
+    })
+    context.uploads.set(dataUrl, upload)
   }
+  return upload
+}
+
+async function processString(content: string, context: ProcessingContext): Promise<string> {
+  const dataUrls = findDataUrls(content)
+  if (dataUrls.length === 0) return content
+  let processed = content
+  for (const dataUrl of new Set(dataUrls)) {
+    processed = processed.split(dataUrl).join(await uploadOnce(dataUrl, context))
+  }
+  return processed
 }
 
 /**
@@ -38,34 +58,10 @@ export const uploadImage = async (dataUrl: string) => {
  */
 export const processContent = async (content: string) => {
   if (!content || typeof content !== 'string') return content
-
-  // Find all data URLs
-  const dataUrls = findDataUrls(content)
-  if (dataUrls.length === 0) return content
-
-  // Create a map of data URLs to their hosted equivalents
-  const urlMap = new Map()
-
-  for (const dataUrl of dataUrls) {
-    if (!urlMap.has(dataUrl)) {
-      try {
-        const imageUrl = await uploadImage(dataUrl)
-        urlMap.set(dataUrl, imageUrl)
-      } catch (error) {
-        logger.error('Error uploading image:', error)
-        // Keep the original data URL if upload fails
-        urlMap.set(dataUrl, dataUrl)
-      }
-    }
-  }
-
-  // Replace all data URLs with their hosted equivalents
-  let newContent = content
-  for (const [dataUrl, imageUrl] of urlMap.entries()) {
-    newContent = newContent.split(dataUrl).join(imageUrl)
-  }
-
-  return newContent
+  return processString(content, {
+    publishedSubPages: new Set(),
+    uploads: new Map(),
+  })
 }
 
 /**
@@ -78,6 +74,7 @@ export const processNotaContent = async (
   content: string | object,
   options?: {
     publishedSubPages?: string[]
+    uploadedImagePaths?: string[]
   },
 ) => {
   if (!content) return null
@@ -85,8 +82,11 @@ export const processNotaContent = async (
   // Parse the content if it's a string
   const contentObj = typeof content === 'string' ? JSON.parse(content) : content
 
-  // Process the content recursively
-  return await processContentObject(contentObj, options)
+  return processContentObject(contentObj, {
+    publishedSubPages: new Set(options?.publishedSubPages ?? []),
+    uploadedImagePaths: options?.uploadedImagePaths,
+    uploads: new Map(),
+  })
 }
 
 /**
@@ -97,22 +97,25 @@ export const processNotaContent = async (
  */
 async function processContentObject(
   obj: any,
-  options?: {
-    publishedSubPages?: string[]
-  },
+  context: ProcessingContext,
 ): Promise<any> {
   if (!obj) return obj
 
   // If it's an array, process each item
   if (Array.isArray(obj)) {
-    // Process each item and filter out any null results (removed restricted links)
-    const processed = await Promise.all(obj.map((item) => processContentObject(item, options)))
+    // Keep uploads sequential so a rejected item cannot leave still-running
+    // uploads that escape the caller's compensating cleanup pass.
+    const processed: any[] = []
+    for (const item of obj) processed.push(await processContentObject(item, context))
     return processed.filter((item) => item !== null)
   }
 
   // If it's an object, process its properties
   if (typeof obj === 'object') {
-    const result = { ...obj }
+    const result: Record<string, any> = {}
+    for (const [key, value] of Object.entries(obj)) {
+      result[key] = await processContentObject(value, context)
+    }
 
     // Handle page links - convert internal /nota/ links to public /p/ links
     if (obj.type === 'pageLink' && obj.attrs?.href && typeof obj.attrs.href === 'string') {
@@ -121,10 +124,10 @@ async function processContentObject(
         const notaId = obj.attrs.href.replace('/nota/', '')
         
         // Check if this sub-nota is published
-        if (options?.publishedSubPages?.includes(notaId)) {
+        if (context.publishedSubPages.has(notaId)) {
           // Replace with public link format
           result.attrs = {
-            ...obj.attrs,
+            ...result.attrs,
             href: `/p/${notaId}`, // Use the standard public format
           }
         } else {
@@ -135,111 +138,13 @@ async function processContentObject(
       }
     }
 
-    // Process inline code block outputs that might contain HTML with images
-    if (obj.type === 'executableCodeBlock' && obj.attrs?.output) {
-      if (typeof obj.attrs.output === 'string' && obj.attrs.output.includes('<img')) {
-        try {
-          // Process any HTML content with img tags
-          const processedOutput = await processContent(obj.attrs.output)
-          result.attrs = {
-            ...obj.attrs,
-            output: processedOutput,
-          }
-        } catch (error) {
-          logger.error('Error processing code block output:', error)
-        }
-      }
-    }
-
-    // Handle image blocks and drawIo blocks
-    if (
-      (obj.type === 'imageBlock' || obj.type === 'drawIoExtension') &&
-      obj.attrs?.src &&
-      typeof obj.attrs.src === 'string' &&
-      obj.attrs.src.startsWith('data:image/')
-    ) {
-      try {
-        const imageUrl = await uploadImage(obj.attrs.src)
-        result.attrs = {
-          ...obj.attrs,
-          src: imageUrl,
-        }
-      } catch (error) {
-        logger.error('Error processing image block:', error)
-      }
-    }
-
-    // Handle subfigures based on the SubfigureExtension
-    if (obj.type === 'subfigure' && obj.attrs?.subfigures && Array.isArray(obj.attrs.subfigures)) {
-      const processedSubfigures = await Promise.all(
-        obj.attrs.subfigures.map(async (subfigure: SubFigure) => {
-          // Check if this subfigure has a data URL as src
-          if (
-            subfigure.src &&
-            typeof subfigure.src === 'string' &&
-            subfigure.src.startsWith('data:image/')
-          ) {
-            try {
-              // Upload the image and get back a hosted URL
-              const imageUrl = await uploadImage(subfigure.src)
-
-              // Return a new subfigure object with the updated src but preserving all other properties
-              return {
-                ...subfigure,
-                src: imageUrl,
-              }
-            } catch (error) {
-              logger.error('Error processing subfigure image:', error)
-              // If upload fails, keep original data URL
-              return subfigure
-            }
-          }
-          // If no data URL or processing fails, return the original subfigure unchanged
-          return subfigure
-        }),
-      )
-
-      // Update the attrs with the processed subfigures
-      result.attrs = {
-        ...obj.attrs,
-        subfigures: processedSubfigures,
-      }
-    }
-
-    // Process children content arrays
-    if (obj.content && Array.isArray(obj.content)) {
-      result.content = await processContentObject(obj.content, options)
-    }
-
-    // Process other properties recursively
-    for (const key in obj) {
-      if (key !== 'content' && typeof obj[key] === 'object' && obj[key] !== null) {
-        result[key] = await processContentObject(obj[key], options)
-      } else if (
-        key !== 'content' &&
-        typeof obj[key] === 'string' &&
-        obj[key].includes('data:image/')
-      ) {
-        // Handle string properties that might contain data URLs
-        result[key] = await processContent(obj[key])
-      }
-    }
-
     return result
   }
 
   // Handle string content that might contain data URLs
   if (typeof obj === 'string') {
-    return await processContent(obj)
+    return processString(obj, context)
   }
 
   return obj
 }
-
-
-
-
-
-
-
-

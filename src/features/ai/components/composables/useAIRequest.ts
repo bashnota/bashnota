@@ -1,4 +1,4 @@
-import { ref, watch, onUnmounted, computed } from 'vue'
+import { ref, watch, onUnmounted } from 'vue';
 import { useAISettingsStore } from '@/features/ai/stores/aiSettingsStore'
 
 export function useAIRequest() {

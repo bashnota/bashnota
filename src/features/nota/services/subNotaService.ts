@@ -1,80 +1,58 @@
+import { nanoid } from 'nanoid'
+import { TextSelection } from 'prosemirror-state'
 import { useNotaStore } from '@/features/nota/stores/nota'
-import { Editor } from '@tiptap/vue-3'
-import { fetchAPI } from '@/services/axios'
-import { logger } from '@/services/logger'
-import type { Nota } from '@/features/nota/types/nota'
-import { toast } from 'vue-sonner'
+import type { Editor } from '@/features/editor/pm'
 
-export interface SubNotaCreationOptions {
+export interface LinkedSubNotaCreationOptions {
   parentId: string
   title: string
-  editor?: Editor
-  range?: any
-  insertLink?: boolean
+  editor: Editor
+  range?: { from: number; to: number }
 }
 
-export async function createSubNota({ 
-  parentId, 
-  title, 
-  editor, 
-  range, 
-  insertLink = true 
-}: SubNotaCreationOptions) {
-  try {
-    if (!title.trim()) {
-      throw new Error('Title cannot be empty')
-    }
+/**
+ * Prepare the parent link without dispatching it, then commit parent content
+ * and child metadata/content as one authority transition. The editor changes
+ * only after durability succeeds, so a failed create leaves the parent intact.
+ */
+export async function createLinkedSubNota({
+  parentId,
+  title,
+  editor,
+  range,
+}: LinkedSubNotaCreationOptions) {
+  const normalizedTitle = title.trim()
+  if (!normalizedTitle) throw new Error('Title cannot be empty.')
+  if (!parentId.trim()) throw new Error('Parent nota is unavailable.')
 
-    // Validate parentId to ensure it's a non-empty string
-    const validParentId = parentId && typeof parentId === 'string' && parentId.trim() !== '' 
-      ? parentId.trim() 
-      : null
-    
-    console.log(`SubNotaService creating nota with parentId: ${validParentId}`)
-    
-    const store = useNotaStore()
-    const newNota = await store.createItem(title.trim(), validParentId)
-    
-    console.log('SubNotaService created nota:', JSON.stringify(newNota, null, 2))
+  const childId = nanoid()
+  const initialDoc = editor.state.doc
+  const nodeType = editor.state.schema.nodes.subNotaLink
+  if (!nodeType) throw new Error('Sub-nota links are unavailable in this editor.')
 
-    // Insert page link if editor and range are provided
-    if (insertLink && editor && range) {
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
-        .insertContent({
-          type: 'pageLink',
-          attrs: {
-            href: `/nota/${newNota.id}`,
-            title: title,
-          },
-        })
-        .run()
-        
-      // Trigger content save by dispatching an update event
-      const transaction = editor.state.tr
-      editor.view.dispatch(transaction)
-    }
-
-    return {
-      success: true,
-      notaId: newNota.id,
-      title: newNota.title,
-      nota: newNota
-    }
-  } catch (error) {
-    logger.error('Failed to create sub nota:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
-    }
+  const link = nodeType.create({
+    targetNotaId: childId,
+    targetNotaTitle: normalizedTitle,
+    displayText: normalizedTitle,
+    linkStyle: 'inline',
+  })
+  let transaction = editor.state.tr
+  if (range) {
+    transaction = transaction.delete(range.from, range.to)
+    transaction = transaction.setSelection(TextSelection.near(transaction.doc.resolve(range.from)))
   }
-} 
+  transaction = transaction.replaceSelectionWith(link).scrollIntoView()
+  const parentDocument = transaction.doc.toJSON()
 
-
-
-
-
-
-
+  const child = await useNotaStore().createLinkedSubNota(
+    parentId,
+    childId,
+    normalizedTitle,
+    parentDocument,
+  )
+  if (editor.state.doc !== initialDoc) {
+    throw new Error('The parent nota changed while the sub-nota was being created. Reload to view the committed link.')
+  }
+  editor.view.dispatch(transaction)
+  return child
+}

@@ -3,9 +3,9 @@ import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/features/auth/stores/auth'
 import { useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import UserTagEditor from '@/features/auth/components/UserTagEditor.vue'
+import AuthFeedback from '@/features/auth/components/AuthFeedback.vue'
 import {
   Card,
   CardContent,
@@ -15,7 +15,6 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Mail, User, ShieldCheck, Calendar, Clock, AtSign } from 'lucide-vue-next'
-import { toast } from 'vue-sonner'
 import { formatDate } from '@/lib/utils'
 import { logger } from '@/services/logger'
 
@@ -25,10 +24,10 @@ const router = useRouter()
 // User state
 const currentUser = computed(() => authStore.currentUser)
 const isLoading = ref(false)
-
-// Account deletion confirmation
-const showDeleteConfirmation = ref(false)
-const deleteConfirmationText = ref('')
+const localError = ref<string | null>(null)
+const resetSuccess = ref<string | null>(null)
+const isLoggingOut = ref(false)
+const feedbackError = computed(() => localError.value || authStore.errorMessage)
 
 onMounted(() => {
   // Redirect to login if user not authenticated
@@ -47,33 +46,20 @@ const formatDateDisplay = (dateString: string) => {
 const handleResetPassword = async () => {
   if (!currentUser.value?.email) return
 
+  localError.value = null
+  resetSuccess.value = null
+  authStore.clearError()
   isLoading.value = true
 
   try {
-    await authStore.resetPassword(currentUser.value.email)
+    const reset = await authStore.resetPassword(currentUser.value.email)
+    if (reset === true) {
+      resetSuccess.value = 'Password reset email sent. Check your inbox for reset instructions.'
+    } else if (!authStore.errorMessage) {
+      localError.value = 'Password reset email could not be sent. Check your email and try again.'
+    }
   } catch (error) {
-    logger.error('Password reset error:', error)
-  } finally {
-    isLoading.value = false
-  }
-}
-
-// Handle account deletion (in a real app, this would need server-side implementation)
-const handleDeleteAccount = async () => {
-  if (deleteConfirmationText.value !== 'DELETE') {
-    toast('Please type DELETE to confirm account deletion', { description: 'Confirmation Required' })
-    return
-  }
-
-  isLoading.value = true
-
-  try {
-    // In a real app, you would call a server-side function to delete the user's account
-    toast('Account deletion is not implemented in this demo', { description: 'Demo Limitation' })
-    showDeleteConfirmation.value = false
-    deleteConfirmationText.value = ''
-  } catch (error) {
-    logger.error('Account deletion error:', error)
+    localError.value = error instanceof Error ? error.message : 'Password reset failed'
   } finally {
     isLoading.value = false
   }
@@ -81,11 +67,22 @@ const handleDeleteAccount = async () => {
 
 // Handle logout
 const handleLogout = async () => {
+  if (isLoggingOut.value) return
+  localError.value = null
+  authStore.clearError()
+  isLoggingOut.value = true
   try {
-    await authStore.logout()
-    router.push('/')
+    const signedOut = await authStore.logout()
+    if (signedOut) {
+      await router.push('/')
+    } else if (!authStore.errorMessage) {
+      localError.value = 'Sign out failed. Check your connection and try again.'
+    }
   } catch (error) {
     logger.error('Logout error:', error)
+    localError.value = error instanceof Error ? error.message : 'Sign out failed. Try again.'
+  } finally {
+    isLoggingOut.value = false
   }
 }
 </script>
@@ -96,7 +93,9 @@ const handleLogout = async () => {
       <!-- Profile Header -->
       <div class="flex items-center justify-between">
         <h1 class="text-2xl font-bold">Your Profile</h1>
-        <Button @click="handleLogout" variant="outline">Logout</Button>
+        <Button @click="handleLogout" variant="outline" :disabled="isLoggingOut">
+          {{ isLoggingOut ? 'Signing out…' : 'Logout' }}
+        </Button>
       </div>
 
       <!-- Profile Info Card -->
@@ -183,6 +182,7 @@ const handleLogout = async () => {
           </div>
         </CardContent>
         <CardFooter class="flex flex-col space-y-4">
+          <AuthFeedback :error="feedbackError" :success="resetSuccess" />
           <Button
             variant="outline"
             class="w-full"
@@ -194,65 +194,6 @@ const handleLogout = async () => {
         </CardFooter>
       </Card>
 
-      <!-- Danger Zone -->
-      <Card class="border-red-200 dark:border-red-800">
-        <CardHeader>
-          <CardTitle class="text-red-600 dark:text-red-400">Danger Zone</CardTitle>
-          <CardDescription>
-            Actions in this section can result in permanent data loss
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p class="text-sm text-muted-foreground mb-4">
-            Deleting your account will remove all your data and cannot be undone.
-          </p>
-          <template v-if="!showDeleteConfirmation">
-            <Button
-              variant="destructive"
-              @click="showDeleteConfirmation = true"
-              :disabled="isLoading"
-            >
-              Delete Account
-            </Button>
-          </template>
-          <div v-else class="space-y-4">
-            <div class="space-y-2">
-              <Label for="confirmDelete">Type DELETE to confirm</Label>
-              <Input
-                id="confirmDelete"
-                :value="deleteConfirmationText"
-                class-name=""
-                type="text"
-                placeholder="DELETE"
-                @input="
-                  (e: Event) => (deleteConfirmationText = (e.target as HTMLInputElement).value)
-                "
-              />
-            </div>
-            <div class="flex gap-2">
-              <Button
-                variant="destructive"
-                @click="handleDeleteAccount"
-                :disabled="isLoading || deleteConfirmationText !== 'DELETE'"
-              >
-                Confirm Delete
-              </Button>
-              <Button
-                variant="outline"
-                @click="
-                  () => {
-                    showDeleteConfirmation = false
-                    deleteConfirmationText = ''
-                  }
-                "
-                :disabled="isLoading"
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
 
     <!-- Loading state -->
@@ -263,11 +204,6 @@ const handleLogout = async () => {
     </div>
   </div>
 </template>
-
-
-
-
-
 
 
 

@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "watermark": "2026-08-13T12:00:00.000Z",
+  "authUsers": [
+    { "uid": "legacy-alice", "email": "alice@example.test", "emailVerified": true, "provider": "email", "displayName": "Alice" },
+    { "uid": "legacy-bob", "email": "bob@example.test", "emailVerified": true, "provider": "email", "displayName": "Bob" }
+  ],
+  "collections": {
+    "users": [
+      { "id": "legacy-alice", "displayName": "Alice", "userTag": "Alice", "createdAt": { "seconds": 1750000000, "nanoseconds": 123456789 }, "lastUpdatedAt": "2026-08-10T10:30:00-07:00" },
+      { "id": "legacy-bob", "displayName": "Bob", "userTag": "bob_2", "createdAt": "2025-06-15T12:00:01Z", "lastUpdatedAt": "2026-08-10T18:00:00Z" }
+    ],
+    "publicProfiles": [
+      { "id": "legacy-alice", "displayName": "Alice", "userTag": "Alice", "photoURL": "https://example.test/alice.png", "lastUpdatedAt": "2026-08-10T17:30:00Z" },
+      { "id": "legacy-bob", "displayName": "Bob", "userTag": "bob_2", "photoURL": "", "lastUpdatedAt": "2026-08-10T18:00:00Z" }
+    ],
+    "userTags": [
+      { "id": "Alice", "uid": "legacy-alice", "createdAt": "2025-06-15T12:00:02Z", "lastUpdatedAt": "2026-08-10T17:30:00Z" },
+      { "id": "bob_2", "uid": "legacy-bob", "createdAt": "2025-06-15T12:00:03Z", "lastUpdatedAt": "2026-08-10T18:00:00Z" }
+    ],
+    "notas": [
+      { "id": "legacy-private-1", "userId": "legacy-alice", "title": "Private fixture", "content": { "blocks": [{ "text": "restricted" }] } }
+    ],
+    "publishedNotas": [
+      {
+        "id": "pub-child", "authorId": "legacy-alice", "authorName": "Alice", "title": "Child", "content": { "type": "doc", "content": [] },
+        "isPublic": true, "isSubPage": true, "parentId": "pub-root", "publishedSubPages": [], "citations": [], "tags": ["child"],
+        "publishedAt": "2026-08-01T01:00:00Z", "updatedAt": "2026-08-02T02:00:00Z", "lastViewedAt": null,
+        "viewCount": 0, "uniqueViewers": 0, "likeCount": 0, "dislikeCount": 0, "cloneCount": 0, "commentCount": 0,
+        "votes": {}, "stats": { "dailyViews": {}, "weeklyViews": {}, "monthlyViews": {} }, "referrers": {}
+      },
+      {
+        "id": "pub-root", "authorId": "legacy-alice", "authorName": "Alice", "title": "Root", "content": "{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"Hello\"}]}]}",
+        "isPublic": true, "isSubPage": false, "parentId": null, "publishedSubPages": ["pub-child"],
+        "citations": [{ "url": "https://example.test/first", "title": "First" }, { "url": "https://example.test/second", "title": "Second" }], "tags": ["fixture", "root"],
+        "publishedAt": { "_seconds": 1754006400, "_nanoseconds": 9000 }, "updatedAt": "2026-08-11T03:04:05.678Z", "lastViewedAt": "2026-08-12T09:00:00Z",
+        "viewCount": 5, "uniqueViewers": 2, "likeCount": 1, "dislikeCount": 0, "cloneCount": 3, "commentCount": 2,
+        "votes": { "legacy-bob": "like" },
+        "stats": { "dailyViews": { "2026-08-12": 5 }, "weeklyViews": { "2026-W33": 5 }, "monthlyViews": { "2026-08": 5 } },
+        "referrers": { "direct": 4, "docs.example.test/path.with.dots": 1 }
+      }
+    ],
+    "publishedNotaViewers": [
+      { "id": "pub-root", "viewers": ["legacy-alice", "legacy-bob"], "lastUpdated": "2026-08-12T09:00:00Z" }
+    ],
+    "publishedNotaViewerDocuments": [
+      { "notaId": "pub-root", "userId": "legacy-bob", "firstViewedAt": "2026-08-11T09:00:00Z" }
+    ],
+    "notaVotes": [
+      { "notaId": "pub-root", "userId": "legacy-bob", "voteType": "like", "createdAt": "2026-08-10T08:00:00Z", "updatedAt": "2026-08-12T08:00:00Z" }
+    ],
+    "comments": [
+      { "id": "comment-reply", "notaId": "pub-root", "authorId": "legacy-alice", "authorName": "Alice", "authorTag": "Alice", "content": "reply", "parentId": "comment-root", "likeCount": 0, "dislikeCount": 0, "replyCount": 0, "votes": {}, "createdAt": "2026-08-12T10:01:00Z", "updatedAt": "2026-08-12T10:01:00Z" },
+      { "id": "comment-root", "notaId": "pub-root", "authorId": "legacy-bob", "authorName": "Bob", "authorTag": "bob_2", "content": { "text": "root comment" }, "parentId": null, "likeCount": 1, "dislikeCount": 0, "replyCount": 1, "votes": { "legacy-alice": "like" }, "createdAt": "2026-08-12T10:00:00Z", "updatedAt": "2026-08-12T10:02:00Z" }
+    ],
+    "newsletterSubscriptions": [
+      { "id": "legacy-bob", "email": "bob@example.test", "displayName": "Bob", "subscribedAt": "2026-08-01T00:00:00Z" }
+    ]
+  },
+  "storageManifest": [
+    { "path": "profile-images/legacy-alice/avatar.png", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "mediaType": "image/png", "ownerUid": "legacy-alice" }
+  ]
+}

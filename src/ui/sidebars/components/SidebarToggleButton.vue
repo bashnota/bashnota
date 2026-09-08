@@ -5,13 +5,13 @@
     @click="$emit('toggle')"
     :title="isOpen ? 'Close sidebar' : 'Open sidebar'"
   >
-    <component :is="isOpen ? closeIcon : openIcon" class="h-4 w-4" />
+    <component :is="isOpen ? displayCloseIcon : openIcon" class="h-4 w-4" />
   </button>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { ChevronLeft, ChevronRight, X, Menu } from 'lucide-vue-next'
+import { ChevronLeft, ChevronRight, X } from 'lucide-vue-next';
 import type { Component } from 'vue'
 
 export interface SidebarToggleButtonProps {
@@ -43,7 +43,7 @@ const effectiveCloseIcon = computed(() => {
 
 // Define what icons to show based on sidebar state
 const openIcon = computed(() => props.isOpen ? X : effectiveOpenIcon.value)
-const closeIcon = computed(() => effectiveCloseIcon.value)
+const displayCloseIcon = computed(() => effectiveCloseIcon.value)
 
 // Emit toggle event to parent
 defineEmits(['toggle'])
@@ -59,7 +59,6 @@ defineEmits(['toggle'])
   background-color: var(--muted);
 }
 </style>
-
 
 
 

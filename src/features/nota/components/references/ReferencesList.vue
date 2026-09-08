@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { Edit, Trash2, ExternalLink, Copy, MoreHorizontal } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -19,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import type { CitationEntry } from '@/features/nota/types/nota'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 
 const props = defineProps<{
   citations: CitationEntry[]

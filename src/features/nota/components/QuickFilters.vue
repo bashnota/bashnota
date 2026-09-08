@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Filter, X } from 'lucide-vue-next'
+import { Filter } from 'lucide-vue-next';
 import type { FilterOption } from '@/features/nota/composables/useNotaFilters'
 
 interface Props {
@@ -42,7 +42,7 @@ const badgeSizes = {
 
 <template>
   <div class="flex flex-wrap items-center gap-2">
-    <div class="flex items-center gap-2">
+    <div v-if="label" class="flex items-center gap-2">
       <Filter :class="['text-muted-foreground', iconSizes[size]]" />
       <span :class="['font-medium text-muted-foreground', size === 'sm' ? 'text-xs' : 'text-sm']">
         {{ label }}

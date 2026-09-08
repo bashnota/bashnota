@@ -311,8 +311,8 @@ import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { toTypedSchema } from "@vee-validate/zod"
 import { useForm } from "vee-validate"
 import * as z from "zod"
-import { NodeViewWrapper } from '@tiptap/vue-3'
-import type { NodeViewProps } from '@tiptap/vue-3'
+import { NodeViewWrapper } from '@/features/editor/pm'
+import type { NodeViewProps } from '@/features/editor/pm'
 import { 
   Pencil, 
   ChevronRight, 
@@ -327,14 +327,7 @@ import {
 } from 'lucide-vue-next'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import {
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form"
+import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
@@ -370,7 +363,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import MixedContentDisplay from './MixedContentDisplay.vue'
 import { logger } from '@/services/logger'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 
 // Props - use NodeViewProps interface
 const props = defineProps<NodeViewProps>()
@@ -579,7 +572,9 @@ const duplicateTheorem = () => {
     }
     
     // Insert the new theorem after the current one
-    const pos = props.getPos() + props.node.nodeSize
+    const nodePos = props.getPos()
+    if (typeof nodePos !== 'number') return
+    const pos = nodePos + props.node.nodeSize
     props.editor.chain().focus().insertContentAt(pos, newTheorem).run()
     
     toast('Theorem duplicated successfully')
@@ -747,8 +742,6 @@ kbd {
   }
 }
 </style>
-
-
 
 
 

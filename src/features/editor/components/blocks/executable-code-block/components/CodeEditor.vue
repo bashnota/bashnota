@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { ref } from 'vue'
 import { Copy, Check } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import CodeMirror from '../CodeMirror.vue'

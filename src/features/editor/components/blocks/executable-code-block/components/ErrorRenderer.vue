@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { parseJupyterError, formatErrorForDisplay, isJupyterError } from '@/features/editor/utils/jupyterErrorParser'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import { ref } from 'vue'
 
 interface Props {
@@ -125,7 +125,7 @@ const copyError = async () => {
     </div>
     
     <!-- Error Details (Collapsible) -->
-    <div v-if="formattedError?.details || showFullError">
+    <div v-if="formattedError?.details">
       <Collapsible v-model:open="isDetailsOpen">
         <CollapsibleTrigger as-child>
           <Button variant="ghost" size="sm" class="h-auto p-2 justify-start gap-2 text-muted-foreground hover:text-foreground">

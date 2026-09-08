@@ -64,11 +64,15 @@ export const useLayoutStore = defineStore('layout', () => {
   
   // Save to localStorage
   watch(
-    panes,
+    () => panes.value.map((pane) => ({
+      id: pane.id,
+      notaId: pane.notaId,
+      isActive: pane.isActive,
+      tabHistory: [...(pane.tabHistory ?? [])],
+    })),
     (newPanes) => {
       localStorage.setItem('layout-panes', JSON.stringify(newPanes))
     },
-    { deep: true }
   )
   
   watch(
@@ -322,4 +326,4 @@ export const useLayoutStore = defineStore('layout', () => {
     switchToTabInPane,
     initializeLayout
   }
-}) 
+})

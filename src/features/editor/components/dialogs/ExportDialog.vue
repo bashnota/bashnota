@@ -115,11 +115,9 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Download, FileText, Globe } from 'lucide-vue-next'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useBlockStore } from '@/features/nota/stores/blockStore'
-import { Editor } from '@tiptap/vue-3'
-import { getEditorExtensions } from '@/features/editor/components/extensions'
 import { exportNotaToHtml } from '@/features/editor/services/exportService'
 
 interface Props {
@@ -451,7 +449,7 @@ const exportDocument = async () => {
       } catch (error) {
         console.error('HTML Export failed', error)
         toast('Export failed', {
-          description: 'Failed to export HTML package.',
+          description: error instanceof Error ? error.message : 'Failed to export HTML package.',
           duration: 3000
         })
       }

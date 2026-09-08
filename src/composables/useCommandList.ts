@@ -119,8 +119,8 @@ export function useCommandList({ items, onCommand }: UseCommandListOptions) {
 
   // Mouse event handlers
   const handleMouseEnter = (item: CommandItem) => {
-    const index = itemToGlobalIndex.value.get(item)
-    if (index !== undefined) {
+    const index = flatItems.value.findIndex(candidate => candidate.title === item.title)
+    if (index >= 0) {
       selectItem(index)
     }
   }

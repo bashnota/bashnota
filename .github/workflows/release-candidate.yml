@@ -1,0 +1,87 @@
+name: Pre-tag release candidate
+run-name: Pre-tag v${{ inputs.version }} at ${{ github.sha }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact SemVer from package.json and CHANGELOG.md (without v)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  package:
+    name: Gate and package exact master commit before tagging
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout exact candidate with complete history
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Bind candidate version and master commit
+        shell: bash
+        env:
+          CANDIDATE_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          node scripts/release/validate-release-version.mjs "$CANDIDATE_VERSION"
+          test "$(node -p "require('./package.json').version")" = "$CANDIDATE_VERSION"
+          git fetch origin master
+          candidate_sha="$(git rev-parse HEAD)"
+          test "$candidate_sha" = "${GITHUB_SHA}"
+          test "$candidate_sha" = "$(git rev-parse origin/master)"
+          echo "RELEASE_VERSION=$CANDIDATE_VERSION" >> "$GITHUB_ENV"
+          echo "RELEASE_COMMIT=$candidate_sha" >> "$GITHUB_ENV"
+      - name: Require successful Quality workflow for exact commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          runs="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${RELEASE_COMMIT}&status=success&per_page=100")"
+          quality_run_id="$(jq -r --arg sha "$RELEASE_COMMIT" '[.workflow_runs[] | select(.head_sha == $sha and .conclusion == "success" and .event == "push" and .head_branch == "master")] | sort_by(.created_at) | last | .id // empty' <<<"$runs")"
+          test -n "$quality_run_id"
+          echo "QUALITY_RUN_ID=$quality_run_id" >> "$GITHUB_ENV"
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22.14.0
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Run every release gate
+        run: |
+          npm audit --omit=dev --audit-level=high
+          npm run release:check
+      - name: Build archive twice and require reproducibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run release:package -- --version "$RELEASE_VERSION" --quality-run-id "$QUALITY_RUN_ID" --release-run-id "$GITHUB_RUN_ID" --output "release/bashnota-${RELEASE_VERSION}.tar.gz"
+          npm run release:package -- --version "$RELEASE_VERSION" --quality-run-id "$QUALITY_RUN_ID" --release-run-id "$GITHUB_RUN_ID" --output "/tmp/bashnota-${RELEASE_VERSION}.tar.gz"
+          cmp "release/bashnota-${RELEASE_VERSION}.tar.gz" "/tmp/bashnota-${RELEASE_VERSION}.tar.gz"
+          (
+            cd release
+            sha256sum --check "bashnota-${RELEASE_VERSION}.tar.gz.sha256"
+          )
+      - name: Refuse a candidate superseded on master
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin master
+          test "$RELEASE_COMMIT" = "$(git rev-parse origin/master)"
+      - name: Upload immutable pre-tag evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bashnota-v${{ inputs.version }}-pretag-${{ github.sha }}
+          path: |
+            release/*.tar.gz
+            release/*.sha256
+          if-no-files-found: error

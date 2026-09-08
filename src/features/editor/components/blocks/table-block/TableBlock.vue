@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { onMounted, watch, ref } from 'vue'
-import { NodeViewWrapper } from '@tiptap/vue-3'
+import { NodeViewWrapper } from '@/features/editor/pm'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { TableData } from '@/features/editor/components/blocks/table-block/TableExtension'
-import type { NodeViewProps } from '@tiptap/vue-3'
+import type { NodeViewProps } from '@/features/editor/pm'
 import { logger } from '@/services/logger'
 
 // Import composables
@@ -86,9 +86,9 @@ const updateNodeAttributes = () => {
       }))
     };
     
-    // Update node attributes with clean data
-    props.node.attrs.tableData = cleanTableData;
-    
+    // Update node attributes through a ProseMirror transaction rather than
+    // mutating the prop directly (vue/no-mutating-props): the direct write
+    // bypassed the editor state and was immediately overwritten below.
     // Use updateAttributes if available (preferred method)
     if (props.updateAttributes) {
       props.updateAttributes({
@@ -399,7 +399,6 @@ const handleReorderRows = async (fromRowId: string, toRowId: string) => {
   margin: 0 !important;
 }
 </style>
-
 
 
 

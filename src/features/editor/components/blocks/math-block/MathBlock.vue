@@ -40,8 +40,8 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onErrorCaptured } from 'vue'
-import { NodeViewWrapper } from '@tiptap/vue-3'
-import type { NodeViewProps } from '@tiptap/vue-3'
+import { NodeViewWrapper } from '@/features/editor/pm'
+import type { NodeViewProps } from '@/features/editor/pm'
 import { Card, CardContent } from '@/components/ui/card'
 import MathDisplay from './MathDisplay.vue'
 import MathInput from './MathInput.vue'
@@ -103,7 +103,6 @@ onErrorCaptured((err, instance, info) => {
   return false
 })
 </script>
-
 
 
 

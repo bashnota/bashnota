@@ -32,9 +32,9 @@
           </RouterLink>
         </Button>
         <Button variant="outline" asChild class="flex-1">
-          <RouterLink to="/docs" class="flex items-center gap-2">
+          <RouterLink to="/settings" class="flex items-center gap-2">
             <BookOpen class="h-4 w-4" />
-            Documentation
+            Open Settings
           </RouterLink>
         </Button>
       </div>
@@ -42,13 +42,13 @@
       <!-- Additional Help -->
       <div class="pt-6 border-t border-border">
         <p class="text-xs text-muted-foreground">
-          Need help? Check out our 
-          <RouterLink to="/help" class="text-primary hover:underline">
-            help center
+          Need help? Return to the
+          <RouterLink to="/" class="text-primary hover:underline">
+            home page
           </RouterLink>
           or
-          <RouterLink to="/contact" class="text-primary hover:underline">
-            contact support
+          <RouterLink to="/settings" class="text-primary hover:underline">
+            open settings
           </RouterLink>
         </p>
       </div>
@@ -60,4 +60,4 @@
 import { RouterLink } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import { Home, BookOpen } from 'lucide-vue-next'
-</script> 
+</script>

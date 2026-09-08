@@ -37,7 +37,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { onMounted, watch } from 'vue';
 import type { Component } from 'vue'
 import { useSidebarStore } from '@/stores/sidebarStore'
 import SidebarHeader from './components/SidebarHeader.vue'

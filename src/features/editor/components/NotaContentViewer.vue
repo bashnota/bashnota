@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue'
-import { useEditor, EditorContent } from '@tiptap/vue-3'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
+import { useEditor, EditorContent } from '@/features/editor/pm'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { ListIcon } from 'lucide-vue-next'
@@ -9,18 +9,16 @@ import { getViewerExtensions } from '@/features/editor/components/extensions'
 import TableOfContents from '@/features/editor/components/ui/TableOfContents.vue'
 import { logger } from '@/services/logger'
 import { useCitationStore } from '@/features/editor/stores/citationStore'
-import { Editor } from '@tiptap/core'
-import type { EditorOptions } from '@tiptap/core'
-import { Node as ProseMirrorNode } from 'prosemirror-model'
-import { EditorView } from 'prosemirror-view'
+import type { Editor } from '@/features/editor/pm'
 import { useCodeExecutionStore } from '@/features/editor/stores/codeExecutionStore'
+import { normalizeCloudPublishedContent, type CloudPublishedContent } from '@/services/cloud/types'
 
 // Import shared CSS
 import '@/assets/editor-styles.css'
 
 // Define props
 const props = defineProps<{
-  content: string | null
+  content: CloudPublishedContent | string | null
   readonly?: boolean
   citations?: any[] // Add citations prop
   isPublished?: boolean // Add isPublished prop
@@ -80,7 +78,7 @@ const registerCodeCells = (content: any) => {
 
 // Create a read-only editor instance with our shared extensions
 const editor = useEditor({
-  content: props.content ? JSON.parse(props.content) : null,
+  content: normalizeCloudPublishedContent(props.content),
   extensions: getViewerExtensions(),
   editable: false, // Read-only mode
   onCreate({ editor }: { editor: Editor }) {
@@ -88,106 +86,8 @@ const editor = useEditor({
     isLoading.value = false
     // Emit an event when the editor is created and content is loaded
     emit('content-rendered')
-  },
-  nodeViews: {
-    citation: (node: ProseMirrorNode, view: EditorView, getPos: () => number, decorations: any) => {
-      return {
-        dom: document.createElement('span'),
-        update: (node: ProseMirrorNode) => {
-          return true
-        },
-        destroy: () => {},
-        selectNode: () => {},
-        deselectNode: () => {},
-      }
-    },
-    notaTable: (node: ProseMirrorNode, view: EditorView, getPos: () => number, decorations: any) => {
-      // Create a container for the table
-      const container = document.createElement('div')
-      container.className = 'data-table'
-
-      // Get the table data from the node attributes
-      const tableData = node.attrs.tableData
-
-      if (tableData) {
-        // Create a table element
-        const table = document.createElement('table')
-        table.className = 'data-table-content'
-
-        // Create the header row
-        const thead = document.createElement('thead')
-        const headerRow = document.createElement('tr')
-        tableData.columns.forEach((column: any) => {
-          const th = document.createElement('th')
-          th.textContent = column.title
-          headerRow.appendChild(th)
-        })
-        thead.appendChild(headerRow)
-        table.appendChild(thead)
-
-        // Create the body
-        const tbody = document.createElement('tbody')
-        tableData.rows.forEach((row: any) => {
-          const tr = document.createElement('tr')
-          tableData.columns.forEach((column: any) => {
-            const td = document.createElement('td')
-            td.textContent = row.cells[column.id] || ''
-            tr.appendChild(td)
-          })
-          tbody.appendChild(tr)
-        })
-        table.appendChild(tbody)
-
-        container.appendChild(table)
-      }
-
-      return {
-        dom: container,
-        update: (node: ProseMirrorNode) => {
-          return true
-        },
-        destroy: () => {},
-        selectNode: () => {},
-        deselectNode: () => {},
-      }
-    },
-    bibliography: (node: ProseMirrorNode, view: EditorView, getPos: () => number, decorations: any) => {
-      const dom = document.createElement('div')
-      dom.className = 'bibliography-wrapper'
-      
-      return {
-        dom,
-        update: (node: ProseMirrorNode) => {
-          return true
-        },
-        destroy: () => {},
-        selectNode: () => {},
-        deselectNode: () => {},
-        stopEvent: () => false,
-        ignoreMutation: () => true,
-        render: () => {
-          return {
-            dom,
-            update: (node: ProseMirrorNode) => {
-              return true
-            },
-            destroy: () => {},
-            selectNode: () => {},
-            deselectNode: () => {},
-            stopEvent: () => false,
-            ignoreMutation: () => true,
-            props: {
-              node,
-              updateAttributes: () => {},
-              editor: editor.value,
-              citations: props.citations
-            }
-          }
-        }
-      }
-    }
   }
-} as unknown as EditorOptions)
+})
 
 // Check if there are any headings in the document
 const hasHeadings = computed(() => {
@@ -227,7 +127,8 @@ watch(
   (newContent) => {
     if (editor.value && newContent) {
       try {
-        editor.value.commands.setContent(JSON.parse(newContent))
+        const normalized = normalizeCloudPublishedContent(newContent)
+        if (normalized) editor.value.commands.setContent(normalized)
       } catch (err) {
         logger.error('Error parsing content:', err)
       }
@@ -238,18 +139,32 @@ watch(
 // Initial loading state
 const isLoading = ref(true)
 
+// Hold the editor-ready polling interval so it can be cleared on unmount
+let readyInterval: ReturnType<typeof setInterval> | null = null
+
 // Set loading to false when editor is ready
 onMounted(() => {
   if (editor.value) {
     isLoading.value = false
   } else {
     // If editor isn't ready yet, wait for it
-    const interval = setInterval(() => {
+    readyInterval = setInterval(() => {
       if (editor.value) {
         isLoading.value = false
-        clearInterval(interval)
+        if (readyInterval) {
+          clearInterval(readyInterval)
+          readyInterval = null
+        }
       }
     }, 100)
+  }
+})
+
+// Ensure the polling interval never outlives the component
+onUnmounted(() => {
+  if (readyInterval) {
+    clearInterval(readyInterval)
+    readyInterval = null
   }
 })
 </script>
@@ -271,7 +186,7 @@ onMounted(() => {
         class="border-r h-full"
       >
         <ScrollArea class="h-full px-4 py-4">
-          <TableOfContents :editor="editor" />
+          <TableOfContents :editor="editor ?? undefined" />
         </ScrollArea>
       </div>
     </div>
@@ -330,11 +245,6 @@ a[data-type='page-link']:hover {
   background-color: rgba(0, 0, 0, 0.05);
 }
 </style>
-
-
-
-
-
 
 
 

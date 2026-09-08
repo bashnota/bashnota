@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { RotateCw, Eye, Palette } from 'lucide-vue-next'
@@ -117,28 +117,33 @@ watch([textColor, lightModeTextColor], () => {
   applyTextColor()
 }, { immediate: true })
 
+// Hold the theme-mode observer so it can be disconnected on unmount
+let themeObserver: MutationObserver | null = null
+
 onMounted(() => {
   // Apply initial text color
   applyTextColor()
-  
+
   // Watch for theme mode changes (light/dark) to reapply text color
-  const observer = new MutationObserver((mutations) => {
+  themeObserver = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
       if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
         applyTextColor()
       }
     })
   })
-  
-  observer.observe(document.documentElement, {
+
+  themeObserver.observe(document.documentElement, {
     attributes: true,
     attributeFilter: ['class']
   })
-  
-  // Clean up observer on unmount
-  const cleanup = () => observer.disconnect()
-  if (typeof window !== 'undefined') {
-    window.addEventListener('beforeunload', cleanup)
+})
+
+// Disconnect the observer when the component unmounts
+onUnmounted(() => {
+  if (themeObserver) {
+    themeObserver.disconnect()
+    themeObserver = null
   }
 })
 

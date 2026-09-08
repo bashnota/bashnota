@@ -1,17 +1,19 @@
+import { redactLogArguments, redactSensitiveString } from '@/utils/redactSensitiveData'
+
 /**
  * Logger service that controls logging based on environment
  * Ensures logs only appear in development and errors are properly handled in all environments
  */
 class Logger {
-  private static instance: Logger;
-  private isDevMode: boolean;
-  private enableDebugLogs: boolean;
+  private static instance: Logger
+  private isDevMode: boolean
+  private enableDebugLogs: boolean
 
   constructor() {
     // Check if we're in development mode
-    this.isDevMode = import.meta.env.DEV === true;
+    this.isDevMode = import.meta.env.DEV === true
     // Allow debug logs in production with special flag
-    this.enableDebugLogs = import.meta.env.VITE_ENABLE_DEBUG_LOGS === 'true';
+    this.enableDebugLogs = import.meta.env.VITE_ENABLE_DEBUG_LOGS === 'true'
   }
 
   /**
@@ -19,9 +21,9 @@ class Logger {
    */
   public static getInstance(): Logger {
     if (!Logger.instance) {
-      Logger.instance = new Logger();
+      Logger.instance = new Logger()
     }
-    return Logger.instance;
+    return Logger.instance
   }
 
   /**
@@ -29,7 +31,7 @@ class Logger {
    */
   log(...args: any[]): void {
     if (this.isDevMode) {
-      console.log(...args);
+      console.log(...redactLogArguments(args))
     }
   }
 
@@ -38,7 +40,7 @@ class Logger {
    */
   warn(...args: any[]): void {
     if (this.isDevMode) {
-      console.warn(...args);
+      console.warn(...redactLogArguments(args))
     }
   }
 
@@ -47,7 +49,7 @@ class Logger {
    */
   info(...args: any[]): void {
     if (this.isDevMode) {
-      console.info(...args);
+      console.info(...redactLogArguments(args))
     }
   }
 
@@ -57,7 +59,7 @@ class Logger {
    */
   error(...args: any[]): void {
     // Error logs are preserved in all environments
-    console.error(...args);
+    console.error(...redactLogArguments(args))
   }
 
   /**
@@ -66,7 +68,7 @@ class Logger {
    */
   debug(...args: any[]): void {
     if (this.isDevMode || this.enableDebugLogs) {
-      console.debug('[DEBUG]', ...args);
+      console.debug('[DEBUG]', ...redactLogArguments(args))
     }
   }
 
@@ -75,7 +77,7 @@ class Logger {
    */
   group(label: string): void {
     if (this.isDevMode) {
-      console.group(label);
+      console.group(redactSensitiveString(label))
     }
   }
 
@@ -84,7 +86,7 @@ class Logger {
    */
   groupEnd(): void {
     if (this.isDevMode) {
-      console.groupEnd();
+      console.groupEnd()
     }
   }
 
@@ -93,7 +95,7 @@ class Logger {
    */
   time(label: string): void {
     if (this.isDevMode) {
-      console.time(label);
+      console.time(redactSensitiveString(label))
     }
   }
 
@@ -102,7 +104,7 @@ class Logger {
    */
   timeEnd(label: string): void {
     if (this.isDevMode) {
-      console.timeEnd(label);
+      console.timeEnd(redactSensitiveString(label))
     }
   }
 
@@ -111,7 +113,7 @@ class Logger {
    * @param prefix The prefix to add to all logs from this logger
    */
   createPrefixedLogger(prefix: string): PrefixedLogger {
-    return new PrefixedLogger(this, prefix);
+    return new PrefixedLogger(this, prefix)
   }
 }
 
@@ -120,52 +122,47 @@ class Logger {
  * Useful for services and components to identify their logs
  */
 class PrefixedLogger {
-  constructor(private logger: Logger, private prefix: string) {}
+  constructor(
+    private logger: Logger,
+    private prefix: string,
+  ) {}
 
   log(...args: any[]): void {
-    this.logger.log(`[${this.prefix}]`, ...args);
+    this.logger.log(`[${this.prefix}]`, ...args)
   }
 
   warn(...args: any[]): void {
-    this.logger.warn(`[${this.prefix}]`, ...args);
+    this.logger.warn(`[${this.prefix}]`, ...args)
   }
 
   info(...args: any[]): void {
-    this.logger.info(`[${this.prefix}]`, ...args);
+    this.logger.info(`[${this.prefix}]`, ...args)
   }
 
   error(...args: any[]): void {
-    this.logger.error(`[${this.prefix}]`, ...args);
+    this.logger.error(`[${this.prefix}]`, ...args)
   }
 
   debug(...args: any[]): void {
-    this.logger.debug(`[${this.prefix}]`, ...args);
+    this.logger.debug(`[${this.prefix}]`, ...args)
   }
-  
+
   group(label: string): void {
-    this.logger.group(`[${this.prefix}] ${label}`);
+    this.logger.group(`[${this.prefix}] ${label}`)
   }
-  
+
   groupEnd(): void {
-    this.logger.groupEnd();
+    this.logger.groupEnd()
   }
-  
+
   time(label: string): void {
-    this.logger.time(`[${this.prefix}] ${label}`);
+    this.logger.time(`[${this.prefix}] ${label}`)
   }
-  
+
   timeEnd(label: string): void {
-    this.logger.timeEnd(`[${this.prefix}] ${label}`);
+    this.logger.timeEnd(`[${this.prefix}] ${label}`)
   }
 }
 
 // Export a singleton instance
-export const logger = Logger.getInstance(); 
-
-
-
-
-
-
-
-
+export const logger = Logger.getInstance()

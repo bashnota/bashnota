@@ -50,6 +50,10 @@ import { LockIcon } from 'lucide-vue-next'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 import { logger } from '@/services/logger'
+import {
+  sanitizeSubfigureCaption,
+  sanitizeSubfigureCaptionSource,
+} from '@/features/editor/utils/sanitizeSubfigureCaption'
 
 interface CaptionData {
   label: string
@@ -83,13 +87,19 @@ const renderedCaption = computed(() => {
     return ''
   }
   
-  let text = localCaption.value
+  // Drop all source attributes before allowing KaTeX's trusted layout markup
+  // into the result. The final post-KaTeX sanitizer is the v-html boundary.
+  let text = sanitizeSubfigureCaptionSource(localCaption.value)
   try {
     // Process display math: $$...$$
     text = text.replace(/\$\$([^$]+)\$\$/g, (match, formula) => {
       return katex.renderToString(formula, {
         throwOnError: false,
-        displayMode: true
+        displayMode: true,
+        // The HTML-only KaTeX output avoids generating MathML, which captions
+        // intentionally never permit through their rendering boundary.
+        output: 'html',
+        trust: false,
       })
     })
     
@@ -101,14 +111,16 @@ const renderedCaption = computed(() => {
       }
       return katex.renderToString(formula, {
         throwOnError: false,
-        displayMode: false
+        displayMode: false,
+        output: 'html',
+        trust: false,
       })
     })
     
-    return text
+    return sanitizeSubfigureCaption(text)
   } catch (error) {
     logger.error('KaTeX parsing error:', error)
-    return text
+    return sanitizeSubfigureCaption(text)
   }
 })
 
@@ -166,8 +178,6 @@ onMounted(() => {
   cursor: not-allowed;
 }
 </style>
-
-
 
 
 

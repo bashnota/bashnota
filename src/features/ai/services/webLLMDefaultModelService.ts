@@ -1,5 +1,5 @@
 import { logger } from '@/services/logger'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import type { WebLLMModelInfo } from './types'
 
 export interface DefaultModelConfig {

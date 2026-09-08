@@ -1,26 +1,12 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { 
-  Plus, 
-  MoreHorizontal,
-  Edit,
-  Copy,
-  Trash2,
-  ChevronUp,
-  ChevronDown,
-  RefreshCw,
-  Sparkles,
-  Settings,
-  Zap
-} from 'lucide-vue-next'
+import { Plus, Copy, RefreshCw, Sparkles, Settings, Zap } from 'lucide-vue-next';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 // Base components
 import SettingSection from '@/features/settings/components/base/SettingSection.vue'
 import SettingGroup from '@/features/settings/components/base/SettingGroup.vue'
-import SettingSwitch from '@/features/settings/components/base/SettingSwitch.vue'
 
 // AI Actions components
 import AIActionCard from './components/AIActionCard.vue'
@@ -29,7 +15,7 @@ import AIActionDialog from './components/AIActionDialog.vue'
 // Store and types
 import { useAIActionsStore } from '@/features/ai/stores/aiActionsStore'
 import type { AIAction } from '@/features/ai/types/aiActions'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 
 const aiActionsStore = useAIActionsStore()
 

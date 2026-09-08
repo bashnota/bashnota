@@ -118,6 +118,11 @@ export class CachedStorageService implements IStorageBackend {
     return this.backend.listNotas()
   }
 
+  async clearAll(): Promise<void> {
+    await this.backend.clearAll()
+    this.clearCache()
+  }
+
   /**
    * Batch write multiple notas
    */

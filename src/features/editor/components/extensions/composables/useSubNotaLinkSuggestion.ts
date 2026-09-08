@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue'
-import type { SubNotaLinkItem, SubNotaLinkAttributes } from '../services/SubNotaLinkService'
+import type { SubNotaLinkItem } from '../services/SubNotaLinkService';
 
 export function useSubNotaLinkSuggestion() {
   // State

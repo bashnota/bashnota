@@ -20,7 +20,7 @@ import {
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import ServerListItem from './ServerListItem.vue'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import { logger } from '@/services/logger'
 
 const props = defineProps<{

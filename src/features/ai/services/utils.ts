@@ -1,6 +1,7 @@
 import axios from 'axios';
 import type { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { logger } from '@/services/logger';
+import { redactSensitiveString } from '@/utils/redactSensitiveData';
 
 /**
  * Configuration for retry mechanism
@@ -84,13 +85,21 @@ export async function imageToBase64(image: string): Promise<string> {
  * Handles API errors and provides meaningful error messages
  */
 export function handleApiError(error: any, providerName: string): Error {
-  if (axios.isAxiosError(error) && error.response) {
+  if (axios.isAxiosError(error)) {
+    if (!error.response) {
+      const message = redactSensitiveString(error.message || 'Network request failed');
+      return new Error(`${providerName} request failed: ${message}`);
+    }
+
     const status = error.response.status;
     const data = error.response.data;
-    
+    const responseMessage = redactSensitiveString(
+      typeof data?.error?.message === 'string' ? data.error.message : '',
+    );
+
     switch (status) {
       case 400:
-        return new Error(`${providerName} API error: ${data?.error?.message || 'Bad request'}`);
+        return new Error(`${providerName} API error: ${responseMessage || 'Bad request'}`);
       case 401:
         return new Error(`${providerName} API error: Unauthorized - check your API key`);
       case 403:
@@ -105,19 +114,24 @@ export function handleApiError(error: any, providerName: string): Error {
       case 504:
         return new Error(`${providerName} server error. Please try again later.`);
       default:
-        return new Error(`${providerName} API error: ${status} ${data?.error?.message || error.message}`);
+        return new Error(
+          `${providerName} API error: ${status} ${responseMessage || redactSensitiveString(error.message || 'Request failed')}`,
+        );
     }
   }
-  
-  return error instanceof Error 
-    ? error 
-    : new Error(`Unknown ${providerName} error: ${JSON.stringify(error)}`);
-} 
 
+  if (error instanceof Error) {
+    return new Error(redactSensitiveString(error.message));
+  }
 
-
-
-
-
-
+  let serializedError: string;
+  try {
+    serializedError = JSON.stringify(error) || String(error);
+  } catch {
+    serializedError = String(error);
+  }
+  return new Error(
+    `Unknown ${providerName} error: ${redactSensitiveString(serializedError)}`,
+  );
+}
 

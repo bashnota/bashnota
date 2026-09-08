@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Textarea } from '@/components/ui/textarea'
-import { Separator } from '@/components/ui/separator'
 import { 
   MessageSquare, 
   Send, 
@@ -14,7 +13,7 @@ import {
   Plus,
   Trash2
 } from 'lucide-vue-next'
-import { useAIChat, type ChatThread } from '../composables/useAIChat'
+import { useAIChat } from '../composables/useAIChat';
 import type { ActionExecutionContext } from '../composables/useAIActions'
 
 interface Props {

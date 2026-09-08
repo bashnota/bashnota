@@ -5,8 +5,10 @@
  * in the editor.
  */
 
-// Main extension
-export { Youtube } from './YoutubeExtension'
+// Main extension — the primitives-based port (youtube.node.ts). The former
+// duplicate extension files (youtube-extension.ts = the one live before the port,
+// and the never-imported YoutubeExtension.ts) have been removed.
+export { Youtube } from './youtube.node'
 
 // Components
 export { default as YoutubeBlock } from './YoutubeBlock.vue'

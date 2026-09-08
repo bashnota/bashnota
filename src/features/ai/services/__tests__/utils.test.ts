@@ -198,7 +198,23 @@ describe('AI services utils', () => {
       
       const result = handleApiError(mockError, 'TestProvider')
       
-      expect(result).toBe(mockError)
+      expect(result).not.toBe(mockError)
+      expect(result.message).toBe('Generic error')
+    })
+
+    it('replaces network Axios errors without retaining credential-bearing config', () => {
+      const secret = 'AIzaCredentialMarker012345678901234'
+      const mockError = Object.assign(new Error(`Network error for ?key=${secret}`), {
+        config: { headers: { 'x-goog-api-key': secret } },
+      })
+      vi.mocked(axios.isAxiosError).mockReturnValue(true)
+
+      const result = handleApiError(mockError, 'Gemini')
+
+      expect(result).not.toBe(mockError)
+      expect(result.message).toContain('[REDACTED]')
+      expect(JSON.stringify(result)).not.toContain(secret)
+      expect(result).not.toHaveProperty('config')
     })
 
     it('should handle unknown errors', () => {

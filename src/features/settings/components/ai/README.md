@@ -94,7 +94,7 @@ The `AICodeActionsSettings` component is self-contained and doesn't require any 
 
 ## Store Integration
 
-The component integrates with the `aiActionsStore` which manages:
+The component integrates with the editor-specific `useEditorAIActionsStore` store, registered as `editorAiActions`, which manages:
 - Provider settings
 - Custom actions
 - Error trigger configuration
@@ -210,4 +210,4 @@ Enable debug mode for troubleshooting:
 const DEBUG_AI_SETTINGS = true
 ```
 
-This will show additional debug information in the console and UI. 
+This will show additional debug information in the console and UI.

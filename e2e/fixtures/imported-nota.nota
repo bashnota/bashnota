@@ -1,0 +1,22 @@
+{
+  "version": "1.0",
+  "exportedAt": "2026-01-15T12:00:00.000Z",
+  "nota": {
+    "id": "e2e-imported-nota",
+    "title": "Imported deterministic nota",
+    "parentId": null,
+    "tags": ["fixture"],
+    "createdAt": "2026-01-15T12:00:00.000Z",
+    "updatedAt": "2026-01-15T12:00:00.000Z",
+    "content": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [{ "type": "text", "text": "Imported fixture content" }]
+        }
+      ]
+    }
+  },
+  "subnotas": []
+}

@@ -1,0 +1,2 @@
+-- Intentionally empty. Production-shaped migration fixtures belong in restricted
+-- environments; committed local seeds must never contain personal data.

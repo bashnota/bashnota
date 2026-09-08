@@ -1,8 +1,17 @@
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue';
 import { useBlockStore } from '@/features/nota/stores/blockStore'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import type { Block } from '@/features/nota/types/blocks'
 import { logger } from '@/services/logger'
+import {
+  persistedBlockDataFromDocument,
+} from '@/features/editor/pm/persistedBlockConversion'
+import { db } from '@/db'
+import {
+  captureCanonicalContent,
+  restoreCanonicalContent,
+} from '@/features/nota/services/versionHistoryPersistence'
+import { withNotaPersistence } from '@/services/databaseAdapter'
 
 /**
  * Composable that integrates Tiptap editor with our block-based database
@@ -24,6 +33,32 @@ export function useBlockEditor(notaId: string) {
    * Get the block structure for the current nota
    */
   const blockStructure = computed(() => blockStore.getBlockStructure(notaId))
+
+  const persistCanonicalMutation = async <T>(
+    mutation: () => Promise<T>,
+    alreadyCoordinated = false,
+    persistNotaMetadata = true,
+  ): Promise<T> => {
+    const execute = async () => {
+      if (!isInitialized.value) await initializeBlocks()
+      const canonicalBefore = await captureCanonicalContent(notaId)
+      const memoryBefore = blockStore.captureNotaMemoryState(notaId)
+      try {
+        const result = await mutation()
+        if (persistNotaMetadata && notaStore.getItem(notaId)) {
+          await notaStore.persistCanonicalContent(notaId, true)
+        }
+        return result
+      } catch (error) {
+        await db.transaction('rw', db.tables, async () => {
+          await restoreCanonicalContent(notaId, canonicalBefore)
+        })
+        blockStore.replaceNotaMemoryState(notaId, memoryBefore)
+        throw error
+      }
+    }
+    return alreadyCoordinated ? execute() : withNotaPersistence(notaId, execute)
+  }
 
   /**
    * Initialize blocks for the current nota
@@ -52,65 +87,14 @@ export function useBlockEditor(notaId: string) {
   }
 
   /**
-   * Sanitize data to ensure it can be serialized for database storage
-   */
-  const sanitizeData = (data: any): any => {
-    if (data === null || data === undefined) {
-      return data
-    }
-
-    if (typeof data === 'string' || typeof data === 'number' || typeof data === 'boolean') {
-      return data
-    }
-
-    if (data instanceof Date) {
-      return data.toISOString()
-    }
-
-    if (Array.isArray(data)) {
-      return data.map(item => sanitizeData(item))
-    }
-
-    if (typeof data === 'object') {
-      const sanitized: any = {}
-      for (const [key, value] of Object.entries(data)) {
-        // Skip functions and other non-serializable types
-        if (typeof value !== 'function' && value !== undefined) {
-          sanitized[key] = sanitizeData(value)
-        }
-      }
-      return sanitized
-    }
-
-    // For any other type, return undefined to skip it
-    return undefined
-  }
-
-  /**
-   * Extract text content from Tiptap node safely
-   */
-  const extractTextContent = (node: any): string => {
-    if (!node || typeof node !== 'object') return ''
-
-    if (node.text && typeof node.text === 'string') {
-      return node.text
-    }
-
-    if (node.content && Array.isArray(node.content)) {
-      return node.content
-        .map((child: any) => extractTextContent(child))
-        .filter((text: string) => text.length > 0)
-        .join(' ')
-    }
-
-    return ''
-  }
-
-  /**
    * Sync current Tiptap content to blocks
    * This is the main function that gets called when content changes
    */
-  const syncContentToBlocks = async (tiptapContent: any) => {
+  const syncContentToBlocks = async (
+    tiptapContent: any,
+    alreadyCoordinated = false,
+    persistNotaMetadata = true,
+  ) => {
     if (!isInitialized.value) {
       await initializeBlocks()
     }
@@ -128,268 +112,46 @@ export function useBlockEditor(notaId: string) {
         return
       }
 
-      // Convert Tiptap content to blocks
-      const newBlocks: any[] = []
-      const newBlockOrder: string[] = []
-
-      // Process each Tiptap node
-      if (tiptapContent.content && Array.isArray(tiptapContent.content)) {
-        for (let i = 0; i < tiptapContent.content.length; i++) {
-          const node = tiptapContent.content[i]
-          const order = i
-
-          let blockData: any = {
-            type: 'text', // default type
-            order,
-            notaId,
-          }
-
-          // Convert Tiptap node to block data based on type
-          switch (node.type) {
-            case 'heading':
-              blockData.type = 'heading'
-              blockData.level = node.attrs?.level || 1
-              blockData.content = node.content?.[0]?.text || ''
-              break
-
-            case 'paragraph':
-              // Check if paragraph contains subNotaLink content
-              const hasSubNotaLink = node.content?.some((child: any) => child.type === 'subNotaLink')
-              if (hasSubNotaLink) {
-                // Extract the subNotaLink data from the first subNotaLink child
-                const subNotaLinkChild = node.content.find((child: any) => child.type === 'subNotaLink')
-                if (subNotaLinkChild) {
-                  blockData.type = 'subNotaLink'
-                  blockData.targetNotaId = subNotaLinkChild.attrs?.targetNotaId || ''
-                  blockData.targetNotaTitle = subNotaLinkChild.attrs?.targetNotaTitle || 'Untitled Nota'
-                  blockData.displayText = subNotaLinkChild.attrs?.displayText || subNotaLinkChild.attrs?.targetNotaTitle || 'Untitled Nota'
-                  blockData.linkStyle = subNotaLinkChild.attrs?.linkStyle || 'inline'
-
-                  // Validate required fields for subNotaLink blocks
-                  if (!blockData.targetNotaId) {
-                    logger.warn('subNotaLink block missing targetNotaId, using placeholder')
-                    blockData.targetNotaId = 'placeholder'
-                  }
-                }
-              } else {
-                // Regular paragraph
-                blockData.type = 'text'
-                // Store the full content array to preserve inline nodes (citations, formatting, etc.)
-                // If content is missing, fallback to empty string
-                blockData.content = node.content || ''
-              }
-              break
-
-
-
-            case 'codeBlock':
-              blockData.type = 'code'
-              blockData.language = node.attrs?.language || 'text'
-              blockData.content = node.content?.[0]?.text || ''
-              break
-
-            case 'mathBlock':
-              blockData.type = 'math'
-              blockData.latex = node.content?.[0]?.text || ''
-              blockData.displayMode = node.attrs?.displayMode || false
-              break
-
-            case 'math':
-              blockData.type = 'math'
-              // Some math nodes may carry latex in attrs or content; support both
-              blockData.latex = node.attrs?.latex ?? (node.content?.[0]?.text || '')
-              blockData.displayMode = node.attrs?.displayMode || false
-              break
-
-            case 'table':
-              blockData.type = 'table'
-              blockData.headers = node.content?.[0]?.content?.map((cell: any) =>
-                cell.content?.[0]?.text || ''
-              ) || []
-              blockData.rows = node.content?.slice(1)?.map((row: any) =>
-                row.content?.map((cell: any) =>
-                  cell.content?.[0]?.text || ''
-                ) || []
-              ) || []
-              break
-
-            case 'image':
-              blockData.type = 'image'
-              blockData.src = node.attrs?.src || ''
-              blockData.alt = node.attrs?.alt || ''
-              blockData.caption = node.attrs?.title || ''
-              break
-
-            case 'blockquote':
-              blockData.type = 'quote'
-              blockData.content = node.content?.[0]?.content?.[0]?.text || ''
-              break
-
-            case 'bulletList':
-            case 'orderedList':
-              blockData.type = 'list'
-              blockData.listType = node.type === 'orderedList' ? 'ordered' : 'unordered'
-              blockData.items = node.content?.map((item: any) =>
-                item.content?.[0]?.content?.[0]?.text || ''
-              ) || []
-              break
-
-            case 'horizontalRule':
-              blockData.type = 'horizontalRule'
-              break
-
-            case 'youtube':
-              blockData.type = 'youtube'
-              blockData.videoId = node.attrs?.videoId || ''
-              blockData.title = node.attrs?.title || ''
-              break
-
-            case 'drawio':
-              blockData.type = 'drawio'
-              blockData.diagramData = node.attrs?.diagramData || ''
-              blockData.width = node.attrs?.width
-              blockData.height = node.attrs?.height
-              break
-
-            case 'citation':
-              blockData.type = 'citation'
-              blockData.citationKey = node.attrs?.citationKey || ''
-              blockData.citationData = node.attrs?.citationData || {}
-              break
-
-            case 'bibliography':
-              blockData.type = 'bibliography'
-              blockData.citations = node.attrs?.citations || []
-              break
-
-            case 'subfigure':
-              blockData.type = 'subfigure'
-              blockData.images = node.attrs?.images || []
-              blockData.layout = node.attrs?.layout || 'horizontal'
-              break
-
-            case 'notaTable':
-              blockData.type = 'notaTable'
-              blockData.tableData = node.attrs?.tableData || []
-              blockData.columns = node.attrs?.columns || []
-              break
-
-            case 'aiGeneration':
-              blockData.type = 'aiGeneration'
-              blockData.prompt = node.attrs?.prompt || ''
-              blockData.generatedContent = node.content?.[0]?.text || ''
-              blockData.model = node.attrs?.model
-              blockData.timestamp = new Date()
-              break
-
-            case 'executableCodeBlock':
-              blockData.type = 'executableCodeBlock'
-              blockData.language = node.attrs?.language || 'text'
-              blockData.content = node.content?.[0]?.text || ''
-              blockData.output = node.attrs?.output
-              blockData.sessionId = node.attrs?.sessionId
-              blockData.isExecuting = node.attrs?.isExecuting || false
-              blockData.executionTime = node.attrs?.executionTime
-              blockData.error = node.attrs?.error
-              blockData.kernelPreferences = node.attrs?.kernelPreferences
-              break
-
-            case 'confusionMatrix':
-              blockData.type = 'confusionMatrix'
-              blockData.matrixData = node.attrs?.matrixData
-              blockData.title = node.attrs?.title || 'Confusion Matrix'
-              blockData.source = node.attrs?.source || 'upload'
-              blockData.filePath = node.attrs?.filePath || ''
-              blockData.stats = node.attrs?.stats
-              break
-
-            case 'theorem':
-              blockData.type = 'theorem'
-              blockData.title = node.attrs?.title || 'Theorem'
-              blockData.content = node.attrs?.content || ''
-              blockData.proof = node.attrs?.proof || ''
-              blockData.theoremType = node.attrs?.type || 'theorem'
-              blockData.number = node.attrs?.number
-              blockData.tags = node.attrs?.tags || []
-              break
-
-            case 'pipeline':
-              blockData.type = 'pipeline'
-              blockData.title = node.attrs?.title || 'Pipeline'
-              blockData.description = node.attrs?.description
-              blockData.nodes = node.attrs?.nodes || []
-              blockData.edges = node.attrs?.edges || []
-              blockData.config = node.attrs?.config
-              break
-
-            case 'mermaid':
-              blockData.type = 'mermaid'
-              blockData.content = node.attrs?.content || ''
-              blockData.title = node.attrs?.title
-              blockData.theme = node.attrs?.theme || 'default'
-              blockData.config = node.attrs?.config
-              break
-
-            case 'subNotaLink':
-              blockData.type = 'subNotaLink'
-              blockData.targetNotaId = node.attrs?.targetNotaId || ''
-              blockData.targetNotaTitle = node.attrs?.targetNotaTitle || 'Untitled Nota'
-              blockData.displayText = node.attrs?.displayText || node.attrs?.targetNotaTitle || 'Untitled Nota'
-              blockData.linkStyle = node.attrs?.linkStyle || 'inline'
-
-              // Validate required fields for subNotaLink blocks
-              if (!blockData.targetNotaId) {
-                logger.warn('subNotaLink block missing targetNotaId, using placeholder')
-                blockData.targetNotaId = 'placeholder'
-              }
-              break
-
-            default:
-              // For unknown types, try to extract text content
-              blockData.content = node.content?.[0]?.text || `[${node.type} block]`
-          }
-
-          // Create or update the block
-          let compositeId: string
-          const existingCompositeId = currentStructure.blockOrder[i]
-          const existingBlock = existingCompositeId ?
-            blockStore.getBlock(existingCompositeId) : null
-
-          // Sanitize block data to prevent DataCloneError
-          const sanitizedBlockData = JSON.parse(JSON.stringify(blockData))
-
-          if (existingBlock && existingBlock.type === blockData.type) {
-            // Update existing block using composite ID
-            await blockStore.updateBlock(existingCompositeId, sanitizedBlockData)
-            compositeId = existingCompositeId
-          } else {
-            // Create new block
-            const newBlock = await blockStore.createBlock(sanitizedBlockData)
-            compositeId = `${newBlock.type}:${String(newBlock.id)}`
-          }
-
-          newBlockOrder.push(compositeId)
-        }
-      }
-
-      // Update block structure with new order
-      if (JSON.stringify(newBlockOrder) !== JSON.stringify(currentStructure.blockOrder)) {
-        currentStructure.blockOrder = newBlockOrder
-        currentStructure.version++
-        currentStructure.lastModified = new Date()
-        await blockStore.saveBlockStructure(currentStructure)
-      }
+      // Validate and convert the complete document before the first write. An
+      // unsupported/corrupt node must never leave a partially updated nota.
+      const convertedBlocks = persistedBlockDataFromDocument(tiptapContent, notaId)
+      await persistCanonicalMutation(async () => {
+        await blockStore.replaceNotaContent(notaId, convertedBlocks)
+      }, alreadyCoordinated, persistNotaMetadata)
 
       // Update the last saved content
       lastSavedContent.value = tiptapContent
 
       logger.info('Successfully synced Tiptap content to blocks for nota:', notaId, {
-        blockCount: newBlockOrder.length,
-        blockOrder: newBlockOrder
+        blockCount: convertedBlocks.length,
+        blockOrder: blockStore.getBlockStructure(notaId)?.blockOrder ?? [],
       })
     } catch (error) {
       logger.error('Failed to sync content to blocks:', error)
       throw error
+    }
+  }
+
+  /**
+   * Prepare live editor JSON inside a version-history transaction. The returned
+   * rollback restores the composable's save cache if a later transaction step
+   * fails, so the next autosave will not incorrectly skip the live document.
+   */
+  const syncContentForVersion = async (content: any): Promise<() => void> => {
+    const previousLastSavedContent = lastSavedContent.value
+    try {
+      // saveNotaVersion already owns the nota/global mutation guard. Reusing
+      // it here would queue behind ourselves and deadlock.
+      // The version transaction re-reads and merges authoritative nota
+      // metadata. Persist only canonical rows here so stale Pinia history from
+      // this tab can never overwrite a version or metadata edit from another.
+      await syncContentToBlocks(content, true, false)
+    } catch (error) {
+      lastSavedContent.value = previousLastSavedContent
+      throw error
+    }
+    return () => {
+      lastSavedContent.value = previousLastSavedContent
     }
   }
 
@@ -405,11 +167,6 @@ export function useBlockEditor(notaId: string) {
     // Use the store's method to get Tiptap content
     return blockStore.getTiptapContent(notaId)
   })
-
-  // Use the store's convertBlockToTiptap method
-  const convertBlockToTiptap = (block: Block): any => {
-    return blockStore.convertBlockToTiptap(block)
-  }
 
   /**
    * Insert a new block at a specific position
@@ -489,7 +246,7 @@ export function useBlockEditor(notaId: string) {
           blockData = { ...blockData, content: content }
       }
 
-      const newBlock = await blockStore.createBlock(blockData)
+      const newBlock = await persistCanonicalMutation(() => blockStore.createBlock(blockData))
 
       logger.info('Inserted new block:', newBlock.id)
       return newBlock
@@ -505,7 +262,7 @@ export function useBlockEditor(notaId: string) {
    */
   const updateBlock = async (blockId: string, updates: Partial<Block>) => {
     try {
-      const updatedBlock = await blockStore.updateBlock(blockId, updates)
+      const updatedBlock = await persistCanonicalMutation(() => blockStore.updateBlock(blockId, updates))
       logger.info('Updated block:', blockId)
       return updatedBlock
     } catch (error) {
@@ -520,7 +277,7 @@ export function useBlockEditor(notaId: string) {
    */
   const deleteBlock = async (blockId: string) => {
     try {
-      await blockStore.deleteBlock(blockId)
+      await persistCanonicalMutation(() => blockStore.deleteBlock(blockId))
       logger.info('Deleted block:', blockId)
     } catch (error) {
       logger.error('Failed to delete block:', error)
@@ -534,7 +291,7 @@ export function useBlockEditor(notaId: string) {
    */
   const reorderBlocks = async (newOrder: string[]) => {
     try {
-      await blockStore.reorderBlocks(notaId, newOrder)
+      await persistCanonicalMutation(() => blockStore.reorderBlocks(notaId, newOrder))
       logger.info('Reordered blocks for nota:', notaId)
     } catch (error) {
       logger.error('Failed to reorder blocks:', error)
@@ -577,6 +334,7 @@ export function useBlockEditor(notaId: string) {
     // Actions
     initializeBlocks,
     syncContentToBlocks,
+    syncContentForVersion,
     insertBlock,
     updateBlock,
     deleteBlock,

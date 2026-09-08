@@ -1,207 +1,169 @@
-import { Node, mergeAttributes } from '@tiptap/core'
-import type { RawCommands } from '@tiptap/core'
-import { VueNodeViewRenderer } from '@tiptap/vue-3'
-import Citation from './Citation.vue'
-import Bibliography from './Bibliography.vue'
-import type { CitationEntry } from '@/features/nota/types/nota'
-import { updateCitationNumbers } from '@/features/editor/services/citationService'
+/**
+ * Citation + Bibliography nodes — ported onto the raw-ProseMirror primitives.
+ *
+ * Like-for-like port of the two former `Node.create` definitions. The declarative
+ * NodeDefinition is the single source of truth: `defineNode` builds the raw-PM
+ * spec exercised by the round-trip tests and registered in the live editor.
+ *
+ * `toDOM` is the sole serializer in both paths. Bibliography attributes use
+ * explicit data-* keys so raw ProseMirror HTML parsing is reversible.
+ * The exported symbols (CitationExtension, BibliographyExtension) are unchanged so
+ * every existing import site keeps working.
+ */
+import { defineNode } from '@/features/editor/pm'
+import type { NodeDefinition } from '@/features/editor/pm'
 
-// Citation inline node
-export const CitationExtension = Node.create({
+function dataAttribute(element: HTMLElement, dataName: string, legacyName: string): string | null {
+  return element.getAttribute(dataName) ?? element.getAttribute(legacyName)
+}
+
+function booleanDataAttribute(
+  element: HTMLElement,
+  dataName: string,
+  legacyName: string,
+  fallback: boolean,
+): boolean {
+  const value = dataAttribute(element, dataName, legacyName)
+  return value == null ? fallback : value === 'true'
+}
+
+// ---------------------------------------------------------------------------
+// Citation (inline node)
+// ---------------------------------------------------------------------------
+export const citationNodeDefinition: NodeDefinition = {
   name: 'citation',
   group: 'inline',
   inline: true,
   atom: true,
   selectable: true,
   draggable: true,
-
-  addAttributes() {
-    return {
-      citationKey: {
-        default: null,
-        parseHTML: element => element.getAttribute('data-citation-key'),
-        renderHTML: attributes => {
-          if (!attributes.citationKey) {
-            return { 'data-citation-key': '' }
-          }
-          return { 'data-citation-key': attributes.citationKey }
+  attrs: {
+    citationKey: {
+      default: null,
+      parseHTML: (element) => element.getAttribute('data-citation-key'),
+    },
+    citationNumber: {
+      default: null,
+      parseHTML: (element) => element.getAttribute('data-citation-number'),
+    },
+    citationStyle: {
+      default: 'numeric',
+      parseHTML: (element) => element.getAttribute('data-citation-style'),
+    },
+    citationFormat: {
+      default: 'short',
+      parseHTML: (element) => element.getAttribute('data-citation-format'),
+    },
+    citationStatus: {
+      default: 'missing',
+      parseHTML: (element) => element.getAttribute('data-citation-status'),
+    },
+    citationData: {
+      default: {},
+      parseHTML: (element) => {
+        try {
+          return JSON.parse(element.getAttribute('data-citation-data') || '{}')
+        } catch {
+          return {}
         }
       },
-      citationNumber: {
-        default: null,
-        parseHTML: element => element.getAttribute('data-citation-number'),
-        renderHTML: attributes => {
-          if (!attributes.citationNumber) {
-            return { 'data-citation-number': '?' }
-          }
-          return { 'data-citation-number': attributes.citationNumber }
-        }
-      },
-      citationStyle: {
-        default: 'numeric',
-        parseHTML: element => element.getAttribute('data-citation-style'),
-        renderHTML: attributes => {
-          return { 'data-citation-style': attributes.citationStyle }
-        }
-      },
-      citationFormat: {
-        default: 'short',
-        parseHTML: element => element.getAttribute('data-citation-format'),
-        renderHTML: attributes => {
-          return { 'data-citation-format': attributes.citationFormat }
-        }
-      },
-      citationStatus: {
-        default: 'missing',
-        parseHTML: element => element.getAttribute('data-citation-status'),
-        renderHTML: attributes => {
-          return { 'data-citation-status': attributes.citationStatus }
-        }
-      }
-    }
+    },
   },
-
-  parseHTML() {
-    return [
-      {
-        tag: 'span[data-type="citation"]',
-      },
-    ]
-  },
-
-  renderHTML({ HTMLAttributes }) {
+  parseDOM: [{ tag: 'span[data-type="citation"]' }],
+  toDOM: (node) => {
+    const a = node.attrs
+    const status = a.citationStatus || 'missing'
     return [
       'span',
-      mergeAttributes(
-        {
-          'data-type': 'citation',
-          class: `citation-reference citation-${HTMLAttributes.citationStatus || 'missing'}`,
-          'data-citation-key': HTMLAttributes.citationKey || '',
-          'data-citation-number': HTMLAttributes.citationNumber || '?',
-          'data-citation-style': HTMLAttributes.citationStyle || 'numeric',
-          'data-citation-format': HTMLAttributes.citationFormat || 'short',
-          'data-citation-status': HTMLAttributes.citationStatus || 'missing'
-        },
-        HTMLAttributes
-      ),
-      `[${HTMLAttributes.citationNumber || '?'}]`,
+      {
+        'data-type': 'citation',
+        class: `citation-reference citation-${status}`,
+        'data-citation-key': a.citationKey || '',
+        'data-citation-number': a.citationNumber || '?',
+        'data-citation-style': a.citationStyle || 'numeric',
+        'data-citation-format': a.citationFormat || 'short',
+        'data-citation-status': status,
+        'data-citation-data': JSON.stringify(a.citationData || {}),
+      },
+      `[${a.citationNumber || '?'}]`,
     ]
   },
+}
 
-  addNodeView() {
-    return VueNodeViewRenderer(Citation as any)
-  },
+export const citationDefinition = defineNode(citationNodeDefinition)
 
-  onUpdate() {
-    updateCitationNumbers(this.editor)
-  },
+export const CitationExtension = citationDefinition
 
-
-
-  addCommands() {
-    return {
-      setCitation: (attributes: Partial<CitationEntry>) => ({ commands }: { commands: RawCommands }) => {
-        return commands.updateAttributes('citation', attributes)
-      },
-      updateCitationNumber: (number: number) => ({ commands }: { commands: RawCommands }) => {
-        return commands.updateAttributes('citation', { citationNumber: number })
-      },
-      updateCitationStyle: (style: string) => ({ commands }: { commands: RawCommands }) => {
-        return commands.updateAttributes('citation', { citationStyle: style })
-      },
-      updateCitationFormat: (format: string) => ({ commands }: { commands: RawCommands }) => {
-        return commands.updateAttributes('citation', { citationFormat: format })
-      }
-    } as Partial<RawCommands>
-  }
-})
-
-// Bibliography block node
-export const BibliographyExtension = Node.create({
+// ---------------------------------------------------------------------------
+// Bibliography (block node)
+// ---------------------------------------------------------------------------
+export const bibliographyNodeDefinition: NodeDefinition = {
   name: 'bibliography',
   group: 'block',
   content: '',
   atom: true,
   draggable: true,
-
-  addAttributes() {
-    return {
-      style: {
-        default: 'apa',
+  attrs: {
+    style: {
+      default: 'apa',
+      parseHTML: (element) => dataAttribute(element, 'data-style', 'style') ?? 'apa',
+    },
+    title: {
+      default: 'References',
+      parseHTML: (element) => dataAttribute(element, 'data-title', 'title') ?? 'References',
+    },
+    sortBy: {
+      default: 'citation-number',
+      parseHTML: (element) => dataAttribute(element, 'data-sort-by', 'sortBy') ?? 'citation-number',
+    },
+    groupBy: {
+      default: 'none',
+      parseHTML: (element) => dataAttribute(element, 'data-group-by', 'groupBy') ?? 'none',
+    },
+    showType: {
+      default: true,
+      parseHTML: (element) => booleanDataAttribute(element, 'data-show-type', 'showType', true),
+    },
+    showDOI: {
+      default: true,
+      parseHTML: (element) => booleanDataAttribute(element, 'data-show-doi', 'showDOI', true),
+    },
+    showURL: {
+      default: true,
+      parseHTML: (element) => booleanDataAttribute(element, 'data-show-url', 'showURL', true),
+    },
+    citations: {
+      default: [],
+      parseHTML: (element) => {
+        try {
+          return JSON.parse(element.getAttribute('data-citations') || '[]')
+        } catch {
+          return []
+        }
       },
-      title: {
-        default: 'References',
-      },
-      sortBy: {
-        default: 'citation-number',
-      },
-      groupBy: {
-        default: 'none',
-      },
-      showType: {
-        default: true,
-      },
-      showDOI: {
-        default: true,
-      },
-      showURL: {
-        default: true,
-      }
-    }
+    },
   },
-
-  parseHTML() {
-    return [
-      {
-        tag: 'div[data-type="bibliography"]',
-      },
-    ]
-  },
-
-  renderHTML({ HTMLAttributes }) {
+  parseDOM: [{ tag: 'div[data-type="bibliography"]' }],
+  toDOM: (node) => {
+    const a = node.attrs
     return [
       'div',
-      mergeAttributes(
-        {
-          'data-type': 'bibliography',
-          class: 'bibliography-block',
-          'data-style': HTMLAttributes.style,
-          'data-sort-by': HTMLAttributes.sortBy,
-          'data-group-by': HTMLAttributes.groupBy,
-          'data-show-type': HTMLAttributes.showType,
-          'data-show-doi': HTMLAttributes.showDOI,
-          'data-show-url': HTMLAttributes.showURL
-        },
-        HTMLAttributes
-      ),
+      {
+        'data-type': 'bibliography',
+        class: 'bibliography-block',
+        'data-style': a.style,
+        'data-title': a.title,
+        'data-sort-by': a.sortBy,
+        'data-group-by': a.groupBy,
+        'data-show-type': a.showType,
+        'data-show-doi': a.showDOI,
+        'data-show-url': a.showURL,
+        'data-citations': JSON.stringify(a.citations || []),
+      },
     ]
   },
+}
 
-  addNodeView() {
-    return VueNodeViewRenderer(Bibliography as any)
-  },
+export const bibliographyDefinition = defineNode(bibliographyNodeDefinition)
 
-  addCommands() {
-    return {
-      setBibliographyStyle: (style: string) => ({ commands }: { commands: RawCommands }) => {
-        return commands.updateAttributes('bibliography', { style })
-      },
-      setBibliographyTitle: (title: string) => ({ commands }: { commands: RawCommands }) => {
-        return commands.updateAttributes('bibliography', { title })
-      },
-      setBibliographySortBy: (sortBy: string) => ({ commands }: { commands: RawCommands }) => {
-        return commands.updateAttributes('bibliography', { sortBy })
-      },
-      setBibliographyGroupBy: (groupBy: string) => ({ commands }: { commands: RawCommands }) => {
-        return commands.updateAttributes('bibliography', { groupBy })
-      }
-    } as Partial<RawCommands>
-  }
-})
-
-
-
-
-
-
-
+export const BibliographyExtension = bibliographyDefinition

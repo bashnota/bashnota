@@ -1,6 +1,5 @@
 import { ref, computed } from 'vue'
 import { EditorView } from '@codemirror/view'
-import { indentWithTab, indentMore, indentLess } from '@codemirror/commands'
 
 export interface CodeFormattingOptions {
   language: string

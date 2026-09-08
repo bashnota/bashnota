@@ -227,6 +227,8 @@ const viewModeLabel = computed(() => {
       return `${startOfWeek.toLocaleDateString('default', { month: 'short', day: 'numeric' })} - ${endOfWeek.toLocaleDateString('default', { month: 'short', day: 'numeric', year: 'numeric' })}`
     case 'day':
       return currentDate.value.toLocaleDateString('default', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+    default:
+      return ''
   }
 })
 

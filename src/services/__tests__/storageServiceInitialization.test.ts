@@ -1,5 +1,24 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { StorageService } from '../storageService'
+import { FileSystemBackend } from '../fileSystemBackend'
+import * as DirectoryStorage from '../directoryHandleStorage'
+import { IndexedDBBackend, MemoryBackend, StorageService } from '../storageService'
+import { isStorageModeAlreadyActive } from '@/composables/useStorageMode'
+
+describe('storage mode recovery selection', () => {
+  it('allows the persisted IndexedDB preference to recover an active memory fallback', () => {
+    expect(isStorageModeAlreadyActive('indexeddb', 'memory', 'indexeddb')).toBe(false)
+  })
+
+  it('skips a transition only when the requested durable backend is active', () => {
+    expect(isStorageModeAlreadyActive('indexeddb', 'indexeddb', 'filesystem')).toBe(true)
+    expect(isStorageModeAlreadyActive('filesystem', 'filesystem', 'indexeddb')).toBe(true)
+  })
+
+  it('uses the persisted preference before authority resolution', () => {
+    expect(isStorageModeAlreadyActive('indexeddb', null, 'indexeddb')).toBe(true)
+    expect(isStorageModeAlreadyActive('filesystem', null, 'indexeddb')).toBe(false)
+  })
+})
 
 /**
  * Integration test for StorageService initialization behavior
@@ -63,12 +82,64 @@ describe('StorageService Initialization (Runtime Behavior)', () => {
     }
     
     global.indexedDB = mockIndexedDB
+    delete (window as any).showDirectoryPicker
   })
 
   afterEach(() => {
     // Restore original indexedDB
     global.indexedDB = originalIndexedDB
-    vi.clearAllMocks()
+    delete (window as any).showDirectoryPicker
+    vi.restoreAllMocks()
+  })
+
+  it('does not publish a backend while filesystem initialization is delayed', async () => {
+    let releaseInitialization!: () => void
+    const delayed = new Promise<void>((resolve) => { releaseInitialization = resolve })
+    vi.spyOn(FileSystemBackend.prototype, 'isAvailable').mockResolvedValue(true)
+    vi.spyOn(FileSystemBackend.prototype, 'initialize').mockImplementation(() => delayed)
+    const service = new StorageService()
+
+    const initialization = service.initialize('filesystem')
+    await vi.waitFor(() => expect(FileSystemBackend.prototype.initialize).toHaveBeenCalled())
+
+    expect(() => service.getBackendType()).toThrow(/not initialized/i)
+    releaseInitialization()
+    await initialization
+    expect(service.getBackendType()).toBe('filesystem')
+  })
+
+  it('reports denied filesystem permission without activating another backend', async () => {
+    ;(window as any).showDirectoryPicker = vi.fn()
+    vi.spyOn(DirectoryStorage, 'getDirectoryHandle').mockResolvedValue({ name: 'denied' } as FileSystemDirectoryHandle)
+    vi.spyOn(DirectoryStorage, 'verifyHandlePermission').mockResolvedValue(false)
+    const indexedInitialize = vi.spyOn(IndexedDBBackend.prototype, 'initialize')
+    const memoryInitialize = vi.spyOn(MemoryBackend.prototype, 'initialize')
+    const service = new StorageService()
+
+    await expect(service.initialize('filesystem')).rejects.toThrow(/Permission denied.*No fallback was activated|No fallback was activated.*Permission denied/)
+    expect(() => service.getBackendType()).toThrow(/not initialized/i)
+    expect(indexedInitialize).not.toHaveBeenCalled()
+    expect(memoryInitialize).not.toHaveBeenCalled()
+  })
+
+  it('reports an unavailable persisted handle without activating IndexedDB', async () => {
+    ;(window as any).showDirectoryPicker = vi.fn()
+    vi.spyOn(DirectoryStorage, 'getDirectoryHandle').mockResolvedValue(null)
+    const indexedInitialize = vi.spyOn(IndexedDBBackend.prototype, 'initialize')
+    const service = new StorageService()
+
+    await expect(service.initialize('filesystem')).rejects.toThrow(/No directory handle available/)
+    expect(indexedInitialize).not.toHaveBeenCalled()
+  })
+
+  it('uses memory only as the visible authority when automatic durable selection fails', async () => {
+    vi.spyOn(FileSystemBackend, 'hasPersistedHandle').mockResolvedValue(false)
+    vi.spyOn(IndexedDBBackend.prototype, 'isAvailable').mockResolvedValue(false)
+    const service = new StorageService()
+
+    await service.initialize()
+
+    expect(service.getBackendType()).toBe('memory')
   })
 
   it('should initialize without attempting FileSystemBackend when no handle is persisted', async () => {
@@ -89,14 +160,10 @@ describe('StorageService Initialization (Runtime Behavior)', () => {
   it('should only attempt FileSystemBackend when explicitly requested', async () => {
     const storageService = new StorageService()
     
-    // When filesystem is explicitly requested and no handle exists, should fail gracefully
-    // and fall back to IndexedDB or Memory
-    await expect(storageService.initialize('filesystem')).resolves.not.toThrow()
-    
-    const backendType = storageService.getBackendType()
-    
-    // Should fall back to a different backend since filesystem was not available
-    expect(['memory', 'indexeddb']).toContain(backendType)
+    // An explicit filesystem selection is an authority choice. If its handle
+    // is unavailable, startup must fail instead of opening another library.
+    await expect(storageService.initialize('filesystem')).rejects.toThrow(/No fallback was activated/)
+    expect(() => storageService.getBackendType()).toThrow(/not initialized/i)
   })
 
   it('should not throw "Must be handling a user gesture" error on app startup', async () => {

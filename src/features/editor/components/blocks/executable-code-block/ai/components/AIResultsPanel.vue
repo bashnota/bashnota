@@ -5,17 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
-import { 
-  FileText, 
-  Copy, 
-  Check, 
-  Play,
-  MessageSquare,
-  ChevronDown,
-  ChevronRight,
-  Code2,
-  ExternalLink
-} from 'lucide-vue-next'
+import { FileText, Copy, Check, Play, MessageSquare, ChevronDown, ChevronRight, Code2 } from 'lucide-vue-next';
 import { useAIActions } from '../composables/useAIActions'
 import { useAIChat } from '../composables/useAIChat'
 

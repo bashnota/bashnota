@@ -1,8 +1,7 @@
-import { Extension } from '@tiptap/core'
-import { NodeSelection, Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
-import { Fragment, Slice, Node } from '@tiptap/pm/model'
-import { EditorView } from '@tiptap/pm/view'
-import * as pmView from '@tiptap/pm/view'
+import { NodeSelection, Plugin, PluginKey, TextSelection } from 'prosemirror-state'
+import { Fragment, Slice, Node } from 'prosemirror-model'
+import { EditorView } from 'prosemirror-view'
+import * as pmView from 'prosemirror-view'
 import { logger } from '@/services/logger'
 
 function getPmView() {
@@ -459,31 +458,3 @@ export function DragHandlePlugin(options: DragHandleOptions & { pluginKey: strin
     },
   })
 }
-
-const DragHandle = Extension.create({
-  name: 'dragHandle',
-
-  addOptions() {
-    return {
-      dragHandleWidth: 20,
-      scrollTreshold: 100,
-      excludedTags: [],
-      customNodes: [],
-    }
-  },
-
-  addProseMirrorPlugins() {
-    return [
-      DragHandlePlugin({
-        pluginKey: 'dragHandle',
-        dragHandleWidth: this.options.dragHandleWidth,
-        scrollTreshold: this.options.scrollTreshold,
-        dragHandleSelector: this.options.dragHandleSelector,
-        excludedTags: this.options.excludedTags,
-        customNodes: this.options.customNodes,
-      }),
-    ]
-  },
-})
-
-export default DragHandle

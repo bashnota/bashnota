@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, nextTick } from 'vue'
-import { NodeViewWrapper } from '@tiptap/vue-3'
+import { NodeViewWrapper } from '@/features/editor/pm'
 import { Card, CardContent } from '@/components/ui/card'
 import { useCodeExecution } from './composables/core/useCodeExecution'
 import { useCodeExecutionStore } from '@/features/editor/stores/codeExecutionStore'
@@ -9,6 +9,10 @@ import CodeBlockWithExecution from './CodeBlockWithExecution.vue'
 import OutputRenderer from './OutputRenderer.vue'
 import KernelConfigurationModal from './components/KernelConfigurationModal.vue'
 import type { CodeBlockProps } from './types'
+import { logger } from '@/services/logger'
+import { TooltipProvider } from '@/components/ui/tooltip'
+
+defineOptions({ inheritAttrs: false })
 
 const props = defineProps<CodeBlockProps>()
 
@@ -19,7 +23,7 @@ const {
   initializeSession,
   executeCode,
   onKernelSelect,
-  onSessionSelect
+  onSessionSelect,
 } = useCodeExecution(props)
 
 // Add stores for configuration modal
@@ -33,24 +37,28 @@ const sessionId = computed(() => props.node.attrs.sessionId || null)
 const code = computed(() => props.node.textContent || '')
 
 // Track if this is being viewed in a published note
-const isPublishedView = computed(() => props.editor.isEditable === false && props.editor.options.editable === false)
+const isPublishedView = computed(
+  () => props.editor.isEditable === false && props.editor.options.editable === false,
+)
 
 // Initialize session if saved
 onMounted(() => {
   initializeSession()
   // Also ensure jupyter servers are loaded
   jupyterStore.loadServers()
-  
+
   // Load configuration from block attributes
   const nodeAttrs = props.node.attrs
   if (nodeAttrs.serverID && nodeAttrs.kernelName) {
-    console.log('Loading saved configuration from block:', nodeAttrs)
+    logger.log('Loading saved configuration from block:', nodeAttrs)
     selectedServerRef.value = nodeAttrs.serverID
     selectedKernelRef.value = nodeAttrs.kernelName
     selectedSessionRef.value = nodeAttrs.sessionId || ''
-    
+
     // Find the server config from available servers
-    const serverConfig = availableServers.value.find(s => `${s.ip}:${s.port}` === nodeAttrs.serverID)
+    const serverConfig = availableServers.value.find(
+      (s) => `${s.ip}:${s.port}` === nodeAttrs.serverID,
+    )
     if (serverConfig) {
       // Add the cell to the store with saved configuration
       codeExecutionStore.addCell({
@@ -59,7 +67,7 @@ onMounted(() => {
         serverConfig: serverConfig,
         kernelName: nodeAttrs.kernelName,
         sessionId: nodeAttrs.sessionId || 'default',
-        output: nodeAttrs.output || ''
+        output: nodeAttrs.output || '',
       })
     }
   }
@@ -80,56 +88,56 @@ const updateOutput = (newOutput: string) => {
   try {
     // Sanitize output to prevent HTML errors
     const sanitizedOutput = sanitizeOutput(newOutput)
-    
-    console.log(`[ExecutableCodeBlock] Updating output for block ${blockId.value}:`, {
+
+    logger.log(`[ExecutableCodeBlock] Updating output for block ${blockId.value}:`, {
       originalLength: newOutput.length,
       sanitizedLength: sanitizedOutput.length,
-      hasHTML: newOutput.includes('<')
+      hasHTML: newOutput.includes('<'),
     })
-    
+
     // Use nextTick to ensure DOM is stable before updating TipTap attributes
     nextTick(() => {
       try {
         // Update the node attributes to persist to database
         props.updateAttributes({ output: sanitizedOutput })
-        
-        console.log(`[ExecutableCodeBlock] TipTap attributes updated successfully`)
+
+        logger.log(`[ExecutableCodeBlock] TipTap attributes updated successfully`)
       } catch (tiptapError) {
-        console.error('Error updating TipTap attributes:', tiptapError)
-        
+        logger.error('Error updating TipTap attributes:', tiptapError)
+
         // Emergency fallback - try with escaped text
         try {
           const escapedOutput = escapeHtmlForTipTap(newOutput)
           props.updateAttributes({ output: escapedOutput })
-          console.log(`[ExecutableCodeBlock] Fallback update successful with escaped content`)
+          logger.log(`[ExecutableCodeBlock] Fallback update successful with escaped content`)
         } catch (fallbackError) {
-          console.error('Even fallback update failed:', fallbackError)
+          logger.error('Even fallback update failed:', fallbackError)
           // Last resort - empty output
           try {
             props.updateAttributes({ output: '' })
           } catch (lastResortError) {
-            console.error('Critical: Could not update attributes at all:', lastResortError)
+            logger.error('Critical: Could not update attributes at all:', lastResortError)
           }
         }
       }
     })
-    
+
     // Update the cell in the code execution store for immediate UI updates
     const cell = codeExecutionStore.getCellById(blockId.value)
     if (cell) {
       cell.output = sanitizedOutput
     }
-    
-    console.log(`[ExecutableCodeBlock] Store output updated successfully`)
+
+    logger.log(`[ExecutableCodeBlock] Store output updated successfully`)
   } catch (error) {
-    console.error('Error in updateOutput function:', error)
-    
+    logger.error('Error in updateOutput function:', error)
+
     // Emergency fallback handling
     nextTick(() => {
       try {
         props.updateAttributes({ output: '' })
       } catch (emergencyError) {
-        console.error('Critical: Emergency fallback failed:', emergencyError)
+        logger.error('Critical: Emergency fallback failed:', emergencyError)
       }
     })
   }
@@ -141,33 +149,33 @@ const sanitizeOutput = (output: string): string => {
     if (!output || typeof output !== 'string') {
       return ''
     }
-    
+
     // Limit output size to prevent database issues
     const maxOutputSize = 1024 * 1024 // 1MB limit
     if (output.length > maxOutputSize) {
-      console.warn(`Output too large (${output.length} chars), truncating to ${maxOutputSize}`)
+      logger.warn(`Output too large (${output.length} chars), truncating to ${maxOutputSize}`)
       return output.substring(0, maxOutputSize) + '\n\n[Output truncated due to size limit]'
     }
-    
+
     // Enhanced sanitization for TipTap compatibility
     let sanitized = output
-    
+
     // Remove null bytes that can break TipTap
     sanitized = sanitized.replace(/\0/g, '')
-    
+
     // Validate and fix HTML structure if present
     if (sanitized.includes('<')) {
       sanitized = sanitizeHtmlForTipTap(sanitized)
     }
-    
+
     // Ensure the content doesn't break TipTap's DOM processing
     if (sanitized.length === 0) {
       return ''
     }
-    
+
     return sanitized
   } catch (error) {
-    console.error('Error sanitizing output:', error)
+    logger.error('Error sanitizing output:', error)
     return '[Error: Output could not be processed]'
   }
 }
@@ -179,32 +187,32 @@ const sanitizeHtmlForTipTap = (htmlContent: string): string => {
     if (typeof document !== 'undefined') {
       const tempDiv = document.createElement('div')
       tempDiv.innerHTML = htmlContent
-      
+
       // Check if parsing was successful
       if (tempDiv.children === undefined || tempDiv.children === null) {
-        console.warn('HTML parsing failed, converting to text')
+        logger.warn('HTML parsing failed, converting to text')
         return escapeHtmlForTipTap(htmlContent)
       }
-      
+
       // Validate the structure
       const serialized = tempDiv.innerHTML
-      
+
       // Double-check by trying to parse again
       const testDiv = document.createElement('div')
       testDiv.innerHTML = serialized
-      
+
       if (testDiv.children === undefined || testDiv.children === null) {
-        console.warn('Serialized HTML still invalid, converting to text')
+        logger.warn('Serialized HTML still invalid, converting to text')
         return escapeHtmlForTipTap(htmlContent)
       }
-      
+
       return serialized
     } else {
       // Server-side or no DOM - escape everything
       return escapeHtmlForTipTap(htmlContent)
     }
   } catch (error) {
-    console.error('Error in HTML sanitization for TipTap:', error)
+    logger.error('Error in HTML sanitization for TipTap:', error)
     return escapeHtmlForTipTap(htmlContent)
   }
 }
@@ -236,79 +244,78 @@ const availableServers = computed(() => {
   return servers
 })
 const availableKernels = computed(() => {
-  // Get kernels for the currently selected server
+  // Get kernels for the currently selected server.
+  // Keep this getter pure — no logging/side effects inside a computed.
   if (!selectedServer.value) {
-    console.log('No selected server, returning empty kernels')
     return []
   }
   const serverKey = selectedServer.value
-  const kernels = jupyterStore.kernels[serverKey] || []
-  console.log(`Kernels for server ${serverKey}:`, kernels)
-  console.log('All kernels in store:', jupyterStore.kernels)
-  return kernels
+  return jupyterStore.kernels[serverKey] || []
 })
 const availableSessions = computed(() => {
   const sessions = codeExecutionStore.getAllSessions || []
-  return sessions.map(session => ({
+  return sessions.map((session) => ({
     id: session.id,
     name: session.name,
-    kernel: { name: session.kernelName || '', id: session.kernelId || '' }
+    kernel: { name: session.kernelName || '', id: session.kernelId || '' },
   }))
 })
 const runningKernels = computed(() => [])
 const isSharedSessionMode = computed(() => codeExecutionStore.sharedSessionMode)
-const isExecuting = computed(() => codeExecutionStore.getCellById(blockId.value)?.isExecuting || false)
+const isExecuting = computed(
+  () => codeExecutionStore.getCellById(blockId.value)?.isExecuting || false,
+)
 const isLoadingKernels = ref(false)
 const isSettingUp = computed(() => isLoadingKernels.value)
 
 const handleOpenConfiguration = async () => {
   // Ensure jupyter servers are loaded before opening the modal
   jupyterStore.loadServers()
-  
+
   // If a server is selected, load its kernels
   if (selectedServer.value) {
-    const server = availableServers.value.find(s => `${s.ip}:${s.port}` === selectedServer.value)
+    const server = availableServers.value.find((s) => `${s.ip}:${s.port}` === selectedServer.value)
     if (server) {
       isLoadingKernels.value = true
       try {
         await jupyterStore.getAvailableKernels(server)
       } catch (error) {
-        console.error('Failed to load kernels on modal open:', error)
+        logger.error('Failed to load kernels on modal open:', error)
       } finally {
         isLoadingKernels.value = false
       }
     }
   }
-  
+
   isConfigurationModalOpen.value = true
 }
 
 // Modal event handlers
 const handleServerChange = async (serverId: string) => {
-  console.log('Server changed to:', serverId)
+  logger.log('Server changed to:', serverId)
   selectedServerRef.value = serverId
   selectedKernelRef.value = '' // Reset kernel when server changes
   selectedSessionRef.value = '' // Reset session when server changes
-  
+
   // Load kernels for the selected server
-  const server = availableServers.value.find(s => `${s.ip}:${s.port}` === serverId)
-  console.log('Found server object:', server)
-  console.log('Available servers:', availableServers.value)
-  
+  const server = availableServers.value.find((s) => `${s.ip}:${s.port}` === serverId)
+  logger.log('Found server object:', server)
+  logger.log('Available servers:', availableServers.value)
+
   if (server) {
     isLoadingKernels.value = true
     try {
-      console.log('Calling getAvailableKernels with server:', server)
+      logger.log('Calling getAvailableKernels with server:', server)
       const kernels = await jupyterStore.getAvailableKernels(server)
-      console.log('Received kernels:', kernels)
-      console.log('Jupyter store kernels after call:', jupyterStore.kernels)
+      logger.log('Received kernels:', kernels)
+      logger.log('Jupyter store kernels after call:', jupyterStore.kernels)
     } catch (error) {
-      console.error('Failed to load kernels:', error)
+      logger.error('Failed to load kernels:', error)
     } finally {
       isLoadingKernels.value = false
     }
   } else {
-    console.warn('No server found for serverId:', serverId)
+    logger.warn('No server found for serverId:', serverId)
   }
 }
 
@@ -323,15 +330,7 @@ const handleSessionChange = async (sessionId: string) => {
 
 const handleCreateNewSession = async () => {
   const sessionId = codeExecutionStore.createSession(`Session ${Date.now()}`)
-  console.log('Created session:', sessionId)
-}
-
-const handleClearAllKernels = async () => {
-  // TODO: Implement clear all kernels
-}
-
-const handleRefreshSessions = async () => {
-  // TODO: Implement session refresh
+  logger.log('Created session:', sessionId)
 }
 
 const handleRefreshServers = async () => {
@@ -340,13 +339,13 @@ const handleRefreshServers = async () => {
 
 const handleRefreshKernels = async () => {
   if (selectedServer.value) {
-    const server = availableServers.value.find(s => `${s.ip}:${s.port}` === selectedServer.value)
+    const server = availableServers.value.find((s) => `${s.ip}:${s.port}` === selectedServer.value)
     if (server) {
       isLoadingKernels.value = true
       try {
         await jupyterStore.getAvailableKernels(server)
       } catch (error) {
-        console.error('Failed to refresh kernels:', error)
+        logger.error('Failed to refresh kernels:', error)
       } finally {
         isLoadingKernels.value = false
       }
@@ -356,17 +355,19 @@ const handleRefreshKernels = async () => {
 
 const handleTestServerConnection = async (server: any) => {
   try {
-    console.log('Testing connection to server:', server)
+    logger.log('Testing connection to server:', server)
     const testResult = await jupyterStore.testServerConnection(server)
-    console.log('Test result:', testResult)
-    
+    logger.log('Test result:', testResult)
+
     if (testResult?.success) {
       alert(`✅ Successfully connected to ${server.ip}:${server.port}`)
     } else {
-      alert(`❌ Failed to connect to ${server.ip}:${server.port}\n\nError: ${testResult?.message || 'Connection failed'}`)
+      alert(
+        `❌ Failed to connect to ${server.ip}:${server.port}\n\nError: ${testResult?.message || 'Connection failed'}`,
+      )
     }
   } catch (error) {
-    console.error('Error testing server connection:', error)
+    logger.error('Error testing server connection:', error)
     alert(`❌ Error testing connection: ${error}`)
   }
 }
@@ -375,15 +376,15 @@ const handleAddTestServer = async () => {
   const testServer = {
     ip: 'localhost',
     port: '8888',
-    token: ''
+    token: '',
   }
-  
+
   // First test the connection
   try {
-    console.log('Testing connection to test server...')
+    logger.log('Testing connection to test server...')
     const testResult = await jupyterStore.testServerConnection(testServer)
-    console.log('Test result:', testResult)
-    
+    logger.log('Test result:', testResult)
+
     if (testResult?.success) {
       const success = jupyterStore.addServer(testServer)
       if (success) {
@@ -392,44 +393,46 @@ const handleAddTestServer = async () => {
         await handleServerChange(serverId)
       }
     } else {
-      console.error('Test server connection failed:', testResult?.message)
-      alert(`Failed to connect to Jupyter server at localhost:8888. Make sure Jupyter is running.\n\nError: ${testResult?.message || 'Connection failed'}`)
+      logger.error('Test server connection failed:', testResult?.message)
+      alert(
+        `Failed to connect to Jupyter server at localhost:8888. Make sure Jupyter is running.\n\nError: ${testResult?.message || 'Connection failed'}`,
+      )
     }
   } catch (error) {
-    console.error('Error testing server connection:', error)
+    logger.error('Error testing server connection:', error)
     alert(`Failed to test connection to Jupyter server: ${error}`)
   }
-}
-
-const handleSelectRunningKernel = async (kernelId: string) => {
-  // TODO: Implement running kernel selection
 }
 
 const handleToggleSharedSessionMode = async () => {
   await codeExecutionStore.toggleSharedSessionMode(notaId.value)
 }
 
-const handleApplyConfiguration = async (config: { server: string; kernel: string; session: string }) => {
-  console.log('Applying configuration:', config)
-  
+const handleApplyConfiguration = async (config: {
+  server: string
+  kernel: string
+  session: string
+}) => {
+  logger.log('Applying configuration:', config)
+
   try {
     // Update the refs with the applied configuration
     selectedServerRef.value = config.server
     selectedKernelRef.value = config.kernel
     selectedSessionRef.value = config.session
-    
+
     // Save the configuration to the nota/block
     const [ip, port] = config.server.split(':')
-    const serverConfig = availableServers.value.find(s => `${s.ip}:${s.port}` === config.server)
-    
+    const serverConfig = availableServers.value.find((s) => `${s.ip}:${s.port}` === config.server)
+
     if (serverConfig && config.kernel) {
       // Update the block attributes with server and kernel info
       props.updateAttributes({
         serverID: config.server,
         kernelName: config.kernel,
-        sessionId: config.session || null
+        sessionId: config.session || null,
       })
-      
+
       // Initialize or update the cell in the code execution store
       codeExecutionStore.addCell({
         id: blockId.value,
@@ -437,38 +440,42 @@ const handleApplyConfiguration = async (config: { server: string; kernel: string
         serverConfig: serverConfig,
         kernelName: config.kernel,
         sessionId: config.session || 'default',
-        output: ''
+        output: '',
       })
-      
-      console.log('Configuration applied successfully')
+
+      logger.log('Configuration applied successfully')
     }
   } catch (error) {
-    console.error('Failed to apply configuration:', error)
+    logger.error('Failed to apply configuration:', error)
   }
 }
-
-
 </script>
 
 <template>
   <NodeViewWrapper class="my-6">
-    <div v-if="isExecutable" class="border-none shadow-md" :class="{ 'published-card': isPublishedView }">
-      <CodeBlockWithExecution
-        :id="blockId"
-        :code="code"
-        :language="language"
-        :session-id="sessionId"
-        :nota-id="notaId"
-        :kernel-preference="kernelPreference"
-        :is-read-only="editor.options.editable === false"
-        :is-published="isPublishedView"
-        :initial-output="output || undefined"
-        @update:code="updateCode"
-        @kernel-select="onKernelSelect"
-        @update:output="updateOutput"
-        @update:session-id="onSessionSelect"
-        @open-configuration="handleOpenConfiguration"
-      />
+    <div
+      v-if="isExecutable"
+      class="border-none shadow-md"
+      :class="{ 'published-card': isPublishedView }"
+    >
+      <TooltipProvider :delay-duration="0">
+        <CodeBlockWithExecution
+          :id="blockId"
+          :code="code"
+          :language="language"
+          :session-id="sessionId"
+          :nota-id="notaId"
+          :kernel-preference="kernelPreference"
+          :is-read-only="editor.options.editable === false"
+          :is-published="isPublishedView"
+          :initial-output="output || undefined"
+          @update:code="updateCode"
+          @kernel-select="onKernelSelect"
+          @update:output="updateOutput"
+          @update:session-id="onSessionSelect"
+          @open-configuration="handleOpenConfiguration"
+        />
+      </TooltipProvider>
     </div>
 
     <Card v-else class="border-none shadow-md" :class="{ 'published-card': isPublishedView }">
@@ -484,7 +491,6 @@ const handleApplyConfiguration = async (config: { server: string; kernel: string
         />
       </CardContent>
     </Card>
-
   </NodeViewWrapper>
 
   <!-- Modal at this level, outside any problematic containers -->
@@ -506,14 +512,11 @@ const handleApplyConfiguration = async (config: { server: string; kernel: string
     @kernel-change="handleKernelChange"
     @session-change="handleSessionChange"
     @create-new-session="handleCreateNewSession"
-    @clear-all-kernels="handleClearAllKernels"
-    @refresh-sessions="handleRefreshSessions"
     @refresh-servers="handleRefreshServers"
     @refresh-kernels="handleRefreshKernels"
     @add-test-server="handleAddTestServer"
     @test-server-connection="handleTestServerConnection"
     @apply-configuration="handleApplyConfiguration"
-    @select-running-kernel="handleSelectRunningKernel"
     @toggle-shared-session-mode="handleToggleSharedSessionMode"
   />
 </template>
@@ -528,7 +531,9 @@ const handleApplyConfiguration = async (config: { server: string; kernel: string
 .published-card {
   background-color: hsl(var(--card));
   border: 1px solid hsl(var(--border));
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  box-shadow:
+    0 1px 3px 0 rgb(0 0 0 / 0.1),
+    0 1px 2px -1px rgb(0 0 0 / 0.1);
 }
 
 /* Add styles for scrollable code blocks */
@@ -576,12 +581,3 @@ const handleApplyConfiguration = async (config: { server: string; kernel: string
   box-shadow: 0 0 0 2px var(--primary-light);
 }
 </style>
-
-
-
-
-
-
-
-
-

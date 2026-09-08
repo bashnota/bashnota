@@ -12,6 +12,7 @@ import { ExternalLink, Copy, Check, Download, RefreshCw, Code, AlertCircle } fro
 import IframeOutputRenderer from '@/features/editor/components/blocks/executable-code-block/IframeOutputRenderer.vue'
 import { ansiToHtml, stripAnsi } from '@/lib/utils'
 import { logger } from '@/services/logger'
+import { sanitizeExecutionOutput } from '@/features/editor/utils/sanitizeExecutionOutput'
 
 interface Props {
   notaId: string
@@ -42,8 +43,9 @@ const outputType = computed(() => {
   const output = codeBlock.value?.output || codeBlock.value?.attrs?.output
   if (!output) return 'text'
   
-  // Check for HTML content
-  if (output.includes('<table') || output.includes('<div') || output.includes('<img')) {
+  // Any markup, including a script-only output, belongs in the opaque iframe.
+  // Plain text continues through the separately sanitized v-html path below.
+  if (/<\/?[a-z][^>]*>/i.test(output)) {
     return 'html'
   }
   
@@ -69,13 +71,13 @@ const formattedOutput = computed(() => {
   if (outputType.value === 'json') {
     try {
       const parsed = JSON.parse(output)
-      return JSON.stringify(parsed, null, 2)
+      return sanitizeExecutionOutput(JSON.stringify(parsed, null, 2))
     } catch {
-      return output
+      return sanitizeExecutionOutput(output)
     }
   }
   
-  return ansiToHtml(output)
+  return sanitizeExecutionOutput(ansiToHtml(output))
 })
 
 const hasError = computed(() => {
@@ -409,7 +411,7 @@ onUnmounted(() => {
             <!-- Iframe Output (for HTML/complex content) -->
             <IframeOutputRenderer
               v-else-if="shouldUseIframe"
-              :content="formattedOutput"
+              :content="codeBlock.output || codeBlock.attrs?.output || ''"
               :type="outputType === 'json' ? 'dataframe' : 'html'"
               height="600px"
             />
@@ -463,4 +465,4 @@ onUnmounted(() => {
 .output-container pre::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--foreground));
 }
-</style> 
+</style>

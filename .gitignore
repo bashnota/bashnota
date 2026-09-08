@@ -23,6 +23,10 @@ lib-cov
 coverage
 *.lcov
 
+# Vitest CI results (uploaded as a job artifact by .github/workflows/ci.yml)
+test-results/
+reports/bundle-visualizer.html
+
 # nyc test coverage
 .nyc_output
 
@@ -48,6 +52,11 @@ web_modules/
 # TypeScript cache
 *.tsbuildinfo
 
+# Guard: src/ is TypeScript-only. Never commit JavaScript emitted into src/ by
+# a misconfigured `vue-tsc --build` (tsconfig lacking noEmit). See tsconfig.*.json.
+src/**/*.js
+src/**/*.js.map
+
 # Optional npm cache directory
 .npm
 
@@ -72,12 +81,48 @@ web_modules/
 # Yarn Integrity file
 .yarn-integrity
 
-# dotenv environment variable files
+# Local environment and shell configuration. Keep only deliberately public
+# templates; every real dotenv variant is private regardless of directory or
+# environment suffix.
 .env
-.env.development.local
-.env.test.local
-.env.production.local
-.env.local
+.env.*
+!.env.example
+!.env.*.example
+.envrc
+.envrc.*
+!.envrc.example
+!.envrc.*.example
+
+# Local provider credentials and emulator/runtime state.
+**/.runtimeconfig.json
+**/.secret.local
+**/.secrets.local
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+.supabase/
+supabase/.temp/
+supabase/.branches/
+
+# Private key stores and downloaded provider credentials. Public templates
+# should use a `.example` suffix instead of a credential-like filename.
+*.[pP][eE][mM]
+*.[kK][eE][yY]
+*.[pP]12
+*.[pP][fF][xX]
+*.[jJ][kK][sS]
+*.[kK][eE][yY][sS][tT][oO][rR][eE]
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+*service-account*.json
+*service_account*.json
+*serviceAccount*.json
+*firebase-adminsdk*.json
+google-services.json
+GoogleService-Info.plist
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -129,13 +174,24 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
-public/
-.firebaserc
-firebase.json
-.firebase/
+# Keep generated/private public assets out, while allowing the checked-in PWA
+# install icon required by the production manifest.
+public/*
+!public/icons/
+!public/robots.txt
+public/icons/*
+!public/icons/app-icon.svg
 
 .vscode/
 
-emulator-data/
-
 md_context/
+
+# The dacli workspace lives on its own ref (dacli-record), not on trunk: records
+# carried on a branch fork with it, so a task closed on a task branch is
+# invisible on trunk until its record merges. The history is NOT lost —
+#   git log dacli-record
+#   git show dacli-record:.dacli/projects/<p>/tasks/done/<file>
+.dacli/
+.codex/
+# Locally generated release artifacts and optional collaboration exports.
+/release/

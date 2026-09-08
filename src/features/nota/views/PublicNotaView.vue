@@ -1,22 +1,56 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, onBeforeMount, watch } from 'vue'
+import { ref, onMounted, computed, watch, shallowRef, type Component } from 'vue';
 import { useRoute, useRouter } from 'vue-router'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useAuthStore } from '@/features/auth/stores/auth'
 import { Button } from '@/components/ui/button'
 import { formatDate } from '@/lib/utils'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import { Share2, ChevronLeft, ChevronUp, ChevronDown, FileText, FileCode } from 'lucide-vue-next'
 import { Skeleton } from '@/components/ui/skeleton'
-import NotaContentViewer from '@/features/editor/components/NotaContentViewer.vue'
 import { type PublishedNota } from '@/features/nota/types/nota'
 import { logger } from '@/services/logger'
-import { statisticsService } from '@/features/bashhub/services/statisticsService'
-import { convertPublicPageLinks } from '@/features/editor/components/extensions/PageLinkExtension'
-import VotersList from '@/features/nota/components/VotersList.vue'
+import { getCommunityCloudApi, getPublicationCloudApi } from '@/services/cloud'
+import { convertPublicPageLinks } from '@/features/nota/utils/publicPageLinks'
 import CommentSection from '@/features/nota/components/CommentSection.vue'
-import { useHead } from '@vueuse/head'
+import { useHead } from '@unhead/vue'
 import CitationDialog from '@/features/nota/components/CitationDialog.vue'
+import { normalizeCloudPublishedContent, type CloudPublishedContent } from '@/services/cloud/types'
+import { loadNotaContentViewer } from './notaContentViewerLoader'
+
+// Public pages render their read-only ProseMirror view only after the page has
+// fetched its published nota. This keeps the initial public-route graph free of
+// the editor stack while retaining the existing viewer once content is ready.
+const VIEWER_TIMEOUT_MS = 15_000
+const notaContentViewer = shallowRef<Component | null>(null)
+const viewerStatus = ref<'idle' | 'loading' | 'error'>('idle')
+const viewerError = ref('')
+let viewerLoadAttempt = 0
+
+async function loadViewer() {
+  const attempt = ++viewerLoadAttempt
+  notaContentViewer.value = null
+  viewerStatus.value = 'loading'
+  viewerError.value = ''
+  try {
+    const component = await Promise.race([
+      loadNotaContentViewer(),
+      new Promise<never>((_, reject) => window.setTimeout(
+        () => reject(new Error('The reader took too long to load.')), VIEWER_TIMEOUT_MS,
+      )),
+    ])
+    if (attempt === viewerLoadAttempt && nota.value) notaContentViewer.value = component
+  } catch (error) {
+    if (attempt === viewerLoadAttempt && nota.value) {
+      viewerStatus.value = 'error'
+      viewerError.value = error instanceof Error ? error.message : 'The reader could not be loaded.'
+    }
+  }
+}
+
+function retryViewer() {
+  void loadViewer()
+}
 
 // Define extended PublishedNota type with optional fields we need
 interface ExtendedPublishedNota extends PublishedNota {
@@ -63,7 +97,7 @@ const notaId = computed(() => {
 })
 const userTag = computed(() => {
   const tag = route.params.userTag;
-  return typeof tag === 'string' ? tag : (Array.isArray(tag) ? tag[0] : '');
+  return typeof tag === 'string' ? tag : (Array.isArray(tag) ? tag[0] : nota.value?.authorTag ?? '');
 })
 
 // Add origin URL computed property
@@ -73,14 +107,15 @@ const originUrl = computed(() => typeof window !== 'undefined' ? window.location
 const cloneCount = ref(0)
 
 // Get a short description from the content (first 160 characters)
-const getMetaDescription = (content: string | null): string => {
+const getMetaDescription = (content: CloudPublishedContent | string | null): string => {
   if (!content) {
     return 'Read this published note on BashNota - a powerful note-taking app for developers.'
   }
   
   try {
     // Parse the JSON content
-    const contentObj = JSON.parse(content)
+    const contentObj = normalizeCloudPublishedContent(content)
+    if (!contentObj) return 'Read this published note on BashNota - a powerful note-taking app for developers.'
     let extractedText = ''
 
     // Helper function to recursively extract text from content
@@ -131,11 +166,12 @@ const getMetaKeywords = (nota: ExtendedPublishedNota): string => {
 }
 
 // Extract first image from content for social sharing
-const getMetaImage = (content: string | null): string => {
+const getMetaImage = (content: CloudPublishedContent | string | null): string => {
   if (!content) return ''
   
   try {
-    const contentObj = JSON.parse(content)
+    const contentObj = normalizeCloudPublishedContent(content)
+    if (!contentObj) return ''
     let imageUrl = ''
     
     // Helper function to find first image
@@ -162,6 +198,11 @@ const getMetaImage = (content: string | null): string => {
   }
 }
 
+const getContentBlockCount = (content: CloudPublishedContent | string | null): number => {
+  const normalized = normalizeCloudPublishedContent(content)
+  return Array.isArray(normalized?.content) ? normalized.content.length : 0
+}
+
 // Determine the proper URL for this nota
 const getPublicLink = (id: string): string => {
   if (userTag.value) {
@@ -170,63 +211,64 @@ const getPublicLink = (id: string): string => {
   return `${window.location.origin}/p/${id}`
 }
 
-// Update meta tags when nota changes
-watch(() => nota.value, (newNota) => {
-  if (newNota) {
-    const title = `${newNota.title} | BashNota`
-    const description = getMetaDescription(newNota.content)
-    const canonicalUrl = getPublicLink(newNota.id)
-    const keywords = getMetaKeywords(newNota)
-    const image = getMetaImage(newNota.content)
+// Register head management during setup. The computed value stays reactive as
+// the publication arrives without calling the composable from a later watcher.
+useHead(computed(() => {
+  const publishedNota = nota.value
+  if (!publishedNota) return {}
 
-    useHead({
-      title,
-      meta: [
-        // Primary meta tags
-        { name: 'description', content: description },
-        { name: 'keywords', content: keywords },
-        { name: 'language', content: 'en' },
-        { name: 'robots', content: 'index, follow' },
-        { name: 'author', content: newNota.authorName },
-
-        // Open Graph tags
-        { property: 'og:title', content: title },
-        { property: 'og:description', content: description },
-        { property: 'og:type', content: 'article' },
-        { property: 'og:url', content: canonicalUrl },
-        { property: 'og:site_name', content: 'BashNota' },
-        { property: 'og:locale', content: 'en_US' },
-        { property: 'article:published_time', content: new Date(newNota.publishedAt).toISOString() },
-        { property: 'article:modified_time', content: new Date(newNota.updatedAt).toISOString() },
-        { property: 'article:author', content: newNota.authorName },
-
-        // Twitter card tags
-        { name: 'twitter:card', content: image ? 'summary_large_image' : 'summary' },
-        { name: 'twitter:title', content: title },
-        { name: 'twitter:description', content: description },
-        { name: 'twitter:site', content: '@bashnota' },
-        { name: 'twitter:creator', content: `@${newNota.authorName}` },
-      ],
-      link: [
-        { rel: 'canonical', href: canonicalUrl }
+  const title = `${publishedNota.title} | BashNota`
+  const description = getMetaDescription(publishedNota.content)
+  const canonicalUrl = getPublicLink(publishedNota.id)
+  const keywords = getMetaKeywords(publishedNota)
+  const image = getMetaImage(publishedNota.content)
+  const imageMeta = image
+    ? [
+        { property: 'og:image', content: image },
+        { property: 'og:image:alt', content: publishedNota.title },
+        { property: 'og:image:width', content: '1200' },
+        { property: 'og:image:height', content: '630' },
+        { name: 'twitter:image', content: image },
+        { name: 'twitter:image:alt', content: publishedNota.title },
       ]
-    })
+    : []
 
-    // Add image meta tags if image is available
-    if (image) {
-      useHead({
-        meta: [
-          { property: 'og:image', content: image },
-          { property: 'og:image:alt', content: newNota.title },
-          { property: 'og:image:width', content: '1200' },
-          { property: 'og:image:height', content: '630' },
-          { name: 'twitter:image', content: image },
-          { name: 'twitter:image:alt', content: newNota.title }
-        ]
-      })
-    }
+  return {
+    title,
+    meta: [
+      { name: 'description', content: description },
+      { name: 'keywords', content: keywords },
+      { name: 'language', content: 'en' },
+      { name: 'robots', content: 'index, follow' },
+      { name: 'author', content: publishedNota.authorName },
+      { property: 'og:title', content: title },
+      { property: 'og:description', content: description },
+      { property: 'og:type', content: 'article' },
+      { property: 'og:url', content: canonicalUrl },
+      { property: 'og:site_name', content: 'BashNota' },
+      { property: 'og:locale', content: 'en_US' },
+      { property: 'article:published_time', content: new Date(publishedNota.publishedAt).toISOString() },
+      { property: 'article:modified_time', content: new Date(publishedNota.updatedAt).toISOString() },
+      { property: 'article:author', content: publishedNota.authorName },
+      { name: 'twitter:card', content: image ? 'summary_large_image' : 'summary' },
+      { name: 'twitter:title', content: title },
+      { name: 'twitter:description', content: description },
+      { name: 'twitter:site', content: '@bashnota' },
+      { name: 'twitter:creator', content: `@${publishedNota.authorName}` },
+      ...imageMeta,
+    ],
+    link: [{ rel: 'canonical', href: canonicalUrl }],
   }
-}, { immediate: true })
+}))
+
+watch(nota, (publishedNota) => {
+  if (publishedNota) void loadViewer()
+  else {
+    viewerLoadAttempt += 1
+    notaContentViewer.value = null
+    viewerStatus.value = 'idle'
+  }
+})
 
 onMounted(async () => {
   try {
@@ -280,16 +322,11 @@ const recordNotaView = async (id: string) => {
   if (viewRecorded.value) return
   
   try {
-    // Get user ID if the user is logged in
-    const userId = authStore.currentUser?.uid || null
-    
     // Get referrer if available
     const referrer = document.referrer || null
     
-    // Record the view
-    await statisticsService.recordView(id, userId, referrer)
-    
-    viewRecorded.value = true
+    const result = await (await getPublicationCloudApi()).statistics.recordView(id, referrer)
+    if (result.ok) viewRecorded.value = true
   } catch (error) {
     // Don't show errors to users for stats tracking
     logger.error('Failed to record view statistics:', error)
@@ -359,9 +396,8 @@ const getAuthorLink = computed(() => {
   
   if (userTag.value) {
     return `/@${userTag.value}`
-  } else {
-    return `/u/${nota.value.authorId}`
   }
+  return `/p/${nota.value.id}`
 })
 
 // Initialize voting data
@@ -370,15 +406,17 @@ const loadVotingData = async () => {
   
   try {
     // Get the statistics which include vote counts
-    const stats = await statisticsService.getStatistics(notaId.value);
-    likeCount.value = stats.likeCount || 0;
-    dislikeCount.value = stats.dislikeCount || 0;
-    cloneCount.value = stats.cloneCount || 0;
+    const result = await (await getPublicationCloudApi()).statistics.getPublicationStats(notaId.value)
+    if (!result.ok || !result.data) throw result.ok ? new Error('Publication not found') : result.error
+    likeCount.value = result.data.likeCount || 0;
+    dislikeCount.value = result.data.dislikeCount || 0;
+    cloneCount.value = result.data.cloneCount || 0;
     
-    // Get the user's vote if they're logged in
+    userVote.value = null
     if (authStore.isAuthenticated && authStore.currentUser?.uid) {
-      const vote = await statisticsService.getUserVote(notaId.value, authStore.currentUser.uid);
-      userVote.value = vote;
+      const voteResult = await (await getCommunityCloudApi()).notaVotes.getVote(notaId.value)
+      if (!voteResult.ok) throw voteResult.error
+      userVote.value = voteResult.data
     }
   } catch (error) {
     logger.error('Failed to load voting data:', error);
@@ -400,22 +438,19 @@ const handleVote = async (voteType: 'like' | 'dislike') => {
     isVoting.value = true;
     
     // Record the vote
-    const result = await statisticsService.recordVote(
-      notaId.value,
-      authStore.currentUser.uid,
-      voteType
-    );
+    const result = await (await getCommunityCloudApi()).notaVotes.vote(notaId.value, voteType)
+    if (!result.ok) throw result.error
     
     // Update local state with the results
-    likeCount.value = result.likeCount;
-    dislikeCount.value = result.dislikeCount;
-    userVote.value = result.userVote;
+    likeCount.value = result.data.likeCount;
+    dislikeCount.value = result.data.dislikeCount;
+    userVote.value = result.data.userVote;
     
     // Show feedback to the user
-    if (result.userVote === null) {
+    if (result.data.userVote === null) {
       toast('Vote removed');
     } else {
-      toast(`You ${result.userVote}d this nota`);
+      toast(`You ${result.data.userVote}d this nota`);
     }
   } catch (error) {
     logger.error('Failed to record vote:', error);
@@ -471,14 +506,14 @@ const openCitationDialog = () => {
       <meta itemprop="datePublished" :content="new Date(nota.publishedAt).toISOString()">
       <meta itemprop="dateModified" :content="new Date(nota.updatedAt).toISOString()">
       <meta itemprop="keywords" :content="metaKeywords">
-      <meta itemprop="wordCount" :content="nota.content ? JSON.parse(nota.content).content?.length || 0 : 0">
+      <meta itemprop="wordCount" :content="String(getContentBlockCount(nota.content))">
       <meta itemprop="inLanguage" content="en-US">
       <meta itemprop="isAccessibleForFree" content="true">
       <meta itemprop="license" content="https://creativecommons.org/licenses/by/4.0/">
       
       <div itemprop="author" itemscope itemtype="https://schema.org/Person">
         <meta itemprop="name" :content="nota.authorName">
-        <meta itemprop="url" :content="`${originUrl}/@${nota.authorId}`">
+        <meta v-if="userTag" itemprop="url" :content="`${originUrl}/@${userTag}`">
       </div>
       
       <div itemprop="publisher" itemscope itemtype="https://schema.org/Organization">
@@ -628,7 +663,6 @@ const openCitationDialog = () => {
               </div>
               
               <!-- Show voters list button -->
-              <VotersList :notaId="notaId" v-if="likeCount > 0 || dislikeCount > 0" />
               
               <!-- Clone count display -->
               <div class="flex items-center gap-1 ml-2">
@@ -659,13 +693,24 @@ const openCitationDialog = () => {
       <div class="flex-1 overflow-y-auto min-h-0 space-y-6">
         <!-- Content area with itemprop for search engines -->
         <div itemprop="articleBody">
-          <NotaContentViewer 
+          <component
+            :is="notaContentViewer"
+            v-if="notaContentViewer"
             :content="nota.content" 
             :citations="nota.citations" 
             :isPublished="true" 
             readonly 
             @content-rendered="handleContentRendered"
           />
+          <div v-else-if="viewerStatus === 'loading'" class="py-12 text-center" role="status" aria-live="polite" aria-busy="true">
+            <Skeleton class="w-full h-24" />
+            <span class="sr-only">Loading published note reader</span>
+          </div>
+          <div v-else-if="viewerStatus === 'error'" class="border rounded-lg p-6 text-center" role="alert" aria-live="assertive">
+            <p class="font-medium">The published note reader could not be loaded.</p>
+            <p class="text-sm text-muted-foreground my-2">{{ viewerError }} Your published note is still available to retry.</p>
+            <Button variant="outline" @click="retryViewer">Retry reader</Button>
+          </div>
         </div>
         
         <!-- Footer with related/related articles if available -->
@@ -717,11 +762,3 @@ const openCitationDialog = () => {
   font-size: 0.875rem;
 }
 </style>
-
-
-
-
-
-
-
-

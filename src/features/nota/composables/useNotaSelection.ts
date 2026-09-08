@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref, computed, toValue, type MaybeRefOrGetter } from 'vue'
 import type { Nota } from '@/features/nota/types/nota'
 
 export function useNotaSelection() {
@@ -8,30 +8,24 @@ export function useNotaSelection() {
   const hasSelection = computed(() => selectedNotas.value.size > 0)
   const selectionCount = computed(() => selectedNotas.value.size)
   
-  const createSelectionForPage = (pageItems: Nota[]) => {
-    const isAllSelected = computed(() => 
-      pageItems.length > 0 && 
-      pageItems.every(nota => selectedNotas.value.has(nota.id))
+  const createSelectionForPage = (pageItems: MaybeRefOrGetter<readonly Nota[]>) => {
+    const currentPageItems = () => toValue(pageItems)
+
+    const isAllSelected = computed(() =>
+      currentPageItems().length > 0 &&
+      currentPageItems().every(nota => selectedNotas.value.has(nota.id))
     )
 
     const isIndeterminate = computed(() => {
-      const pageSelection = pageItems.filter(nota => selectedNotas.value.has(nota.id))
-      return pageSelection.length > 0 && pageSelection.length < pageItems.length
+      const items = currentPageItems()
+      const pageSelection = items.filter(nota => selectedNotas.value.has(nota.id))
+      return pageSelection.length > 0 && pageSelection.length < items.length
     })
 
-    const handleSelectAll = () => {
+    const handleSelectAll = (selected = !isAllSelected.value) => {
+      const items = currentPageItems()
       const newSelection = new Set(selectedNotas.value)
-      if (isAllSelected.value) {
-        // Deselect all on current page
-        pageItems.forEach(nota => {
-          newSelection.delete(nota.id)
-        })
-      } else {
-        // Select all on current page
-        pageItems.forEach(nota => {
-          newSelection.add(nota.id)
-        })
-      }
+      items.forEach(nota => selected ? newSelection.add(nota.id) : newSelection.delete(nota.id))
       selectedNotas.value = newSelection
     }
 

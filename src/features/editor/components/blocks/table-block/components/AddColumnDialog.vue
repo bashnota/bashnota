@@ -3,14 +3,7 @@ import { toTypedSchema } from "@vee-validate/zod"
 import { useForm } from "vee-validate"
 import * as z from "zod"
 import { Button } from '@/components/ui/button'
-import {
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form"
+import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import {
   Select,
   SelectContent,
@@ -19,7 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
-import { ref, watch, onMounted } from 'vue'
+import { watch } from 'vue';
 import { COLUMN_TYPES } from '@/features/editor/components/blocks/table-block/constants/columnTypes'
 import type { ColumnType } from '@/features/editor/components/blocks/table-block/composables/useTableOperations'
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, toRef } from 'vue'
+import { toRef } from 'vue';
 import { 
   Command, 
   CommandEmpty, 
@@ -59,6 +59,15 @@ const getCategoryItems = (items: CommandItemType[]) => {
   })
 }
 
+const getItemIndex = (item: CommandItemType) =>
+  commandList.flatItems.value.findIndex(candidate => candidate.title === item.title)
+
+const handleKeyDown = (event: KeyboardEvent) => {
+  if (commandList.handleKeyDown(event)) {
+    event.stopImmediatePropagation()
+  }
+}
+
 defineExpose({
   onKeyDown: commandList.handleKeyDown,
 })
@@ -68,6 +77,7 @@ defineExpose({
   <Command 
     :class="cn('rounded-lg border shadow-md bg-background', className)"
     :style="{ maxHeight, minWidth }"
+    @keydown.capture="handleKeyDown"
   >
     <CommandInput 
       :placeholder="placeholder"
@@ -91,12 +101,9 @@ defineExpose({
             :key="item.title"
             :value="item.title"
             :disabled="item.disabled"
-            @select="() => {
-              if (!item.disabled) {
-                emit('select', item)
-                props.command(item)
-              }
-            }"
+            :class="getItemIndex(item) === commandList.selectedIndex.value ? 'bg-accent text-accent-foreground' : undefined"
+            @pointerenter="commandList.handleMouseEnter(item)"
+            @select="() => commandList.executeItem(item)"
           >
             <!-- Icon -->
             <component 
@@ -106,7 +113,9 @@ defineExpose({
             />
             
             <!-- Title -->
-            <span>{{ item.title }}</span>
+            <span :data-command-selected="getItemIndex(item) === commandList.selectedIndex.value ? 'true' : undefined">
+              {{ item.title }}
+            </span>
             
             <!-- Description -->
             <span 
@@ -153,10 +162,6 @@ defineExpose({
   background: hsl(var(--background)) !important;
 }
 </style>
-
-
-
-
 
 
 

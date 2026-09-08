@@ -4,7 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import { Button } from '@/components/ui/button'
 import { RotateCw, Type } from 'lucide-vue-next'
 

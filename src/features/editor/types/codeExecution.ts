@@ -1,5 +1,15 @@
 import type { JupyterServer } from '@/features/jupyter/types/jupyter'
 
+export type ExecutionState =
+  | 'idle'
+  | 'queued'
+  | 'running'
+  | 'interrupting'
+  | 'timed_out'
+  | 'cancelled'
+  | 'failed'
+  | 'succeeded'
+
 export interface CodeCell {
   id: string
   code: string
@@ -10,6 +20,9 @@ export interface CodeCell {
   isExecuting: boolean
   hasError: boolean
   error: Error | null
+  executionState: ExecutionState
+  executionStartedAt: number | null
+  executionElapsedMs: number
   isPublished?: boolean // Flag to indicate this is a cell in a published nota
   isPipelineCell?: boolean // Flag to indicate this is a pipeline cell that should not use shared session mode
 }
@@ -62,7 +75,6 @@ export interface SessionManager {
   deleteSession(id: string): void
   setActiveSession(id: string): void
 }
-
 
 
 

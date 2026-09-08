@@ -1,18 +1,57 @@
 import { defineStore } from 'pinia'
 import { ref, computed, reactive, readonly } from 'vue'
-import { CodeExecutionService } from '@/services/codeExecutionService'
+import {
+  CodeExecutionService,
+  DEFAULT_EXECUTION_TIMEOUT_MS,
+  ExecutionCancelledError,
+  ExecutionTimeoutError,
+} from '@/services/codeExecutionService'
 import { JupyterService } from '@/features/jupyter/services/jupyterService'
-import type { CodeCell, KernelSession } from '@/features/editor/types/codeExecution'
+import type { CodeCell, ExecutionState, KernelSession } from '@/features/editor/types/codeExecution'
 import type { JupyterServer, KernelSpec, NotaConfig, SavedSession } from '@/features/jupyter/types/jupyter'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
 import { getURLWithoutProtocol } from '@/lib/utils'
 import { logger } from '@/services/logger'
+import { showJupyterExecutionGuidance } from '@/features/jupyter/services/jupyterExecutionGuidance'
 
 export const useCodeExecutionStore = defineStore('codeExecution', () => {
   const cells = ref<Map<string, CodeCell>>(new Map())
   const kernelSessions = ref<Map<string, KernelSession>>(new Map())
   const executionService = new CodeExecutionService()
+  const executionTimeoutSeconds = ref(DEFAULT_EXECUTION_TIMEOUT_MS / 1000)
+  const activeExecutions = new Map<string, AbortController>()
+  const EXECUTION_TIMEOUT_STORAGE_KEY = 'code-execution-timeout-seconds'
+
+  const loadExecutionTimeout = () => {
+    try {
+      const saved = Number(localStorage.getItem(EXECUTION_TIMEOUT_STORAGE_KEY))
+      if (Number.isFinite(saved) && saved >= 5 && saved <= 3600) {
+        executionTimeoutSeconds.value = saved
+      }
+    } catch (error) {
+      logger.warn('Failed to load execution timeout:', error)
+    }
+  }
+
+  const setExecutionTimeoutSeconds = (seconds: number) => {
+    if (!Number.isFinite(seconds) || seconds < 5 || seconds > 3600) {
+      throw new Error('Execution timeout must be between 5 and 3600 seconds')
+    }
+    executionTimeoutSeconds.value = Math.round(seconds)
+    localStorage.setItem(EXECUTION_TIMEOUT_STORAGE_KEY, String(executionTimeoutSeconds.value))
+  }
+
+  const updateExecutionState = (cellId: string, state: ExecutionState) => {
+    const cell = cells.value.get(cellId)
+    if (!cell) return
+    cell.executionState = state
+    cell.isExecuting = ['queued', 'running', 'interrupting'].includes(state)
+    if (cell.executionStartedAt !== null) {
+      cell.executionElapsedMs = Date.now() - cell.executionStartedAt
+    }
+    cells.value.set(cellId, { ...cell })
+  }
   
   // Lazy getters for other stores
   const getNotaStore = () => useNotaStore()
@@ -101,7 +140,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
   }
 
   // Save current sessions to nota config
-  const saveSessions = async (notaId: string) => {
+  const saveSessions = async (notaId: string, alreadyCoordinated = false) => {
     const savedSessions = Array.from(kernelSessions.value.values()).map((session) => ({
       id: session.id,
       name: session.name,
@@ -112,7 +151,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
       config.savedSessions = savedSessions
       config.sharedSessionMode = sharedSessionMode.value
       config.sharedSessionId = sharedSessionId.value
-    })
+    }, alreadyCoordinated)
   }
 
   // Session Management
@@ -503,12 +542,15 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
   }
 
   // Cell Management
-  function addCell(cell: Omit<CodeCell, 'isExecuting' | 'hasError' | 'error'> & { isPublished?: boolean; isPipelineCell?: boolean }) {
+  function addCell(cell: Omit<CodeCell, 'isExecuting' | 'hasError' | 'error' | 'executionState' | 'executionStartedAt' | 'executionElapsedMs'> & { isPublished?: boolean; isPipelineCell?: boolean }) {
     cells.value.set(cell.id, {
       ...cell,
       isExecuting: false,
       hasError: false,
       error: null,
+      executionState: 'idle',
+      executionStartedAt: null,
+      executionElapsedMs: 0,
       // Save isPublished flag in the cell data so components can use it to handle display differently
       isPublished: cell.isPublished || false,
       // Save isPipelineCell flag to prevent shared session mode interference
@@ -526,6 +568,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
     serverConfig: JupyterServer,
     kernelName: string,
     sessionId: string,
+    signal?: AbortSignal,
   ) {
     try {
       // Validate kernel name before attempting to create a kernel
@@ -555,7 +598,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
         }
       }
       
-      const kernelId = await executionService.createKernel(serverConfig, kernelName)
+      const kernelId = await executionService.createKernel(serverConfig, kernelName, signal)
       const session = kernelSessions.value.get(sessionId)
       if (session) {
         session.kernelId = kernelId
@@ -575,6 +618,15 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
     if (!cell) {
       logger.error(`Cannot execute cell: Cell ${cellId} not found`)
       return
+    }
+
+    if (activeExecutions.has(cellId)) {
+      logger.warn(`Cell ${cellId} is already executing`)
+      return
+    }
+
+    if (getJupyterStore().jupyterServers.length === 0) {
+      showJupyterExecutionGuidance()
     }
 
     // Log the cell state
@@ -602,6 +654,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
           cell.hasError = true;
           cell.error = new Error('No Jupyter servers available');
           cell.output = 'Error: No Jupyter servers available. Please add a server first.';
+          cell.executionState = 'failed'
           cells.value.set(cellId, { ...cell });
           return;
         }
@@ -644,6 +697,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
           cell.hasError = true;
           cell.error = new Error('No working servers with kernels available');
           cell.output = 'Error: Could not find a working server with available kernels.';
+          cell.executionState = 'failed'
           cells.value.set(cellId, { ...cell });
           return;
         }
@@ -665,6 +719,11 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
       const session = kernelSessions.value.get(sharedSessionId.value);
       if (!session) {
         logger.error('Shared session not found after creation');
+        cell.hasError = true
+        cell.error = new Error('Shared session could not be created')
+        cell.output = cell.error.message
+        cell.executionState = 'failed'
+        cells.value.set(cellId, { ...cell })
         return;
       }
 
@@ -681,6 +740,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
       cell.hasError = true;
       cell.error = new Error('No server configuration');
       cell.output = 'Error: No server configuration. Please select a server.';
+      cell.executionState = 'failed'
       cells.value.set(cellId, { ...cell });
       return;
     }
@@ -690,10 +750,21 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
       cell.hasError = true;
       cell.error = new Error('Invalid kernel name');
       cell.output = 'Error: Invalid kernel name. Please select a valid kernel.';
+      cell.executionState = 'failed'
       cells.value.set(cellId, { ...cell });
       return;
     }
 
+    const controller = new AbortController()
+    const timeoutMs = executionTimeoutSeconds.value * 1000
+    const timeoutId = setTimeout(() => {
+      controller.abort(new ExecutionTimeoutError(timeoutMs))
+    }, timeoutMs)
+    activeExecutions.set(cellId, controller)
+
+    cell.executionStartedAt = Date.now()
+    cell.executionElapsedMs = 0
+    cell.executionState = 'queued'
     cell.isExecuting = true;
     cell.hasError = false;
     cell.error = null;
@@ -709,14 +780,14 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
 
         if (!session?.kernelId) {
           logger.log(`Creating kernel session for existing session ${cell.sessionId}`);
-          await createKernelSession(cell.serverConfig, cell.kernelName, cell.sessionId);
+          await createKernelSession(cell.serverConfig, cell.kernelName, cell.sessionId, controller.signal);
           session = kernelSessions.value.get(cell.sessionId);
         }
       } else {
         // Create a new session for this cell if it doesn't have one
         const sessionId = createSession(`Session ${kernelSessions.value.size + 1}`);
         logger.log(`Creating new session ${sessionId} and kernel for cell ${cellId}`);
-        await createKernelSession(cell.serverConfig, cell.kernelName, sessionId);
+        await createKernelSession(cell.serverConfig, cell.kernelName, sessionId, controller.signal);
         session = kernelSessions.value.get(sessionId);
         addCellToSession(cellId, sessionId);
       }
@@ -740,34 +811,100 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
             logger.log(`Updated cell output to: "${updatedCell.output}"`);
           }
         },
+        {
+          timeoutMs,
+          signal: controller.signal,
+          onStateChange: (state) => updateExecutionState(cellId, state),
+        },
       );
 
       // Final output update
       const result = results[0];
       logger.log(`Final execution result:`, result);
-      if (result) {
-        cell.output = result.output;
-        cell.hasError = result.hasError || false;
-        logger.log(`Final cell state - output: "${cell.output}", hasError: ${cell.hasError}`);
+      const completedCell = cells.value.get(cellId)
+      if (result && completedCell) {
+        completedCell.output = result.output;
+        completedCell.hasError = result.hasError || false;
+        completedCell.executionState = result.hasError ? 'failed' : 'succeeded'
+        logger.log(`Final cell state - output: "${completedCell.output}", hasError: ${completedCell.hasError}`);
+        cells.value.set(cellId, { ...completedCell });
       }
-      
-      // Force update the cell in the Map
-      cells.value.set(cellId, { ...cell });
-      logger.log(`Cell ${cellId} execution completed. Final output: "${cell.output}"`);
+      logger.log(`Cell ${cellId} execution completed. Final output: "${result?.output || ''}"`);
       
     } catch (error: any) {
       logger.error(`Execution error for cell ${cellId}:`, error);
-      cell.hasError = true;
-      cell.error = error instanceof Error ? error : new Error('Execution failed');
-      cell.output = error instanceof Error ? error.message : 'Execution failed';
-      cells.value.set(cellId, { ...cell });
+      const failedCell = cells.value.get(cellId)
+      if (failedCell) {
+        const executionError = error instanceof Error ? error : new Error('Execution failed')
+        failedCell.hasError = true;
+        failedCell.error = executionError;
+        failedCell.output = executionError.message;
+        if (error instanceof ExecutionTimeoutError) {
+          failedCell.executionState = 'timed_out'
+        } else if (error instanceof ExecutionCancelledError) {
+          if (failedCell.executionState !== 'failed') failedCell.executionState = 'cancelled'
+        } else {
+          failedCell.executionState = 'failed'
+        }
+        cells.value.set(cellId, { ...failedCell });
+      }
     } finally {
-      cell.isExecuting = false;
-      cells.value.set(cellId, { ...cell });
+      clearTimeout(timeoutId)
+      activeExecutions.delete(cellId)
+      const finishedCell = cells.value.get(cellId)
+      if (finishedCell) {
+        finishedCell.isExecuting = false;
+        finishedCell.executionElapsedMs = finishedCell.executionStartedAt === null
+          ? finishedCell.executionElapsedMs
+          : Date.now() - finishedCell.executionStartedAt
+        cells.value.set(cellId, { ...finishedCell });
+      }
     }
   }
 
+  async function interruptCell(cellId: string) {
+    const controller = activeExecutions.get(cellId)
+    const cell = cells.value.get(cellId)
+    if (!controller || !cell) return false
+
+    updateExecutionState(cellId, 'interrupting')
+    const session = cell.sessionId ? kernelSessions.value.get(cell.sessionId) : undefined
+    try {
+      if (session?.kernelId && cell.serverConfig) {
+        await executionService.interruptKernel(
+          cell.serverConfig,
+          session.kernelId,
+          AbortSignal.timeout(5_000),
+        )
+      }
+      controller.abort(new ExecutionCancelledError('Execution interrupted by user'))
+      return true
+    } catch (error) {
+      const currentCell = cells.value.get(cellId)
+      if (currentCell) {
+        currentCell.hasError = true
+        currentCell.error = error instanceof Error ? error : new Error('Failed to interrupt execution')
+        currentCell.output = currentCell.error.message
+        currentCell.executionState = 'failed'
+        cells.value.set(cellId, { ...currentCell })
+      }
+      controller.abort(new ExecutionCancelledError('Execution cancelled after interrupt failed'))
+      return false
+    }
+  }
+
+  function cancelCell(cellId: string) {
+    const controller = activeExecutions.get(cellId)
+    if (!controller) return false
+    controller.abort(new ExecutionCancelledError('Execution cancelled by user'))
+    return true
+  }
+
   async function executeAll() {
+    if (getJupyterStore().jupyterServers.length === 0) {
+      showJupyterExecutionGuidance()
+    }
+
     // Group cells by session
     const sessionCells = new Map<string, CodeCell[]>()
 
@@ -785,25 +922,17 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
       async ([sessionId, sessionCells]) => {
         const session = kernelSessions.value.get(sessionId)
         if (!session) return
+        const controller = new AbortController()
+        const timeoutMs = executionTimeoutSeconds.value * 1000
+        const timeoutId = setTimeout(() => {
+          controller.abort(new ExecutionTimeoutError(timeoutMs))
+        }, timeoutMs)
 
-        // Ensure session has a kernel
-        if (!session.kernelId) {
-          const firstCell = sessionCells[0]
-          await createKernelSession(firstCell.serverConfig!, firstCell.kernelName, sessionId)
-        }
-
-        const updatedSession = kernelSessions.value.get(sessionId)
-        if (!updatedSession?.kernelId) throw new Error('Failed to create or get kernel session')
-
-        // Prepare cells for execution
-        const codeBlocks = sessionCells.map((cell) => ({
-          id: cell.id,
-          notebookId: sessionId,
-          code: cell.code,
-        }))
-
-        // Mark cells as executing
         sessionCells.forEach((cell) => {
+          activeExecutions.set(cell.id, controller)
+          cell.executionStartedAt = Date.now()
+          cell.executionElapsedMs = 0
+          cell.executionState = 'queued'
           cell.isExecuting = true
           cell.hasError = false
           cell.error = null
@@ -812,6 +941,25 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
         })
 
         try {
+          if (!session.kernelId) {
+            const firstCell = sessionCells[0]
+            await createKernelSession(
+              firstCell.serverConfig!,
+              firstCell.kernelName,
+              sessionId,
+              controller.signal,
+            )
+          }
+
+          const updatedSession = kernelSessions.value.get(sessionId)
+          if (!updatedSession?.kernelId) throw new Error('Failed to create or get kernel session')
+
+          const codeBlocks = sessionCells.map((cell) => ({
+            id: cell.id,
+            notebookId: sessionId,
+            code: cell.code,
+          }))
+
           const results = await executionService.executeNotebookBlocks(
             updatedSession.serverConfig,
             updatedSession.kernelId,
@@ -823,6 +971,13 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
                 cells.value.set(blockId, { ...cell })
               }
             },
+            {
+              timeoutMs,
+              signal: controller.signal,
+              onStateChange: (state) => {
+                sessionCells.forEach((cell) => updateExecutionState(cell.id, state))
+              },
+            },
           )
 
           // Final output update
@@ -831,6 +986,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
             if (cell) {
               cell.output = result.output
               cell.hasError = result.hasError || false
+              cell.executionState = result.hasError ? 'failed' : 'succeeded'
               cells.value.set(cell.id, { ...cell })
             }
           })
@@ -839,13 +995,23 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
             cell.hasError = true
             cell.error = error instanceof Error ? error : new Error('Execution failed')
             cell.output = cell.error.message
+            cell.executionState = error instanceof ExecutionTimeoutError
+              ? 'timed_out'
+              : error instanceof ExecutionCancelledError
+                ? 'cancelled'
+                : 'failed'
             cells.value.set(cell.id, { ...cell })
           })
         } finally {
+          clearTimeout(timeoutId)
           sessionCells.forEach((c) => {
+            activeExecutions.delete(c.id)
             const cell = cells.value.get(c.id)
             if (cell) {
               cell.isExecuting = false
+              cell.executionElapsedMs = cell.executionStartedAt === null
+                ? cell.executionElapsedMs
+                : Date.now() - cell.executionStartedAt
               cells.value.set(c.id, { ...cell })
             }
           })
@@ -857,6 +1023,11 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
   }
 
   async function cleanup() {
+    for (const controller of new Set(activeExecutions.values())) {
+      controller.abort(new ExecutionCancelledError('Execution cancelled because the editor closed'))
+    }
+    activeExecutions.clear()
+
     // Clean up all kernel sessions
     for (const session of kernelSessions.value.values()) {
       if (session.kernelId && session.serverConfig) {
@@ -873,6 +1044,7 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
 
   // Initialize the store
   loadSharedSessionMode()
+  loadExecutionTimeout()
 
   return {
     cells,
@@ -882,6 +1054,8 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
     getAllSessions,
     addCell,
     executeCell,
+    interruptCell,
+    cancelCell,
     executeAll,
     cleanup,
     createSession,
@@ -900,14 +1074,8 @@ export const useCodeExecutionStore = defineStore('codeExecution', () => {
     // Server selection dialog controls
     serverDialogControls,
     handleServerSelected,
-    handleServerSelectionCancelled
+    handleServerSelectionCancelled,
+    executionTimeoutSeconds,
+    setExecutionTimeoutSeconds,
   }
 })
-
-
-
-
-
-
-
-

@@ -1,4 +1,3 @@
-import { ref } from 'vue'
 import { useUIStore } from '@/stores/uiStore'
 import { useTabsStore } from '@/stores/tabsStore'
 

@@ -15,8 +15,7 @@ import {
 } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Eye, EyeOff, Mail, Lock } from 'lucide-vue-next'
-import { toast } from 'vue-sonner'
-import { logger } from '@/services/logger'
+import AuthFeedback from '@/features/auth/components/AuthFeedback.vue'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -25,9 +24,19 @@ const route = useRoute()
 // Form state
 const email = ref('')
 const password = ref('')
-const rememberMe = ref(false)
+const saveEmail = ref(false)
 const showPassword = ref(false)
 const isLoading = ref(false)
+const localError = ref<string | null>(null)
+const resetSuccess = ref<string | null>(null)
+
+const feedbackError = computed(() => localError.value || authStore.errorMessage)
+
+function beginAttempt(): void {
+  localError.value = null
+  resetSuccess.value = null
+  authStore.clearError()
+}
 
 // Computed properties for form validation
 const isEmailValid = computed(() => {
@@ -47,10 +56,9 @@ const isFormValid = computed(() => {
 
 // Handle login with email/password
 const handleLogin = async () => {
+  beginAttempt()
   if (!isFormValid.value) {
-    toast('Please fill in all fields correctly', {
-      description: 'Invalid Form'
-    })
+    localError.value = 'Enter a valid email address and password to sign in.'
     return
   }
 
@@ -60,23 +68,20 @@ const handleLogin = async () => {
     const result = await authStore.loginWithEmail({ email: email.value, password: password.value })
 
     if (result) {
-      // Store email in localStorage if remember me is checked
-      if (rememberMe.value) {
+      // This preference stores only the email address. Supabase owns session
+      // persistence independently, so the control must not imply otherwise.
+      if (saveEmail.value) {
         localStorage.setItem('rememberedEmail', email.value)
       } else {
         localStorage.removeItem('rememberedEmail')
       }
-
-      toast('Login successful!', {
-        description: 'Welcome back!'
-      })
 
       // Navigate to the redirect URL or home page
       const redirectUrl = (route.query.redirect as string) || '/'
       router.push(redirectUrl)
     }
   } catch (error) {
-    logger.error('Login error:', error)
+    localError.value = error instanceof Error ? error.message : 'Login failed'
   } finally {
     isLoading.value = false
   }
@@ -84,22 +89,17 @@ const handleLogin = async () => {
 
 // Handle Google sign-in
 const handleGoogleLogin = async () => {
+  beginAttempt()
   isLoading.value = true
 
   try {
-    const result = await authStore.loginWithGoogle()
-
-    if (result) {
-      toast('Google login successful!', {
-        description: 'Welcome back!'
-      })
-
-      // Navigate to the redirect URL or home page
-      const redirectUrl = (route.query.redirect as string) || '/'
-      router.push(redirectUrl)
-    }
+    const redirectUrl = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
+    const started = await authStore.loginWithGoogle(redirectUrl)
+    // Supabase PKCE navigates
+    // away and resumes through /auth/callback instead.
+    if (started && authStore.isAuthenticated) await router.push(redirectUrl)
   } catch (error) {
-    logger.error('Google login error:', error)
+    localError.value = error instanceof Error ? error.message : 'Google login failed'
   } finally {
     isLoading.value = false
   }
@@ -107,22 +107,20 @@ const handleGoogleLogin = async () => {
 
 // Handle forgotten password
 const handleForgotPassword = async () => {
+  beginAttempt()
   if (!email.value || !isEmailValid.value) {
-    toast('Please enter a valid email address', {
-      description: 'Invalid Email'
-    })
+    localError.value = 'Enter a valid email address to reset your password.'
     return
   }
 
   isLoading.value = true
 
   try {
-    await authStore.resetPassword(email.value)
-    toast('Password reset email sent!', {
-      description: 'Check your email for reset instructions'
-    })
+    if ((await authStore.resetPassword(email.value)) === true) {
+      resetSuccess.value = 'Password reset email sent. Check your inbox for reset instructions.'
+    }
   } catch (error) {
-    logger.error('Password reset error:', error)
+    localError.value = error instanceof Error ? error.message : 'Password reset failed'
   } finally {
     isLoading.value = false
   }
@@ -133,7 +131,7 @@ const initFromStorage = () => {
   const savedEmail = localStorage.getItem('rememberedEmail')
   if (savedEmail) {
     email.value = savedEmail
-    rememberMe.value = true
+    saveEmail.value = true
   }
 }
 
@@ -151,6 +149,7 @@ initFromStorage()
         </CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
+        <AuthFeedback :error="feedbackError" :success="resetSuccess" />
         <!-- Email Field -->
         <div class="space-y-2">
           <Label for="email">Email</Label>
@@ -160,11 +159,10 @@ initFromStorage()
             />
             <Input
               id="email"
-              :value="email"
+              v-model="email"
               type="email"
-              :class-name="`pl-10 ${email && !isEmailValid ? 'border-red-500' : ''}`"
+              :class="`pl-10 ${email && !isEmailValid ? 'border-red-500' : ''}`"
               placeholder="email@example.com"
-              @input="(e: Event) => (email = (e.target as HTMLInputElement).value)"
               @keyup.enter="handleLogin"
             />
           </div>
@@ -191,16 +189,18 @@ initFromStorage()
             />
             <Input
               id="password"
-              :value="password"
+              v-model="password"
               :type="showPassword ? 'text' : 'password'"
-              :class-name="`pl-10 ${password && !isPasswordValid ? 'border-red-500' : ''}`"
+              :class="`pl-10 ${password && !isPasswordValid ? 'border-red-500' : ''}`"
               placeholder="••••••••"
-              @input="(e: Event) => (password = (e.target as HTMLInputElement).value)"
               @keyup.enter="handleLogin"
             />
             <button
               type="button"
-              class="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
+              class="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              :aria-label="showPassword ? 'Hide password' : 'Show password'"
+              :aria-pressed="showPassword"
+              aria-controls="password"
               @click="showPassword = !showPassword"
             >
               <Eye v-if="showPassword" class="h-4 w-4" />
@@ -214,12 +214,16 @@ initFromStorage()
 
         <!-- Remember Me -->
         <div class="flex items-center space-x-2">
-          <Checkbox id="remember" v-model:checked="rememberMe" />
+          <Checkbox
+            id="save-email"
+            :model-value="saveEmail"
+            @update:model-value="value => { saveEmail = value === true }"
+          />
           <label
-            for="remember"
+            for="save-email"
             class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
           >
-            Remember me
+            Save email on this device
           </label>
         </div>
 
@@ -273,11 +277,3 @@ initFromStorage()
     </Card>
   </div>
 </template>
-
-
-
-
-
-
-
-

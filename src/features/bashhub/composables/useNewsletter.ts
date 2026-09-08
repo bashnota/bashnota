@@ -1,8 +1,7 @@
 import { ref } from 'vue'
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore'
-import { firestore } from '@/services/firebase'
 import { useAuthStore } from '@/features/auth/stores/auth'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
+import { getCommunityCloudApi } from '@/services/cloud'
 
 export function useNewsletter() {
   const isSubscribing = ref(false)
@@ -18,14 +17,8 @@ export function useNewsletter() {
     isSubscribing.value = true
     try {
       const user = authStore.currentUser
-      const newsletterDocRef = doc(firestore, 'newsletterSubscriptions', user.uid)
-      
-      await setDoc(newsletterDocRef, {
-        email: user.email,
-        displayName: user.displayName || '',
-        subscribedAt: serverTimestamp(),
-        uid: user.uid
-      })
+      const result=await (await getCommunityCloudApi()).newsletter.subscribe(user.email??'',user.displayName||'')
+      if(!result.ok)throw result.error
 
       toast('🎉 You have successfully subscribed to the newsletter!', { description: 'Subscription Successful' })
       return true
@@ -42,4 +35,4 @@ export function useNewsletter() {
     isSubscribing,
     subscribeToNewsletter,
   }
-} 
+}

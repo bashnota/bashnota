@@ -14,11 +14,13 @@ const router = createRouter({
       name: 'nota',
       component: () => import('@/features/nota/views/SplitNotaView.vue'),
       props: true,
+      meta: { editorShell: true },
     },
     {
       path: '/favorites',
       name: 'favorites',
       component: () => import('@/features/nota/views/FavoritesView.vue'),
+      meta: { editorShell: true },
     },
     {
       path: '/settings',
@@ -43,6 +45,7 @@ const router = createRouter({
       name: 'code-block-output',
       component: () => import('@/features/editor/views/CodeBlockOutputView.vue'),
       props: true,
+      meta: { editorShell: true },
     },
     // Auth routes
     {
@@ -56,6 +59,16 @@ const router = createRouter({
       name: 'register',
       component: () => import('@/features/auth/views/RegisterView.vue'),
       meta: { requiresGuest: true },
+    },
+    {
+      path: '/auth/callback',
+      name: 'auth-callback',
+      component: () => import('@/features/auth/views/OAuthCallbackView.vue'),
+    },
+    {
+      path: '/auth/reset-password',
+      name: 'auth-reset-password',
+      component: () => import('@/features/auth/views/PasswordResetView.vue'),
     },
     {
       path: '/profile',
@@ -128,8 +141,6 @@ router.beforeEach(async (to, from, next) => {
 })
 
 export default router
-
-
 
 
 

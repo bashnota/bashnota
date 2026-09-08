@@ -82,7 +82,6 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
 import { 
   Navigation as NavigationIcon,
   Compass as CompassIcon,

@@ -1,4 +1,4 @@
-import { ref, reactive, computed, nextTick, onUnmounted, watch, type Ref } from 'vue'
+import { ref, reactive, computed, onUnmounted, watch, type Ref } from 'vue';
 import type { ViewportFunctions } from '@vue-flow/core'
 
 export interface ViewportState {

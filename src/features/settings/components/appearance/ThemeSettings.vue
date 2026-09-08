@@ -4,7 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import { RotateCw, Palette } from 'lucide-vue-next'
 import { useTheme } from '@/composables/theme'
 import { useThemeColor, themeDefinitions, type ThemeColor } from '@/composables/theme'

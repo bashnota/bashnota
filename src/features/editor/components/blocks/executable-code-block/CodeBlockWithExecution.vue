@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, nextTick, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, nextTick, onBeforeUnmount, watch } from 'vue';
 import type { KernelConfig } from '@/features/jupyter/types/jupyter'
 
 // Core composables for state management
@@ -9,12 +9,12 @@ import { useCodeBlockExecutionSimplified } from '@/features/editor/components/bl
 import { useRobustExecution } from '@/features/editor/composables/useRobustExecution'
 import { useCodeExecutionStore } from '@/features/editor/stores/codeExecutionStore'
 import { useEnhancedOutputManagement } from '@/features/editor/composables/useEnhancedOutputManagement'
+import { logger } from '@/services/logger'
 
 // Get code execution store instance
 const codeExecutionStore = useCodeExecutionStore()
 
 // Components
-import CodeBlockToolbar from './components/CodeBlockToolbar.vue'
 import SideToolbar from './components/SideToolbar.vue'
 import StatusIndicator from './components/StatusIndicator.vue'
 import WarningBanners from './components/WarningBanners.vue'
@@ -26,7 +26,7 @@ import ErrorDisplay from './ErrorDisplay.vue'
 import TemplateSelector from './TemplateSelector.vue'
 
 // UI utilities
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 
 // Types
 interface Props {
@@ -70,7 +70,6 @@ const {
 
 // UI state management
 const {
-  isHovered,
   showToolbar,
   isCodeVisible,
   isFullScreen,
@@ -99,6 +98,27 @@ const {
   codeValue,
   isReadyToExecute
 })
+
+const executionClock = ref(Date.now())
+let executionClockTimer: ReturnType<typeof setInterval> | null = null
+const effectiveIsExecuting = computed(() => isExecuting.value || cell.value?.isExecuting || false)
+const visibleExecutionElapsedMs = computed(() => {
+  const currentCell = cell.value
+  if (!currentCell) return 0
+  if (effectiveIsExecuting.value && currentCell.executionStartedAt !== null) {
+    return executionClock.value - currentCell.executionStartedAt
+  }
+  return currentCell.executionElapsedMs
+})
+
+watch(effectiveIsExecuting, (executing) => {
+  if (executionClockTimer) clearInterval(executionClockTimer)
+  executionClockTimer = null
+  if (executing) {
+    executionClock.value = Date.now()
+    executionClockTimer = setInterval(() => { executionClock.value = Date.now() }, 100)
+  }
+}, { immediate: true })
 
 // Server/kernel selection - get from store or use robust execution
 const selectedServer = computed(() => {
@@ -214,6 +234,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   isMounted.value = false
+  if (executionClockTimer) clearInterval(executionClockTimer)
 })
 
 // Enhanced execution function with robust configuration
@@ -245,7 +266,7 @@ const safeExecuteCode = async () => {
           }
         })
       } else {
-        console.error(`[CodeBlockWithExecution] Robust execution failed for cell ${props.id}`)
+        logger.info(`[CodeBlockWithExecution] Execution needs configuration for cell ${props.id}`)
         emit('update:output', 'Error: Code execution failed. Please check your server configuration.')
       }
     } else {
@@ -289,29 +310,14 @@ const hasError = computed(() => {
   return currentCell?.hasError || false
 })
 
-// Mouse event handlers
-const handleMouseEnter = () => {
-  if (!isMounted.value) return
-  try {
-    isHovered.value = true
-  } catch (error) {
-    console.warn('Error in mouse enter handler:', error)
-  }
+const executionState = computed(() => cell.value?.executionState ?? 'idle')
+
+const handleInterruptExecution = async () => {
+  await codeExecutionStore.interruptCell(props.id)
 }
 
-const handleMouseLeave = () => {
-  if (!isMounted.value) return
-  
-  // Use nextTick to ensure component state is stable
-  nextTick(() => {
-    try {
-      if (isMounted.value) {
-        isHovered.value = false
-      }
-    } catch (error) {
-      console.warn('Error in mouse leave handler:', error)
-    }
-  })
+const handleCancelExecution = () => {
+  codeExecutionStore.cancelCell(props.id)
 }
 
 // Configuration modal handler
@@ -411,21 +417,21 @@ const handleShowAIAssistant = () => {
     ref="codeBlockRef"
     class="flex flex-col bg-card text-card-foreground rounded-lg border shadow-sm transition-all duration-200 group hover:shadow-md relative"
     :class="codeBlockClasses"
-    @mouseenter="handleMouseEnter"
-    @mouseleave="handleMouseLeave"
   >
     <!-- Status indicator bar -->
     <StatusIndicator
-      :is-executing="isExecuting || (cell?.isExecuting) || false"
+      :is-executing="effectiveIsExecuting"
       :has-error="hasError"
       :is-published="isPublished || false"
+      :execution-state="executionState"
+      :elapsed-ms="visibleExecutionElapsedMs"
     />
 
     <!-- Side Toolbar -->
     <SideToolbar
-      :is-visible="isHovered || showToolbar"
+      :is-visible="showToolbar"
       :is-read-only="isReadOnly || false"
-      :is-executing="isExecuting || false"
+      :is-executing="effectiveIsExecuting"
       :is-published="isPublished || false"
       :is-ready-to-execute="!!isReadyToExecute"
       :is-code-visible="isCodeVisible"
@@ -436,6 +442,8 @@ const handleShowAIAssistant = () => {
       :selected-kernel="selectedKernel"
       :has-output="hasOutput"
       @execute-code="safeExecuteCode"
+      @interrupt-execution="handleInterruptExecution"
+      @cancel-execution="handleCancelExecution"
       @toggle-code-visibility="toggleCodeVisibility"
       @toggle-fullscreen="isFullScreen = true"
       @copy-code="copyCode"
@@ -450,7 +458,7 @@ const handleShowAIAssistant = () => {
       :cell-id="props.id"
       :is-read-only="isReadOnly || false"
       :is-published="isPublished || false"
-      :is-executing="isExecuting || false"
+      :is-executing="effectiveIsExecuting"
       :is-shared-session-mode="isSharedSessionMode"
       :selected-server="selectedServer"
       :selected-kernel="selectedKernel"
@@ -477,7 +485,7 @@ const handleShowAIAssistant = () => {
       :cell-id="props.id"
       :is-read-only="isReadOnly || false"
       :is-published="isPublished || false"
-      :is-executing="isExecuting || false"
+      :is-executing="effectiveIsExecuting"
       :update-attributes="updateOutputToNota"
     />
 
@@ -489,7 +497,7 @@ const handleShowAIAssistant = () => {
       :outputType="hasError ? 'error' : undefined"
       :language="language"
       v-model:isOpen="isFullScreen"
-      :is-executing="isExecuting && !isPublished"
+      :is-executing="effectiveIsExecuting && !isPublished"
       :is-read-only="isReadOnly"
       :is-published="isPublished"
       :block-id="props.id"

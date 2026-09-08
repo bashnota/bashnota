@@ -10,7 +10,7 @@ import { Separator } from '@/components/ui/separator'
 import { FileText, AlertCircle, Loader2 } from 'lucide-vue-next'
 import { useCitationStore } from '@/features/editor/stores/citationStore'
 import type { CitationEntry } from '@/features/nota/types/nota'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import { useReferenceForm } from '@/features/nota/composables/useReferenceForm'
 
 const props = defineProps<{
@@ -76,16 +76,21 @@ const saveCitation = async () => {
     }
     
     if (props.isEditing && props.currentCitation) {
-      await citationStore.updateCitation(
-        props.currentCitation.id,
+      const updatedCitation = await citationStore.updateCitation(
         props.notaId,
+        props.currentCitation.id,
         {
           ...props.currentCitation,
           ...citationData
         }
       )
+      if (!updatedCitation) throw new Error('The reference no longer exists in this nota.')
     } else {
-      await citationStore.addCitation(props.notaId, citationData as Omit<CitationEntry, 'id' | 'createdAt'>)
+      const addedCitation = await citationStore.addCitation(
+        props.notaId,
+        citationData as Omit<CitationEntry, 'id' | 'createdAt'>
+      )
+      if (!addedCitation) throw new Error('The reference could not be saved to this nota.')
     }
     
     emit('saved')

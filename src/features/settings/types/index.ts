@@ -9,7 +9,7 @@ export type { AdvancedSettings } from './advanced'
 import type { EditorSettings } from './editor'
 import type { AppearanceSettings } from './appearance'
 import type { AISettings } from './ai'
-import type { KeyboardSettings, KeyboardShortcut } from './keyboard'
+import type { KeyboardSettings } from './keyboard';
 import type { IntegrationSettings } from './integrations'
 import type { AdvancedSettings } from './advanced'
 

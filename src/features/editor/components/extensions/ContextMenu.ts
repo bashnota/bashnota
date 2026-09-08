@@ -1,6 +1,4 @@
-import { Extension } from '@tiptap/core'
-import { Plugin, PluginKey } from '@tiptap/pm/state'
-import { EditorView } from '@tiptap/pm/view'
+import { Plugin, PluginKey } from 'prosemirror-state'
 import { selectNode } from './DragHandle'
 import type { DragHandleOptions } from './DragHandle'
 
@@ -50,33 +48,3 @@ export function ContextMenuPlugin(options: ContextMenuOptions & { pluginKey: str
     },
   })
 }
-
-const ContextMenu = Extension.create({
-  name: 'contextMenu',
-
-  addOptions() {
-    return {
-      enableContextMenu: true,
-      dragHandleWidth: 20,
-      scrollTreshold: 100,
-      excludedTags: [],
-      customNodes: [],
-    }
-  },
-
-  addProseMirrorPlugins() {
-    return [
-      ContextMenuPlugin({
-        pluginKey: 'contextMenu',
-        enableContextMenu: this.options.enableContextMenu,
-        dragHandleWidth: this.options.dragHandleWidth,
-        scrollTreshold: this.options.scrollTreshold,
-        dragHandleSelector: this.options.dragHandleSelector,
-        excludedTags: this.options.excludedTags,
-        customNodes: this.options.customNodes,
-      }),
-    ]
-  },
-})
-
-export default ContextMenu

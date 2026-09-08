@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, watch } from 'vue';
 import { marked } from 'marked';
-import DOMPurify from 'dompurify';
 import 'highlight.js/styles/github-dark.css';
 import hljs from 'highlight.js';
+import { sanitizeMarkdownHtml } from './sanitizeMarkdownHtml';
 
 const props = defineProps<{
   content: string;
@@ -11,6 +11,7 @@ const props = defineProps<{
 }>();
 
 const htmlContent = ref('');
+const parsingFailed = ref(false);
 
 // Configure marked with highlight.js for code syntax highlighting
 marked.setOptions({
@@ -41,40 +42,36 @@ const processContent = async () => {
   try {
     // Convert markdown to HTML
     const rawHtml = await marked.parse(props.content);
-    
-    // Sanitize HTML to prevent XSS
-    const cleanHtml = DOMPurify.sanitize(rawHtml, {
-      USE_PROFILES: { html: true },
-      ALLOWED_TAGS: [
-        'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'p', 'a', 'ul', 'ol',
-        'nl', 'li', 'b', 'i', 'strong', 'em', 'strike', 'code', 'hr', 'br', 'div',
-        'table', 'thead', 'caption', 'tbody', 'tr', 'th', 'td', 'pre', 'span', 'img'
-      ],
-      ALLOWED_ATTR: [
-        'href', 'name', 'target', 'class', 'id', 'style', 'alt', 'src'
-      ]
-    });
-    
-    htmlContent.value = cleanHtml;
+
+    // This is the only path to v-html. The private explicit policy preserves
+    // marked/highlight.js structure while rejecting events, style and unsafe URLs.
+    htmlContent.value = sanitizeMarkdownHtml(rawHtml);
+    parsingFailed.value = false;
   } catch (error) {
     console.error('Error processing markdown:', error);
-    // Fallback to plain text if something goes wrong
-    htmlContent.value = `<p>${props.content}</p>`;
+
+    // Fail closed: never assemble the untrusted source into an HTML string.
+    // The template's interpolation branch writes this value as textContent.
+    htmlContent.value = '';
+    parsingFailed.value = true;
   }
 };
 
-// Process content initially and when it changes
-onMounted(() => {
-  processContent();
-});
-
+// Process content initially and whenever a persisted/remote message changes.
 watch(() => props.content, () => {
-  processContent();
-});
+  void processContent();
+}, { immediate: true });
 </script>
 
 <template>
+  <div
+    v-if="parsingFailed"
+    class="markdown-content"
+    :class="props.class"
+    data-markdown-fallback
+  >{{ props.content }}</div>
   <div 
+    v-else
     class="markdown-content"
     :class="props.class"
     v-html="htmlContent"
@@ -190,8 +187,6 @@ watch(() => props.content, () => {
   line-height: 1.6;
 }
 </style>
-
-
 
 
 

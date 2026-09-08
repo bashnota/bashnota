@@ -1,7 +1,12 @@
-import { Node, mergeAttributes } from '@tiptap/core'
-import { VueNodeViewRenderer } from '@tiptap/vue-3'
-import TableBlock from '@/features/editor/components/blocks/table-block/TableBlock.vue'
-import { v4 as uuidv4 } from 'uuid'
+/**
+ * Nota-table node — ported onto the raw-ProseMirror primitives.
+ *
+ * `tableData` uses JSON in `data-table-data`, matching the export service's
+ * existing contract and making raw ProseMirror HTML round-trips reversible. The
+ * configured `class: 'data-table'` still comes from the registration site.
+ */
+import { defineNode } from '@/features/editor/pm'
+import type { NodeDefinition } from '@/features/editor/pm'
 
 export interface TableColumn {
   id: string
@@ -20,100 +25,61 @@ export interface TableData {
   }>
 }
 
-declare module '@tiptap/core' {
-  interface Commands<ReturnType> {
-    notaTable: {
-      insertNotaTable: (notaId: string) => ReturnType
-    }
+function emptyTableData(): TableData {
+  return {
+    id: '',
+    name: 'Untitled',
+    columns: [],
+    rows: [],
   }
 }
 
-export const TableExtension = Node.create({
+function parseTableData(element: HTMLElement): TableData {
+  const value = element.getAttribute('data-table-data') ?? element.getAttribute('tableData')
+  if (!value) return emptyTableData()
+  try {
+    return JSON.parse(value) as TableData
+  } catch {
+    return emptyTableData()
+  }
+}
+
+export const notaTableNodeDefinition: NodeDefinition = {
   name: 'notaTable',
   group: 'block',
   atom: true,
   draggable: true,
   selectable: true,
   inline: false,
-
-  addAttributes() {
-    return {
-      tableData: {
-        default: {
-          id: '',
-          name: 'Untitled',
-          columns: [],
-          rows: []
+  attrs: {
+    tableData: {
+      default: emptyTableData(),
+      parseHTML: parseTableData,
+    },
+    columns: {
+      default: [],
+      parseHTML: (element) => {
+        try {
+          return JSON.parse(element.getAttribute('data-columns') || '[]')
+        } catch {
+          return []
         }
-      }
-    }
-  },
-
-  parseHTML() {
-    return [
-      {
-        tag: 'div[data-type="data-table"]',
       },
-    ]
+    },
   },
+  parseDOM: [{ tag: 'div[data-type="data-table"]' }],
+  toDOM: (node) => [
+    'div',
+    {
+      'data-type': 'data-table',
+      'data-table-data': JSON.stringify(node.attrs.tableData),
+      'data-columns': JSON.stringify(node.attrs.columns || []),
+      class: 'data-table',
+    },
+    ['div', { class: 'data-table-content' }],
+  ],
+}
 
-  renderHTML({ HTMLAttributes }) {
-    return [
-      'div',
-      mergeAttributes({ 'data-type': 'data-table' }, HTMLAttributes),
-      ['div', { class: 'data-table-content' }],
-    ]
-  },
+export const notaTableDefinition = defineNode(notaTableNodeDefinition)
 
-  addNodeView() {
-    // @ts-ignore
-    return VueNodeViewRenderer(TableBlock)
-  },
-
-  addCommands() {
-    return {
-      insertNotaTable:
-        (notaId: string) =>
-          ({ chain }) => {
-            const tableId = uuidv4()
-            const columnId = uuidv4()
-
-            return chain()
-              .insertContent({
-                type: this.name,
-                attrs: {
-                  tableData: {
-                    id: tableId,
-                    name: 'Untitled',
-                    columns: [
-                      {
-                        id: columnId,
-                        title: 'Title',
-                        type: 'text',
-                      },
-                    ],
-                    rows: [
-                      {
-                        id: uuidv4(),
-                        cells: {
-                          [columnId]: '',
-                        },
-                      },
-                    ],
-                  }
-                },
-              })
-              .run()
-          },
-    }
-  },
-})
-
-
-
-
-
-
-
-
-
+export const TableExtension = notaTableDefinition

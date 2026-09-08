@@ -17,7 +17,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, defineProps, defineEmits, onErrorCaptured, computed } from 'vue'
+import { ref, onMounted, watch, onErrorCaptured, computed } from 'vue'
 import { useMathJax } from '@/features/editor/composables/useMathJax'
 import { useEquationNumber } from '@/features/editor/composables/useEquationCounter'
 import { logger } from '@/services/logger'
@@ -99,7 +99,6 @@ onErrorCaptured((err) => {
   return false
 })
 </script> 
-
 
 
 

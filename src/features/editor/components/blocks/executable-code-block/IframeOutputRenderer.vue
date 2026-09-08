@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import {
+  createIframeOutputChannel,
+  createIframeOutputDocument,
+  getTrustedIframeOutputHeight,
+  IFRAME_OUTPUT_SANDBOX,
+} from './iframeOutputSecurity'
 
 interface Props {
   content: string
@@ -10,174 +16,45 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   height: '400px',
-  width: '100%'
+  width: '100%',
 })
 
 const iframeRef = ref<HTMLIFrameElement | null>(null)
 const isLoaded = ref(false)
+const messageChannel = ref(createIframeOutputChannel())
+const iframeDocument = computed(() => createIframeOutputDocument(props.content || '', messageChannel.value))
 
-const updateIframeContent = async () => {
-  if (!iframeRef.value || !props.content) return
+const handleMessage = (event: MessageEvent<unknown>) => {
+  const iframe = iframeRef.value
+  if (!iframe) return
 
-  try {
-    const iframe = iframeRef.value
-    const doc = iframe.contentDocument || iframe.contentWindow?.document
-    if (!doc) return
+  const trustedHeight = getTrustedIframeOutputHeight(
+    event,
+    iframe.contentWindow,
+    messageChannel.value,
+  )
+  if (trustedHeight === null) return
 
-    // Create a complete HTML document with basic styling
-    const htmlContent = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Output</title>
-  <style>
-    body {
-      margin: 0;
-      padding: 16px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
-      font-size: 14px;
-      line-height: 1.5;
-      color: #374151;
-      background: white;
-      overflow-x: auto;
-    }
-    
-    /* Table styling for DataFrames */
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      margin: 0;
-    }
-    
-    table th,
-    table td {
-      border: 1px solid #e5e7eb;
-      padding: 8px 12px;
-      text-align: left;
-    }
-    
-    table th {
-      background-color: #f9fafb;
-      font-weight: 600;
-    }
-    
-    table tr:nth-child(even) {
-      background-color: #f9fafb;
-    }
-    
-    /* Image styling */
-    img {
-      max-width: 100%;
-      height: auto;
-      display: block;
-      margin: 0 auto;
-    }
-    
-    /* Plot styling */
-    .plotly-graph-div {
-      width: 100% !important;
-      height: auto !important;
-    }
-    
-    /* Widget styling */
-    .widget-container {
-      width: 100%;
-      overflow-x: auto;
-    }
-    
-    /* Responsive adjustments */
-    @media (max-width: 768px) {
-      body {
-        padding: 8px;
-        font-size: 12px;
-      }
-      
-      table th,
-      table td {
-        padding: 4px 8px;
-      }
-    }
-  </style>
-</head>
-<body>
-  ${props.content}
-  
-  <scr` + `ipt>
-    // Auto-resize iframe based on content
-    function resizeIframe() {
-      try {
-        const height = Math.max(
-          document.body.scrollHeight,
-          document.body.offsetHeight,
-          document.documentElement.clientHeight,
-          document.documentElement.scrollHeight,
-          document.documentElement.offsetHeight
-        );
-        
-        // Send height to parent window
-        if (window.parent) {
-          window.parent.postMessage({
-            type: 'iframe-resize',
-            height: height + 20 // Add some padding
-          }, '*');
-        }
-      } catch (e) {
-        console.error('Error resizing iframe:', e);
-      }
-    }
-    
-    // Resize on load and when content changes
-    window.addEventListener('load', resizeIframe);
-    window.addEventListener('resize', resizeIframe);
-    
-    // Watch for dynamic content changes
-    const observer = new MutationObserver(resizeIframe);
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true
-    });
-    
-    // Initial resize
-    setTimeout(resizeIframe, 100);
-  </scr` + `ipt>
-</body>
-</html>`
-
-    // Write content to iframe
-    doc.open()
-    doc.write(htmlContent)
-    doc.close()
-    
-    isLoaded.value = true
-  } catch (error) {
-    console.error('Error updating iframe content:', error)
-  }
+  iframe.style.height = `${trustedHeight}px`
 }
 
-// Handle iframe resize messages
-const handleMessage = (event: MessageEvent) => {
-  if (event.data.type === 'iframe-resize' && iframeRef.value) {
-    const newHeight = Math.min(event.data.height, 600) // Max height of 600px
-    iframeRef.value.style.height = `${newHeight}px`
-  }
+const handleLoad = () => {
+  isLoaded.value = true
 }
 
 onMounted(() => {
   window.addEventListener('message', handleMessage)
-  nextTick(() => {
-    updateIframeContent()
-  })
 })
 
-watch(() => props.content, () => {
-  updateIframeContent()
+onUnmounted(() => {
+  window.removeEventListener('message', handleMessage)
 })
 
-watch(() => props.type, () => {
-  updateIframeContent()
+watch([() => props.content, () => props.type], () => {
+  isLoaded.value = false
+  // A navigation keeps the same WindowProxy, so rotate the unguessable channel
+  // to reject any delayed messages from the previous srcdoc document.
+  messageChannel.value = createIframeOutputChannel()
 })
 </script>
 
@@ -188,12 +65,13 @@ watch(() => props.type, () => {
       :width="width"
       :height="height"
       frameborder="0"
-      sandbox="allow-scripts allow-same-origin"
+      :sandbox="IFRAME_OUTPUT_SANDBOX"
+      :srcdoc="iframeDocument"
       class="output-iframe"
       title="Code execution output"
+      @load="handleLoad"
     ></iframe>
-    
-    <!-- Loading state -->
+
     <div v-if="!isLoaded" class="iframe-loading">
       <div class="loading-spinner"></div>
       <div class="loading-text">Loading output...</div>
@@ -252,24 +130,23 @@ watch(() => props.type, () => {
   100% { transform: rotate(360deg); }
 }
 
-/* Dark mode support */
 @media (prefers-color-scheme: dark) {
   .iframe-output-container {
     border-color: #374151;
     background: #1f2937;
   }
-  
+
   .iframe-loading {
     background: rgba(31, 41, 55, 0.9);
   }
-  
+
   .loading-text {
     color: #9ca3af;
   }
-  
+
   .loading-spinner {
     border-color: #374151;
     border-top-color: #60a5fa;
   }
 }
-</style> 
+</style>

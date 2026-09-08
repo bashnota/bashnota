@@ -4,6 +4,11 @@
       class="inline-flex items-center gap-1 px-2 py-1 rounded-md border cursor-pointer hover:bg-muted/50 transition-colors"
       :class="linkStyleClasses"
       @click="navigateToNota"
+      @keydown.enter.prevent="navigateToNota"
+      @keydown.space.prevent="navigateToNota"
+      role="link"
+      tabindex="0"
+      :aria-label="`Open sub-nota ${targetNotaTitle}`"
       :title="`Go to: ${targetNotaTitle}`"
     >
       <FileText class="w-3 h-3 text-muted-foreground" />
@@ -14,10 +19,10 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRouter } from 'vue-router'
 import { FileText } from 'lucide-vue-next'
-import { NodeViewWrapper } from '@tiptap/vue-3'
-import { toast } from 'vue-sonner'
+import { NodeViewWrapper } from '@/features/editor/pm'
+import { toast } from '@/services/toast'
+import { useNotaNavigation } from '@/features/nota/composables/useNotaNavigation'
 
 interface Props {
   node: {
@@ -31,7 +36,7 @@ interface Props {
 }
 
 const props = defineProps<Props>()
-const router = useRouter()
+const { openNota } = useNotaNavigation()
 
 // Computed
 const targetNotaId = computed(() => props.node.attrs.targetNotaId)
@@ -51,9 +56,15 @@ const linkStyleClasses = computed(() => {
 })
 
 // Methods
-const navigateToNota = () => {
+const navigateToNota = async () => {
   if (targetNotaId.value) {
-    router.push(`/nota/${targetNotaId.value}`)
+    try {
+      await openNota(targetNotaId.value)
+    } catch (error) {
+      toast.error('Unable to open sub-nota', {
+        description: error instanceof Error ? error.message : 'Please try again.',
+      })
+    }
   } else {
     toast.error('Invalid nota link')
   }

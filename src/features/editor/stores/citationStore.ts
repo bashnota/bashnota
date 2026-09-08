@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { logger } from '@/services/logger'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import type { CitationEntry } from '@/features/nota/types/nota'
 
@@ -11,7 +10,7 @@ export const useCitationStore = defineStore('citation', () => {
   const getNotaStore = () => useNotaStore()
 
   // Add a new citation
-  const addCitation = (notaId: string, citation: Omit<CitationEntry, 'id' | 'createdAt'>) => {
+  const addCitation = async (notaId: string, citation: Omit<CitationEntry, 'id' | 'createdAt'>) => {
     const nota = getNotaStore().getCurrentNota(notaId)
     if (!nota) return null
 
@@ -23,12 +22,12 @@ export const useCitationStore = defineStore('citation', () => {
     }
 
     const updatedCitations = [...(nota.citations || []), newCitation]
-    getNotaStore().saveNota({ id: notaId, citations: updatedCitations })
+    await getNotaStore().saveNota({ id: notaId, citations: updatedCitations })
     return newCitation
   }
 
   // Update an existing citation
-  const updateCitation = (notaId: string, citationId: string, updates: Partial<CitationEntry>) => {
+  const updateCitation = async (notaId: string, citationId: string, updates: Partial<CitationEntry>) => {
     const nota = getNotaStore().getCurrentNota(notaId)
     if (!nota) return null
 
@@ -40,19 +39,19 @@ export const useCitationStore = defineStore('citation', () => {
     const updatedCitations = [...citations]
     updatedCitations[citationIndex] = updatedCitation
 
-    getNotaStore().saveNota({ id: notaId, citations: updatedCitations })
+    await getNotaStore().saveNota({ id: notaId, citations: updatedCitations })
     return updatedCitation
   }
 
   // Delete a citation
-  const deleteCitation = (notaId: string, citationId: string) => {
+  const deleteCitation = async (notaId: string, citationId: string) => {
     const nota = getNotaStore().getCurrentNota(notaId)
     if (!nota) return false
 
     const citations = nota.citations || []
     const updatedCitations = citations.filter(c => c.id !== citationId)
 
-    getNotaStore().saveNota({ id: notaId, citations: updatedCitations })
+    await getNotaStore().saveNota({ id: notaId, citations: updatedCitations })
     return true
   }
 

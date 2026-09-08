@@ -1,17 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { computed, watch } from 'vue';
 import { toTypedSchema } from "@vee-validate/zod"
 import { useForm } from "vee-validate"
 import * as z from "zod"
 import { Button } from '@/components/ui/button'
-import {
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form"
+import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'

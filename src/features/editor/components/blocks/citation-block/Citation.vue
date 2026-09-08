@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NodeViewWrapper } from '@tiptap/vue-3'
+import { NodeViewWrapper } from '@/features/editor/pm'
 import { useCitationStore } from '@/features/editor/stores/citationStore'
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
@@ -8,7 +8,7 @@ import { Link, ExternalLink, Edit, Copy, ClipboardCheck, X, Search, Loader2 } fr
 import type { CitationEntry } from '@/features/nota/types/nota'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 
 const props = defineProps({
   node: {
@@ -616,7 +616,6 @@ const importCitation = async (citation: CitationEntry) => {
   @apply border-primary/50;
 }
 </style>
-
 
 
 

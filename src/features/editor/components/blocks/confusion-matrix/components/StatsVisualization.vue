@@ -257,7 +257,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
-import { Chart, type ChartConfiguration, registerables } from 'chart.js'
+import { Chart, registerables } from 'chart.js';
 import {
   Card,
   CardContent,

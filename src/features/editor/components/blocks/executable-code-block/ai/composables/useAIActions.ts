@@ -1,5 +1,5 @@
-import { ref, computed, watch } from 'vue'
-import { useAIActionsStore } from '@/features/editor/stores/aiActionsStore'
+import { ref, computed } from 'vue';
+import { useEditorAIActionsStore } from '@/features/editor/stores/aiActionsStore'
 import type { CustomAIAction } from '@/features/editor/stores/aiActionsStore'
 
 export interface ActionExecutionContext {
@@ -24,7 +24,7 @@ export interface ActionResult {
 }
 
 export function useAIActions(context: ActionExecutionContext) {
-  const aiActionsStore = useAIActionsStore()
+  const aiActionsStore = useEditorAIActionsStore()
   
   // State
   const executingActions = ref<Set<string>>(new Set())

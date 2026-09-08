@@ -7,7 +7,7 @@
     @click.stop
   >
     <div
-      v-for="(action, index) in actions"
+      v-for="action in actions"
       :key="action.id"
       class="context-menu-item"
       :class="{ 
@@ -158,4 +158,4 @@ onUnmounted(() => {
   border-radius: 3px;
   font-family: monospace;
 }
-</style> 
+</style>

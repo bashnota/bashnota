@@ -1,10 +1,11 @@
 /**
  * Consolidated Settings Service
- * 
+ *
  * Consolidates 15+ localStorage keys into single file-based settings
  */
 
 import { logger } from './logger'
+import { credentialFreeValue } from '@/utils/credentialPersistence'
 
 export interface SettingsSchema {
   editor: {
@@ -47,7 +48,7 @@ const DEFAULT_SETTINGS: SettingsSchema = {
   ai: { enabled: true, providers: {} },
   keyboard: { shortcuts: {} },
   integrations: { github: { enabled: false }, jupyter: { enabled: true } },
-  advanced: { developerMode: false, debugLogs: false }
+  advanced: { developerMode: false, debugLogs: false },
 }
 
 export class ConsolidatedSettingsService {
@@ -60,7 +61,11 @@ export class ConsolidatedSettingsService {
     try {
       const stored = await this.backend.readSettings()
       if (stored) {
-        this.settings = this.mergeWithDefaults(stored)
+        const credentialFree = credentialFreeValue(stored)
+        this.settings = this.mergeWithDefaults(credentialFree)
+        if (JSON.stringify(stored) !== JSON.stringify(credentialFree)) {
+          await this.backend.writeSettings(credentialFree)
+        }
       }
       this.initialized = true
       logger.info('[ConsolidatedSettings] Initialized')
@@ -88,14 +93,14 @@ export class ConsolidatedSettingsService {
 
   async set(path: string, value: any): Promise<void> {
     this.ensureInitialized()
-    
+
     if (path === 'editor.fontSize' && (typeof value !== 'number' || value < 8 || value > 32)) {
       throw new Error('Invalid fontSize')
     }
-    
+
     const parts = path.split('.')
     let target: any = this.settings
-    
+
     // Create nested objects if they don't exist
     for (let i = 0; i < parts.length - 1; i++) {
       if (target[parts[i]] === undefined || typeof target[parts[i]] !== 'object') {
@@ -103,7 +108,7 @@ export class ConsolidatedSettingsService {
       }
       target = target[parts[i]]
     }
-    
+
     target[parts[parts.length - 1]] = value
     await this.save()
     logger.debug(`[ConsolidatedSettings] Set ${path}`)
@@ -130,7 +135,7 @@ export class ConsolidatedSettingsService {
 
   async export(): Promise<string> {
     this.ensureInitialized()
-    return JSON.stringify(this.settings, null, 2)
+    return JSON.stringify(credentialFreeValue(this.settings), null, 2)
   }
 
   async import(data: string): Promise<void> {
@@ -150,21 +155,42 @@ export class ConsolidatedSettingsService {
     if (!this.initialized) {
       await this.initialize()
     }
-    
+
     const migrated: Partial<SettingsSchema> = {}
-    
+
     if (oldData['editor-settings']) {
       try {
         migrated.editor = JSON.parse(oldData['editor-settings'])
-      } catch (e) { /* ignore */ }
+      } catch (e) {
+        /* ignore */
+      }
     }
-    
+
     if (oldData['appearance-settings']) {
       try {
         migrated.appearance = JSON.parse(oldData['appearance-settings'])
-      } catch (e) { /* ignore */ }
+      } catch (e) {
+        /* ignore */
+      }
     }
-    
+
+    if (oldData['ai-settings']) {
+      try {
+        migrated.ai = credentialFreeValue(JSON.parse(oldData['ai-settings']))
+      } catch (e) {
+        /* ignore */
+      }
+    }
+
+    const integrationSettings = oldData['integrations-settings'] ?? oldData['integration-settings']
+    if (integrationSettings) {
+      try {
+        migrated.integrations = credentialFreeValue(JSON.parse(integrationSettings))
+      } catch (e) {
+        /* ignore */
+      }
+    }
+
     this.settings = this.mergeWithDefaults(migrated)
     await this.save()
     logger.info('[ConsolidatedSettings] Migrated from localStorage')
@@ -172,7 +198,7 @@ export class ConsolidatedSettingsService {
 
   private async save(): Promise<void> {
     try {
-      await this.backend.writeSettings(this.settings)
+      await this.backend.writeSettings(credentialFreeValue(this.settings))
     } catch (error) {
       logger.error('[ConsolidatedSettings] Failed to save:', error)
       throw error
@@ -187,7 +213,7 @@ export class ConsolidatedSettingsService {
       ai: { ...defaults.ai, ...partial.ai },
       keyboard: { ...defaults.keyboard, ...partial.keyboard },
       integrations: { ...defaults.integrations, ...partial.integrations },
-      advanced: { ...defaults.advanced, ...partial.advanced }
+      advanced: { ...defaults.advanced, ...partial.advanced },
     }
   }
 

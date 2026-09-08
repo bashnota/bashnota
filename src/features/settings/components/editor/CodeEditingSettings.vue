@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import { Button } from '@/components/ui/button'
 import { RotateCw, Code } from 'lucide-vue-next'
 

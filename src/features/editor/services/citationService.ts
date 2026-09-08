@@ -1,4 +1,4 @@
-import type { Editor } from '@tiptap/core'
+import type { Editor } from '@/features/editor/pm'
 
 /**
  * Updates citation numbers in the document based on their order.

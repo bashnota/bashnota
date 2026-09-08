@@ -17,9 +17,9 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { NodeViewWrapper, type NodeViewProps } from '@tiptap/vue-3'
+import { NodeViewWrapper, type NodeViewProps } from '@/features/editor/pm'
 import { useNotaStore } from '@/features/nota/stores/nota'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 
 // Use the proper NodeViewProps interface from Tiptap
 const props = defineProps<NodeViewProps>()

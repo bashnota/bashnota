@@ -91,7 +91,7 @@ Detailed analysis of all 664 source files (108,027 LOC).
 
 **Detailed Breakdown:**
 - **Services:** 22+ without tests (8% coverage)
-  - CRITICAL: firebase.ts, auth.ts, aiService.ts, jupyterService.ts
+  - CRITICAL: cloud/, supabaseAuth.ts, aiService.ts, jupyterService.ts
 - **Composables:** 60+ without tests (0% coverage)
   - CRITICAL: useSettings.ts, useSidebarManager.ts, useNotaActions.ts
 - **Stores:** 19 without tests (0% coverage)
@@ -166,7 +166,7 @@ Total TODOs:            20+
 
 ### Immediate (Week 1-2)
 1. 🎯 Add tests for critical services
-   - firebase.ts, auth.ts, aiService.ts, jupyterService.ts
+   - cloud/, supabaseAuth.ts, aiService.ts, jupyterService.ts
 2. 🎯 Fix TODOs in nota.ts (block system)
 3. 🎯 Standardize file naming conventions
 
@@ -251,7 +251,7 @@ LOW (Nice-to-Have):
 ### Test Implementation Priority
 ```
 CRITICAL:
-- firebase.ts, auth.ts, aiService.ts
+- cloud/, supabaseAuth.ts, aiService.ts
 - jupyterService.ts, codeExecutionService.ts
 - useSettings.ts, useSidebarManager.ts
 - All 19 stores

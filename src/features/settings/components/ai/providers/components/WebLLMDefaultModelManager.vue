@@ -238,7 +238,7 @@ import { webLLMDefaultModelService } from '@/features/ai/services/webLLMDefaultM
 import type { DefaultModelConfig } from '@/features/ai/services/webLLMDefaultModelService'
 import type { WebLLMModelInfo } from '@/features/ai/services/types'
 
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import { logger } from '@/services/logger'
 
 interface Props {

@@ -1,20 +1,30 @@
-import { Extension } from '@tiptap/core'
-import Suggestion from '@tiptap/suggestion'
-import { VueRenderer } from '@tiptap/vue-3'
+import type { Plugin } from 'prosemirror-state'
+import { Suggestion } from './suggestionPlugin'
+import { VueRenderer } from '@/features/editor/pm'
 import tippy from 'tippy.js'
 import SubNotaLinkSuggestionList from './SubNotaLinkSuggestionList.vue'
-import { SubNotaLinkService, type SubNotaLinkItem, type SubNotaLinkAttributes } from './services/SubNotaLinkService'
+import { SubNotaLinkService } from './services/SubNotaLinkService';
 
-export const SubNotaLinkSlashCommand = Extension.create({
-  name: 'subNotaLinkSlashCommand',
+export interface SubNotaLinkSlashCommandOptions {
+  /** The editor handle (the live TipTap editor during this phase). */
+  editor: any
+}
 
-  addOptions() {
-    return {
-      suggestion: {
+/**
+ * Build the sub-nota-link slash-command suggestion plugin.
+ *
+ * Was a TipTap `Extension.create({ name: 'subNotaLinkSlashCommand' })` wrapping
+ * the former suggestion helper and Vue renderer. Now a plain
+ * ProseMirror plugin factory over the hand-written {@link Suggestion} plugin and
+ * the in-house {@link VueRenderer}. The suggestion config (char, allow, items,
+ * render) is unchanged.
+ */
+export function subNotaLinkSlashCommandPlugin({ editor }: SubNotaLinkSlashCommandOptions): Plugin {
+  const suggestion: Record<string, any> = {
         char: '/',
         startOfLine: true,
         debounce: 100,
-        
+
         command: ({ editor, range, props }: any) => {
           try {
             // Validate range before proceeding
@@ -171,22 +181,20 @@ export const SubNotaLinkSlashCommand = Extension.create({
                 if (component) {
                   component.destroy()
                 }
+                popup = null
+                component = null
               } catch (error) {
                 console.error('Error exiting subNotaLink suggestion:', error)
               }
             },
           }
         },
-      },
-    }
-  },
+  }
 
-  addProseMirrorPlugins() {
-    return [
-      Suggestion({
-        editor: this.editor,
-        ...this.options.suggestion,
-      }),
-    ]
-  },
-})
+  return Suggestion({
+    editor,
+    ...suggestion,
+  })
+}
+
+export default subNotaLinkSlashCommandPlugin

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -24,10 +24,8 @@ import {
 import { 
   Filter, 
   X, 
-  Clock, 
   FileText,
   ChevronDown,
-  Settings2
 } from 'lucide-vue-next'
 import { useNotaActions } from '@/features/nota/composables/useNotaActions'
 import { useNotaStore } from '@/features/nota/stores/nota'
@@ -40,32 +38,32 @@ import NotaTable from '@/features/nota/components/NotaTable.vue'
 import BatchActionsToolbar from '@/features/nota/components/BatchActionsToolbar.vue'
 import type { Nota } from '@/features/nota/types/nota'
 
+const NotaQuickPreview = defineAsyncComponent(
+  () => import('@/features/nota/components/NotaQuickPreview.vue'),
+)
+
 interface Props {
   isLoading: boolean
   showFavorites: boolean
   searchQuery: string
   selectedTag: string
   notas: Nota[]
-  totalCount?: number
   filesystemNotas?: Nota[]
   isFilesystemMode?: boolean
-  hasDirectoryAccess?: boolean
 }
 
 interface Emits {
-  (e: 'create-nota'): void
   (e: 'update:selectedTag', value: string): void
   (e: 'clear-filters'): void
   (e: 'update:searchQuery', value: string): void
   (e: 'update:showFavorites', value: boolean): void
-  (e: 'page-change', page: number): void
 }
 
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 const router = useRouter()
 const notaStore = useNotaStore()
-const { toggleNotaFavorite, navigateToNotaSettings } = useNotaActions()
+const { toggleNotaFavorite } = useNotaActions()
 const { 
   isProcessing,
   batchToggleFavorite,
@@ -85,7 +83,6 @@ const {
   activeFiltersCount,
   currentSortOption,
   sortDirection,
-  filteredAndSortedNotas,
   hasSelection,
   selectionCount,
   currentPage,
@@ -110,7 +107,6 @@ const {
   getSelectedNotas,
   clearAllFilters: clearFiltersComposable,
   formatDate,
-  getContentPreview,
   SORT_OPTIONS,
 } = useNotaList({
   notas: () => props.notas,
@@ -160,6 +156,11 @@ const handleQuickPreview = (nota: Nota) => {
 }
 
 const handleNotaClick = (nota: Nota) => {
+  router.push(`/nota/${nota.id}`)
+}
+
+const handlePreviewOpen = (nota: Nota) => {
+  showQuickPreview.value = false
   router.push(`/nota/${nota.id}`)
 }
 
@@ -244,275 +245,216 @@ watch(() => props.showFavorites, (newValue) => {
 </script>
 
 <template>
-  <div class="flex flex-col h-full space-y-4">
-    <!-- Compact Header with Controls -->
-    <Card class="border-l-primary/30">
-      <CardContent class="p-4">
-        <!-- Main Control Bar -->
-        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <!-- Title and Stats -->
-          <div class="flex items-center gap-2">
-            <Clock class="h-4 w-4" />
-            <span class="font-semibold">Notas</span>
-            <Badge variant="secondary" class="text-xs">
-              {{ paginatedNotas.length }}
-            </Badge>
-            <Badge v-if="hasActiveFilters" variant="outline" class="text-xs border-primary/50 text-primary">
-              {{ activeFiltersCount }} filter{{ activeFiltersCount > 1 ? 's' : '' }} active
+  <Card
+    role="region"
+    aria-labelledby="nota-library-heading"
+    class="flex h-full min-h-0 flex-col overflow-hidden"
+  >
+    <CardContent class="flex min-h-0 flex-1 flex-col p-0">
+      <header class="border-b px-4 py-4 sm:px-5">
+        <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div class="flex min-w-0 items-center gap-2">
+            <h2 id="nota-library-heading" class="font-semibold tracking-tight">Nota library</h2>
+            <Badge variant="secondary" class="text-xs tabular-nums">
+              {{ paginationInfo.totalItems }}
             </Badge>
           </div>
 
-          <!-- Search and Controls -->
           <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <!-- Search Component -->
             <SearchInput
               :model-value="localSearchQuery"
               placeholder="Search notas..."
+              class="w-full sm:w-72"
               @update:model-value="updateSearch"
-              class="w-full sm:w-64"
             />
 
-            <!-- Filter Toggle -->
+            <DropdownMenu>
+              <DropdownMenuTrigger as-child>
+                <Button variant="outline" size="sm" class="h-8 justify-between sm:min-w-36">
+                  {{ currentSortOption?.label || 'Sort' }}
+                  <ChevronDown aria-hidden="true" class="ml-2 h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" class="w-48">
+                <DropdownMenuCheckboxItem
+                  v-for="option in SORT_OPTIONS"
+                  :key="option.key"
+                  :checked="currentSortOption?.key === option.key"
+                  @click="handleSort(option.key)"
+                >
+                  {{ option.label }}
+                </DropdownMenuCheckboxItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <Button
               variant="outline"
               size="sm"
               class="h-8"
+              :class="{ 'border-primary/30 bg-primary/10 text-primary': showFilters }"
+              :aria-expanded="showFilters"
+              aria-controls="nota-library-filters"
               @click="showFilters = !showFilters"
-              :class="{ 'bg-primary/10 text-primary': showFilters }"
             >
-              <Filter class="h-3 w-3 mr-1" />
+              <Filter aria-hidden="true" class="mr-1.5 h-3.5 w-3.5" />
               Filters
-              <Badge v-if="activeFiltersCount" variant="secondary" class="ml-1 h-4 text-xs">
+              <Badge v-if="activeFiltersCount" variant="secondary" class="ml-1.5 h-4 text-xs">
                 {{ activeFiltersCount }}
               </Badge>
             </Button>
           </div>
         </div>
 
-        <!-- Enhanced Filters Panel -->
-        <div v-if="showFilters" class="mt-3 pt-3 border-t space-y-3">
-          <!-- Quick Filters Component -->
+        <div
+          v-show="showFilters"
+          id="nota-library-filters"
+          class="mt-4 space-y-3 border-t pt-4"
+        >
           <QuickFilters
             :filters="filterOptions"
             :selected-filters="selectedQuickFilters"
+            label=""
             @toggle-filter="toggleQuickFilter"
           />
 
-          <!-- Advanced Filters Row -->
-          <div class="flex flex-wrap items-center gap-2 text-sm">
-            <!-- View Filter -->
-            <div class="flex items-center gap-1">
-              <span class="text-muted-foreground text-xs">View:</span>
-              <Select v-model:value="viewFilter">
-                <SelectTrigger class="w-28 h-6 text-xs">
+          <div class="flex flex-wrap items-center gap-3 text-sm">
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-muted-foreground">Show</span>
+              <Select v-model="viewFilter">
+                <SelectTrigger class="h-8 w-32 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">
-                    <div class="flex items-center justify-between w-full">
-                      <span>All</span>
-                      <Badge variant="secondary" class="ml-1 text-xs">{{ props.notas.length }}</Badge>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="favorites">
-                    <div class="flex items-center justify-between w-full">
-                      <span>Favorites</span>
-                      <Badge variant="secondary" class="ml-1 text-xs">{{ props.notas.filter(n => n.favorite).length }}</Badge>
-                    </div>
-                  </SelectItem>
+                  <SelectItem value="all">All notas</SelectItem>
+                  <SelectItem value="favorites">Favorites</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            <!-- Tag Filter Component -->
             <TagFilter
               :tags="availableTags"
               :selected-tags="selectedTags"
               @toggle-tag="toggleTag"
             />
 
-            <!-- Sort Options -->
-            <div class="flex items-center gap-1">
-              <Settings2 class="h-3 w-3 text-muted-foreground" />
-              <span class="text-muted-foreground text-xs">Sort:</span>
-              <DropdownMenu>
-                <DropdownMenuTrigger as-child>
-                  <Button variant="outline" size="sm" class="h-6 px-2 text-xs">
-                    {{ currentSortOption?.label || 'Sort' }}
-                    <ChevronDown class="h-3 w-3 ml-1" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuCheckboxItem
-                    v-for="option in SORT_OPTIONS"
-                    :key="option.key"
-                    :checked="currentSortOption?.key === option.key"
-                    @click="handleSort(option.key)"
-                  >
-                    {{ option.label }}
-                  </DropdownMenuCheckboxItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            <!-- Clear Filters -->
             <Button
               v-if="hasActiveFilters"
               variant="ghost"
               size="sm"
-              class="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+              class="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
               @click="clearAllFiltersLocal"
             >
-              <X class="h-3 w-3 mr-1" />
-              Clear All
+              <X aria-hidden="true" class="mr-1 h-3.5 w-3.5" />
+              Clear filters
             </Button>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </header>
 
-    <!-- Results Info and Table -->
-    <Card>
-      <CardContent class="p-0">
-        <!-- Results Info Bar -->
-        <div class="p-3 border-b bg-muted/30">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2 text-sm text-muted-foreground">
-              <FileText class="h-4 w-4" />
-              <span>
-                Showing {{ paginationInfo.startItem }}-{{ paginationInfo.endItem }} of {{ paginationInfo.totalItems }} notas
-              </span>
-            </div>
-            
-            <!-- Selection and New Button -->
-            <div class="flex items-center gap-3">
-              <div v-if="hasSelection" class="flex items-center gap-2">
-                <span class="text-xs text-muted-foreground">{{ selectionCount }} selected</span>
-              </div>
-              
-              <Button
-                variant="default"
-                size="sm"
-                class="h-7"
-                @click="emit('create-nota')"
-              >
-                <FileText class="h-3 w-3 mr-1" />
-                New Nota
-              </Button>
-            </div>
-          </div>
+      <BatchActionsToolbar
+        v-if="hasSelection"
+        :selected-count="selectionCount"
+        :selected-ids="getSelectedIds()"
+        :selected-notas="getSelectedNotas(props.notas)"
+        :all-tags="availableTags"
+        :is-processing="isProcessing"
+        @batch-toggle-favorite="handleBatchToggleFavorite"
+        @batch-delete="handleBatchDelete"
+        @batch-add-tags="handleBatchAddTags"
+        @batch-remove-tags="handleBatchRemoveTags"
+        @clear-selection="clearSelection"
+      />
+
+      <div v-if="isLoading" class="flex-1 p-8">
+        <div class="space-y-4">
+          <Skeleton class="h-8 w-full" />
+          <Skeleton class="h-8 w-full" />
+          <Skeleton class="h-8 w-full" />
+          <Skeleton class="h-8 w-full" />
+          <Skeleton class="h-8 w-full" />
         </div>
+      </div>
 
-        <!-- Batch Actions Toolbar -->
-        <BatchActionsToolbar
-          v-if="hasSelection"
-          :selected-count="selectionCount"
-          :selected-ids="getSelectedIds()"
-          :selected-notas="getSelectedNotas(props.notas)"
-          :all-tags="availableTags"
-          :is-processing="isProcessing"
-          @batch-toggle-favorite="handleBatchToggleFavorite"
-          @batch-delete="handleBatchDelete"
-          @batch-add-tags="handleBatchAddTags"
-          @batch-remove-tags="handleBatchRemoveTags"
-          @clear-selection="clearSelection"
+      <div v-else-if="paginatedNotas.length > 0" class="min-h-0 flex-1 overflow-y-auto">
+        <NotaTable
+          :notas="paginatedNotas"
+          :current-sort-option="currentSortOption"
+          :sort-direction="sortDirection"
+          :is-all-selected="isAllSelected"
+          :is-indeterminate="isIndeterminate"
+          :format-date="formatDate"
+          :is-nota-selected="isNotaSelected"
+          :is-filesystem-nota="isFilesystemMode ? isFilesystemNota : undefined"
+          mode="list"
+          @sort="handleSort"
+          @select-all="handleSelectAll"
+          @select-nota="handleSelectNota"
+          @nota-click="handleNotaClick"
+          @preview-nota="handleQuickPreview"
+          @toggle-favorite="toggleNotaFavorite"
+          @delete-nota="(id) => notaStore.deleteItem(id)"
+          @tag-click="(tag) => emit('update:selectedTag', tag)"
         />
+      </div>
 
-        <!-- Table -->
-        <div v-if="isLoading" class="p-8">
-          <div class="space-y-4">
-            <Skeleton class="h-8 w-full" />
-            <Skeleton class="h-8 w-full" />
-            <Skeleton class="h-8 w-full" />
-            <Skeleton class="h-8 w-full" />
-            <Skeleton class="h-8 w-full" />
-          </div>
+      <TableEmpty v-else class="flex-1">
+        <div class="py-12 text-center">
+          <FileText class="mx-auto h-10 w-10 text-muted-foreground/40" />
+          <h3 class="mt-4 text-base font-semibold">No notas found</h3>
+          <p class="mt-1 text-sm text-muted-foreground">
+            {{ hasActiveFilters ? 'Adjust or clear the current filters.' : 'Create your first nota from the workspace panel.' }}
+          </p>
         </div>
+      </TableEmpty>
 
-        <div v-else-if="paginatedNotas.length > 0" class="max-h-[600px] overflow-y-auto">
-          <NotaTable
-            :notas="paginatedNotas"
-            :current-sort-option="currentSortOption"
-            :sort-direction="sortDirection"
-            :is-all-selected="isAllSelected"
-            :is-indeterminate="isIndeterminate"
-            :format-date="formatDate"
-            :is-nota-selected="isNotaSelected"
-            :is-filesystem-nota="isFilesystemMode ? isFilesystemNota : undefined"
-            mode="list"
-            @sort="handleSort"
-            @select-all="handleSelectAll"
-            @select-nota="handleSelectNota"
-            @nota-click="handleNotaClick"
-            @preview-nota="handleQuickPreview"
-            @toggle-favorite="toggleNotaFavorite"
-            @delete-nota="(id) => notaStore.deleteItem(id)"
-            @tag-click="(tag) => emit('update:selectedTag', tag)"
-          />
-        </div>
+      <footer
+        v-if="paginationInfo.totalItems > 0"
+        class="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <p class="text-xs text-muted-foreground tabular-nums">
+          {{ paginationInfo.startItem }}–{{ paginationInfo.endItem }} of {{ paginationInfo.totalItems }}
+        </p>
 
-        <TableEmpty v-else>
-          <div class="text-center py-8">
-            <FileText class="mx-auto h-12 w-12 text-muted-foreground/50" />
-            <h3 class="mt-4 text-lg font-semibold">No notas found</h3>
-            <p class="text-muted-foreground">
-              {{ hasActiveFilters ? 'Try adjusting your filters' : 'Create your first nota to get started' }}
-            </p>
+        <div v-if="totalPages > 1" class="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            :disabled="currentPage === 1"
+            @click="previousPage"
+          >
+            Previous
+          </Button>
+
+          <template v-for="page in getVisiblePages()" :key="page">
             <Button
-              v-if="!hasActiveFilters"
-              class="mt-4"
-              @click="emit('create-nota')"
-            >
-              <FileText class="h-4 w-4 mr-2" />
-              Create Nota
-            </Button>
-          </div>
-        </TableEmpty>
-      </CardContent>
-    </Card>
-
-    <!-- Pagination -->
-    <Card v-if="totalPages > 1">
-      <CardContent class="p-4">
-        <div class="flex items-center justify-between">
-          <div class="text-sm text-muted-foreground">
-            Showing {{ paginationInfo.startItem }} to {{ paginationInfo.endItem }} of {{ paginationInfo.totalItems }} entries
-          </div>
-          
-          <div class="flex items-center gap-1">
-            <Button
-              variant="outline"
+              v-if="typeof page === 'number'"
+              :variant="page === currentPage ? 'default' : 'outline'"
               size="sm"
-              :disabled="currentPage === 1"
-              @click="previousPage"
+              class="w-9"
+              @click="goToPage(page)"
             >
-              Previous
+              {{ page }}
             </Button>
-            
-            <template v-for="page in getVisiblePages()" :key="page">
-              <Button
-                v-if="typeof page === 'number'"
-                :variant="page === currentPage ? 'default' : 'outline'"
-                size="sm"
-                class="w-9"
-                @click="goToPage(page)"
-              >
-                {{ page }}
-              </Button>
-              <span v-else class="px-2 text-muted-foreground">{{ page }}</span>
-            </template>
-            
-            <Button
-              variant="outline"
-              size="sm"
-              :disabled="currentPage === totalPages"
-              @click="nextPage"
-            >
-              Next
-            </Button>
-          </div>
+            <span v-else class="px-2 text-muted-foreground">{{ page }}</span>
+          </template>
+
+          <Button
+            variant="outline"
+            size="sm"
+            :disabled="currentPage === totalPages"
+            @click="nextPage"
+          >
+            Next
+          </Button>
         </div>
-      </CardContent>
-    </Card>
-  </div>
+      </footer>
+    </CardContent>
+  </Card>
+
+  <NotaQuickPreview
+    v-if="showQuickPreview"
+    v-model:open="showQuickPreview"
+    :nota="quickPreviewNota"
+    @open-nota="handlePreviewOpen"
+  />
 </template>

@@ -7,13 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import {
-  Table,
-  BarChart,
-  Calendar,
-  LayoutGrid,
-  GanttChart,
-} from 'lucide-vue-next'
+import { Table, BarChart, Calendar, LayoutGrid } from 'lucide-vue-next';
 
 export type TableLayout = 'table' | 'chart' | 'calendar' | 'kanban' | 'timeline'
 

@@ -1,14 +1,12 @@
 <script setup lang="ts">
-import { ref } from 'vue'
 import { useFeatureFlags } from '@/composables/useFeatureFlags'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 
 const {
   useNewStorage,
-  useSimplifiedNavigation,
   useConsolidatedSettings,
   enableAllNewFeatures,
   disableAllNewFeatures,
@@ -23,18 +21,6 @@ const handleToggleStorage = () => {
     description: newValue 
       ? 'Using file-based storage. Reload the page to apply changes.'
       : 'Using Dexie database. Reload the page to apply changes.',
-    duration: 5000
-  })
-}
-
-const handleToggleNavigation = () => {
-  const newValue = !useSimplifiedNavigation.value
-  useSimplifiedNavigation.value = newValue
-  
-  toast(newValue ? 'Simplified Navigation Enabled' : 'Legacy Navigation Enabled', {
-    description: newValue 
-      ? '3-panel layout active. Reload the page to apply changes.'
-      : '7-sidebar layout active. Reload the page to apply changes.',
     duration: 5000
   })
 }
@@ -107,7 +93,7 @@ const handleReloadPage = () => {
             3-panel layout with command palette (87% less complexity)
           </div>
         </div>
-        <Switch :checked="useSimplifiedNavigation" @update:checked="handleToggleNavigation" />
+        <Switch :checked="false" disabled aria-label="Simplified navigation unavailable" />
       </div>
 
       <!-- Settings Flag -->

@@ -1,7 +1,5 @@
 import { ref, computed, watch } from 'vue'
-import { nanoid } from 'nanoid'
 import { useAISettingsStore } from '@/features/ai/stores/aiSettingsStore'
-import { logger } from '@/services/logger'
 import { useConversationManager } from './useConversationManager'
 import { aiConversationService } from '@/features/ai/services/aiConversationService'
 

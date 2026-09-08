@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick, onBeforeUnmount, watch } from 'vue'
+import { ref, watch } from 'vue';
 import { toTypedSchema } from "@vee-validate/zod"
 import { useForm } from "vee-validate"
 import * as z from "zod"
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useSubNotaDialog } from '@/features/editor/composables/useSubNotaDialog'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import { logger } from '@/services/logger'
 import { CheckIcon, XIcon, LoaderIcon, FileTextIcon, FolderIcon } from 'lucide-vue-next'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
@@ -19,11 +19,9 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from '@/components/ui/input'
-import { db } from '@/db'
 
-const { state, closeSubNotaDialog, handleSuccess } = useSubNotaDialog()
+const { state, closeSubNotaDialog, submitSubNota } = useSubNotaDialog()
 
-const notaStore = useNotaStore()
 const isLoading = ref(false)
 const parentName = ref('')
 const showParentNote = ref(false)
@@ -38,7 +36,7 @@ const formSchema = toTypedSchema(z.object({
 }))
 
 // Form setup
-const { handleSubmit, resetForm, setValues } = useForm({
+const { handleSubmit, resetForm } = useForm({
   validationSchema: formSchema,
   initialValues: {
     title: ''
@@ -46,35 +44,23 @@ const { handleSubmit, resetForm, setValues } = useForm({
 })
 
 // Get parent note title for context
-const fetchParentTitle = async () => {
-  try {
-    if (!state.value.parentId) return
-    
-    const parentNota = await db.notas.get(state.value.parentId)
-    if (parentNota) {
-      parentName.value = parentNota.title
-      showParentNote.value = true
-    }
-  } catch (error) {
-    logger.error('Failed to fetch parent nota:', error)
-  }
-}
-
 const handleClose = () => {
   closeSubNotaDialog()
   resetForm()
 }
 
-onMounted(async () => {
-  await nextTick()
-  // Fetch parent nota info
-  fetchParentTitle()
-})
-
-// Clean up event listeners
-onBeforeUnmount(() => {
-  // No cleanup needed for shadcn dialog
-})
+watch(
+  () => [state.value.isOpen, state.value.parentId] as const,
+  ([isOpen, parentId]) => {
+    if (!isOpen) return
+    const parentNota = parentId ? useNotaStore().getItem(parentId) : null
+    parentName.value = parentNota?.title ?? ''
+    showParentNote.value = Boolean(parentNota)
+    isLoading.value = false
+    isSubmitted.value = false
+    resetForm()
+  },
+)
 
 const handleKeyDown = (event: KeyboardEvent) => {
   // Only handle global keyboard events here, not input-specific ones
@@ -90,49 +76,16 @@ const onSubmit = handleSubmit(async (values) => {
   isLoading.value = true
   isSubmitted.value = true
 
-  // Make absolutely sure parentId is a string (not undefined, empty string, etc.)
-  // If it's an invalid parentId, explicitly pass null instead of undefined/empty string
-  const parentId = state.value.parentId && state.value.parentId.trim() !== '' ? state.value.parentId : null
-  
   try {
-    const newNota = await notaStore.createItem(values.title.trim(), parentId)
-    
-    // Verify in database that parentId was set correctly
-    setTimeout(async () => {
-      try {
-        const storedNota = await db.notas.get(newNota.id)
-        // Silent verification
-        if (storedNota?.parentId !== parentId) {
-          logger.error('ParentId mismatch!', { 
-            expectedParentId: parentId, 
-            actualParentId: storedNota?.parentId 
-          })
-        }
-      } catch (e) {
-        logger.error('Error verifying nota in database:', e)
-      }
-    }, 500)
-    
-    // Show success message with better description
+    await submitSubNota(values.title.trim())
     const parentContext = parentName.value ? ` under "${parentName.value}"` : ''
     toast(`"${values.title}" created successfully${parentContext}`)
-    
-    // Add a visual highlight to the created link
-    setTimeout(() => {
-      // Find the newly created link and apply a highlight
-      const linkElement = document.querySelector(`a[href="/nota/${newNota.id}"]`)
-      if (linkElement) {
-        linkElement.classList.add('newly-created')
-        setTimeout(() => {
-          linkElement.classList.remove('newly-created')
-        }, 2000)
-      }
-    }, 100)
-    
-    handleSuccess(newNota.id, values.title)
+    resetForm()
   } catch (error) {
     logger.error('Failed to create nota:', error)
-    toast('Failed to create sub nota. Please try again.')
+    toast.error('Failed to create sub nota', {
+      description: error instanceof Error ? error.message : 'Please try again.',
+    })
     isSubmitted.value = false
     isLoading.value = false
   } 
@@ -233,8 +186,6 @@ const cancel = () => {
   }
 }
 </style> 
-
-
 
 
 

@@ -4,7 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import { Button } from '@/components/ui/button'
 import { RotateCw, Layout } from 'lucide-vue-next'
 

@@ -1,17 +1,20 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { BookIcon, Plus } from 'lucide-vue-next'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useCitationStore } from '@/features/editor/stores/citationStore'
 import type { CitationEntry } from '@/features/nota/types/nota'
-import type { Editor } from '@tiptap/vue-3'
-import { toast } from 'vue-sonner'
+import type { Editor } from '@/features/editor/pm'
+import { toast } from '@/services/toast'
 
 // Import modular components
 import ReferencesList from './references/ReferencesList.vue'
 import ReferenceDialog from './references/ReferenceDialog.vue'
+import ReferenceDoiDialog from './references/ReferenceDoiDialog.vue'
+import ReferenceEditDialog from './references/ReferenceEditDialog.vue'
+import ReferenceMethodDialog from './references/ReferenceMethodDialog.vue'
 import EmptyReferencesState from './references/EmptyReferencesState.vue'
 import { useReferencesSearch } from '@/features/nota/composables/useReferencesSearch'
 import { useReferenceDialog } from '@/features/nota/composables/useReferenceDialog'
@@ -37,18 +40,34 @@ const { searchQuery, filteredCitations } = useReferencesSearch(notaCitations)
 
 // Use dialog composable
 const {
-  showAddDialog,
+  showAddDialog: showManualDialog,
   isEditing,
   currentCitation,
   openAddDialog,
   editCitation,
   closeDialog
 } = useReferenceDialog()
+const showMethodDialog = ref(false)
+const showBibtexDialog = ref(false)
+const showDoiDialog = ref(false)
+
+const openMethodDialog = () => {
+  showMethodDialog.value = true
+}
+
+const selectReferenceMethod = async (method: 'manual' | 'bibtex' | 'doi') => {
+  showMethodDialog.value = false
+  await nextTick()
+  if (method === 'manual') openAddDialog()
+  if (method === 'bibtex') showBibtexDialog.value = true
+  if (method === 'doi') showDoiDialog.value = true
+}
 
 // Citation operations
 const deleteCitation = async (id: string) => {
   try {
-    await citationStore.deleteCitation(props.notaId, id)
+    const deleted = await citationStore.deleteCitation(props.notaId, id)
+    if (!deleted) throw new Error('The reference no longer exists in this nota.')
     toast('Reference deleted successfully')
   } catch (error) {
     console.error('Failed to delete citation:', error)
@@ -76,8 +95,18 @@ const insertCitation = (citation: CitationEntry) => {
 }
 
 const handleCitationSaved = () => {
+  const wasEditing = isEditing.value
   closeDialog()
-  toast(isEditing.value ? 'Reference updated successfully' : 'Reference added successfully')
+  toast(wasEditing ? 'Reference updated successfully' : 'Reference added successfully')
+}
+
+const handleBibtexSaved = () => {
+  showBibtexDialog.value = false
+}
+
+const handleDoiSaved = () => {
+  showDoiDialog.value = false
+  toast('Reference added successfully')
 }
 </script>
 
@@ -97,7 +126,7 @@ const handleCitationSaved = () => {
       <!-- Add Reference Button (when references exist) -->
       <div v-if="filteredCitations.length > 0" class="mb-4">
         <Button 
-          @click="openAddDialog" 
+          @click="openMethodDialog"
           size="sm" 
           variant="outline" 
           class="w-full"
@@ -110,7 +139,7 @@ const handleCitationSaved = () => {
       <!-- Empty State -->
       <EmptyReferencesState 
         v-if="filteredCitations.length === 0 && !searchQuery"
-        @add-reference="openAddDialog"
+        @add-reference="openMethodDialog"
       />
 
       <!-- No Search Results -->
@@ -139,14 +168,33 @@ const handleCitationSaved = () => {
     </div>
   </ScrollArea>
 
-  <!-- Add/Edit Citation Dialog -->
+  <ReferenceMethodDialog v-model:open="showMethodDialog" @select="selectReferenceMethod" />
+
+  <!-- BibTeX import -->
   <ReferenceDialog
-    v-model:open="showAddDialog"
+    v-model:open="showBibtexDialog"
+    :nota-id="notaId"
+    :existing-citations="notaCitations"
+    @saved="handleBibtexSaved"
+    @close="showBibtexDialog = false"
+  />
+
+  <!-- Manual add/edit -->
+  <ReferenceEditDialog
+    v-model:open="showManualDialog"
     :is-editing="isEditing"
     :current-citation="currentCitation"
     :nota-id="notaId"
     :existing-citations="notaCitations"
     @saved="handleCitationSaved"
     @close="closeDialog"
+  />
+
+  <!-- DOI lookup -->
+  <ReferenceDoiDialog
+    v-model:open="showDoiDialog"
+    :nota-id="notaId"
+    :existing-citations="notaCitations"
+    @saved="handleDoiSaved"
   />
 </template>

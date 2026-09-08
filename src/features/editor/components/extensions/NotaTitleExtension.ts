@@ -1,86 +1,33 @@
-import { Node, mergeAttributes } from '@tiptap/core'
-import { VueNodeViewRenderer } from '@tiptap/vue-3'
-import NotaTitleComponent from '../blocks/nota-title/NotaTitleComponent.vue'
+/**
+ * NotaTitle node — ported onto the raw-ProseMirror primitives.
+ *
+ * Like-for-like port of the former `Node.create`. A display-only `inline*`,
+ * `defining` block whose Vue node view owns a contenteditable title. Its `title`
+ * attribute parses from the element's `textContent` and serialises to `data-title`
+ * plus an inline content hole — preserved verbatim from the original.
+ */
+import { defineNode } from '@/features/editor/pm'
+import type { NodeDefinition } from '@/features/editor/pm'
 
 export interface NotaTitleOptions {
-  HTMLAttributes: Record<string, any>
+  HTMLAttributes: Record<string, unknown>
 }
 
-declare module '@tiptap/core' {
-  interface Commands<ReturnType> {
-    notaTitle: {
-      /**
-       * Set a nota title
-       */
-      setNotaTitle: (title: string) => ReturnType
-      /**
-       * Update the nota title
-       */
-      updateNotaTitle: (title: string) => ReturnType
-    }
-  }
-}
-
-export const NotaTitleExtension = Node.create<NotaTitleOptions>({
+export const notaTitleNodeDefinition: NodeDefinition = {
   name: 'notaTitle',
-
   group: 'block',
-
   content: 'inline*',
-
   defining: true,
-  
-  // This is a display-only node that won't be saved in the content
-  // It's only used for the UI title field
-
-  addOptions() {
-    return {
-      HTMLAttributes: {},
-    }
+  attrs: {
+    title: {
+      default: '',
+      parseHTML: (element) => element.textContent || '',
+    },
   },
+  parseDOM: [{ tag: 'div[data-type="nota-title"]' }],
+  toDOM: (node) => ['div', { 'data-type': 'nota-title', 'data-title': node.attrs.title }, 0],
+}
 
-  addAttributes() {
-    return {
-      title: {
-        default: '',
-        parseHTML: element => element.textContent || '',
-        renderHTML: attributes => {
-          return {
-            'data-title': attributes.title,
-          }
-        },
-      },
-    }
-  },
+export const notaTitleDefinition = defineNode(notaTitleNodeDefinition)
 
-  parseHTML() {
-    return [
-      {
-        tag: 'div[data-type="nota-title"]',
-      },
-    ]
-  },
-
-  renderHTML({ HTMLAttributes }) {
-    return ['div', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, { 'data-type': 'nota-title' }), 0]
-  },
-
-  addCommands() {
-    return {
-      setNotaTitle:
-        (title: string) =>
-        ({ commands }) => {
-          return commands.setNode(this.name, { title })
-        },
-      updateNotaTitle:
-        (title: string) =>
-        ({ commands }) => {
-          return commands.updateAttributes(this.name, { title })
-        },
-    }
-  },
-
-  addNodeView() {
-    return VueNodeViewRenderer(NotaTitleComponent)
-  },
-})
+export const NotaTitleExtension = notaTitleDefinition

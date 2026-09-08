@@ -3,6 +3,7 @@
   "include": ["src/**/__tests__/*", "env.d.ts"],
   "exclude": [],
   "compilerOptions": {
+    "noEmit": true,
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.vitest.tsbuildinfo",
 
     "lib": [],

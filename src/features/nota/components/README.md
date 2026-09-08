@@ -24,7 +24,6 @@ This directory contains a wide range of components that build the user interface
 -   **`CommentItem.vue`**: Renders a single comment in a list.
 -   **`CommentSection.vue`**: Orchestrates the display of a list of comments and the comment form.
 -   **`NotaTree.vue`**: A component that displays a tree-like structure of Notas, showing parent-child relationships.
--   **`VotersList.vue`**: A component that displays a list of users who have voted on a Nota.
 
 ## Theme Controls
 -   **`DarkModeToggle.vue`**: A simple toggle switch for enabling or disabling dark mode.
@@ -33,4 +32,4 @@ This directory contains a wide range of components that build the user interface
 -   **`ThemeSelector.vue`**: A more general control for selecting different application themes.
 
 ## Subdirectories
--   **`references`**: Contains components specifically for the references management feature. 
+-   **`references`**: Contains components specifically for the references management feature.

@@ -39,7 +39,7 @@
 </template>
 
 <script setup lang="ts">
-import { NodeViewWrapper } from '@tiptap/vue-3'
+import { NodeViewWrapper } from '@/features/editor/pm'
 import { computed, ref, onMounted, nextTick } from 'vue'
 import YoutubePlayer from './YoutubePlayer.vue'
 import { useYoutubeParser } from './useYoutubeParser'
@@ -225,7 +225,6 @@ onMounted(() => {
   border-width: 0;
 }
 </style> 
-
 
 
 

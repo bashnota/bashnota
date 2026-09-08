@@ -25,7 +25,8 @@ import type {
   TheoremBlock,
   PipelineBlock,
   MermaidBlock,
-  SubNotaLinkBlock
+  SubNotaLinkBlock,
+  BlockKey,
 } from '@/features/nota/types/blocks'
 
 export class NotaDB extends Dexie {
@@ -155,7 +156,7 @@ export class NotaDB extends Dexie {
    */
   async saveBlock(block: any) {
     const table = this.getBlockTable(block.type)
-    if (block.id) {
+    if (block.id != null) {
       return await table.put(block)
     } else {
       return await table.add(block)
@@ -165,7 +166,7 @@ export class NotaDB extends Dexie {
   /**
    * Get a block by ID from the appropriate table
    */
-  async getBlock(blockId: string, blockType: string) {
+  async getBlock(blockId: BlockKey, blockType: string) {
     const table = this.getBlockTable(blockType)
     return await table.get(blockId)
   }
@@ -181,7 +182,7 @@ export class NotaDB extends Dexie {
   /**
    * Delete a block from the appropriate table
    */
-  async deleteBlock(blockId: string, blockType: string) {
+  async deleteBlock(blockId: BlockKey, blockType: string) {
     const table = this.getBlockTable(blockType)
     return await table.delete(blockId)
   }
@@ -275,8 +276,6 @@ export class NotaDB extends Dexie {
 }
 
 export const db = new NotaDB()
-
-
 
 
 

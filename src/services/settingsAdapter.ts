@@ -1,5 +1,7 @@
 import { ConsolidatedSettingsService } from './consolidatedSettingsService'
 import type { AllSettings } from '@/features/settings/types'
+import { credentialFreeValue } from '@/utils/credentialPersistence'
+import { logger } from '@/services/logger'
 
 /**
  * Settings adapter that bridges the old localStorage-based settings
@@ -22,24 +24,52 @@ export class SettingsAdapter {
       const backend = {
         type: 'localStorage' as const,
         async read(): Promise<string | null> {
-          return localStorage.getItem('bashnota-consolidated-settings')
+          const data = localStorage.getItem('bashnota-consolidated-settings')
+          if (!data) return null
+          try {
+            const credentialFree = JSON.stringify(credentialFreeValue(JSON.parse(data)))
+            if (credentialFree !== data) {
+              localStorage.setItem('bashnota-consolidated-settings', credentialFree)
+            }
+            return credentialFree
+          } catch {
+            localStorage.removeItem('bashnota-consolidated-settings')
+            return null
+          }
         },
         async write(data: string): Promise<void> {
-          localStorage.setItem('bashnota-consolidated-settings', data)
+          localStorage.setItem(
+            'bashnota-consolidated-settings',
+            JSON.stringify(credentialFreeValue(JSON.parse(data))),
+          )
         },
         async delete(): Promise<void> {
           localStorage.removeItem('bashnota-consolidated-settings')
         },
         async readSettings(): Promise<any> {
           const data = localStorage.getItem('bashnota-consolidated-settings')
-          return data ? JSON.parse(data) : null
+          if (!data) return null
+          try {
+            const parsed = JSON.parse(data)
+            const credentialFree = credentialFreeValue(parsed)
+            if (JSON.stringify(parsed) !== JSON.stringify(credentialFree)) {
+              localStorage.setItem('bashnota-consolidated-settings', JSON.stringify(credentialFree))
+            }
+            return credentialFree
+          } catch {
+            localStorage.removeItem('bashnota-consolidated-settings')
+            return null
+          }
         },
         async writeSettings(settings: any): Promise<void> {
-          localStorage.setItem('bashnota-consolidated-settings', JSON.stringify(settings))
+          localStorage.setItem(
+            'bashnota-consolidated-settings',
+            JSON.stringify(credentialFreeValue(settings)),
+          )
         },
         async deleteSettings(): Promise<void> {
           localStorage.removeItem('bashnota-consolidated-settings')
-        }
+        },
       }
 
       this.service = new ConsolidatedSettingsService(backend)
@@ -62,11 +92,12 @@ export class SettingsAdapter {
       'ai-settings',
       'keyboard-settings',
       'integration-settings',
+      'integrations-settings',
       'advanced-settings',
       'theme-settings',
-      'interface-settings'
+      'interface-settings',
     ]
-    return oldKeys.some(key => localStorage.getItem(key) !== null)
+    return oldKeys.some((key) => localStorage.getItem(key) !== null)
   }
 
   /**
@@ -76,29 +107,45 @@ export class SettingsAdapter {
     if (!this.service) return
 
     const oldData: Record<string, string> = {}
-    
+
     // Collect all old settings
     const keys = [
       'editor-settings',
       'ai-settings',
       'keyboard-settings',
       'integration-settings',
+      'integrations-settings',
       'advanced-settings',
       'theme-settings',
-      'interface-settings'
+      'interface-settings',
     ]
 
     for (const key of keys) {
       const value = localStorage.getItem(key)
       if (value) {
-        oldData[key] = value
+        try {
+          JSON.parse(value)
+          oldData[key] = value
+        } catch {
+          localStorage.removeItem(key)
+        }
       }
     }
 
     // Migrate using the service
     await this.service.migrateFromLocalStorage(oldData)
-    
-    console.log('[SettingsAdapter] Migrated settings from old localStorage format')
+
+    // The compatibility keys can remain while the feature flag is toggled, but
+    // they must no longer retain credentials collected by older releases.
+    for (const [key, value] of Object.entries(oldData)) {
+      try {
+        localStorage.setItem(key, JSON.stringify(credentialFreeValue(JSON.parse(value))))
+      } catch {
+        localStorage.removeItem(key)
+      }
+    }
+
+    logger.info('[SettingsAdapter] Migrated settings from old localStorage format')
   }
 
   /**
@@ -123,10 +170,17 @@ export class SettingsAdapter {
   async saveSettings(settings: AllSettings): Promise<void> {
     if (this.useNewSettings && this.service) {
       // Save using new service
-      const validCategories = ['editor', 'appearance', 'ai', 'keyboard', 'integrations', 'advanced'] as const
+      const validCategories = [
+        'editor',
+        'appearance',
+        'ai',
+        'keyboard',
+        'integrations',
+        'advanced',
+      ] as const
       for (const [category, data] of Object.entries(settings)) {
         if (validCategories.includes(category as any)) {
-          await this.service.updateCategory(category as typeof validCategories[number], data)
+          await this.service.updateCategory(category as (typeof validCategories)[number], data)
         }
       }
     } else {
@@ -156,6 +210,7 @@ export class SettingsAdapter {
         }
         return value
       } catch {
+        localStorage.removeItem(key)
         return undefined
       }
     }
@@ -172,12 +227,13 @@ export class SettingsAdapter {
       const [category, ...rest] = path.split('.')
       const key = `${category}-settings`
       const stored = localStorage.getItem(key)
-      
+
       let data = {}
       if (stored) {
         try {
           data = JSON.parse(stored)
         } catch {
+          localStorage.removeItem(key)
           data = {}
         }
       }
@@ -192,14 +248,16 @@ export class SettingsAdapter {
       }
       current[rest[rest.length - 1]] = value
 
-      localStorage.setItem(key, JSON.stringify(data))
+      localStorage.setItem(key, JSON.stringify(credentialFreeValue(data)))
     }
   }
 
   /**
    * Reset a category to defaults
    */
-  async resetCategory(category: 'editor' | 'appearance' | 'ai' | 'keyboard' | 'integrations' | 'advanced'): Promise<void> {
+  async resetCategory(
+    category: 'editor' | 'appearance' | 'ai' | 'keyboard' | 'integrations' | 'advanced',
+  ): Promise<void> {
     if (this.useNewSettings && this.service) {
       await this.service.resetCategory(category)
     } else {
@@ -254,17 +312,23 @@ export class SettingsAdapter {
       ai: {},
       keyboard: {},
       integrations: {},
-      advanced: {}
+      advanced: {},
     }
 
     // Load each category
     const categories = ['editor', 'ai', 'keyboard', 'integrations', 'advanced']
     for (const category of categories) {
-      const stored = localStorage.getItem(`${category}-settings`)
+      const key = `${category}-settings`
+      const stored = localStorage.getItem(key)
       if (stored) {
         try {
-          settings[category] = JSON.parse(stored)
+          const parsed = JSON.parse(stored)
+          settings[category] = credentialFreeValue(parsed)
+          if (JSON.stringify(parsed) !== JSON.stringify(settings[category])) {
+            localStorage.setItem(`${category}-settings`, JSON.stringify(settings[category]))
+          }
         } catch {
+          localStorage.removeItem(key)
           settings[category] = {}
         }
       }
@@ -275,21 +339,42 @@ export class SettingsAdapter {
     const interfaceSettings = localStorage.getItem('interface-settings')
     if (themeSettings) {
       try {
-        settings.appearance = { ...settings.appearance, ...JSON.parse(themeSettings) }
-      } catch {}
+        const parsed = JSON.parse(themeSettings)
+        const credentialFree = credentialFreeValue(parsed)
+        settings.appearance = {
+          ...settings.appearance,
+          ...credentialFree,
+        }
+        if (JSON.stringify(parsed) !== JSON.stringify(credentialFree)) {
+          localStorage.setItem('theme-settings', JSON.stringify(credentialFree))
+        }
+      } catch {
+        localStorage.removeItem('theme-settings')
+      }
     }
     if (interfaceSettings) {
       try {
-        settings.appearance = { ...settings.appearance, ...JSON.parse(interfaceSettings) }
-      } catch {}
+        const parsed = JSON.parse(interfaceSettings)
+        const credentialFree = credentialFreeValue(parsed)
+        settings.appearance = {
+          ...settings.appearance,
+          ...credentialFree,
+        }
+        if (JSON.stringify(parsed) !== JSON.stringify(credentialFree)) {
+          localStorage.setItem('interface-settings', JSON.stringify(credentialFree))
+        }
+      } catch {
+        localStorage.removeItem('interface-settings')
+      }
     }
 
     return settings
   }
 
   private saveToLocalStorage(settings: AllSettings): void {
+    const credentialFree = credentialFreeValue(settings)
     // Save each category
-    for (const [category, data] of Object.entries(settings)) {
+    for (const [category, data] of Object.entries(credentialFree)) {
       if (category === 'appearance') {
         // Split appearance into theme and interface for backward compatibility
         localStorage.setItem('theme-settings', JSON.stringify(data))
@@ -309,9 +394,7 @@ export let settingsAdapter: SettingsAdapter | null = null
 /**
  * Initialize the settings adapter
  */
-export async function initializeSettingsAdapter(
-  useNewSettings = false
-): Promise<SettingsAdapter> {
+export async function initializeSettingsAdapter(useNewSettings = false): Promise<SettingsAdapter> {
   settingsAdapter = new SettingsAdapter(useNewSettings)
   await settingsAdapter.initialize()
   return settingsAdapter

@@ -1,4 +1,4 @@
-import { ref, watch, nextTick, inject } from 'vue'
+import { ref, watch, nextTick } from 'vue';
 import { useCodeExecutionStore } from '@/features/editor/stores/codeExecutionStore'
 import { logger } from '@/services/logger'
 

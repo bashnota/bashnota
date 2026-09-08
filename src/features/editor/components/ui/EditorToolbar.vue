@@ -53,7 +53,7 @@ import {
   FileText,
 } from 'lucide-vue-next'
 import { computed, ref, onMounted } from 'vue'
-import type { Editor } from '@tiptap/vue-3'
+import type { Editor } from '@/features/editor/pm'
 import {
   toggleRenderMathState
 } from '@/features/editor/components/extensions/MarkdownExtension'
@@ -496,9 +496,9 @@ const documentActions = computed(() => [
     id: 'run-all',
     icon: props.isExecutingAll ? Loader2 : PlayCircle,
     label: 'Run All',
-    tooltip: 'Run all cells',
-    action: () => emit('run-all'),
-    isDisabled: !props.canRunAll || props.isExecutingAll,
+    tooltip: 'Run all is not available yet',
+    action: () => undefined,
+    isDisabled: true,
     variant: 'outline' as const,
   },
   {
@@ -527,8 +527,9 @@ const documentActions = computed(() => [
     id: 'share',
     icon: Share2,
     label: 'Share',
-    tooltip: 'Share document',
-    action: () => emit('share'),
+    tooltip: 'Sharing is not available yet',
+    action: () => undefined,
+    isDisabled: true,
   },
   {
     id: 'export',

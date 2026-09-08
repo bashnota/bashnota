@@ -1,4 +1,4 @@
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue';
 import { Star, Clock, Tag } from 'lucide-vue-next'
 import type { Nota } from '@/features/nota/types/nota'
 

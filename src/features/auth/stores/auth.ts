@@ -1,9 +1,22 @@
 import { defineStore } from 'pinia'
-import { authService } from '@/features/auth/services/auth'
+import { supabaseAuthService as authService } from '@/features/auth/services/supabaseAuth'
 import type { AuthState, LoginCredentials, RegisterCredentials } from '@/features/auth/types/user'
-import { logAnalyticsEvent } from '@/services/firebase'
-import { toast } from 'vue-sonner'
-import { validateUserTag } from '@/utils/userTagGenerator'
+import { toast } from '@/services/toast'
+
+const TAG_PATTERN = /^[a-zA-Z0-9_]{3,30}$/
+const authRedirect = (path: string) => new URL(`${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`, window.location.origin).toString()
+const authStateGenerations = new WeakMap<object, number>()
+const pendingLogoutProfiles = new WeakMap<object, AuthState['user']>()
+
+function beginAuthStateTransition(store: object): number {
+  const generation = (authStateGenerations.get(store) ?? 0) + 1
+  authStateGenerations.set(store, generation)
+  return generation
+}
+
+function isCurrentAuthStateTransition(store: object, generation: number): boolean {
+  return authStateGenerations.get(store) === generation
+}
 
 export const useAuthStore = defineStore('auth', {
   state: (): AuthState => ({
@@ -24,8 +37,8 @@ export const useAuthStore = defineStore('auth', {
     isAdmin: (state) => {
       if (!state.user) return false;
       
-      // List of admin user IDs - for demonstration, this could be moved to 
-      // a Firestore collection or an environment variable in a real app
+      // This should move to a restricted Supabase role table before admin-only
+      // product behavior is added.
       const adminUserIds = [
         'YQBcqDhwkKMtNbh1WmdFp2bFBXk1', // Replace with actual admin UIDs
       ];
@@ -36,30 +49,37 @@ export const useAuthStore = defineStore('auth', {
 
   actions: {
     // Initialize auth state listener
-    init() {
-      return new Promise<void>((resolve) => {
-        // Set up auth state listener
-        authService.onAuthStateChange(async (user) => {
-          // Save token to local storage
-          if (user) {
-            // @ts-ignore
-            localStorage.setItem('token', user.accessToken)
-          } else {
-            localStorage.removeItem('token')
-          }
-
-          this.user = await authService.mapUserToProfile(user)
-          
-          // Check if user needs a tag
-          if (user && this.user && !this.user.userTag) {
-            console.log('User is missing a tag, will generate one')
-            await this.generateUserTag()
-          }
-          
-          this.initialized = true
-          resolve()
+    async init() {
+      if (this.initialized) return
+      const initialGeneration = beginAuthStateTransition(this)
+      try {
+        authService.onAuthStateChange(session => {
+          // Supabase emits SIGNED_OUT before a failed remote revocation can be
+          // compensated. Keep the visible profile stable until logout() knows
+          // whether the operation committed or must be retried.
+          if (session === null && pendingLogoutProfiles.has(this)) return
+          const generation = beginAuthStateTransition(this)
+          void authService.mapSessionToProfile(session).then(profile => {
+            if (!isCurrentAuthStateTransition(this, generation)) return
+            this.user = profile
+            this.error = null
+          }).catch(error => {
+            if (!isCurrentAuthStateTransition(this, generation)) return
+            this.user = null
+            this.error = error instanceof Error ? error.message : 'Authentication state could not be restored'
+          })
         })
-      })
+        const initialSession = await authService.currentSession()
+        const profile = await authService.mapSessionToProfile(initialSession)
+        if (isCurrentAuthStateTransition(this, initialGeneration)) this.user = profile
+      } catch (error) {
+        if (isCurrentAuthStateTransition(this, initialGeneration)) {
+          this.user = null
+          this.error = error instanceof Error ? error.message : 'Authentication state could not be restored'
+        }
+      } finally {
+        this.initialized = true
+      }
     },
 
     // Login with email and password
@@ -68,21 +88,14 @@ export const useAuthStore = defineStore('auth', {
       this.error = null
 
       try {
-        const user = await authService.loginWithEmail(credentials.email, credentials.password)
-        this.user = await authService.mapUserToProfile(user)
-        toast('You have successfully logged in!', {
-          description: 'Welcome back!'
-        })
-
-        // Log analytics event
-        if (this.user) {
-          logAnalyticsEvent('login_success', { method: 'email' })
-        }
-
-        return user
+        const session = await authService.loginWithEmail(credentials.email, credentials.password)
+        const generation = beginAuthStateTransition(this)
+        const profile = await authService.mapSessionToProfile(session)
+        if (!isCurrentAuthStateTransition(this, generation)) return null
+        this.user = profile
+        return profile
       } catch (error: any) {
         this.error = error.message || 'Login failed'
-        logAnalyticsEvent('login_error', { method: 'email', error: error.code || 'unknown_error' })
         return null
       } finally {
         this.loading = false
@@ -90,27 +103,24 @@ export const useAuthStore = defineStore('auth', {
     },
 
     // Login with Google
-    async loginWithGoogle() {
+    async loginWithGoogle(redirect = '/') {
       this.loading = true
       this.error = null
 
       try {
-        const user = await authService.loginWithGoogle()
-        this.user = await authService.mapUserToProfile(user)
-        toast('You have successfully logged in with Google!', {
-          description: 'Welcome!'
-        })
-
-        // Log analytics event
-        if (this.user) {
-          logAnalyticsEvent('login_success', { method: 'google' })
+        const callback = new URL(authRedirect('/auth/callback'))
+        callback.searchParams.set('redirect', redirect)
+        const session = await authService.loginWithGoogle(callback.toString())
+        if (session) {
+          const generation = beginAuthStateTransition(this)
+          const profile = await authService.mapSessionToProfile(session)
+          if (!isCurrentAuthStateTransition(this, generation)) return false
+          this.user = profile
         }
-
-        return user
+        return true
       } catch (error: any) {
         this.error = error.message || 'Google login failed'
-        logAnalyticsEvent('login_error', { method: 'google', error: error.code || 'unknown_error' })
-        return null
+        return false
       } finally {
         this.loading = false
       }
@@ -122,86 +132,51 @@ export const useAuthStore = defineStore('auth', {
       this.error = null
 
       try {
-        const user = await authService.register(
+        const session = await authService.register(
           credentials.email,
           credentials.password,
           credentials.displayName,
         )
-        this.user = await authService.mapUserToProfile(user)
-        toast('Your account has been created successfully!', {
-          description: 'Welcome to BashNota!'
-        })
-
-        // Log analytics event
-        if (this.user) {
-          logAnalyticsEvent('signup_success', { method: 'email' })
-        }
-
-        return user
+        const generation = beginAuthStateTransition(this)
+        const profile = await authService.mapSessionToProfile(session)
+        if (!isCurrentAuthStateTransition(this, generation)) return false
+        this.user = profile
+        return true
       } catch (error: any) {
         this.error = error.message || 'Registration failed'
-        logAnalyticsEvent('signup_error', { method: 'email', error: error.code || 'unknown_error' })
-        return null
+        return false
       } finally {
         this.loading = false
       }
     },
-    
+
     // Generate a user tag for the current user
-    async generateUserTag() {
-      if (!this.user) return
-      
-      this.loading = true
-      this.error = null
-      
-      try {
-        // If user already has a tag from Firebase Auth but not in Firestore
-        if (this.user.uid) {
-          // The auth service will generate a tag based on display name if available
-          await authService.createUserTagForNewUser({
-            uid: this.user.uid,
-            displayName: this.user.displayName,
-            email: this.user.email,
-          } as any)
-          
-          // Refresh user profile to get the newly created tag
-          this.user = await authService.mapUserToProfile(await authService.getCurrentUser())
-          
-          toast('Your user tag has been generated', {
-            description: 'User Tag Created'
-          })
-          return true
-        }
-        
-        return false
-      } catch (error: any) {
-        this.error = error.message || 'Failed to generate user tag'
-        return false
-      } finally {
-        this.loading = false
-      }
+    async isUserTagAvailable(tag: string) {
+      if (!TAG_PATTERN.test(tag)) return false
+      if (tag === this.user?.userTag) return true
+      return authService.isTagAvailable(tag)
     },
-    
+
     // Update the user's tag
     async updateUserTag(newTag: string) {
       if (!this.user) return false
-      
+
       this.loading = true
       this.error = null
-      
+
       try {
         // Validate the tag first
-        const validation = await validateUserTag(newTag)
-        
-        if (!validation.isValid || !validation.isAvailable) {
-          this.error = validation.error || 'Invalid or unavailable user tag'
+        if (!TAG_PATTERN.test(newTag)) {
+          this.error = 'Tag must be 3–30 letters, numbers, or underscores'
           toast(this.error, {
             description: 'User Tag Error'
           })
           return false
         }
-        
-        // Update the tag
+        if (newTag !== this.user.userTag && !(await authService.isTagAvailable(newTag))) {
+          this.error = 'This user tag is already taken'
+          return false
+        }
         await authService.updateUserTag(this.user.uid, newTag)
         
         // Update local user object
@@ -209,8 +184,6 @@ export const useAuthStore = defineStore('auth', {
           ...this.user,
           userTag: newTag,
         }
-        
-        logAnalyticsEvent('user_tag_updated')
         
         return true
       } catch (error: any) {
@@ -224,13 +197,22 @@ export const useAuthStore = defineStore('auth', {
     // Logout
     async logout() {
       this.loading = true
+      this.error = null
+      const previousUser = this.user
+      pendingLogoutProfiles.set(this, previousUser)
+      beginAuthStateTransition(this)
 
       try {
         await authService.logout()
+        pendingLogoutProfiles.delete(this)
+        beginAuthStateTransition(this)
         this.user = null
         // Clear any in-memory user data if needed
         return true
       } catch (error: any) {
+        pendingLogoutProfiles.delete(this)
+        beginAuthStateTransition(this)
+        this.user = previousUser
         this.error = error.message || 'Logout failed'
         return false
       } finally {
@@ -244,13 +226,42 @@ export const useAuthStore = defineStore('auth', {
       this.error = null
 
       try {
-        await authService.resetPassword(email)
-        toast('Password reset email has been sent to your email address.', {
-          description: 'Password Reset'
-        })
+        await authService.resetPassword(email, authRedirect('/auth/reset-password'))
         return true
       } catch (error: any) {
         this.error = error.message || 'Password reset failed'
+        return false
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async completeOAuthCallback(callbackUrl: string) {
+      this.loading = true
+      this.error = null
+      try {
+        const session = await authService.completeOAuthCallback(callbackUrl)
+        const generation = beginAuthStateTransition(this)
+        const profile = await authService.mapSessionToProfile(session)
+        if (!isCurrentAuthStateTransition(this, generation)) return false
+        this.user = profile
+        return true
+      } catch (error: any) {
+        this.error = error.message || 'OAuth sign-in failed'
+        return false
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async updatePassword(password: string) {
+      this.loading = true
+      this.error = null
+      try {
+        await authService.updatePassword(password)
+        return true
+      } catch (error: any) {
+        this.error = error.message || 'Password update failed'
         return false
       } finally {
         this.loading = false
@@ -263,11 +274,3 @@ export const useAuthStore = defineStore('auth', {
     },
   },
 })
-
-
-
-
-
-
-
-

@@ -1,6 +1,6 @@
-import { Extension } from '@tiptap/core'
-import DragHandle from './DragHandle'
-import ContextMenu from './ContextMenu'
+import type { Plugin } from 'prosemirror-state'
+import { DragHandlePlugin } from './DragHandle'
+import { ContextMenuPlugin } from './ContextMenu'
 
 export interface GlobalDragHandleOptions {
   /**
@@ -35,50 +35,47 @@ export interface GlobalDragHandleOptions {
   enableContextMenu: boolean
 }
 
-const GlobalDragHandle = Extension.create({
-  name: 'globalDragHandle',
+const DEFAULT_OPTIONS: GlobalDragHandleOptions = {
+  dragHandleWidth: 20,
+  scrollTreshold: 100,
+  excludedTags: [],
+  customNodes: [],
+  enableContextMenu: true,
+}
 
-  addOptions() {
-    return {
-      dragHandleWidth: 20,
-      scrollTreshold: 100,
-      excludedTags: [],
-      customNodes: [],
-      enableContextMenu: true,
-    }
-  },
+/**
+ * Build the global drag-handle plugins.
+ *
+ * Previously a TipTap `Extension.create` that composed the `DragHandle` and
+ * `ContextMenu` sub-extensions via `addExtensions`. Now a plain ProseMirror
+ * plugin factory returning both plugins in the same order (drag handle first,
+ * then context menu). The registration site wraps these back into the editor.
+ */
+export function globalDragHandlePlugins(
+  options: Partial<GlobalDragHandleOptions> = {},
+): Plugin[] {
+  const opts: GlobalDragHandleOptions = { ...DEFAULT_OPTIONS, ...options }
 
-  addExtensions() {
-    return [
-      DragHandle.configure({
-        dragHandleWidth: this.options.dragHandleWidth,
-        scrollTreshold: this.options.scrollTreshold,
-        dragHandleSelector: this.options.dragHandleSelector,
-        excludedTags: this.options.excludedTags,
-        customNodes: this.options.customNodes,
-      }),
-      ContextMenu.configure({
-        enableContextMenu: this.options.enableContextMenu,
-        dragHandleWidth: this.options.dragHandleWidth,
-        scrollTreshold: this.options.scrollTreshold,
-        dragHandleSelector: this.options.dragHandleSelector,
-        excludedTags: this.options.excludedTags,
-        customNodes: this.options.customNodes,
-      }),
-    ]
-  },
-})
-
-export default GlobalDragHandle
+  return [
+    DragHandlePlugin({
+      pluginKey: 'dragHandle',
+      dragHandleWidth: opts.dragHandleWidth,
+      scrollTreshold: opts.scrollTreshold,
+      dragHandleSelector: opts.dragHandleSelector,
+      excludedTags: opts.excludedTags,
+      customNodes: opts.customNodes,
+    }),
+    ContextMenuPlugin({
+      pluginKey: 'contextMenu',
+      enableContextMenu: opts.enableContextMenu,
+      dragHandleWidth: opts.dragHandleWidth,
+      scrollTreshold: opts.scrollTreshold,
+      dragHandleSelector: opts.dragHandleSelector,
+      excludedTags: opts.excludedTags,
+      customNodes: opts.customNodes,
+    }),
+  ]
+}
 
 // Re-export utilities that might be used elsewhere
 export { serializeForClipboard, selectNode } from './DragHandle'
-
-
-
-
-
-
-
-
-

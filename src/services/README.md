@@ -5,9 +5,8 @@ This directory contains global, application-wide services that are not specific 
 ## Services
 
 -   **`aiService.ts`**: A high-level service for interacting with AI models. Note: Most AI logic is within `src/features/ai`.
--   **`axios.ts`**: Configures the global Axios instance used for making HTTP requests to the backend API.
 -   **`codeExecutionService.ts`**: A service that manages the execution of code, likely by interfacing with a Jupyter kernel.
--   **`firebase.ts`**: Initializes and configures the connection to Firebase services.
+-   **`cloud/`**: Provides the sole Supabase boundary for auth, data, metrics, newsletter, and storage workflows.
 -   **`logger.ts`**: A service for application-wide logging, which can be configured for different environments and log levels.
 
 ## Subdirectories
@@ -17,10 +16,10 @@ This directory contains global, application-wide services that are not specific 
 ## Files
 
 - **`aiConversationService.ts`**: Manages the state and logic for AI conversations.
-- **`auth.ts`**: Handles user authentication, registration, and session management.
-- **`commentService.ts`**: Manages all operations related to comments (creating, fetching, deleting).
+- **`features/auth/services/supabaseAuth.ts`**: Handles user authentication, registration, and session management.
+- **`features/nota/services/communityCommentService.ts`**: Manages all operations related to comments.
 - **`jupyterService.ts`**: Handles communication with the Jupyter server API.
 - **`notaExtensionService.ts`**: A service for managing 'nota' extensions.
 - **`publishNotaUtilities.ts`**: Contains utility functions to help with the process of publishing a 'nota'.
-- **`statisticsService.ts`**: A service for fetching and processing statistics.
-- **`subNotaService.ts`**: Manages operations for 'sub-notas'. 
+- **`cloud/supabasePublishing.ts`**: Persists and reads publication statistics.
+- **`subNotaService.ts`**: Manages operations for 'sub-notas'.

@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import { Copy, Share2, Globe, EyeOff, Loader2, RefreshCw, FolderTree } from 'lucide-vue-next'
 import { Switch } from '@/components/ui/switch'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -36,6 +36,7 @@ const isAuthenticated = computed(() => authStore.isAuthenticated)
 const includeSubPages = ref(false)
 const hasSubPages = ref(false)
 const subPagesCount = ref(0)
+let publishedStateRefresh: Promise<void> | null = null
 
 const isPublished = computed(() => {
   return notaStore.isPublished(props.notaId)
@@ -108,12 +109,29 @@ const copyLink = () => {
     })
 }
 
+const refreshPublishedState = async () => {
+  if (publishedStateRefresh) return publishedStateRefresh
+
+  publishedStateRefresh = (async () => {
+    try {
+      await notaStore.loadPublishedNotas()
+    } catch (error) {
+      logger.error('Unable to refresh published state:', error)
+      toast('Unable to refresh published status. Your existing status was kept.')
+    }
+    await checkForSubPages()
+  })()
+
+  try {
+    await publishedStateRefresh
+  } finally {
+    publishedStateRefresh = null
+  }
+}
+
 // Load published notas when dialog is mounted
 onMounted(async () => {
-  if (isAuthenticated.value) {
-    await notaStore.loadPublishedNotas()
-    await checkForSubPages()
-  }
+  if (props.open && isAuthenticated.value) await refreshPublishedState()
 })
 
 // Reset state when dialog is opened
@@ -125,8 +143,7 @@ watch(
 
       // Refresh published status when dialog opens
       if (isAuthenticated.value) {
-        notaStore.loadPublishedNotas()
-        checkForSubPages()
+        void refreshPublishedState()
       }
     }
   },
@@ -293,7 +310,6 @@ watch(
     </DialogContent>
   </Dialog>
 </template>
-
 
 
 

@@ -7,16 +7,17 @@ import {
   Star,
   Plus
 } from 'lucide-vue-next'
-import { useRouter } from 'vue-router'
+import { useNotaNavigation } from '@/features/nota/composables/useNotaNavigation'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { withDefaults } from 'vue'
 import type { Nota } from '@/features/nota/types/nota'
 import { useFavoriteBlocksStore } from '@/features/nota/stores/favoriteBlocksStore'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import type { Editor } from '@tiptap/vue-3'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import type { Editor } from '@/features/editor/pm'
 import { logger } from '@/services/logger'
+import { toast } from '@/services/toast'
 import NotaEditMenu from '@/features/nota/components/NotaEditMenu.vue'
+import { useRouter } from 'vue-router'
 
 interface Props {
   items: Nota[]
@@ -44,6 +45,7 @@ const props = withDefaults(defineProps<Props>(), {
   newNotaTitle: '',
 })
 
+const { openNota } = useNotaNavigation()
 const router = useRouter()
 const store = useNotaStore()
 const favoriteBlocksStore = useFavoriteBlocksStore()
@@ -91,6 +93,16 @@ const closeContextMenu = () => {
   itemContextMenu.value = null
 }
 
+const navigateToNota = async (notaId: string) => {
+  try {
+    await openNota(notaId)
+  } catch (error) {
+    toast.error('Unable to open nota', {
+      description: error instanceof Error ? error.message : 'Please try again.',
+    })
+  }
+}
+
 const handleModalSubmit = (name: string) => {
   if (!editor.value) {
     logger.error('Editor is not initialized')
@@ -126,6 +138,8 @@ onUnmounted(() => {
           v-if="hasChildren(item.id)"
           @click="toggleItem(item.id)"
           class="w-4 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground flex-shrink-0"
+          :aria-label="`${expandedItems.has(item.id) ? 'Collapse' : 'Expand'} ${item.title}`"
+          :aria-expanded="expandedItems.has(item.id)"
         >
           <ChevronRight class="h-4 w-4" />
         </button>
@@ -142,10 +156,12 @@ onUnmounted(() => {
           ref="renameInput"
           autofocus
         />
-        <RouterLink
+        <a
           v-else
-          :to="`/nota/${item.id}`"
+          :href="router.resolve({ name: 'nota', params: { id: item.id } }).href"
           class="flex items-center gap-1.5 min-w-0 flex-1 px-1.5 py-0.5 rounded-sm hover:bg-slate-200/50"
+          @click.prevent="navigateToNota(item.id)"
+          @keydown.enter.prevent="navigateToNota(item.id)"
         >
           <FileText
             v-if="hasChildren(item.id)"
@@ -154,7 +170,7 @@ onUnmounted(() => {
           <span class="truncate overflow-hidden min-w-0 max-w-full">
             {{ item.title }}
           </span>
-        </RouterLink>
+        </a>
 
         <div
           class="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 flex-shrink-0 ml-auto"
@@ -266,11 +282,6 @@ onUnmounted(() => {
   background-color: hsl(var(--accent) / 0.2);
 }
 </style>
-
-
-
-
-
 
 
 

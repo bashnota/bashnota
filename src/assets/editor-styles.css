@@ -4,7 +4,8 @@
   font-size: var(--editor-font-size, 16px);
   line-height: var(--editor-line-height, 1.6);
   tab-size: var(--editor-tab-size, 2);
-  white-space: var(--word-wrap, break-word);
+  white-space: pre-wrap;
+  overflow-wrap: var(--word-wrap, break-word);
 }
 
 .ProseMirror .has-focus {

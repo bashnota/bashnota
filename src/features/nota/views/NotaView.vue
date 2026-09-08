@@ -4,10 +4,9 @@ import BlockCommandMenu from '@/features/editor/components/ui/BlockCommandMenu.v
 import NotaConfigModal from '@/features/editor/components/blocks/nota-config/NotaConfigModal.vue'
 import { ref, onMounted, watch, computed } from 'vue'
 import { useNotaStore } from '@/features/nota/stores/nota'
-import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
 import { useTabsStore } from '@/stores/tabsStore'
 import { useCodeExecutionStore } from '@/features/editor/stores/codeExecutionStore'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import PublishNotaModal from '@/features/editor/components/dialogs/PublishNotaModal.vue'
 import { logger } from '@/services/logger'
 
@@ -17,7 +16,6 @@ const props = defineProps<{
 
 // Stores
 const notaStore = useNotaStore()
-const jupyterStore = useJupyterStore()
 const tabsStore = useTabsStore()
 const codeExecutionStore = useCodeExecutionStore()
 
@@ -63,14 +61,6 @@ onMounted(async () => {
       }
     })
 
-    // Check if this is a root nota and has no Jupyter servers configured
-    if (loadedNota && !loadedNota.parentId && jupyterStore.jupyterServers.length === 0) {
-      toast({
-        title: 'Configure Jupyter',
-        description: 'Set up your Jupyter server to enable code execution in this notebook.',
-      })
-    }
-    
     isReady.value = true
   } catch (error) {
     logger.error('Error loading nota:', error)
@@ -201,7 +191,6 @@ const handleTagsUpdate = async (tags: string[]) => {
     />
   </div>
 </template>
-
 
 
 

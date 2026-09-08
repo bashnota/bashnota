@@ -1,4 +1,4 @@
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted } from 'vue';
 import { logger } from '@/services/logger'
 
 declare global {
@@ -183,7 +183,7 @@ export function useMathJax() {
           const output = window.MathJax.tex2svg(latex, { display: false })
           const tempDiv = document.createElement('div')
           tempDiv.appendChild(output.cloneNode(true))
-          return `<span class="mathjax-inline-wrapper" style="display:inline-flex;vertical-align:middle;">${tempDiv.innerHTML}</span>`
+          return `<span>${tempDiv.innerHTML}</span>`
         } catch (err) {
           logger.error('Error rendering inline LaTeX:', err)
           return `<span class="text-destructive">Invalid LaTeX: ${latex}</span>`
@@ -215,9 +215,6 @@ export function useMathJax() {
     error
   }
 }
-
-
-
 
 
 

@@ -1,4 +1,4 @@
-import { Editor } from '@tiptap/vue-3'
+import { Editor } from '@/features/editor/pm'
 import { getEditorExtensions } from '@/features/editor/components/extensions'
 
 /**
@@ -15,4 +15,4 @@ export function markdownToTiptap(markdown: string): object {
   const json = editor.getJSON()
   editor.destroy()
   return json
-} 
+}

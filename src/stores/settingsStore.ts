@@ -1,34 +1,19 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import type { 
-  AllSettings, 
-  EditorSettings, 
-  AppearanceSettings, 
-  AISettings, 
-  KeyboardSettings, 
-  IntegrationSettings, 
-  AdvancedSettings 
-} from '@/features/settings/types'
-import { 
-  editorSettingsDefaults 
-} from '@/features/settings/types/editor'
-import { 
-  appearanceSettingsDefaults 
-} from '@/features/settings/types/appearance'
-import { 
-  aiSettingsDefaults 
-} from '@/features/settings/types/ai'
-import { 
-  keyboardSettingsDefaults 
-} from '@/features/settings/types/keyboard'
-import { 
-  integrationSettingsDefaults 
-} from '@/features/settings/types/integrations'
-import { 
-  advancedSettingsDefaults 
-} from '@/features/settings/types/advanced'
-import { toast } from 'vue-sonner'
+import type { AllSettings } from '@/features/settings/types'
+import { editorSettingsDefaults } from '@/features/settings/types/editor'
+import { appearanceSettingsDefaults } from '@/features/settings/types/appearance'
+import { aiSettingsDefaults } from '@/features/settings/types/ai'
+import { keyboardSettingsDefaults } from '@/features/settings/types/keyboard'
+import { integrationSettingsDefaults } from '@/features/settings/types/integrations'
+import { advancedSettingsDefaults } from '@/features/settings/types/advanced'
+import { toast } from '@/services/toast'
 import { logger } from '@/services/logger'
+import {
+  credentialFreeSettings,
+  withoutApiKeys,
+  withoutJupyterToken,
+} from '@/utils/credentialPersistence'
 
 export const useSettingsStore = defineStore('settings', () => {
   // State
@@ -38,7 +23,7 @@ export const useSettingsStore = defineStore('settings', () => {
     ai: { ...aiSettingsDefaults },
     keyboard: { ...keyboardSettingsDefaults },
     integrations: { ...integrationSettingsDefaults },
-    advanced: { ...advancedSettingsDefaults }
+    advanced: { ...advancedSettingsDefaults },
   })
 
   const isLoading = ref(false)
@@ -62,14 +47,18 @@ export const useSettingsStore = defineStore('settings', () => {
     try {
       // Load from localStorage with backward compatibility
       const loadedSettings = { ...settings.value }
-      
+
       // Load each category separately for backward compatibility
       const categories = [
         { key: 'editor', storageKey: 'editor-settings', defaults: editorSettingsDefaults },
         { key: 'ai', storageKey: 'ai-settings', defaults: aiSettingsDefaults },
         { key: 'keyboard', storageKey: 'keyboard-settings', defaults: keyboardSettingsDefaults },
-        { key: 'integrations', storageKey: 'integration-settings', defaults: integrationSettingsDefaults },
-        { key: 'advanced', storageKey: 'advanced-settings', defaults: advancedSettingsDefaults }
+        {
+          key: 'integrations',
+          storageKey: 'integration-settings',
+          defaults: integrationSettingsDefaults,
+        },
+        { key: 'advanced', storageKey: 'advanced-settings', defaults: advancedSettingsDefaults },
       ]
 
       for (const category of categories) {
@@ -77,9 +66,15 @@ export const useSettingsStore = defineStore('settings', () => {
           const stored = localStorage.getItem(category.storageKey)
           if (stored) {
             const parsed = JSON.parse(stored)
+            const sanitized =
+              category.key === 'ai'
+                ? { ...parsed, apiKeys: {} }
+                : category.key === 'integrations'
+                  ? { ...parsed, jupyterToken: '' }
+                  : parsed
             loadedSettings[category.key as keyof AllSettings] = {
               ...category.defaults,
-              ...parsed
+              ...sanitized,
             } as any
           }
         } catch (error) {
@@ -90,19 +85,19 @@ export const useSettingsStore = defineStore('settings', () => {
       // Handle appearance settings separately (backward compatibility)
       try {
         let mergedAppearance = { ...appearanceSettingsDefaults }
-        
+
         const themeSettings = localStorage.getItem('theme-settings')
         if (themeSettings) {
           const parsed = JSON.parse(themeSettings)
           mergedAppearance = { ...mergedAppearance, ...parsed }
         }
-        
+
         const interfaceSettings = localStorage.getItem('interface-settings')
         if (interfaceSettings) {
           const parsed = JSON.parse(interfaceSettings)
           mergedAppearance = { ...mergedAppearance, ...parsed }
         }
-        
+
         loadedSettings.appearance = mergedAppearance
       } catch (error) {
         logger.warn('Failed to load appearance settings from localStorage', error)
@@ -114,19 +109,28 @@ export const useSettingsStore = defineStore('settings', () => {
         if (unifiedSettings) {
           const parsed = JSON.parse(unifiedSettings)
           // Merge with loaded settings, giving priority to unified format
-          Object.assign(loadedSettings, parsed)
+          Object.assign(loadedSettings, credentialFreeSettings({ ...loadedSettings, ...parsed }))
         }
       } catch (error) {
         logger.warn('Failed to load unified settings', error)
       }
 
       settings.value = loadedSettings
+      localStorage.setItem(
+        'bashnota-settings',
+        JSON.stringify(credentialFreeSettings(settings.value)),
+      )
+      localStorage.setItem('ai-settings', JSON.stringify(withoutApiKeys(settings.value.ai)))
+      localStorage.setItem(
+        'integration-settings',
+        JSON.stringify(withoutJupyterToken(settings.value.integrations)),
+      )
       hasUnsavedChanges.value = false
       logger.info('Settings loaded successfully')
     } catch (error) {
       logger.error('Failed to load settings', error)
       toast.error('Failed to load settings', {
-        description: 'Using default settings instead'
+        description: 'Using default settings instead',
       })
     } finally {
       isLoading.value = false
@@ -136,66 +140,75 @@ export const useSettingsStore = defineStore('settings', () => {
   const saveSettings = async () => {
     try {
       // Save to new unified format
-      localStorage.setItem('bashnota-settings', JSON.stringify(settings.value))
-      
+      localStorage.setItem(
+        'bashnota-settings',
+        JSON.stringify(credentialFreeSettings(settings.value)),
+      )
+
       // Keep backward compatibility by saving individual categories
       localStorage.setItem('editor-settings', JSON.stringify(settings.value.editor))
-      localStorage.setItem('ai-settings', JSON.stringify(settings.value.ai))
-      
+      localStorage.setItem('ai-settings', JSON.stringify(withoutApiKeys(settings.value.ai)))
+      localStorage.setItem(
+        'integration-settings',
+        JSON.stringify(withoutJupyterToken(settings.value.integrations)),
+      )
+
       // For appearance, merge theme and interface settings
       const appearanceForBackcompat = {
         theme: settings.value.appearance.theme,
         themeColor: settings.value.appearance.themeColor,
         highContrast: settings.value.appearance.highContrast,
         reducedMotion: settings.value.appearance.reducedMotion,
-        darkModeSchedule: settings.value.appearance.darkModeSchedule
+        darkModeSchedule: settings.value.appearance.darkModeSchedule,
       }
       localStorage.setItem('theme-settings', JSON.stringify(appearanceForBackcompat))
-      
+
       const interfaceForBackcompat = {
         sidebarWidth: settings.value.appearance.sidebarWidth,
         sidebarPosition: settings.value.appearance.sidebarPosition,
         density: settings.value.appearance.density,
         showStatusBar: settings.value.appearance.showStatusBar,
         showMenuBar: settings.value.appearance.showMenuBar,
-        customCss: settings.value.appearance.customCss
+        customCss: settings.value.appearance.customCss,
       }
       localStorage.setItem('interface-settings', JSON.stringify(interfaceForBackcompat))
 
       lastSaved.value = new Date()
       hasUnsavedChanges.value = false
-      
+
       // Emit global event for other parts of the app
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('settings-changed', { 
-          detail: { settings: settings.value, timestamp: lastSaved.value } 
-        }))
+        window.dispatchEvent(
+          new CustomEvent('settings-changed', {
+            detail: { settings: settings.value, timestamp: lastSaved.value },
+          }),
+        )
       }
-      
+
       logger.info('Settings saved successfully')
     } catch (error) {
       logger.error('Failed to save settings', error)
       toast.error('Failed to save settings', {
-        description: 'Your changes may be lost'
+        description: 'Your changes may be lost',
       })
       throw error
     }
   }
 
   const updateCategory = <K extends keyof AllSettings>(
-    category: K, 
-    updates: Partial<AllSettings[K]>
+    category: K,
+    updates: Partial<AllSettings[K]>,
   ) => {
     settings.value[category] = {
       ...settings.value[category],
-      ...updates
+      ...updates,
     }
     hasUnsavedChanges.value = true
-    
+
     // Auto-save after a short delay
     clearTimeout(autoSaveTimeout)
     autoSaveTimeout = setTimeout(() => {
-      saveSettings().catch(console.error)
+      saveSettings().catch((error) => logger.error(error))
     }, 1000)
   }
 
@@ -206,13 +219,13 @@ export const useSettingsStore = defineStore('settings', () => {
       ai: aiSettingsDefaults,
       keyboard: keyboardSettingsDefaults,
       integrations: integrationSettingsDefaults,
-      advanced: advancedSettingsDefaults
+      advanced: advancedSettingsDefaults,
     }
-    
+
     settings.value[category] = { ...defaults[category] } as AllSettings[K]
     hasUnsavedChanges.value = true
-    saveSettings().catch(console.error)
-    
+    saveSettings().catch((error) => logger.error(error))
+
     toast.success(`${category} settings reset to defaults`)
   }
 
@@ -223,11 +236,11 @@ export const useSettingsStore = defineStore('settings', () => {
       ai: { ...aiSettingsDefaults },
       keyboard: { ...keyboardSettingsDefaults },
       integrations: { ...integrationSettingsDefaults },
-      advanced: { ...advancedSettingsDefaults }
+      advanced: { ...advancedSettingsDefaults },
     }
     hasUnsavedChanges.value = true
-    saveSettings().catch(console.error)
-    
+    saveSettings().catch((error) => logger.error(error))
+
     toast.success('All settings reset to defaults')
   }
 
@@ -235,9 +248,9 @@ export const useSettingsStore = defineStore('settings', () => {
     const data = {
       version: '1.0.0',
       timestamp: new Date().toISOString(),
-      settings: settings.value
+      settings: credentialFreeSettings(settings.value),
     }
-    
+
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -247,7 +260,7 @@ export const useSettingsStore = defineStore('settings', () => {
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
-    
+
     toast.success('Settings exported successfully')
   }
 
@@ -255,22 +268,22 @@ export const useSettingsStore = defineStore('settings', () => {
     try {
       const text = await file.text()
       const data = JSON.parse(text)
-      
+
       if (data.settings) {
         // Validate and merge imported settings
-        const mergedSettings = {
+        const mergedSettings = credentialFreeSettings({
           editor: { ...editorSettingsDefaults, ...data.settings.editor },
           appearance: { ...appearanceSettingsDefaults, ...data.settings.appearance },
           ai: { ...aiSettingsDefaults, ...data.settings.ai },
           keyboard: { ...keyboardSettingsDefaults, ...data.settings.keyboard },
           integrations: { ...integrationSettingsDefaults, ...data.settings.integrations },
-          advanced: { ...advancedSettingsDefaults, ...data.settings.advanced }
-        }
-        
+          advanced: { ...advancedSettingsDefaults, ...data.settings.advanced },
+        })
+
         settings.value = mergedSettings
         hasUnsavedChanges.value = true
         await saveSettings()
-        
+
         toast.success('Settings imported successfully')
       } else {
         throw new Error('Invalid settings file format')
@@ -278,7 +291,7 @@ export const useSettingsStore = defineStore('settings', () => {
     } catch (error) {
       logger.error('Failed to import settings', error)
       toast.error('Failed to import settings', {
-        description: 'Please check the file format'
+        description: 'Please check the file format',
       })
       throw error
     }
@@ -293,7 +306,10 @@ export const useSettingsStore = defineStore('settings', () => {
     () => {
       hasUnsavedChanges.value = true
     },
-    { deep: true }
+    // Run before load/save clears the flag. The default deferred watcher could
+    // re-mark freshly loaded settings as dirty on the next tick, leaving the
+    // global "unsaved" banner visible indefinitely.
+    { deep: true, flush: 'sync' },
   )
 
   return {
@@ -302,7 +318,7 @@ export const useSettingsStore = defineStore('settings', () => {
     isLoading,
     lastSaved,
     hasUnsavedChanges,
-    
+
     // Category getters
     editorSettings,
     appearanceSettings,
@@ -310,7 +326,7 @@ export const useSettingsStore = defineStore('settings', () => {
     keyboardSettings,
     integrationSettings,
     advancedSettings,
-    
+
     // Actions
     loadSettings,
     saveSettings,
@@ -318,6 +334,6 @@ export const useSettingsStore = defineStore('settings', () => {
     resetCategory,
     resetAllSettings,
     exportSettings,
-    importSettings
+    importSettings,
   }
 })

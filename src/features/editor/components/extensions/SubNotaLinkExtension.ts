@@ -1,158 +1,66 @@
-import { Node, mergeAttributes } from '@tiptap/core'
-import { VueNodeViewRenderer } from '@tiptap/vue-3'
-import SubNotaBlock from '../blocks/sub-nota-block/SubNotaBlock.vue'
+/**
+ * SubNotaLink node — ported onto the raw-ProseMirror primitives.
+ *
+ * Like-for-like port of the former `Node.create`. `toDOM` reproduces the original
+ * `renderHTML` (a `span[data-type="sub-nota-link"]` carrying the four data-*
+ * attributes plus a text fallback); the three commands are passed through TipTap
+ * unchanged so existing call sites keep working.
+ */
+import { defineNode } from '@/features/editor/pm'
+import type { NodeDefinition } from '@/features/editor/pm'
 
 export interface SubNotaLinkOptions {
-  HTMLAttributes: Record<string, any>
+  HTMLAttributes: Record<string, unknown>
 }
 
-declare module '@tiptap/core' {
-  interface Commands<ReturnType> {
-    subNotaLink: {
-      setSubNotaLink: (attributes: {
-        targetNotaId: string
-        targetNotaTitle: string
-        displayText?: string
-        linkStyle?: 'inline' | 'button' | 'card'
-      }) => ReturnType
-    }
-  }
+interface SubNotaLinkAttributes {
+  targetNotaId: string
+  targetNotaTitle: string
+  displayText?: string
+  linkStyle?: 'inline' | 'button' | 'card'
 }
 
-export const SubNotaLink = Node.create<SubNotaLinkOptions>({
+export const subNotaLinkNodeDefinition: NodeDefinition = {
   name: 'subNotaLink',
-
-  addOptions() {
-    return {
-      HTMLAttributes: {},
-    }
-  },
-
   group: 'block',
-
   selectable: true,
-
   atom: true,
-
   content: '', // Empty content since it's an atom
-
-  addAttributes() {
-    return {
-      targetNotaId: {
-        default: null,
-        parseHTML: element => element.getAttribute('data-target-nota-id'),
-        renderHTML: attributes => {
-          if (!attributes.targetNotaId) {
-            return {}
-          }
-          return {
-            'data-target-nota-id': attributes.targetNotaId,
-          }
-        },
-      },
-      targetNotaTitle: {
-        default: null,
-        parseHTML: element => element.getAttribute('data-target-nota-title'),
-        renderHTML: attributes => {
-          if (!attributes.targetNotaTitle) {
-            return {}
-          }
-          return {
-            'data-target-nota-title': attributes.targetNotaTitle,
-          }
-        },
-      },
-      displayText: {
-        default: null,
-        parseHTML: element => element.getAttribute('data-display-text'),
-        renderHTML: attributes => {
-          if (!attributes.displayText) {
-            return {}
-          }
-          return {
-            'data-display-text': attributes.displayText,
-          }
-        },
-      },
-      linkStyle: {
-        default: 'inline',
-        parseHTML: element => element.getAttribute('data-link-style') || 'inline',
-        renderHTML: attributes => {
-          return {
-            'data-link-style': attributes.linkStyle,
-          }
-        },
-      },
-    }
+  attrs: {
+    targetNotaId: {
+      default: null,
+      parseHTML: (element) => element.getAttribute('data-target-nota-id'),
+    },
+    targetNotaTitle: {
+      default: null,
+      parseHTML: (element) => element.getAttribute('data-target-nota-title'),
+    },
+    displayText: {
+      default: null,
+      parseHTML: (element) => element.getAttribute('data-display-text'),
+    },
+    linkStyle: {
+      default: 'inline',
+      parseHTML: (element) => element.getAttribute('data-link-style') || 'inline',
+    },
   },
-
-  parseHTML() {
+  parseDOM: [{ tag: 'span[data-type="sub-nota-link"]' }],
+  toDOM: (node) => {
+    const a = node.attrs
     return [
+      'span',
       {
-        tag: 'span[data-type="sub-nota-link"]',
+        'data-type': 'sub-nota-link',
+        'data-target-nota-id': a.targetNotaId,
+        'data-target-nota-title': a.targetNotaTitle,
+        'data-display-text': a.displayText,
+        'data-link-style': a.linkStyle,
       },
+      a.displayText || a.targetNotaTitle || 'Sub Nota Link',
     ]
   },
+}
 
-  renderHTML({ HTMLAttributes, node }) {
-    return ['span', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
-      'data-type': 'sub-nota-link',
-      'data-target-nota-id': node.attrs.targetNotaId,
-      'data-target-nota-title': node.attrs.targetNotaTitle,
-      'data-display-text': node.attrs.displayText,
-      'data-link-style': node.attrs.linkStyle,
-    }), node.attrs.displayText || node.attrs.targetNotaTitle || 'Sub Nota Link']
-  },
+export const subNotaLinkDefinition = defineNode(subNotaLinkNodeDefinition)
 
-  addCommands() {
-    return {
-      setSubNotaLink: (attributes: {
-        targetNotaId: string
-        targetNotaTitle: string
-        displayText?: string
-        linkStyle?: 'inline' | 'button' | 'card'
-      }) => ({ commands }) => {
-        return commands.insertContent({
-          type: 'subNotaLink',
-          attrs: attributes
-        })
-      },
-      
-      convertToSubNotaLink: (attributes: {
-        targetNotaId: string
-        targetNotaTitle: string
-        displayText?: string
-        linkStyle?: 'inline' | 'button' | 'card'
-      }) => ({ commands, state }) => {
-        const { selection } = state
-        if (selection.empty) return false
-        
-        // Replace the selected content with a subNotaLink
-        return commands.replaceSelection({
-          type: 'subNotaLink',
-          attrs: attributes
-        })
-      },
-      
-      insertSubNotaLink: (attributes: {
-        targetNotaId: string
-        targetNotaTitle: string
-        displayText?: string
-        linkStyle?: 'inline' | 'button' | 'card'
-      }) => ({ commands, state }) => {
-        const { selection } = state
-        const { $from } = selection
-        
-        // Insert at the current position, creating a new block
-        return commands.insertContentAt($from.pos, {
-          type: 'subNotaLink',
-          attrs: attributes
-        })
-      },
-    }
-  },
-
-  addNodeView() {
-    return VueNodeViewRenderer(SubNotaBlock as any)
-  },
-})
+export const SubNotaLink = subNotaLinkDefinition

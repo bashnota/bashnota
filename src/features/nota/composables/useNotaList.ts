@@ -3,7 +3,6 @@ import { useNotaFilters, type UseNotaFiltersOptions } from './useNotaFilters'
 import { useNotaSorting, type SortField } from './useNotaSorting'
 import { useNotaPagination } from './useNotaPagination'
 import { useNotaSelection } from './useNotaSelection'
-import type { Nota } from '@/features/nota/types/nota'
 
 export interface UseNotaListOptions extends UseNotaFiltersOptions {
   itemsPerPage?: number
@@ -57,8 +56,6 @@ export function useNotaList(options: UseNotaListOptions) {
     const notas = options.notas()
     const searchQuery = localSearchQuery.value // Always use local search query
     const selectedTag = '' // Will be handled by parent component
-    const showFavorites = options.showFavorites?.() || false
-    
     // Apply filters
     const filtered = applyFilters(notas, searchQuery, selectedTag)
     
@@ -67,7 +64,7 @@ export function useNotaList(options: UseNotaListOptions) {
   })
 
   // Create pagination that reacts to filtered data changes
-  const { currentPage, createPagination } = useNotaPagination(options.itemsPerPage)
+  const { currentPage } = useNotaPagination(options.itemsPerPage)
   
   // Create reactive pagination for current filtered results
   const totalPages = computed(() => Math.ceil(filteredAndSortedNotas.value.length / (options.itemsPerPage || 10)))
@@ -138,7 +135,7 @@ export function useNotaList(options: UseNotaListOptions) {
   }
 
   // Create selection management for current page
-  const pageSelection = createSelectionForPage(paginatedItems.value)
+  const pageSelection = createSelectionForPage(paginatedItems)
 
   // Update search with external callback
   const updateSearch = (value: string) => {

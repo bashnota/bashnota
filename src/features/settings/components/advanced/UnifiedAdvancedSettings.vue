@@ -5,33 +5,22 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Slider } from '@/components/ui/slider'
 import { Separator } from '@/components/ui/separator'
-import { 
-  AlertCircle, 
-  Database, 
-  FolderOpen, 
-  HardDrive, 
-  RefreshCw, 
-  Eye, 
-  EyeOff,
-  Zap,
-  Bug,
-  FileText,
-  Settings as SettingsIcon
-} from 'lucide-vue-next'
-import { toast } from 'vue-sonner'
-import { useStorageMode } from '@/composables/useStorageMode'
+import { AlertCircle, Database, FolderOpen, HardDrive, RefreshCw, Eye, EyeOff, Zap } from 'lucide-vue-next';
+import { toast } from '@/services/toast'
+import type { AcceptableValue } from 'reka-ui'
+import { isStorageModeAlreadyActive, useStorageMode } from '@/composables/useStorageMode'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { logger } from '@/services/logger'
 
 const settingsStore = useSettingsStore()
 const {
   storageMode,
+  activeBackend,
   autoWatch,
   isFilesystemSupported,
   isFilesystemMode,
-  isIndexedDBMode,
+  isMemoryMode,
   isWatchingFiles,
   getModeDescription,
   switchToFilesystem,
@@ -44,19 +33,8 @@ type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
 // Local state for UI
 const isChanging = ref(false)
-const showReloadPrompt = ref(false)
 
 // Sync with settings store
-watch(
-  () => settingsStore.advancedSettings.storageMode,
-  (newMode) => {
-    if (newMode !== storageMode.value) {
-      storageMode.value = newMode
-    }
-  },
-  { immediate: true }
-)
-
 watch(
   () => settingsStore.advancedSettings.filesystemAutoWatch,
   (newValue) => {
@@ -90,9 +68,18 @@ watch(clearCacheOnStartup, (value) => {
   settingsStore.updateCategory('advanced', { clearCacheOnStartup: value })
 })
 
+// Handle log level change
+const handleLogLevelChange = (value: AcceptableValue) => {
+  if (value === 'debug' || value === 'info' || value === 'warn' || value === 'error') {
+    logLevel.value = value
+  }
+}
+
 // Handle storage mode change
-const handleStorageModeChange = async (newMode: StorageMode) => {
-  if (newMode === storageMode.value) return
+const handleStorageModeChange = async (value: AcceptableValue) => {
+  if (value !== 'indexeddb' && value !== 'filesystem') return
+  const newMode: StorageMode = value
+  if (isStorageModeAlreadyActive(newMode, activeBackend.value, storageMode.value)) return
 
   isChanging.value = true
   try {
@@ -114,7 +101,7 @@ const handleStorageModeChange = async (newMode: StorageMode) => {
         
         logger.info('[StorageMode] Directory selected:', directoryHandle.name)
         
-        await switchToFilesystem()
+        await switchToFilesystem(directoryHandle)
         
         // Update settings store
         settingsStore.updateCategory('advanced', {
@@ -122,9 +109,8 @@ const handleStorageModeChange = async (newMode: StorageMode) => {
         })
 
         toast.success('Filesystem Mode Enabled', {
-          description: `Directory "${directoryHandle.name}" selected. Please reload the page to complete the switch.`
+          description: `Directory "${directoryHandle.name}" is now the active storage backend.`
         })
-        showReloadPrompt.value = true
       } catch (error: any) {
         logger.error('Failed to enable filesystem mode:', error)
         
@@ -135,12 +121,14 @@ const handleStorageModeChange = async (newMode: StorageMode) => {
           })
         } else {
           toast.error('Failed to Enable Filesystem Mode', {
-            description: 'Could not access the file system. Please check your browser permissions.'
+            description: error instanceof Error
+              ? error.message
+              : 'Could not access the file system. Please check your browser permissions.'
           })
         }
       }
     } else {
-      switchToIndexedDB()
+      await switchToIndexedDB()
       
       // Update settings store
       settingsStore.updateCategory('advanced', {
@@ -148,14 +136,13 @@ const handleStorageModeChange = async (newMode: StorageMode) => {
       })
 
       toast.success('IndexedDB Mode Enabled', {
-        description: 'Please reload the page to apply changes.'
+        description: 'IndexedDB is now the active storage backend.'
       })
-      showReloadPrompt.value = true
     }
   } catch (error) {
     logger.error('Failed to change storage mode:', error)
     toast.error('Failed to Change Storage Mode', {
-      description: 'An error occurred while changing the storage mode.'
+      description: error instanceof Error ? error.message : 'An error occurred while changing the storage mode.'
     })
   } finally {
     isChanging.value = false
@@ -177,10 +164,6 @@ const handleAutoWatchChange = (value: boolean) => {
 }
 
 // Reload page
-const handleReload = () => {
-  window.location.reload()
-}
-
 // Get storage mode icon
 const getStorageModeIcon = computed(() => {
   return isFilesystemMode.value ? FolderOpen : Database
@@ -188,6 +171,7 @@ const getStorageModeIcon = computed(() => {
 
 // Get storage mode display name
 const getStorageModeDisplayName = computed(() => {
+  if (isMemoryMode.value) return 'Temporary Memory'
   return isFilesystemMode.value ? 'File System' : 'IndexedDB'
 })
 
@@ -227,7 +211,7 @@ defineExpose({ resetToDefaults })
           <Label>Storage Backend</Label>
           <Select 
             :model-value="storageMode" 
-            @update:model-value="(value: StorageMode) => handleStorageModeChange(value)"
+            @update:model-value="handleStorageModeChange"
             :disabled="isChanging"
           >
             <SelectTrigger class="w-full">
@@ -262,6 +246,10 @@ defineExpose({ resetToDefaults })
           <p class="text-sm text-muted-foreground">
             {{ getModeDescription }}
           </p>
+          <div v-if="isMemoryMode" class="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/20 dark:text-amber-300" role="status">
+            <AlertCircle class="mt-0.5 h-4 w-4 flex-shrink-0" />
+            <p>The active backend is temporary memory, not IndexedDB. Select a durable backend before relying on this library.</p>
+          </div>
         </div>
 
         <!-- Filesystem Mode Options -->
@@ -312,23 +300,6 @@ defineExpose({ resetToDefaults })
           </div>
         </div>
 
-        <!-- Reload Prompt -->
-        <div v-if="showReloadPrompt" class="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950/20 rounded-lg">
-          <div class="flex items-start gap-2">
-            <RefreshCw class="w-4 h-4 text-green-600 dark:text-green-400 mt-0.5" />
-            <div class="text-sm text-green-700 dark:text-green-300">
-              <p class="font-medium">Reload Required</p>
-              <p class="text-xs">Please reload the page to apply storage mode changes</p>
-            </div>
-          </div>
-          <Button 
-            size="sm" 
-            variant="default"
-            @click="handleReload"
-          >
-            Reload Now
-          </Button>
-        </div>
       </CardContent>
     </Card>
 
@@ -382,7 +353,7 @@ defineExpose({ resetToDefaults })
             <Label>Log Level</Label>
             <Select 
               :model-value="logLevel" 
-              @update:model-value="(value: LogLevel) => logLevel = value"
+              @update:model-value="handleLogLevelChange"
             >
               <SelectTrigger class="w-full">
                 <SelectValue />

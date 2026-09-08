@@ -1,4 +1,4 @@
-import { markdownParserService, type ParsingResult } from './MarkdownParserService'
+import { markdownParserService } from './MarkdownParserService';
 import { logger } from '@/services/logger'
 
 export interface PasteResult {

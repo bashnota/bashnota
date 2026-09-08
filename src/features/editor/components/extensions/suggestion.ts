@@ -1,7 +1,9 @@
-import { Editor, VueRenderer, type Range } from '@tiptap/vue-3'
+import { Editor, VueRenderer } from '@/features/editor/pm'
+import type { Range } from './suggestionPlugin'
 import { useCitationPicker } from '@/features/editor/composables/useCitationPicker'
 import { useSubNotaDialog } from '@/features/editor/composables/useSubNotaDialog'
-import tippy, { type Instance, type Props } from 'tippy.js'
+import { createLinkedSubNota } from '@/features/nota/services/subNotaService'
+import tippy, { type Props } from 'tippy.js';
 import CommandsList from '@/features/editor/components/blocks/CommandsList.vue'
 import type { CitationEntry } from '@/features/nota/types/nota'
 import 'tippy.js/dist/tippy.css'
@@ -30,14 +32,8 @@ import {
   BookIcon,
   FileText,
 } from 'lucide-vue-next'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import { logger } from '@/services/logger'
-
-declare module '@tiptap/core' {
-  interface EditorEvents {
-    'toggle-ai-sidebar': any
-  }
-}
 
 /**
  * Type definitions for improved type safety
@@ -55,6 +51,7 @@ interface CommandItem {
   icon: any
   keywords: string[]
   description?: string
+  disabled?: boolean
   command: (args: CommandArgs) => void
 }
 
@@ -261,21 +258,32 @@ function highlightElement(selector: string, duration = 2000): void {
 /**
  * Helper function to create a command that sets an editor attribute
  */
-function createSimpleCommand(attribute: string) {
+function runEditorCommand(label: string, command: () => boolean): boolean {
+  try {
+    const succeeded = command()
+    if (succeeded) return true
+  } catch (error) {
+    logger.error(`Failed to run ${label} command:`, error)
+  }
+
+  toast({
+    title: `Couldn't insert ${label}`,
+    description: 'The editor could not apply that command at the current selection.',
+    variant: 'destructive',
+  })
+  return false
+}
+
+function createSimpleCommand(label: string, apply: (chain: any) => { run: () => boolean }) {
   return ({ editor, range }: CommandArgs) => {
-    // Using dynamic method access in a type-safe way
-    const chain = editor.chain().focus().deleteRange(range);
-    const methodName = `set${attribute}` as keyof typeof chain;
-    if (typeof chain[methodName] === 'function') {
-      (chain[methodName] as Function)().run();
-    }
-  };
+    runEditorCommand(label, () => apply(editor.chain().focus().deleteRange(range)).run())
+  }
 }
 
 /**
  * Helper function to safely execute editor commands with proper error handling
  */
-function safeExecuteCommand(callback: Function) {
+function safeExecuteCommand(callback: (...args: any[]) => any) {
   return (...args: any[]) => {
     try {
       return callback(...args);
@@ -327,7 +335,7 @@ function createBasicCommands(): CommandItem[] {
       icon: TextIcon,
       keywords: ['text', 'paragraph', 'p'],
       description: 'Regular paragraph text',
-      command: createSimpleCommand('Paragraph'),
+      command: createSimpleCommand('Text', chain => chain.setParagraph()),
     },
     {
       title: 'Heading 1',
@@ -335,9 +343,7 @@ function createBasicCommands(): CommandItem[] {
       icon: Heading1,
       keywords: ['h1', 'heading', 'title', 'large'],
       description: 'Large heading for document titles',
-      command: ({ editor, range }: CommandArgs) => {
-        editor.chain().focus().deleteRange(range).setHeading({ level: 1 }).run();
-      },
+      command: createSimpleCommand('Heading 1', chain => chain.setHeading({ level: 1 })),
     },
     {
       title: 'Heading 2',
@@ -345,9 +351,7 @@ function createBasicCommands(): CommandItem[] {
       icon: Heading2,
       keywords: ['h2', 'heading', 'subtitle'],
       description: 'Medium heading for sections',
-      command: ({ editor, range }: CommandArgs) => {
-        editor.chain().focus().deleteRange(range).setHeading({ level: 2 }).run();
-      },
+      command: createSimpleCommand('Heading 2', chain => chain.setHeading({ level: 2 })),
     },
     {
       title: 'Heading 3',
@@ -355,9 +359,7 @@ function createBasicCommands(): CommandItem[] {
       icon: Heading3,
       keywords: ['h3', 'heading', 'subsection'],
       description: 'Small heading for subsections',
-      command: ({ editor, range }: CommandArgs) => {
-        editor.chain().focus().deleteRange(range).setHeading({ level: 3 }).run();
-      },
+      command: createSimpleCommand('Heading 3', chain => chain.setHeading({ level: 3 })),
     },
     {
       title: 'Bullet List',
@@ -365,7 +367,7 @@ function createBasicCommands(): CommandItem[] {
       icon: List,
       keywords: ['bullet', 'list', 'unordered', 'ul'],
       description: 'Unordered list with bullet points',
-      command: createSimpleCommand('BulletList'),
+      command: createSimpleCommand('Bullet List', chain => chain.toggleBulletList()),
     },
     {
       title: 'Ordered List',
@@ -373,7 +375,7 @@ function createBasicCommands(): CommandItem[] {
       icon: ListOrdered,
       keywords: ['ordered', 'list', 'numbered', 'ol'],
       description: 'Numbered list for sequential items',
-      command: createSimpleCommand('OrderedList'),
+      command: createSimpleCommand('Ordered List', chain => chain.toggleOrderedList()),
     },
     {
       title: 'Task List',
@@ -381,7 +383,7 @@ function createBasicCommands(): CommandItem[] {
       icon: SquareCheck,
       keywords: ['task', 'list', 'todo', 'checkbox', 'checklist'],
       description: 'Interactive checklist for tasks',
-      command: createSimpleCommand('TaskList'),
+      command: createSimpleCommand('Task List', chain => chain.toggleTaskList()),
     },
     {
       title: 'Code Block',
@@ -389,7 +391,7 @@ function createBasicCommands(): CommandItem[] {
       icon: FileCode,
       keywords: ['code', 'pre', 'codeblock', 'syntax'],
       description: 'Syntax-highlighted code block',
-      command: createSimpleCommand('CodeBlock'),
+      command: createSimpleCommand('Code Block', chain => chain.toggleCodeBlock()),
     },
     {
       title: 'Blockquote',
@@ -397,7 +399,7 @@ function createBasicCommands(): CommandItem[] {
       icon: Quote,
       keywords: ['quote', 'blockquote', 'citation'],
       description: 'Highlighted quote or excerpt',
-      command: createSimpleCommand('Blockquote'),
+      command: createSimpleCommand('Blockquote', chain => chain.toggleBlockquote()),
     },
     {
       title: 'Horizontal Rule',
@@ -405,9 +407,7 @@ function createBasicCommands(): CommandItem[] {
       icon: Minus,
       keywords: ['hr', 'rule', 'line', 'divider', 'separator'],
       description: 'Visual divider line',
-      command: ({ editor, range }: CommandArgs) => {
-        editor.chain().focus().deleteRange(range).setHorizontalRule().run();
-      },
+      command: createSimpleCommand('Horizontal Rule', chain => chain.setHorizontalRule()),
     },
   ];
 }
@@ -583,14 +583,9 @@ function createAdvancedCommands(): CommandItem[] {
       category: 'Diagrams & Visualization',
       icon: ChartPieIcon,
       keywords: ['diagram', 'chart', 'mermaid', 'flow'],
-      description: 'Create flowcharts and diagrams with Mermaid syntax',
-      command: ({ editor, range }: CommandArgs) => {
-        editor
-          .chain()
-          .focus()
-          .deleteRange(range)
-          .run();
-      },
+      description: 'Not available yet',
+      disabled: true,
+      command: () => undefined,
     },
     {
       title: 'Draw.io Diagram',
@@ -656,12 +651,9 @@ function createAdvancedCommands(): CommandItem[] {
       category: 'AI & Automation',
       icon: SparklesIcon,
       keywords: ['ai', 'assistant', 'generate', 'chat'],
-      description: 'Open AI assistant for content generation and help',
-      command: ({ editor, range }: CommandArgs) => {
-        // Emit a custom event to toggle the AI sidebar
-        editor.emit('toggle-ai-sidebar', () => { })
-        editor.chain().focus().deleteRange(range).run()
-      },
+      description: 'Not available yet',
+      disabled: true,
+      command: () => undefined,
     },
 
     // Navigation & Organization
@@ -683,49 +675,18 @@ function createAdvancedCommands(): CommandItem[] {
         // Create popup manager
         const popupManager = new PopupManager();
 
-        // Handle sub nota creation success
-        const handleSuccess = (newNotaId: string, title: string) => {
-          // Hide popup first (will trigger cleanup)
-          popupManager.hide();
-
-          // Wait a tick to ensure cleanup is complete before modifying editor
-          setTimeout(() => {
-            // Insert the sub-nota link using the proper command
-            editor
-              .chain()
-              .focus()
-              .deleteRange(range)
-              .setSubNotaLink({
-                targetNotaId: newNotaId,
-                targetNotaTitle: title,
-                displayText: title,
-                linkStyle: 'inline'
-              })
-              .run();
-
-            // Trigger content save
-            const transaction = editor.state.tr;
-            editor.view.dispatch(transaction);
-
-            // Show success message
-            const parentContext = document.querySelector(`#nota-${parentId}`)
-              ? ` under "${document.querySelector(`#nota-${parentId} .nota-title`)?.textContent?.trim() || ''}"`
-              : '';
-
-            toast(`"${title}" created successfully${parentContext}`);
-
-            // Highlight the newly created link
-            highlightElement(`span[data-target-nota-id="${newNotaId}"]`);
-          }, 20);
-        };
-
         // Use the subnota dialog composable
         const { openSubNotaDialog } = useSubNotaDialog()
 
         if (parentId) {
+          popupManager.hide()
           openSubNotaDialog(
             parentId,
-            handleSuccess,
+            async (title) => {
+              const created = await createLinkedSubNota({ parentId, title, editor, range })
+              highlightElement(`span[data-target-nota-id="${created.id}"]`)
+              return created
+            },
             () => {
               // Cleanup callback - nothing needed since dialog handles itself
             }
@@ -835,6 +796,8 @@ export default {
       onExit: () => {
         popup?.[0].destroy();
         component?.destroy();
+        popup = null;
+        component = null;
       },
     };
   },
@@ -894,10 +857,5 @@ export default {
     },
   },
 }
-
-
-
-
-
 
 

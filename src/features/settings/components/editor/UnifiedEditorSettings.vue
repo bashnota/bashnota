@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue';
 import { Button } from '@/components/ui/button'
 import { RotateCw, Type, FileText, Code2, Settings as SettingsIcon, Eye, Palette, RotateCcw } from 'lucide-vue-next'
 import { useSettings } from '@/composables/useSettings'
-import { toast } from 'vue-sonner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 
@@ -134,42 +133,42 @@ onMounted(() => {
     >
       <!-- Overview Stats -->
       <SettingGroup title="Quick Overview" description="Current editor configuration">
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div class="text-center p-4 bg-muted/50 rounded-lg">
-            <div class="text-2xl font-bold text-primary">{{ settings.fontSize[0] }}px</div>
-            <div class="text-sm text-muted-foreground">Font Size</div>
+        <div class="grid grid-cols-2 gap-2 md:grid-cols-4">
+          <div class="rounded-md border bg-background p-3">
+            <div class="text-lg font-semibold text-foreground">{{ settings.fontSize[0] }}px</div>
+            <div class="mt-1 text-xs uppercase tracking-wide text-muted-foreground">Font size</div>
           </div>
-          <div class="text-center p-4 bg-green-50 dark:bg-green-950 rounded-lg">
-            <div class="text-2xl font-bold text-green-600">{{ settings.lineHeight[0] }}</div>
-            <div class="text-sm text-muted-foreground">Line Height</div>
+          <div class="rounded-md border bg-background p-3">
+            <div class="text-lg font-semibold text-foreground">{{ settings.lineHeight[0] }}</div>
+            <div class="mt-1 text-xs uppercase tracking-wide text-muted-foreground">Line height</div>
           </div>
-          <div class="text-center p-4 bg-blue-50 dark:bg-blue-950 rounded-lg">
-            <div class="text-2xl font-bold text-blue-600">{{ settings.tabSize[0] }}</div>
-            <div class="text-sm text-muted-foreground">Tab Size</div>
+          <div class="rounded-md border bg-background p-3">
+            <div class="text-lg font-semibold text-foreground">{{ settings.tabSize[0] }}</div>
+            <div class="mt-1 text-xs uppercase tracking-wide text-muted-foreground">Tab size</div>
           </div>
-          <div class="text-center p-4 bg-purple-50 dark:bg-purple-950 rounded-lg">
-            <div class="text-2xl font-bold text-purple-600">{{ settings.autoSave ? 'ON' : 'OFF' }}</div>
-            <div class="text-sm text-muted-foreground">Auto Save</div>
+          <div class="rounded-md border bg-background p-3">
+            <div class="text-lg font-semibold text-foreground">{{ settings.autoSave ? 'On' : 'Off' }}</div>
+            <div class="mt-1 text-xs uppercase tracking-wide text-muted-foreground">Autosave</div>
           </div>
         </div>
       </SettingGroup>
     </SettingSection>
 
     <Tabs v-model="activeTab" class="w-full">
-      <TabsList class="grid w-full grid-cols-4">
-        <TabsTrigger value="text-editing">
+      <TabsList class="flex h-auto w-full justify-start overflow-x-auto p-1 sm:grid sm:grid-cols-4">
+        <TabsTrigger value="text-editing" class="h-10 shrink-0 px-3 sm:min-w-0">
           <Type class="mr-2 h-4 w-4" />
           Text Editing
         </TabsTrigger>
-        <TabsTrigger value="code-editing">
+        <TabsTrigger value="code-editing" class="h-10 shrink-0 px-3 sm:min-w-0">
           <Code2 class="mr-2 h-4 w-4" />
           Code Editing
         </TabsTrigger>
-        <TabsTrigger value="formatting">
+        <TabsTrigger value="formatting" class="h-10 shrink-0 px-3 sm:min-w-0">
           <SettingsIcon class="mr-2 h-4 w-4" />
           Formatting
         </TabsTrigger>
-        <TabsTrigger value="appearance">
+        <TabsTrigger value="appearance" class="h-10 shrink-0 px-3 sm:min-w-0">
           <Palette class="mr-2 h-4 w-4" />
           Appearance
         </TabsTrigger>

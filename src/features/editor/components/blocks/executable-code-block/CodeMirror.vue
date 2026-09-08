@@ -10,7 +10,7 @@ import { css } from '@codemirror/lang-css'
 import { json } from '@codemirror/lang-json'
 import { EditorView, lineNumbers } from '@codemirror/view'
 import { indentUnit } from '@codemirror/language'
-import { computed, ref, onMounted, watch, onUnmounted } from 'vue'
+import { computed, ref, shallowRef, onMounted, watch, onUnmounted } from 'vue'
 import { useCodeFormatting } from './composables/features/useCodeFormatting'
 import { Button } from '@/components/ui/button'
 
@@ -40,7 +40,8 @@ const emit = defineEmits<{
 
 const isDark = ref(false)
 const editorElement = ref<HTMLElement | null>(null)
-const editorView = ref<EditorView | null>(null)
+// shallowRef so Vue does not deep-proxy the CodeMirror EditorView instance
+const editorView = shallowRef<EditorView | null>(null)
 
 // Determine colorization extension for known languages
 const languageExtension = computed(() => {
@@ -193,10 +194,12 @@ const extensions = computed(() => {
 
 // Watch for dark mode changes
 const darkModeMediaQuery = ref<MediaQueryList | null>(null)
+// Hold the theme-toggle observer so it can be disconnected on unmount
+let themeObserver: MutationObserver | null = null
 
 onMounted(() => {
   checkDarkMode()
-  
+
   // Listen for system theme changes
   if (typeof window !== 'undefined' && window.matchMedia) {
     darkModeMediaQuery.value = window.matchMedia('(prefers-color-scheme: dark)')
@@ -204,15 +207,15 @@ onMounted(() => {
   }
 
   // Also listen for class changes on documentElement for theme toggles
-  const observer = new MutationObserver(mutations => {
+  themeObserver = new MutationObserver(mutations => {
     mutations.forEach(mutation => {
       if (mutation.attributeName === 'class') {
         checkDarkMode()
       }
     })
   })
-  
-  observer.observe(document.documentElement, { attributes: true })
+
+  themeObserver.observe(document.documentElement, { attributes: true })
 
   // Set initial focus if autofocus is true and not readonly/disabled
   if (props.autofocus && !props.readonly && !props.disabled && editorElement.value) {
@@ -223,10 +226,14 @@ onMounted(() => {
   }
 })
 
-// Clean up event listeners
+// Clean up event listeners and observers
 onUnmounted(() => {
   if (darkModeMediaQuery.value) {
     darkModeMediaQuery.value.removeEventListener('change', checkDarkMode)
+  }
+  if (themeObserver) {
+    themeObserver.disconnect()
+    themeObserver = null
   }
 })
 

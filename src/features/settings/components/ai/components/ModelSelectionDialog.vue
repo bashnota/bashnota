@@ -19,7 +19,7 @@ import {
 import { useAIProviders } from '@/features/ai/components/composables/useAIProviders'
 import { useAISettingsStore } from '@/features/ai/stores/aiSettingsStore'
 import type { GeminiModelInfo, WebLLMModelInfo } from '@/features/ai/services'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 
 interface Props {
   providerId: string

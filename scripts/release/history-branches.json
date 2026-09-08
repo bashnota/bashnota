@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "include": [
+    "refs/heads/master",
+    "refs/remotes/origin/master",
+    "refs/heads/release/*",
+    "refs/remotes/origin/release/*"
+  ],
+  "preserveUnique": [
+    { "ref": "refs/remotes/origin/code-params", "oid": "3cafd2f2c74ebb627c08beac8015b0dfda0b1b8d", "reason": "Reviewed legacy product-development branch retained for authentic feature history." },
+    { "ref": "refs/remotes/origin/js-block", "oid": "f461d2b7edce8196ddc8c322f3cca25d089a61f9", "reason": "Reviewed legacy product-development branch retained for authentic feature history." },
+    { "ref": "refs/remotes/origin/link-ext", "oid": "4ffe01eda18de1e89552d4584ccf8314e72cdefd", "reason": "Reviewed legacy product-development branch retained for authentic feature history." },
+    { "ref": "refs/remotes/origin/pydoide-support", "oid": "a709871eb230c66621a272356fd2983fa2946234", "reason": "Reviewed legacy product-development branch retained for authentic feature history." },
+    { "ref": "refs/remotes/origin/vibe-check", "oid": "aae29e0629b9c26fa7c64d9780cbec217e04cecf", "reason": "Reviewed legacy product-development branch retained for authentic feature history." },
+    { "ref": "refs/remotes/origin/codex/fix-editor-insertion-commands", "oid": "99af6ad0b7ebb206a539cd8438a5c875296d1ba9", "reason": "Reviewed agent-authored product branch retained so automated contribution history is not discarded by namespace." },
+    { "ref": "refs/remotes/origin/codex/fix-html-export-integrity", "oid": "d2b6e0b7f456af7ec6c1c6d6993ea5541ddbda39", "reason": "Reviewed agent-authored product branch retained so automated contribution history is not discarded by namespace." },
+    { "ref": "refs/remotes/origin/codex/fix-jupyter-intent-guidance", "oid": "e5f4fbe1bf2686bc0dd4e73165515ac118c0a441", "reason": "Reviewed agent-authored product branch retained so automated contribution history is not discarded by namespace." },
+    { "ref": "refs/remotes/origin/dacli/022-feature-request-reduce-bundle-size-and-complete-pwa-deployment-support", "oid": "72f59fa56fde80c75aa0528dbd4a805f955f338e", "reason": "Reviewed agent-authored product branch retained so automated contribution history is not discarded by namespace." }
+  ],
+  "excludePinned": [
+    { "ref": "refs/remotes/origin/dacli-record", "oid": "0bf4f01281b7ae4675ad69237865a625ebc2812e", "reason": "Dacli's operational journal contains private orchestration records rather than distributable product source." },
+    { "ref": "refs/remotes/origin/gh-pages", "oid": "1dce3b8f53dba01921e063ac08dfb51a6616be41", "reason": "Generated deployment output is reproducible from source and is excluded from the source-history archive." }
+  ],
+  "exclude": [
+    "refs/remotes/origin/codex/*",
+    "refs/remotes/origin/dacli/*",
+    "refs/remotes/origin/dependabot/*",
+    "refs/remotes/origin/HEAD"
+  ],
+  "policy": "Included release-line and tag refs are bundled only when their tips are ancestors of release HEAD. preserveUnique refs are explicitly reviewed development lines pinned to immutable commit OIDs whose authentic commits remain relevant even outside HEAD. Exact non-source refs may be omitted only through an OID-pinned reviewed exclusion. Pattern-excluded agent and dependency branches must already be merged into HEAD; unique commits block packaging until individually dispositioned. Any other branch is omitted only when fully merged into HEAD; an unclassified branch with unique commits makes packaging fail."
+}

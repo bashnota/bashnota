@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { logger } from '@/services/logger'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import type { ConversationMessage } from './useConversation'
 
 // Define error types for better error handling

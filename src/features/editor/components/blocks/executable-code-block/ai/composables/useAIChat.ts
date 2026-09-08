@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue'
-import { useAIActionsStore } from '@/features/editor/stores/aiActionsStore'
+import { useEditorAIActionsStore } from '@/features/editor/stores/aiActionsStore'
 
 export interface ChatMessage {
   id: string
@@ -21,7 +21,7 @@ export interface ChatThread {
 }
 
 export function useAIChat() {
-  const aiActionsStore = useAIActionsStore()
+  const aiActionsStore = useEditorAIActionsStore()
   
   // State
   const chatThreads = ref<Map<string, ChatThread>>(new Map())

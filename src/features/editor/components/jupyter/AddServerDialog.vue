@@ -67,7 +67,7 @@ const formSchema = toTypedSchema(z.object({
 }))
 
 // Form setup
-const form = useForm({
+const validationForm = useForm({
   validationSchema: formSchema,
   initialValues: {
     name: '',
@@ -80,7 +80,7 @@ const form = useForm({
 
 // Watch for props changes to update form values
 watch(() => props.form, (newForm) => {
-  form.setValues({
+  validationForm.setValues({
     name: newForm.name || '',
     url: newForm.url || '',
     ip: newForm.ip || '',
@@ -90,7 +90,7 @@ watch(() => props.form, (newForm) => {
 }, { immediate: true })
 
 // Methods
-const onSubmit = form.handleSubmit((values) => {
+const onSubmit = validationForm.handleSubmit((values) => {
   const updatedForm: ServerForm = {
     name: values.name,
     url: values.url || '',
@@ -103,11 +103,11 @@ const onSubmit = form.handleSubmit((values) => {
 })
 
 const parseUrl = () => {
-  if (!form.values.url?.trim()) return
+  if (!validationForm.values.url?.trim()) return
   const updatedForm: ServerForm = {
     ...props.form,
-    name: form.values.name || '',
-    url: form.values.url || ''
+    name: validationForm.values.name || '',
+    url: validationForm.values.url || ''
   }
   emit('update:form', updatedForm)
   emit('parse-url')
@@ -115,7 +115,7 @@ const parseUrl = () => {
 
 const cancel = () => {
   emit('update:open', false)
-  form.resetForm()
+  validationForm.resetForm()
 }
 </script>
 
@@ -170,7 +170,7 @@ const cancel = () => {
                     variant="outline" 
                     size="sm"
                     @click="parseUrl" 
-                    :disabled="!form.values.url?.trim() || isParsing"
+                    :disabled="!validationForm.values.url?.trim() || isParsing"
                     class="shrink-0"
                   >
                     <Loader2 v-if="isParsing" class="mr-2 h-4 w-4 animate-spin" />
@@ -244,7 +244,8 @@ const cancel = () => {
                 </div>
               </FormControl>
               <FormDescription>
-                Authentication token if required by your Jupyter server
+                Kept in memory for this tab only. Remote servers require HTTPS; token-authenticated
+                execution also requires a same-origin HTTPS proxy so the token never enters a URL.
               </FormDescription>
               <FormMessage />
             </FormItem>

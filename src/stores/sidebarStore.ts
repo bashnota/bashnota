@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, reactive, watchEffect } from 'vue'
+import { reactive } from 'vue';
 
 // Define sidebar positions
 export type SidebarPosition = 'left' | 'right'

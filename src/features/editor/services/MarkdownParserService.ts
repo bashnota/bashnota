@@ -1,5 +1,4 @@
 import { logger } from '@/services/logger'
-import type { Block } from '@/features/nota/types/blocks'
 
 export interface ParsedBlock {
   type: string

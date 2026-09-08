@@ -54,8 +54,9 @@ import { useAuthStore } from '@/features/auth/stores/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { validateUserTagFormat } from '@/utils/userTagGenerator'
 import { Info, RefreshCcw } from 'lucide-vue-next'
+
+const USER_TAG_PATTERN = /^[a-zA-Z0-9_]{3,30}$/
 
 const authStore = useAuthStore()
 
@@ -117,7 +118,7 @@ const validateFormat = (value: string): boolean => {
   }
 
   // Basic format validation
-  const isValidFormat = validateUserTagFormat(value)
+  const isValidFormat = USER_TAG_PATTERN.test(value)
   
   if (!isValidFormat) {
     validationMessage.value = 'Tag must be 3-30 characters and contain only letters, numbers, and underscores'
@@ -164,17 +165,15 @@ const checkAndUpdateTag = async () => {
   isCheckingAvailability.value = true
   
   try {
-    // Import directly instead of dynamic import to avoid potential issues
-    const { validateUserTag } = await import('@/utils/userTagGenerator')
-    const result = await validateUserTag(tagInput.value)
+    const isAvailable = await authStore.isUserTagAvailable(tagInput.value)
     
     hasBeenValidated.value = true
     
-    if (result.isAvailable) {
+    if (isAvailable) {
       validationMessage.value = 'This tag is available! Click Update to use it.'
       validationStatus.value = 'success'
     } else {
-      validationMessage.value = result.error || 'This tag is not available'
+      validationMessage.value = 'This tag is not available'
       validationStatus.value = 'error'
     }
   } catch (error: any) {
@@ -205,7 +204,6 @@ const updateTag = async () => {
   }
 }
 </script>
-
 
 
 

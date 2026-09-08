@@ -1,36 +1,50 @@
 <script setup lang="ts">
-import { Loader2, AlertTriangle } from 'lucide-vue-next'
+import { computed } from 'vue'
+import { Loader2, AlertTriangle, Clock3, Square } from 'lucide-vue-next'
+import type { ExecutionState } from '@/features/editor/types/codeExecution'
 
 interface Props {
   isExecuting: boolean
   hasError: boolean
   isPublished: boolean
+  executionState?: ExecutionState
+  elapsedMs?: number
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
+
+const state = computed<ExecutionState>(() => props.executionState ?? (props.isExecuting ? 'running' : props.hasError ? 'failed' : 'idle'))
+const label = computed(() => ({
+  idle: '',
+  queued: 'Queued',
+  running: 'Running',
+  interrupting: 'Interrupting',
+  timed_out: 'Timed out',
+  cancelled: 'Cancelled',
+  failed: 'Failed',
+  succeeded: 'Completed',
+})[state.value])
 </script>
 
 <template>
   <div
-    v-if="(isExecuting || hasError) && !isPublished"
+    v-if="state !== 'idle' && state !== 'succeeded' && !isPublished"
     class="flex items-center px-3 py-1.5 bg-muted/20 border-b"
+    role="status"
+    aria-live="polite"
   >
-    <!-- Execution status indicator -->
     <div
-      v-if="isExecuting && !isPublished"
-      class="flex items-center text-xs gap-1 px-2 py-1 rounded-full status-running"
+      class="flex items-center text-xs gap-1 px-2 py-1 rounded-full"
+      :class="state === 'failed' || state === 'timed_out' ? 'status-error' : 'status-running'"
     >
-      <Loader2 class="h-3 w-3 animate-spin" />
-      <span>Running</span>
-    </div>
-    
-    <!-- Error indicator -->
-    <div
-      v-else-if="hasError && !isPublished"
-      class="flex items-center text-xs gap-1 px-2 py-1 rounded-full status-error"
-    >
-      <AlertTriangle class="h-3 w-3" />
-      <span>Error</span>
+      <Clock3 v-if="state === 'queued'" class="h-3 w-3" />
+      <Square v-else-if="state === 'cancelled'" class="h-3 w-3 fill-current" />
+      <AlertTriangle v-else-if="state === 'failed' || state === 'timed_out'" class="h-3 w-3" />
+      <Loader2 v-else class="h-3 w-3 animate-spin" />
+      <span>{{ label }}</span>
+      <span v-if="elapsedMs !== undefined" class="tabular-nums opacity-75">
+        · {{ (elapsedMs / 1000).toFixed(1) }}s
+      </span>
     </div>
   </div>
 </template>

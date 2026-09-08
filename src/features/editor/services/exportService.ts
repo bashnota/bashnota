@@ -1,8 +1,11 @@
 import JSZip from 'jszip'
 import { saveAs } from 'file-saver'
-import { generateHTML } from '@tiptap/html'
 import katex from 'katex'
 import { getEditorExtensions } from '@/features/editor/components/extensions'
+import { Editor } from '@/features/editor/pm'
+import { sanitizeExecutionOutput } from '@/features/editor/utils/sanitizeExecutionOutput'
+import { parseSafeExportImageDataUrl } from './export/exportImageAsset'
+import { finalizeExportHtml, markGeneratedKatex, sanitizeExportSourceHtml } from './export/sanitizeExportHtml'
 import { buildHtmlPage } from './export/templates/defaultTemplate'
 
 // --- Types ---
@@ -27,30 +30,56 @@ interface ExportContext {
     processedIds: Set<string>
     fetchNota?: (id: string) => Promise<NotaExportContent | null>
     imgCounter: number // Global counter for images
+    assetNames: Set<string>
+}
+
+interface ResolvedExportItem {
+    id: string
+    title: string
+    content: any
+    citations?: any[]
+}
+
+export class ExportIntegrityError extends Error {
+    public readonly cause?: unknown
+
+    constructor(public readonly targetNotaId: string, reason: 'missing' | 'unreadable' | 'invalid', cause?: unknown) {
+        const detail = reason === 'missing'
+            ? 'does not exist'
+            : reason === 'invalid'
+                ? 'contains invalid export content'
+                : 'could not be read'
+        super(`Linked nota "${targetNotaId}" ${detail}. The HTML archive was not created.`)
+        this.name = 'ExportIntegrityError'
+        this.cause = cause
+    }
 }
 
 // --- Main Export Function ---
 export const exportNotaToHtml = async (options: NotaExportOptions) => {
     const { title, content, citations, rootNotaId, fetchNota } = options
+    const extensions = getEditorExtensions()
+    const parser = new DOMParser()
+    const rootId = rootNotaId || 'root'
+    const resolvedItems = await resolveExportGraph({
+        root: { id: rootId, title, content, citations },
+        fetchNota,
+        extensions,
+        parser,
+    })
+
     const zip = new JSZip()
     const assetsFolder = zip.folder('assets')
 
     const context: ExportContext = {
         zip,
         assetsFolder,
-        queue: [],
-        processedIds: new Set(),
-        fetchNota,
-        imgCounter: 0
+        queue: [...resolvedItems],
+        processedIds: new Set(resolvedItems.map(item => item.id)),
+        fetchNota: undefined,
+        imgCounter: 0,
+        assetNames: new Set(),
     }
-
-    // Initialize with root
-    const rootId = rootNotaId || 'root'
-    context.queue.push({ id: rootId, title, content, citations })
-    context.processedIds.add(rootId)
-
-    const extensions = getEditorExtensions()
-    const parser = new DOMParser()
 
     // We process the queue using a simple loop.
     while (context.queue.length > 0) {
@@ -59,8 +88,10 @@ export const exportNotaToHtml = async (options: NotaExportOptions) => {
         const relativePathPrefix = isRoot ? '' : '../' // Pages are in pages/ folder, so assets need ../
 
         // 1. Generate Raw HTML
-        const rawHtml = generateHTML(item.content, extensions)
-        const doc = parser.parseFromString(rawHtml, 'text/html')
+        const exportEditor = new Editor({ content: item.content, extensions })
+        const rawHtml = exportEditor.getHTML()
+        exportEditor.destroy()
+        const doc = parser.parseFromString(sanitizeExportSourceHtml(rawHtml), 'text/html')
 
         // 2. Process Content
         await processLinks(doc, isRoot, context)
@@ -72,8 +103,9 @@ export const exportNotaToHtml = async (options: NotaExportOptions) => {
         processInlineLatex(doc)
 
         // 3. Build Final HTML Page
-        const finalHtml = buildHtmlPage(item.title, doc.body.innerHTML)
-        const fileName = isRoot ? 'index.html' : `pages/${item.id}.html`
+        const allowedAssetUrls = new Set(Array.from(context.assetNames, name => `${relativePathPrefix}assets/${name}`))
+        const finalHtml = buildHtmlPage(item.title, finalizeExportHtml(doc.body.innerHTML, { allowedAssetUrls }))
+        const fileName = isRoot ? 'index.html' : `pages/${safePageId(item.id)}.html`
         context.zip.file(fileName, finalHtml)
     }
 
@@ -83,6 +115,74 @@ export const exportNotaToHtml = async (options: NotaExportOptions) => {
 }
 
 // --- Helpers ---
+
+async function resolveExportGraph({
+    root,
+    fetchNota,
+    extensions,
+    parser,
+}: {
+    root: ResolvedExportItem
+    fetchNota?: (id: string) => Promise<NotaExportContent | null>
+    extensions: ReturnType<typeof getEditorExtensions>
+    parser: DOMParser
+}): Promise<ResolvedExportItem[]> {
+    const resolved = new Map<string, ResolvedExportItem>([[root.id, root]])
+    const queue = [root]
+
+    while (queue.length > 0) {
+        const item = queue.shift()!
+        const linkedIds = discoverInternalNotaIds(item.content, extensions, parser)
+
+        for (const targetId of linkedIds) {
+            if (resolved.has(targetId)) continue
+            if (!fetchNota) throw new ExportIntegrityError(targetId, 'unreadable')
+
+            let fetched: NotaExportContent | null
+            try {
+                fetched = await fetchNota(targetId)
+            } catch (error) {
+                throw new ExportIntegrityError(targetId, 'unreadable', error)
+            }
+
+            if (!fetched) throw new ExportIntegrityError(targetId, 'missing')
+            if (!fetched.content || typeof fetched.content !== 'object') {
+                throw new ExportIntegrityError(targetId, 'invalid')
+            }
+
+            const resolvedItem: ResolvedExportItem = { id: targetId, ...fetched }
+            resolved.set(targetId, resolvedItem)
+            queue.push(resolvedItem)
+        }
+    }
+
+    return Array.from(resolved.values())
+}
+
+function discoverInternalNotaIds(
+    content: any,
+    extensions: ReturnType<typeof getEditorExtensions>,
+    parser: DOMParser,
+): Set<string> {
+    const editor = new Editor({ content, extensions })
+    try {
+        const doc = parser.parseFromString(sanitizeExportSourceHtml(editor.getHTML()), 'text/html')
+        const ids = new Set<string>()
+
+        doc.querySelectorAll('span[data-type="sub-nota-link"][data-target-nota-id]').forEach((element) => {
+            const id = element.getAttribute('data-target-nota-id')
+            if (id) ids.add(id)
+        })
+        doc.querySelectorAll('a[href]').forEach((element) => {
+            const match = element.getAttribute('href')?.match(/\/nota\/([a-zA-Z0-9_-]+)/)
+            if (match?.[1]) ids.add(match[1])
+        })
+
+        return ids
+    } finally {
+        editor.destroy()
+    }
+}
 
 async function processLinks(doc: Document, isRoot: boolean, ctx: ExportContext) {
     const relativePathPrefix = isRoot ? '' : '../'
@@ -95,7 +195,7 @@ async function processLinks(doc: Document, isRoot: boolean, ctx: ExportContext) 
         const targetTitle = el.textContent || el.getAttribute('data-target-nota-title') || 'Sub Nota'
 
         if (targetId) {
-            const href = `${relativePathPrefix}${pagesPrefix}${targetId}.html`
+            const href = `${relativePathPrefix}${pagesPrefix}${safePageId(targetId)}.html`
             const a = document.createElement('a')
             a.href = href
             a.textContent = targetTitle
@@ -113,10 +213,14 @@ async function processLinks(doc: Document, isRoot: boolean, ctx: ExportContext) 
         const internalMatch = href?.match(/\/nota\/([a-zA-Z0-9_-]+)/)
         if (internalMatch && internalMatch[1]) {
             const targetId = internalMatch[1]
-            a.setAttribute('href', `${relativePathPrefix}${pagesPrefix}${targetId}.html`)
+            a.setAttribute('href', `${relativePathPrefix}${pagesPrefix}${safePageId(targetId)}.html`)
             await queueNotaIfNeeded(targetId, ctx)
         }
     }
+}
+
+function safePageId(id: string): string {
+    return /^[a-zA-Z0-9_-]+$/.test(id) ? id : `nota-${encodeURIComponent(id).replace(/[^a-zA-Z0-9_-]/g, '_')}`
 }
 
 async function queueNotaIfNeeded(id: string, ctx: ExportContext) {
@@ -137,11 +241,20 @@ function processAssets(doc: Document, relativePrefix: string, ctx: ExportContext
     // Images
     doc.querySelectorAll('img').forEach((img) => {
         const src = img.getAttribute('src')
-        if (src && src.startsWith('data:image')) {
-            const extension = src.split(';')[0].split('/')[1] || 'png'
-            const filename = `image_${ctx.imgCounter++}.${extension}`
-            const base64Data = src.split(',')[1]
-            if (ctx.assetsFolder) ctx.assetsFolder.file(filename, base64Data, { base64: true })
+        if (!src) {
+            img.remove()
+            return
+        }
+        if (src?.startsWith('data:')) {
+            const asset = parseSafeExportImageDataUrl(src)
+            if (!asset) {
+                img.remove()
+                return
+            }
+
+            const filename = `image_${ctx.imgCounter++}.${asset.extension}`
+            if (ctx.assetsFolder) ctx.assetsFolder.file(filename, asset.base64, { base64: true })
+            ctx.assetNames.add(filename)
             img.setAttribute('src', `${relativePrefix}assets/${filename}`)
         }
     })
@@ -155,20 +268,20 @@ function processAssets(doc: Document, relativePrefix: string, ctx: ExportContext
         div.removeAttribute('data-output')
         div.classList.add('output')
 
-        const imgMatch = outputContent.match(/src="(data:image\/[^;]+;base64[^"]+)"/)
-        if (imgMatch && imgMatch[1]) {
-            const src = imgMatch[1]
-            const extension = src.split(';')[0].split('/')[1] || 'png'
-            const filename = `output_${ctx.imgCounter++}.${extension}`
-            const base64Data = src.split(',')[1]
-            if (ctx.assetsFolder) ctx.assetsFolder.file(filename, base64Data, { base64: true })
+        const outputDocument = new DOMParser().parseFromString(outputContent, 'text/html')
+        const outputImage = outputDocument.querySelector('img[src]')
+        const asset = outputImage && parseSafeExportImageDataUrl(outputImage.getAttribute('src') || '')
+        if (asset) {
+            const filename = `output_${ctx.imgCounter++}.${asset.extension}`
+            if (ctx.assetsFolder) ctx.assetsFolder.file(filename, asset.base64, { base64: true })
+            ctx.assetNames.add(filename)
 
             const img = document.createElement('img')
             img.setAttribute('src', `${relativePrefix}assets/${filename}`)
             div.appendChild(img)
         } else {
             if (/<[a-z][\s\S]*>/i.test(outputContent)) {
-                div.innerHTML = outputContent
+                div.innerHTML = sanitizeExecutionOutput(outputContent)
             } else {
                 const pre = document.createElement('pre')
                 pre.textContent = outputContent
@@ -182,7 +295,10 @@ function processCustomBlocks(doc: Document) {
     // Math
     doc.querySelectorAll('div[data-type="math"]').forEach(div => {
         const latex = div.getAttribute('data-latex') || ''
-        try { div.innerHTML = katex.renderToString(latex, { throwOnError: false }) } catch (e) { }
+        try {
+            div.innerHTML = katex.renderToString(latex, { throwOnError: false })
+            markGeneratedKatex(div)
+        } catch { }
     })
 
     // Theorem
@@ -216,7 +332,9 @@ function processCustomBlocks(doc: Document) {
             const proofDiv = document.createElement('div')
             proofDiv.className = 'theorem-proof'
             proofDiv.style.marginTop = '0.5rem'
-            proofDiv.innerHTML = `<strong>Proof:</strong> ${proof}`
+            const label = document.createElement('strong')
+            label.textContent = 'Proof:'
+            proofDiv.append(label, document.createTextNode(` ${proof}`))
             container.appendChild(proofDiv)
         }
 
@@ -247,7 +365,7 @@ function processCustomBlocks(doc: Document) {
                 })
                 table.appendChild(tbody)
                 div.replaceWith(table)
-            } catch (e) { }
+            } catch { }
         }
     })
 
@@ -279,7 +397,7 @@ function processCustomBlocks(doc: Document) {
                     tbody.appendChild(tr)
                 })
                 table.appendChild(tbody); container.appendChild(table)
-            } catch (e) { }
+            } catch { }
         }
         el.replaceWith(container)
     })
@@ -289,7 +407,11 @@ function processCustomBlocks(doc: Document) {
         const title = el.getAttribute('title') || 'Execution Pipeline'
         const div = document.createElement('div')
         div.className = 'pipeline-placeholder'
-        div.innerHTML = `<h3>${title}</h3><p>Pipeline Visualization (Interactive Only)</p>`
+        const heading = document.createElement('h3')
+        heading.textContent = title
+        const message = document.createElement('p')
+        message.textContent = 'Pipeline Visualization (Interactive Only)'
+        div.append(heading, message)
         el.replaceWith(div)
     })
 
@@ -440,8 +562,9 @@ function processInlineLatex(doc: Document) {
                         displayMode: isDisplay
                     })
                     if (isDisplay) span.style.display = 'block'
+                    markGeneratedKatex(span)
                     fragment.appendChild(span)
-                } catch (e) {
+                } catch {
                     fragment.appendChild(document.createTextNode(match[0])) // Fallback to raw text
                 }
 

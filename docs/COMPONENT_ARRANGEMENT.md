@@ -352,7 +352,7 @@ Recommended:
 ```
 Priority services needing tests:
 🔴 HIGH:
-- src/services/firebase.ts               (authentication, database)
+- src/services/cloud/                     (Supabase authentication and database)
 - src/services/aiService.ts              (AI core functionality)
 - src/features/auth/services/auth.ts     (user authentication)
 - src/features/jupyter/services/jupyterService.ts (code execution)

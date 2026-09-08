@@ -17,7 +17,6 @@ import {
   Layers, 
   Link2, 
   Plus, 
-  Trash2, 
   RotateCw, 
   Check, 
   Loader2,
@@ -69,9 +68,6 @@ interface Emits {
   // Session management events
   'session-change': [sessionId: string]
   'create-new-session': []
-  'clear-all-kernels': []
-  'refresh-sessions': []
-  'select-running-kernel': [kernelId: string]
   // Shared session mode event
   'toggle-shared-session-mode': []
 }
@@ -168,18 +164,6 @@ const handleSessionChange = (sessionId: string) => {
 
 const handleCreateNewSession = () => {
   emit('create-new-session')
-}
-
-const handleClearAllKernels = () => {
-  emit('clear-all-kernels')
-}
-
-const handleRefreshSessions = () => {
-  emit('refresh-sessions')
-}
-
-const handleSelectRunningKernel = (kernelId: string) => {
-  emit('select-running-kernel', kernelId)
 }
 
 const handleApply = () => {
@@ -489,20 +473,9 @@ const testServerConnection = (server: any) => {
               <Button
                 variant="outline"
                 size="sm"
-                @click="handleRefreshSessions"
-                :disabled="isExecuting || isSettingUp"
-                class="h-6 px-2 text-xs rounded-r-none border-r-0"
-              >
-                <RotateCw class="h-3 w-3 mr-1" />
-                Refresh
-              </Button>
-              
-              <Button
-                variant="outline"
-                size="sm"
                 @click="handleCreateNewSession"
                 :disabled="!isKernelSelected || isExecuting || isSettingUp"
-                class="h-6 px-2 text-xs rounded-l-none"
+                class="h-6 px-2 text-xs"
               >
                 <Plus class="h-3 w-3 mr-1" />
                 New Session
@@ -541,16 +514,6 @@ const testServerConnection = (server: any) => {
           <div v-if="runningKernels.length > 0" class="space-y-2">
             <div class="flex items-center justify-between">
               <div class="text-xs font-medium text-muted-foreground">Running Kernels</div>
-              <Button
-                variant="destructive"
-                size="sm"
-                @click="handleClearAllKernels"
-                :disabled="isExecuting || isSettingUp"
-                class="h-6 px-2 text-xs"
-              >
-                <Trash2 class="h-3 w-3 mr-1" />
-                Clear All
-              </Button>
             </div>
             
             <div class="max-h-32 overflow-y-auto space-y-1">
@@ -577,14 +540,6 @@ const testServerConnection = (server: any) => {
                   <span class="text-muted-foreground">
                     {{ formatLastActivity(kernel.lastActivity) }}
                   </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    class="h-5 w-5 p-0"
-                    @click="handleSelectRunningKernel(kernel.id)"
-                  >
-                    <Link2 class="h-3 w-3" />
-                  </Button>
                 </div>
               </div>
             </div>

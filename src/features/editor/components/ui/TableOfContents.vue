@@ -4,7 +4,7 @@ import { ListOrdered, Heading1, Heading2, Heading3 } from 'lucide-vue-next'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import type { Editor } from '@tiptap/vue-3'
+import type { Editor } from '@/features/editor/pm'
 
 const props = defineProps<{
   editor?: Editor
@@ -118,7 +118,6 @@ const getHeadingIcon = (level: number) => {
     </ScrollArea>
   </div>
 </template>
-
 
 
 

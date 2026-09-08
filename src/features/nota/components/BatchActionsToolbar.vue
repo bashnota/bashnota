@@ -10,13 +10,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,7 +31,6 @@ import {
   Loader2
 } from 'lucide-vue-next'
 import type { Nota } from '@/features/nota/types/nota'
-import type { BatchActionResult } from '@/features/nota/composables/useNotaBatchActions'
 
 interface Props {
   selectedCount: number

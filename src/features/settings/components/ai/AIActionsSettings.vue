@@ -222,7 +222,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue';
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -264,7 +264,7 @@ import { useAIActionsStore } from '@/features/ai/stores/aiActionsStore'
 import { getIconComponent, getColorClasses } from '@/features/ai/utils/iconResolver'
 import { AVAILABLE_ICONS, AVAILABLE_COLORS } from '@/features/ai/types/aiActions'
 import type { AIAction } from '@/features/ai/types/aiActions'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 
 const aiActionsStore = useAIActionsStore()
 

@@ -73,9 +73,18 @@ describe('Logger', () => {
     })
 
     it('should handle error objects', () => {
-      const error = new Error('test error')
+      const error = new Error('request?token=secret')
       logger.error('Error occurred:', error)
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error occurred:', error)
+      const loggedError = consoleErrorSpy.mock.calls[0][1] as Error
+      expect(loggedError).toBeInstanceOf(Error)
+      expect(loggedError.message).toBe('request?token=[REDACTED]')
+    })
+
+    it('redacts secrets in nested error artifacts', () => {
+      logger.error('failed', { config: { headers: { Authorization: 'Bearer secret' } } })
+      expect(consoleErrorSpy).toHaveBeenCalledWith('failed', {
+        config: { headers: { Authorization: '[REDACTED]' } },
+      })
     })
 
     it('should handle multiple arguments', () => {

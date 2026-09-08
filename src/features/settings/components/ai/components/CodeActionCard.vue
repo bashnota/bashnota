@@ -11,16 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { 
-  MoreHorizontal,
-  Edit,
-  Copy,
-  Trash2,
-  TestTube,
-  Play,
-  Eye,
-  EyeOff
-} from 'lucide-vue-next'
+import { MoreHorizontal, Edit, Copy, Trash2, TestTube, EyeOff } from 'lucide-vue-next';
 import type { CustomAIAction } from '@/features/editor/stores/aiActionsStore'
 
 interface Props {

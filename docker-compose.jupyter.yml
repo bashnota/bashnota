@@ -1,0 +1,30 @@
+services:
+  jupyter:
+    image: quay.io/jupyter/minimal-notebook@sha256:aebcf531fc77f3341568f5e37de7eb392ae48f1ae5ce9bc9cf779bd602548d17
+    ports:
+      - "127.0.0.1:8888:8888"
+    command:
+      - start-notebook.py
+      - --ServerApp.token=
+      - --ServerApp.password=
+      - --ServerApp.allow_origin=${JUPYTER_ALLOWED_ORIGIN:-http://127.0.0.1:5173}
+      - --ServerApp.allow_credentials=True
+      - --ServerApp.disable_check_xsrf=True
+    volumes:
+      - bashnota-jupyter-work:/home/jovyan/work
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8888/api/kernelspecs', timeout=3)"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+volumes:
+  bashnota-jupyter-work:

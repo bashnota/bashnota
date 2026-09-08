@@ -11,16 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { 
-  MoreHorizontal,
-  Edit,
-  Copy,
-  Trash2,
-  ChevronUp,
-  ChevronDown,
-  Eye,
-  EyeOff
-} from 'lucide-vue-next'
+import { MoreHorizontal, Edit, Copy, Trash2, ChevronUp, ChevronDown, EyeOff } from 'lucide-vue-next';
 import { getIconComponent, getColorClasses } from '@/features/ai/utils/iconResolver'
 import type { AIAction } from '@/features/ai/types/aiActions'
 

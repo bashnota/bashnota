@@ -1,10 +1,11 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { aiService } from '@/features/ai/services'
 import type { ProviderConfig as LLMProvider } from '@/features/ai/services'
 import { webLLMDefaultModelService } from '@/features/ai/services/webLLMDefaultModelService'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import { logger } from '@/services/logger'
+import { withoutApiKeys } from '@/utils/credentialPersistence'
 
 export interface AISettings {
   preferredProviderId: string
@@ -41,13 +42,15 @@ export const useAISettingsStore = defineStore('aiSettings', () => {
     webllmDefaultModel: '', // Default WebLLM model to auto-load
     webllmAutoLoad: true, // Auto-load default model on request
     webllmAutoLoadStrategy: 'smallest', // Default to smallest model for better UX
-    autoSelectProvider: true // Default to auto-selecting the best available provider
+    autoSelectProvider: true, // Default to auto-selecting the best available provider
   })
 
   const providers = computed(() => aiService.getProviderConfigs())
-  
-  const preferredProvider = computed<LLMProvider | undefined>(
-    () => (aiService.getProviderConfigs() as LLMProvider[]).find(p => p.id === settings.value.preferredProviderId)
+
+  const preferredProvider = computed<LLMProvider | undefined>(() =>
+    (aiService.getProviderConfigs() as LLMProvider[]).find(
+      (p) => p.id === settings.value.preferredProviderId,
+    ),
   )
 
   const getApiKey = (providerId: string): string => {
@@ -57,15 +60,21 @@ export const useAISettingsStore = defineStore('aiSettings', () => {
   const setApiKey = (providerId: string, apiKey: string) => {
     settings.value.apiKeys = {
       ...settings.value.apiKeys,
-      [providerId]: apiKey
+      [providerId]: apiKey,
     }
     saveSettings()
+    if (apiKey) {
+      toast({
+        title: 'API Key Available',
+        description: `API key for ${providerId} is kept in memory for this tab.`,
+      })
+    }
   }
 
   const setPreferredProvider = (providerId: string) => {
     settings.value.preferredProviderId = providerId
     saveSettings()
-    
+
     // Update the AI service's default provider to match
     try {
       aiService.setDefaultProviderId(providerId)
@@ -77,7 +86,7 @@ export const useAISettingsStore = defineStore('aiSettings', () => {
   const updateSettings = (newSettings: Partial<AISettings>) => {
     settings.value = {
       ...settings.value,
-      ...newSettings
+      ...newSettings,
     }
     saveSettings()
   }
@@ -87,25 +96,29 @@ export const useAISettingsStore = defineStore('aiSettings', () => {
     if (savedSettings) {
       try {
         const parsed = JSON.parse(savedSettings)
+        const { apiKeys: _discardPersistedKeys, ...nonSecretSettings } = parsed
         settings.value = {
           ...settings.value,
-          ...parsed
+          ...nonSecretSettings,
+          apiKeys: {},
         }
+        saveSettings()
       } catch (error) {
         logger.error('Failed to parse saved AI settings', error)
+        localStorage.removeItem('ai-settings')
       }
     }
   }
 
   const saveSettings = () => {
-    localStorage.setItem('ai-settings', JSON.stringify(settings.value))
+    localStorage.setItem('ai-settings', JSON.stringify(withoutApiKeys(settings.value)))
   }
 
   const setWebLLMDefaultModel = (modelId: string) => {
     settings.value.webllmDefaultModel = modelId
     saveSettings()
     logger.info(`WebLLM default model set to: ${modelId}`)
-    
+
     try {
       webLLMDefaultModelService.setUserDefaultModel(modelId)
     } catch (error) {
@@ -117,24 +130,26 @@ export const useAISettingsStore = defineStore('aiSettings', () => {
     settings.value.webllmAutoLoad = enabled
     saveSettings()
     logger.info(`WebLLM auto-load ${enabled ? 'enabled' : 'disabled'}`)
-    
+
     try {
       webLLMDefaultModelService.saveDefaultModelConfig({
-        autoLoadOnRequest: enabled
+        autoLoadOnRequest: enabled,
       })
     } catch (error) {
       logger.error('Failed to update WebLLM auto-load setting:', error)
     }
   }
 
-  const setWebLLMAutoLoadStrategy = (strategy: 'default' | 'smallest' | 'fastest' | 'balanced' | 'none') => {
+  const setWebLLMAutoLoadStrategy = (
+    strategy: 'default' | 'smallest' | 'fastest' | 'balanced' | 'none',
+  ) => {
     settings.value.webllmAutoLoadStrategy = strategy
     saveSettings()
     logger.info(`WebLLM auto-load strategy set to: ${strategy}`)
-    
+
     try {
       webLLMDefaultModelService.saveDefaultModelConfig({
-        autoLoadStrategy: strategy === 'default' ? 'balanced' : strategy as any
+        autoLoadStrategy: strategy === 'default' ? 'balanced' : (strategy as any),
       })
     } catch (error) {
       logger.error('Failed to update WebLLM auto-load strategy:', error)
@@ -145,26 +160,32 @@ export const useAISettingsStore = defineStore('aiSettings', () => {
     currentModel: settings.value.webllmModel,
     defaultModel: settings.value.webllmDefaultModel,
     autoLoad: settings.value.webllmAutoLoad,
-    autoLoadStrategy: settings.value.webllmAutoLoadStrategy
+    autoLoadStrategy: settings.value.webllmAutoLoadStrategy,
   })
 
   const syncWebLLMSettings = async () => {
     try {
       const config = webLLMDefaultModelService.getDefaultModelConfig()
-      
+
       // Sync from WebLLM service to store
-      if (config.userSelectedModel && config.userSelectedModel !== settings.value.webllmDefaultModel) {
+      if (
+        config.userSelectedModel &&
+        config.userSelectedModel !== settings.value.webllmDefaultModel
+      ) {
         settings.value.webllmDefaultModel = config.userSelectedModel
       }
-      
+
       if (config.autoLoadOnRequest !== settings.value.webllmAutoLoad) {
         settings.value.webllmAutoLoad = config.autoLoadOnRequest
       }
-      
-      if (config.autoLoadStrategy && config.autoLoadStrategy !== settings.value.webllmAutoLoadStrategy) {
+
+      if (
+        config.autoLoadStrategy &&
+        config.autoLoadStrategy !== settings.value.webllmAutoLoadStrategy
+      ) {
         settings.value.webllmAutoLoadStrategy = config.autoLoadStrategy as any
       }
-      
+
       saveSettings()
     } catch (error) {
       logger.error('Failed to sync WebLLM settings:', error)
@@ -173,22 +194,6 @@ export const useAISettingsStore = defineStore('aiSettings', () => {
 
   // Load settings on store initialization
   loadSettings()
-
-  // Add a watcher that auto-saves when API keys change
-  watch(settings.value.apiKeys, (newKeys, oldKeys) => {
-    // Only process keys that have changed
-    Object.entries(newKeys).forEach(([providerId, key]) => {
-      if (key !== oldKeys[providerId]) {
-        setApiKey(providerId, key)
-        if (key) {
-          toast({
-            title: 'API Key Saved',
-            description: `API key for ${providerId} has been saved.`,
-          })
-        }
-      }
-    })
-  }, { deep: true })
 
   return {
     settings,
@@ -202,14 +207,6 @@ export const useAISettingsStore = defineStore('aiSettings', () => {
     setWebLLMAutoLoad,
     setWebLLMAutoLoadStrategy,
     getWebLLMSettings,
-    syncWebLLMSettings
+    syncWebLLMSettings,
   }
 })
-
-
-
-
-
-
-
-

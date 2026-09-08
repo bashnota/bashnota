@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { generateCitation, type CitationFormat } from '@/lib/citation'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import { Copy, FileDown, FileCode } from 'lucide-vue-next'
 import type { PublishedNota } from '@/features/nota/types/nota'
 

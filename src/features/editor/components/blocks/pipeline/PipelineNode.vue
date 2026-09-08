@@ -228,45 +228,24 @@
 </template>
 
 <script setup lang="ts">
+import '@vue-flow/core/dist/style.css'
+import '@vue-flow/core/dist/theme-default.css'
+import '@vue-flow/controls/dist/style.css'
+import '@vue-flow/minimap/dist/style.css'
+
 import { ref, computed, reactive, onMounted, onUnmounted, nextTick, watch } from 'vue'
-import { 
-  VueFlow, 
-  ConnectionMode, 
-  MarkerType, 
-  type Node,
-  type Edge
-} from '@vue-flow/core'
-import { 
-  type PipelineNodeData, 
-  type PipelineNode, 
-  type PipelineEdge, 
-  type PipelineSettings, 
-  type PipelineExecutionSummary,
-  type PipelineNodeState,
-  type PipelineError
-} from '@/features/editor/types/pipeline'
-import { NodeViewWrapper } from '@tiptap/vue-3'
+import { VueFlow, ConnectionMode, MarkerType, type Node } from '@vue-flow/core';
+import { type PipelineNode, type PipelineEdge, type PipelineSettings, type PipelineExecutionSummary, type PipelineError } from '@/features/editor/types/pipeline';
+import { NodeViewWrapper } from '@/features/editor/pm'
 import { Background } from '@vue-flow/background'
 import { MiniMap } from '@vue-flow/minimap'
 import { Controls } from '@vue-flow/controls'
-import { 
-  Plus as PlusIcon,
-  Loader as LoaderIcon,
-  MousePointerClick as MousePointerClickIcon,
-  Navigation as NavigationIcon,
-  Edit as EditIcon,
-  Play as PlayIcon,
-  Copy as CopyIcon,
-  Trash2 as DeleteIcon,
-  Eye as ViewIcon,
-  Layout as LayoutIcon,
-  Settings as SettingsIcon,
-  Square as StopIcon
-} from 'lucide-vue-next'
+import { Plus as PlusIcon, MousePointerClick as MousePointerClickIcon, Navigation as NavigationIcon, Edit as EditIcon, Play as PlayIcon, Copy as CopyIcon, Trash2 as DeleteIcon, Eye as ViewIcon, Layout as LayoutIcon, Settings as SettingsIcon, Square as StopIcon } from 'lucide-vue-next';
 import { useRouter } from 'vue-router'
 import { useCodeExecutionStore } from '@/features/editor/stores/codeExecutionStore'
 import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
 import { useJupyterServers } from '@/features/jupyter/composables/useJupyterServers'
+import { logger } from '@/services/logger'
 
 // Import composables
 import { usePipelineFlow } from './composables/usePipelineFlow'
@@ -284,7 +263,7 @@ import PipelineNavigationPanel from './components/PipelineNavigationPanel.vue'
 import PipelineCodeNode from './components/PipelineCodeNode.vue'
 import PipelineContextMenu from './components/PipelineContextMenu.vue'
 import PipelineToast, { type PipelineToast as ToastType } from './components/PipelineToast.vue'
-import type { NodeViewProps } from '@tiptap/vue-3'
+import type { NodeViewProps } from '@/features/editor/pm'
 import type { PipelineContextMenuAction } from '../../../types/pipeline'
 
 const props = defineProps<NodeViewProps & {
@@ -377,7 +356,7 @@ const addPipelineError = (error: Omit<PipelineError, 'timestamp'>) => {
     })
   }
   
-  console.error('Pipeline Error:', pipelineError)
+  logger.error('Pipeline Error:', pipelineError)
 }
 
 const clearPipelineErrors = (nodeId?: string) => {
@@ -459,7 +438,7 @@ const getNodeContextActions = (nodeId: string): PipelineContextMenuAction[] => {
       action: () => {
         if (isRunning) {
           // TODO: Implement node-specific cancellation
-          console.log('Node-specific cancellation not yet implemented')
+          logger.log('Node-specific cancellation not yet implemented')
         } else {
           flowState.selectedNodeId = nodeId
           handleRunNode()
@@ -473,7 +452,7 @@ const getNodeContextActions = (nodeId: string): PipelineContextMenuAction[] => {
       disabled: !node.data?.output,
       action: () => {
         // TODO: Implement output viewer
-        console.log('Output viewer not yet implemented')
+        logger.log('Output viewer not yet implemented')
       }
     },
     {
@@ -760,7 +739,7 @@ const visibleNodesCount = computed(() => getVisibleNodesCount())
 // Connection tracking helpers
 const logConnectionInfo = (nodeId: string) => {
   const info = getNodeConnectionInfo(nodeId)
-  console.log(`Node ${nodeId} connection info:`, {
+  logger.log(`Node ${nodeId} connection info:`, {
     inputs: info.inputs.length,
     outputs: info.outputs.length,
     hasMultipleOutputs: info.hasMultipleOutputs,
@@ -805,7 +784,7 @@ const handleToggleFullscreen = () => {
       if (containerRef.value) {
         toggleFullscreen()
       } else {
-        console.warn('Container ref not available for fullscreen')
+        logger.warn('Container ref not available for fullscreen')
       }
     })
   } else {
@@ -875,7 +854,7 @@ const handleDeleteCodeBlock = () => {
 }
 
 const handleResetAllOutputs = () => {
-  console.log('Resetting outputs for all pipeline nodes')
+  logger.log('Resetting outputs for all pipeline nodes')
   
   // Reset output and status for all nodes
   flowState.nodes.forEach(node => {
@@ -900,7 +879,7 @@ const handleResetAllOutputs = () => {
   // Save changes
   saveToAttributes()
   
-  console.log(`Reset outputs for ${flowState.nodes.length} nodes`)
+  logger.log(`Reset outputs for ${flowState.nodes.length} nodes`)
 }
 
 const handleRunNode = async () => {
@@ -909,12 +888,12 @@ const handleRunNode = async () => {
   // Ensure server availability
   const serversAvailable = await ensureServerAvailability()
   if (!serversAvailable) {
-    console.error('Cannot execute node: No Jupyter servers available')
+    logger.error('Cannot execute node: No Jupyter servers available')
     return
   }
   
   const node = selectedNode.value
-  console.log(`Executing single node ${node.id}: ${node.data.title || 'Untitled'}`)
+  logger.log(`Executing single node ${node.id}: ${node.data.title || 'Untitled'}`)
   
   // Ensure reactive updates
   Object.assign(node.data, { status: 'running' })
@@ -928,7 +907,7 @@ const handleRunNode = async () => {
       status: 'completed',
       executionTime: Date.now() - startTime
     })
-            console.log(`Node ${node.id} completed successfully in ${node.data.executionTime}ms`)
+            logger.log(`Node ${node.id} completed successfully in ${node.data.executionTime}ms`)
         
         // Show success toast
         showToast({
@@ -973,7 +952,7 @@ const handleApplyKernelSettings = () => {
 const ensureServerAvailability = async (): Promise<boolean> => {
   // Check if we have any configured servers
   if (!jupyterStore.jupyterServers || jupyterStore.jupyterServers.length === 0) {
-    console.error('No Jupyter servers configured for pipeline execution')
+    logger.error('No Jupyter servers configured for pipeline execution')
     return false
   }
 
@@ -986,7 +965,7 @@ const ensureServerAvailability = async (): Promise<boolean> => {
       await codeExecutionStore.ensureSharedSession()
       return true
     } catch (error) {
-      console.error('Failed to setup shared session:', error)
+      logger.error('Failed to setup shared session:', error)
       return false
     }
   }
@@ -994,7 +973,7 @@ const ensureServerAvailability = async (): Promise<boolean> => {
   // For other modes, check if we have at least one working server
   const serverResult = await jupyterStore.getFirstAvailableServer()
   if (!serverResult) {
-    console.error('No available Jupyter servers with kernels found')
+    logger.error('No available Jupyter servers with kernels found')
     return false
   }
 
@@ -1007,7 +986,7 @@ const handleExecutePipeline = async () => {
   // Ensure server availability before starting
   const serversAvailable = await ensureServerAvailability()
   if (!serversAvailable) {
-    console.error('Cannot execute pipeline: No Jupyter servers available')
+    logger.error('Cannot execute pipeline: No Jupyter servers available')
     // TODO: Show user-friendly error message or server setup dialog
     return
   }
@@ -1034,19 +1013,19 @@ const handleExecutePipeline = async () => {
     executionSummary.total = allNodes.length
     
     // Debug logging
-    console.log('=== PIPELINE EXECUTION ANALYSIS ===')
-    console.log(`Total nodes in pipeline: ${allNodes.length}`)
-    console.log(`Nodes with code: ${nodesWithCode.length}`)
-    console.log(`Empty nodes: ${emptyNodes.length}`)
+    logger.log('=== PIPELINE EXECUTION ANALYSIS ===')
+    logger.log(`Total nodes in pipeline: ${allNodes.length}`)
+    logger.log(`Nodes with code: ${nodesWithCode.length}`)
+    logger.log(`Empty nodes: ${emptyNodes.length}`)
     
-    console.log('\nNodes with code:')
+    logger.log('\nNodes with code:')
     nodesWithCode.forEach(n => {
-      console.log(`  - ${n.id}: "${n.data?.title || 'Untitled'}" (${n.data?.code?.length || 0} chars)`)
+      logger.log(`  - ${n.id}: "${n.data?.title || 'Untitled'}" (${n.data?.code?.length || 0} chars)`)
     })
     
-    console.log('\nEmpty nodes:')
+    logger.log('\nEmpty nodes:')
     emptyNodes.forEach(n => {
-      console.log(`  - ${n.id}: "${n.data?.title || 'Untitled'}" (empty)`)
+      logger.log(`  - ${n.id}: "${n.data?.title || 'Untitled'}" (empty)`)
     })
     
     // Execute based on the chosen execution order
@@ -1057,14 +1036,14 @@ const handleExecutePipeline = async () => {
     }
     
     const executionTime = Date.now() - (executionStartTime.value || 0)
-    console.log('\n=== PIPELINE EXECUTION SUMMARY ===')
-    console.log(`Execution mode: ${pipelineSettings.executionOrder}`)
-    console.log(`Total nodes in pipeline: ${flowState.nodes.length}`)
-    console.log(`Nodes executed: ${executionSummary.executed}`)
-    console.log(`Nodes skipped: ${executionSummary.skipped}`)
-    console.log(`Errors: ${executionSummary.errors}`)
-    console.log(`Total execution time: ${executionTime}ms`)
-    console.log(`Success rate: ${executionSummary.executed}/${nodesWithCode.length} executable nodes`)
+    logger.log('\n=== PIPELINE EXECUTION SUMMARY ===')
+    logger.log(`Execution mode: ${pipelineSettings.executionOrder}`)
+    logger.log(`Total nodes in pipeline: ${flowState.nodes.length}`)
+    logger.log(`Nodes executed: ${executionSummary.executed}`)
+    logger.log(`Nodes skipped: ${executionSummary.skipped}`)
+    logger.log(`Errors: ${executionSummary.errors}`)
+    logger.log(`Total execution time: ${executionTime}ms`)
+    logger.log(`Success rate: ${executionSummary.executed}/${nodesWithCode.length} executable nodes`)
     
     // Show completion toast
     if (executionSummary.errors === 0) {
@@ -1094,7 +1073,7 @@ const handleExecutePipeline = async () => {
     }
     
   } catch (error) {
-    console.error('❌ Pipeline execution failed:', error)
+    logger.error('❌ Pipeline execution failed:', error)
   } finally {
     isExecuting.value = false
     currentExecutingNode.value = null
@@ -1105,8 +1084,8 @@ const handleExecutePipeline = async () => {
 // Sequential execution (original behavior for sequential and topological modes)
 const executeSequential = async (nodesWithCode: any[], emptyNodes: any[]) => {
   const order = getExecutionOrder()
-  console.log(`\nExecution order (${pipelineSettings.executionOrder}): ${order.length} nodes`)
-  console.log('Order:', order)
+  logger.log(`\nExecution order (${pipelineSettings.executionOrder}): ${order.length} nodes`)
+  logger.log('Order:', order)
   
   let processedNodes = 0
   
@@ -1115,21 +1094,21 @@ const executeSequential = async (nodesWithCode: any[], emptyNodes: any[]) => {
     
     const node = flowState.nodes.find(n => n.id === nodeId)
     if (!node) {
-      console.warn(`❌ Node ${nodeId} not found in flowState.nodes`)
+      logger.warn(`❌ Node ${nodeId} not found in flowState.nodes`)
       continue
     }
     
     processedNodes++
     const hasCode = node.data?.code && node.data.code.trim().length > 0
     
-    console.log(`\n[${processedNodes}/${order.length}] Processing node ${nodeId}:`)
-    console.log(`  Title: "${node.data?.title || 'Untitled'}"`)
-    console.log(`  Has code: ${hasCode}`)
-    console.log(`  Code length: ${node.data?.code?.length || 0} chars`)
+    logger.log(`\n[${processedNodes}/${order.length}] Processing node ${nodeId}:`)
+    logger.log(`  Title: "${node.data?.title || 'Untitled'}"`)
+    logger.log(`  Has code: ${hasCode}`)
+    logger.log(`  Code length: ${node.data?.code?.length || 0} chars`)
     
     if (hasCode) {
       currentExecutingNode.value = nodeId
-      console.log(`  ✅ EXECUTING: ${node.data.title || nodeId}`)
+      logger.log(`  ✅ EXECUTING: ${node.data.title || nodeId}`)
       // Ensure reactive updates
       Object.assign(node.data, { status: 'running' })
       updateNodeState(nodeId, { isExecuting: true })
@@ -1144,7 +1123,7 @@ const executeSequential = async (nodesWithCode: any[], emptyNodes: any[]) => {
         })
         executedNodes.value++
         executionSummary.executed++
-        console.log(`  ✅ COMPLETED: ${node.data.title || nodeId} in ${node.data.executionTime}ms`)
+        logger.log(`  ✅ COMPLETED: ${node.data.title || nodeId} in ${node.data.executionTime}ms`)
       } catch (error) {
         // Ensure reactive updates
         Object.assign(node.data, { status: 'error' })
@@ -1158,9 +1137,9 @@ const executeSequential = async (nodesWithCode: any[], emptyNodes: any[]) => {
           type: 'execution'
         })
         
-        console.error(`  ❌ ERROR: ${node.data.title || nodeId}:`, error)
+        logger.error(`  ❌ ERROR: ${node.data.title || nodeId}:`, error)
         if (pipelineSettings.stopOnError) {
-          console.log('  🛑 Pipeline execution stopped due to error (stopOnError is enabled)')
+          logger.log('  🛑 Pipeline execution stopped due to error (stopOnError is enabled)')
           break
         }
       } finally {
@@ -1168,7 +1147,7 @@ const executeSequential = async (nodesWithCode: any[], emptyNodes: any[]) => {
       }
     } else {
       executionSummary.skipped++
-      console.log(`  ⏭️  SKIPPED: ${node.data.title || nodeId} (no code)`)
+      logger.log(`  ⏭️  SKIPPED: ${node.data.title || nodeId} (no code)`)
       // Set status to indicate it was processed but skipped (ensure reactive updates)
       Object.assign(node.data, { status: 'idle' })
     }
@@ -1177,7 +1156,7 @@ const executeSequential = async (nodesWithCode: any[], emptyNodes: any[]) => {
 
 // Parallel execution with dependency management
 const executeParallelWithDependencies = async (nodesWithCode: any[], emptyNodes: any[]) => {
-  console.log('\n🚀 Starting parallel execution with dependency management...')
+  logger.log('\n🚀 Starting parallel execution with dependency management...')
   
   // Build dependency graph
   const dependencies = new Map<string, Set<string>>() // node -> dependencies
@@ -1206,11 +1185,11 @@ const executeParallelWithDependencies = async (nodesWithCode: any[], emptyNodes:
     dependents.get(edge.source)?.add(edge.target)
   })
   
-  console.log('Dependency analysis:')
+  logger.log('Dependency analysis:')
   dependencies.forEach((deps, nodeId) => {
     const node = flowState.nodes.find(n => n.id === nodeId)
     if (deps.size > 0) {
-      console.log(`  ${node?.data?.title || nodeId} depends on: [${Array.from(deps).map(id => {
+      logger.log(`  ${node?.data?.title || nodeId} depends on: [${Array.from(deps).map(id => {
         const depNode = flowState.nodes.find(n => n.id === id)
         return depNode?.data?.title || id
       }).join(', ')}]`)
@@ -1251,14 +1230,14 @@ const executeParallelWithDependencies = async (nodesWithCode: any[], emptyNodes:
     const hasCode = node.data?.code && node.data.code.trim().length > 0
     
     if (!hasCode) {
-      console.log(`⏭️  SKIPPING: ${node.data?.title || nodeId} (no code)`)
+      logger.log(`⏭️  SKIPPING: ${node.data?.title || nodeId} (no code)`)
       nodeStatus.set(nodeId, 'skipped')
       Object.assign(node.data, { status: 'idle' })
       executionSummary.skipped++
       return
     }
     
-    console.log(`🔄 EXECUTING: ${node.data?.title || nodeId}`)
+    logger.log(`🔄 EXECUTING: ${node.data?.title || nodeId}`)
     nodeStatus.set(nodeId, 'running')
     Object.assign(node.data, { status: 'running' })
     updateNodeState(nodeId, { isExecuting: true })
@@ -1275,7 +1254,7 @@ const executeParallelWithDependencies = async (nodesWithCode: any[], emptyNodes:
       })
       executedNodes.value++
       executionSummary.executed++
-      console.log(`✅ COMPLETED: ${node.data?.title || nodeId} in ${node.data.executionTime}ms`)
+      logger.log(`✅ COMPLETED: ${node.data?.title || nodeId} in ${node.data.executionTime}ms`)
       
     } catch (error) {
       // Error
@@ -1291,7 +1270,7 @@ const executeParallelWithDependencies = async (nodesWithCode: any[], emptyNodes:
         type: 'execution'
       })
       
-      console.error(`❌ ERROR: ${node.data?.title || nodeId}:`, error)
+      logger.error(`❌ ERROR: ${node.data?.title || nodeId}:`, error)
       
       // If stopOnError is enabled, mark all dependent nodes as skipped
       if (pipelineSettings.stopOnError) {
@@ -1314,7 +1293,7 @@ const executeParallelWithDependencies = async (nodesWithCode: any[], emptyNodes:
         markDependentsAsSkipped(nodeId)
         
         if (affectedNodes.size > 0) {
-          console.log(`🛑 Marked ${affectedNodes.size} dependent nodes as skipped due to error`)
+          logger.log(`🛑 Marked ${affectedNodes.size} dependent nodes as skipped due to error`)
         }
       }
       
@@ -1356,11 +1335,11 @@ const executeParallelWithDependencies = async (nodesWithCode: any[], emptyNodes:
   
   // Wait for all remaining tasks to complete
   if (runningTasks.size > 0) {
-    console.log(`⏳ Waiting for ${runningTasks.size} remaining tasks to complete...`)
+    logger.log(`⏳ Waiting for ${runningTasks.size} remaining tasks to complete...`)
     await Promise.all(runningTasks.values())
   }
   
-  console.log('🏁 Parallel execution completed')
+  logger.log('🏁 Parallel execution completed')
 }
 
 const handleCancelExecution = () => {
@@ -1382,7 +1361,7 @@ const handleCancelExecution = () => {
     }
   })
   
-  console.log('🛑 Pipeline execution cancelled by user')
+  logger.log('🛑 Pipeline execution cancelled by user')
 }
 
 // Navigation handlers
@@ -1449,9 +1428,9 @@ const buildTopologicalOrder = (): string[] => {
   const visited = new Set<string>()
   const order: string[] = []
   
-  console.log('\n🔄 Building topological execution order...')
-  console.log(`Available nodes: ${flowState.nodes.length}`)
-  console.log(`Available edges: ${flowState.edges.length}`)
+  logger.log('\n🔄 Building topological execution order...')
+  logger.log(`Available nodes: ${flowState.nodes.length}`)
+  logger.log(`Available edges: ${flowState.edges.length}`)
   
   const visit = (nodeId: string) => {
     if (visited.has(nodeId)) return
@@ -1469,18 +1448,18 @@ const buildTopologicalOrder = (): string[] => {
     !flowState.edges.some(edge => edge.target === node.id)
   )
   
-  console.log(`Root nodes (no dependencies): ${rootNodes.length}`)
+  logger.log(`Root nodes (no dependencies): ${rootNodes.length}`)
   rootNodes.forEach(node => visit(node.id))
   
   // Handle disconnected nodes (nodes not part of the main graph)
   flowState.nodes.forEach(node => {
     if (!visited.has(node.id)) {
-      console.log(`Adding disconnected node: ${node.id}`)
+      logger.log(`Adding disconnected node: ${node.id}`)
       visit(node.id)
     }
   })
   
-  console.log(`Final execution order: [${order.join(' → ')}]`)
+  logger.log(`Final execution order: [${order.join(' → ')}]`)
   return order
 }
 
@@ -1515,7 +1494,7 @@ const executeCodeBlock = async (node: Node) => {
     serverConfig = session.serverConfig
     kernelName = session.kernelName || pipelineSettings.sharedKernelName || ''
     
-    console.log(`Shared mode setup for node ${nodeId}:`, {
+    logger.log(`Shared mode setup for node ${nodeId}:`, {
       sessionId,
       kernelName,
       sessionKernelName: session.kernelName,
@@ -1552,9 +1531,9 @@ const executeCodeBlock = async (node: Node) => {
       }
           } else {
         // Find a suitable server and kernel
-        console.log('Finding available server and kernel for isolated mode...')
+        logger.log('Finding available server and kernel for isolated mode...')
         const serverResult = await jupyterStore.getFirstAvailableServer()
-        console.log('Server result:', serverResult)
+        logger.log('Server result:', serverResult)
         
         if (!serverResult) {
           throw new Error('No available Jupyter servers with kernels found')
@@ -1567,14 +1546,14 @@ const executeCodeBlock = async (node: Node) => {
         serverConfig = serverResult.server
         kernelName = serverResult.kernel.name
         
-        console.log('Selected kernel for isolated mode:', {
+        logger.log('Selected kernel for isolated mode:', {
           serverConfig: `${serverConfig.ip}:${serverConfig.port}`,
           kernelName,
           kernelSpec: serverResult.kernel
         })
       }
     
-    console.log(`Isolated mode setup for node ${nodeId}:`, {
+    logger.log(`Isolated mode setup for node ${nodeId}:`, {
       sessionId,
       kernelName,
       serverConfig: `${serverConfig.ip}:${serverConfig.port}`
@@ -1609,7 +1588,7 @@ const executeCodeBlock = async (node: Node) => {
       kernelName = session.kernelName
     }
     
-    console.log(`Mixed mode setup for node ${nodeId}:`, {
+    logger.log(`Mixed mode setup for node ${nodeId}:`, {
       sessionId,
       kernelName,
       hasNodeSession: node.data.sessionId && codeExecutionStore.kernelSessions.has(node.data.sessionId),
@@ -1625,7 +1604,7 @@ const executeCodeBlock = async (node: Node) => {
   // Create a cell for execution
   const cellId = `pipeline-${nodeId}-${Date.now()}`
   
-  console.log(`Adding cell for execution:`, {
+  logger.log(`Adding cell for execution:`, {
     cellId,
     sessionId,
     kernelName,
@@ -1802,11 +1781,11 @@ watch(() => flowState.edges.length, (newLength, oldLength) => {
   
   // Log connection tracking info when edges change
   if (newLength > oldLength) {
-    console.log('New connection made! Current connection tracking:')
+    logger.log('New connection made! Current connection tracking:')
     flowState.nodes.forEach(node => {
       const info = getNodeConnectionInfo(node.id)
       if (info.outputs.length > 0 || info.inputs.length > 0) {
-        console.log(`Node ${node.data?.title || node.id}:`, {
+        logger.log(`Node ${node.data?.title || node.id}:`, {
           inputs: info.inputs.length,
           outputs: info.outputs.length,
           hasMultipleOutputs: info.hasMultipleOutputs,
@@ -1843,11 +1822,11 @@ onMounted(async () => {
         await codeExecutionStore.toggleSharedSessionMode(notaId.value)
       }
     } catch (error) {
-      console.warn('Failed to initialize shared session mode:', error)
+      logger.warn('Failed to initialize shared session mode:', error)
     }
   }
   
-  console.log('Pipeline initialized:', {
+  logger.log('Pipeline initialized:', {
     nodeCount: flowState.nodes.length,
     kernelMode: pipelineSettings.kernelMode,
     availableServers: jupyterStore.jupyterServers.length,

@@ -1,0 +1,21 @@
+BashNota
+Copyright (C) 2025-2026 BashNota contributors
+
+This program is licensed under the GNU Affero General Public License version 3
+only. The complete license text is in LICENSE. Source distributions must retain
+LICENSE, this NOTICE, and the contributor/provenance records under
+docs/provenance/.
+
+The names and aliases visible in the Git history remain the authoritative
+authorship record. docs/provenance/contributors.json reconciles known aliases
+without altering that history and distinguishes human from automated-agent
+work. No trademark rights are granted by the software license.
+
+Third-party npm packages, fonts, icons, and other dependencies retain their own
+copyrights and licenses. Generate the resolved dependency report with:
+
+    npm ci
+    npm run release:licenses
+
+Bundled test fixtures are described in docs/provenance/fixtures.json. They are
+not user submissions and must not be replaced with production or personal data.

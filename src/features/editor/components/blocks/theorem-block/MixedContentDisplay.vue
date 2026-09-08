@@ -6,9 +6,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, watch } from 'vue';
 import { useMathJax } from '@/features/editor/composables/useMathJax'
 import { logger } from '@/services/logger'
+import {
+  sanitizeRenderedTheoremContent,
+  sanitizeTheoremSource,
+} from '@/features/editor/utils/sanitizeTheoremContent'
 
 const props = defineProps<{
   content: string
@@ -16,6 +20,16 @@ const props = defineProps<{
 
 const processedContent = ref<string>('')
 const { renderLatexInline, initMathJax, isMathJaxLoaded } = useMathJax()
+
+const prepareSource = (content: string) => {
+  // The persisted value remains untouched; this is only the transient source
+  // passed to MathJax and, on failure, rendered as the safe fallback.
+  return sanitizeTheoremSource(content)
+    .split('\n\n')
+    .map(paragraph => `<p>${paragraph.trim()}</p>`)
+    .join('')
+    .replace(/\n/g, '<br>')
+}
 
 // Process content to render LaTeX expressions inside dollar signs
 const processContent = async () => {
@@ -30,32 +44,24 @@ const processContent = async () => {
       await initMathJax()
     }
     
-    // Pre-process content to preserve whitespace and add proper line breaks
-    let contentWithBreaks = props.content
-      // Replace newlines with proper paragraph breaks
-      .split('\n\n')
-      .map(paragraph => `<p>${paragraph.trim()}</p>`)
-      .join('')
-      // Replace single newlines with line breaks
-      .replace(/\n/g, '<br>')
+    // Strip untrusted source attributes before it is combined with MathJax's
+    // generated markup. The second sanitization below is still required: a
+    // renderer error or an unexpected renderer result must never bypass v-html.
+    const contentWithBreaks = prepareSource(props.content)
     
     // Convert LaTeX expressions to HTML with MathJax
     const result = renderLatexInline(contentWithBreaks)
-    processedContent.value = result
+    processedContent.value = sanitizeRenderedTheoremContent(result)
   } catch (error) {
     logger.error('Error processing mixed content:', error)
-    // Fallback to plain text if processing fails
-    processedContent.value = props.content
+    // The same post-render boundary covers the renderer-error fallback.
+    processedContent.value = sanitizeRenderedTheoremContent(prepareSource(props.content))
   }
 }
 
 // Watch for changes in content
 watch(() => props.content, processContent, { immediate: true })
 
-// Process content on mount
-onMounted(async () => {
-  await processContent()
-})
 </script>
 
 <style>
@@ -76,10 +82,8 @@ onMounted(async () => {
 .mixed-content-wrapper p:last-child {
   margin-bottom: 0;
 }
+
 </style>
-
-
-
 
 
 

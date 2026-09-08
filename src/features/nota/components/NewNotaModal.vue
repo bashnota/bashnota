@@ -1,22 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch } from 'vue';
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useBlockStore } from '@/features/nota/stores/blockStore'
 import { useRouter } from 'vue-router'
-import { 
-  FileText, 
-  Calculator, 
-  Code, 
-  BookOpen, 
-  Lightbulb,
-  Clipboard,
-  Brain,
-  LineChart,
-  Coffee,
-  Rocket,
-  Search,
-  X
-} from 'lucide-vue-next'
+import { FileText, Lightbulb, Clipboard, Coffee, Search } from 'lucide-vue-next';
 import {
   Dialog,
   DialogScrollContent,
@@ -30,8 +17,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { logger } from '@/services/logger'
-import type { Nota } from '@/features/nota/types/nota'
-import { markdownToTiptap } from '@/lib/markdownToTiptap'
 
 interface NotaTemplate {
   id: string

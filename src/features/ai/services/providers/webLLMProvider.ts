@@ -1,4 +1,4 @@
-import * as webllm from '@mlc-ai/web-llm';
+import type * as WebLLM from '@mlc-ai/web-llm';
 import { logger } from '@/services/logger';
 import { webLLMDefaultModelService } from '../webLLMDefaultModelService';
 import type {
@@ -10,11 +10,22 @@ import type {
   WebLLMProgressCallback,
 } from '@/features/ai/services/types';
 
+// The @mlc-ai/web-llm package is large (multiple MB). Import it dynamically so it
+// is emitted as its own chunk and only fetched at runtime when a user actually
+// uses the WebLLM provider, instead of shipping it in the entry bundle to everyone.
+let webllmModulePromise: Promise<typeof import('@mlc-ai/web-llm')> | null = null;
+function loadWebLLM(): Promise<typeof import('@mlc-ai/web-llm')> {
+  if (!webllmModulePromise) {
+    webllmModulePromise = import('@mlc-ai/web-llm');
+  }
+  return webllmModulePromise;
+}
+
 export class WebLLMProvider implements AIProvider {
   id: string = 'webllm';
   name: string = 'WebLLM (Browser)';
   
-  private engine: webllm.MLCEngine | null = null;
+  private engine: WebLLM.MLCEngine | null = null;
   private currentModel: string | null = null;
   private modelLoadingProgress: number = 0;
   private isModelLoading: boolean = false;
@@ -315,12 +326,13 @@ export class WebLLMProvider implements AIProvider {
 
     try {
       logger.info(`Initializing WebLLM model: ${modelId}`);
-      
-      // Create a new chat instance
+
+      // Create a new chat instance (loads the WebLLM chunk on first use)
+      const webllm = await loadWebLLM();
       this.engine = await webllm.CreateMLCEngine(
         modelId,
-        { 
-          initProgressCallback: (report: webllm.InitProgressReport) => {
+        {
+          initProgressCallback: (report: WebLLM.InitProgressReport) => {
             this.modelLoadingProgress = report.progress;
             logger.info(`WebLLM loading progress: ${Math.round(report.progress * 100)}% - ${report.text}`);
             // Pass the progress report to the callback if it exists
@@ -350,7 +362,8 @@ export class WebLLMProvider implements AIProvider {
   
   async getAvailableModels(): Promise<WebLLMModelInfo[]> {
     try {
-      // Get the list of models from WebLLM
+      // Get the list of models from WebLLM (loads the WebLLM chunk on first use)
+      const webllm = await loadWebLLM();
       const modelRecords = webllm.prebuiltAppConfig.model_list;
       
       // Transform the model records into a more user-friendly format

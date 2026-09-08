@@ -24,7 +24,7 @@
     <!-- 4+ Panes Layout (Grid) -->
     <template v-if="layoutStore.panes.length >= 4">
       <!-- Panes -->
-      <template v-for="(pane, index) in layoutStore.panes" :key="pane.id">
+      <template v-for="pane in layoutStore.panes" :key="pane.id">
         <NotaPane :pane="pane" :ref="setPaneRef" />
       </template>
       
@@ -194,4 +194,4 @@ defineExpose({
   background-color: hsl(var(--primary));
   opacity: 0.8;
 }
-</style> 
+</style>

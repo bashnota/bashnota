@@ -1,21 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { 
-  Brain, 
-  Code2, 
-  Shield, 
-  AlertTriangle, 
-  TestTube,
-  Download,
-  Upload,
-  RefreshCw,
-  Plus,
-  Settings,
-  Zap,
-  Eye
-} from 'lucide-vue-next'
+import { Brain, Code2, Shield, AlertTriangle, Download, Upload, RefreshCw, Plus, Settings, Zap, Eye } from 'lucide-vue-next';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 // Base components
@@ -29,11 +15,11 @@ import CodeActionCard from './components/CodeActionCard.vue'
 import CodeActionDialog from './components/CodeActionDialog.vue'
 
 // Store and types
-import { useAIActionsStore } from '@/features/editor/stores/aiActionsStore'
+import { useEditorAIActionsStore } from '@/features/editor/stores/aiActionsStore'
 import type { CustomAIAction } from '@/features/editor/stores/aiActionsStore'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 
-const aiActionsStore = useAIActionsStore()
+const aiActionsStore = useEditorAIActionsStore()
 
 // Local state
 const activeTab = ref('features')

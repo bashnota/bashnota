@@ -4,46 +4,14 @@ import { useEditorStore } from '@/features/editor/stores/editorStore'
 import { useSharedSession } from '@/features/editor/composables/useSharedSession'
 import { useSidebarManager } from '@/composables/useSidebarManager'
 import { useSubNotaDialog } from '@/features/editor/composables/useSubNotaDialog'
+import { createLinkedSubNota } from '@/features/nota/services/subNotaService'
 import { toggleRenderMathState } from '@/features/editor/components/extensions/MarkdownExtension'
-import { Editor } from '@tiptap/vue-3'
+import type { Editor } from '@/features/editor/pm'
+import { toast } from '@/services/toast'
+import { logger } from '@/services/logger'
 
 // Action Icons
-import {
-  Save,
-  Share2,
-  Download,
-  Star,
-  Clock,
-  Undo,
-  Redo,
-  Bold,
-  Italic,
-  Code,
-  List,
-  ListOrdered,
-  Table,
-  FileCode,
-  Quote,
-  MinusSquare,
-  Pilcrow,
-  Heading1,
-  Heading2,
-  Heading3,
-  Link2,
-  Loader2,
-  PlayCircle,
-  Eye,
-  EyeOff,
-  Menu,
-  BookIcon,
-  ServerIcon,
-  BrainIcon,
-  Tag,
-  Check,
-  FileText,
-  Trash2,
-  Settings
-} from 'lucide-vue-next'
+import { Save, Share2, Download, Star, Clock, Undo, Redo, Bold, Italic, Code, List, ListOrdered, Table, FileCode, Quote, MinusSquare, Pilcrow, Heading1, Heading2, Heading3, Link2, Loader2, PlayCircle, Eye, EyeOff, Menu, BookIcon, ServerIcon, BrainIcon, Tag, FileText, Trash2, Settings } from 'lucide-vue-next';
 
 import {
   Menubar,
@@ -118,22 +86,32 @@ const toggleMathRendering = () => {
   }
 }
 
+const runInsertion = (label: string, command: (activeEditor: Editor) => boolean) => {
+  const activeEditor = editor.value
+  if (!activeEditor) return
+
+  try {
+    if (command(activeEditor)) return
+  } catch (error) {
+    logger.error(`Failed to insert ${label}:`, error)
+  }
+
+  toast({
+    title: `Couldn't insert ${label}`,
+    description: 'Place the cursor in an editable part of the nota and try again.',
+    variant: 'destructive',
+  })
+}
+
 // Sub-Nota Link Handler
 const handleSubNotaLink = () => {
   const parentId = editorStore.activeEditorComponent?.currentNota?.id || ''
   
   openSubNotaDialog(
     parentId,
-    (newNotaId, title) => {
-      // Optional: Add link to editor if active
-      if (editor.value) {
-        editor.value.chain().focus().setSubNotaLink({
-          targetNotaId: newNotaId,
-          targetNotaTitle: title,
-          displayText: title,
-          linkStyle: 'inline'
-        }).run()
-      }
+    async (title) => {
+      if (!editor.value) throw new Error('No active editor found.')
+      return createLinkedSubNota({ parentId, title, editor: editor.value })
     },
     () => {} // No-op for cancel
   )
@@ -169,18 +147,18 @@ onMounted(() => {
           {{ isFavorite ? 'Remove from Favorites' : 'Add to Favorites' }}
         </MenubarItem>
         <MenubarSeparator />
-        <MenubarItem @click="emit('share')">
+        <MenubarItem disabled title="Sharing is not available from this menu yet">
           <Share2 class="w-4 h-4 mr-2" />
-          Share...
+          Share (Unavailable)
         </MenubarItem>
         <MenubarItem @click="emit('export-nota')">
           <Download class="w-4 h-4 mr-2" />
           Export...
         </MenubarItem>
         <MenubarSeparator />
-        <MenubarItem @click="emit('open-config')">
+        <MenubarItem disabled title="Document properties are not available yet">
           <Settings class="w-4 h-4 mr-2" />
-          Properties
+          Properties (Unavailable)
         </MenubarItem>
       </MenubarContent>
     </MenubarMenu>
@@ -224,20 +202,20 @@ onMounted(() => {
     <MenubarMenu>
       <MenubarTrigger>Insert</MenubarTrigger>
       <MenubarContent>
-        <MenubarItem @click="editor?.chain().focus().insertTable().run()" :disabled="!editor">
+        <MenubarItem @click="runInsertion('Table', activeEditor => activeEditor.chain().focus().insertTable().run())" :disabled="!editor">
           <Table class="w-4 h-4 mr-2" />
           Table
         </MenubarItem>
-        <MenubarItem @click="editor?.chain().focus().toggleCodeBlock().run()" :disabled="!editor">
+        <MenubarItem @click="runInsertion('Code Block', activeEditor => activeEditor.chain().focus().toggleCodeBlock().run())" :disabled="!editor">
           <FileCode class="w-4 h-4 mr-2" />
           Code Block
         </MenubarItem>
-        <MenubarItem @click="editor?.chain().focus().toggleBlockquote().run()" :disabled="!editor">
+        <MenubarItem @click="runInsertion('Block Quote', activeEditor => activeEditor.chain().focus().toggleBlockquote().run())" :disabled="!editor">
           <Quote class="w-4 h-4 mr-2" />
           Block Quote
         </MenubarItem>
         <MenubarSeparator />
-        <MenubarItem @click="editor?.chain().focus().setHorizontalRule().run()" :disabled="!editor">
+        <MenubarItem @click="runInsertion('Horizontal Rule', activeEditor => activeEditor.chain().focus().setHorizontalRule().run())" :disabled="!editor">
           <MinusSquare class="w-4 h-4 mr-2" />
           Horizontal Rule
         </MenubarItem>
@@ -358,9 +336,9 @@ onMounted(() => {
     <MenubarMenu>
       <MenubarTrigger>Run</MenubarTrigger>
       <MenubarContent>
-        <MenubarItem @click="emit('run-all')" :disabled="!canRunAll || isExecutingAll">
+        <MenubarItem disabled title="Run all is not available yet">
           <component :is="isExecutingAll ? Loader2 : PlayCircle" class="w-4 h-4 mr-2" :class="{ 'animate-spin': isExecutingAll }" />
-          Run All Cells
+          Run All Cells (Unavailable)
         </MenubarItem>
         
         <MenubarSeparator />

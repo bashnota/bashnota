@@ -1,26 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, nextTick } from 'vue'
-import { 
-  MoreVertical, 
-  Plus, 
-  Trash2,
-  ChevronUp,
-  ChevronDown,
-  ChevronsUpDown,
-  Text,
-  Hash,
-  Calendar,
-  List
-} from 'lucide-vue-next'
+import { MoreVertical, Plus, Trash2, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { COLUMN_TYPES, getColumnTypeIcon } from '@/features/editor/components/blocks/table-block/constants/columnTypes'
 import type { ColumnType } from '@/features/editor/components/blocks/table-block/composables/useTableOperations'
 

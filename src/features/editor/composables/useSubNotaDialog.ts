@@ -3,27 +3,27 @@ import { ref } from 'vue'
 interface SubNotaDialogState {
   isOpen: boolean
   parentId: string | null
-  onSuccess: ((newNotaId: string, title: string) => void) | null
+  onSubmit: ((title: string) => Promise<{ id: string; title: string }>) | null
   onCancel: (() => void) | null
 }
 
 const state = ref<SubNotaDialogState>({
   isOpen: false,
   parentId: null,
-  onSuccess: null,
+  onSubmit: null,
   onCancel: null
 })
 
 export function useSubNotaDialog() {
   const openSubNotaDialog = (
     parentId: string,
-    onSuccess: (newNotaId: string, title: string) => void,
+    onSubmit: (title: string) => Promise<{ id: string; title: string }>,
     onCancel: () => void
   ) => {
     state.value = {
       isOpen: true,
       parentId,
-      onSuccess,
+      onSubmit,
       onCancel
     }
   }
@@ -35,22 +35,28 @@ export function useSubNotaDialog() {
     state.value = {
       isOpen: false,
       parentId: null,
-      onSuccess: null,
+      onSubmit: null,
       onCancel: null
     }
   }
 
-  const handleSuccess = (newNotaId: string, title: string) => {
-    if (state.value.onSuccess) {
-      state.value.onSuccess(newNotaId, title)
+  const submitSubNota = async (title: string) => {
+    const submit = state.value.onSubmit
+    if (!submit) throw new Error('Sub-nota creation is unavailable.')
+    const created = await submit(title)
+    state.value = {
+      isOpen: false,
+      parentId: null,
+      onSubmit: null,
+      onCancel: null,
     }
-    closeSubNotaDialog()
+    return created
   }
 
   return {
     state,
     openSubNotaDialog,
     closeSubNotaDialog,
-    handleSuccess
+    submitSubNota
   }
 }

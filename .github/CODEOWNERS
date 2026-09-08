@@ -1,0 +1,13 @@
+# Repository-wide fallback; GitHub resolves the last matching rule.
+* @mlnomadpy
+
+# Release, legal, security, and supply-chain boundaries.
+/LICENSE @mlnomadpy
+/NOTICE @mlnomadpy
+/SECURITY.md @mlnomadpy
+/docs/provenance/ @mlnomadpy
+/.github/workflows/ @mlnomadpy
+/scripts/release/ @mlnomadpy
+
+# Production backend and schema boundary.
+/supabase/ @mlnomadpy

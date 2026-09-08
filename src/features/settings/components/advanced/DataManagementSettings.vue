@@ -4,9 +4,24 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
-import { Database, Download, Upload, Trash2, AlertTriangle, RotateCw } from 'lucide-vue-next'
-import { toast } from 'vue-sonner'
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Database, Download, Upload, Trash2, AlertTriangle } from 'lucide-vue-next';
+import { toast } from '@/services/toast'
 import { useNotaStore } from '@/features/nota/stores/nota'
+import {
+  deleteAllData,
+  prepareDataDeletion,
+  type DataDeletionPlan,
+  type DataDeletionReport,
+} from '@/services/dataDeletionService'
 
 const notaStore = useNotaStore()
 
@@ -15,13 +30,24 @@ const isExporting = ref(false)
 const isImporting = ref(false)
 const isClearing = ref(false)
 const importFile = ref<File | null>(null)
+const isPreparingDeletion = ref(false)
+const isDeleting = ref(false)
+const deleteDialogOpen = ref(false)
+const deletionPlan = ref<DataDeletionPlan | null>(null)
+const deletionReport = ref<DataDeletionReport | null>(null)
+const confirmationText = ref('')
+const filesystemAuthorized = ref(false)
+const DELETE_CONFIRMATION = 'DELETE ALL DATA'
+
+const deletionConfirmed = computed(() => confirmationText.value === DELETE_CONFIRMATION
+  && (!deletionPlan.value?.filesystem || filesystemAuthorized.value))
 
 // Computed storage size
 const storageSize = computed(() => {
   try {
     // Get localStorage usage estimate
     let totalSize = 0
-    for (let key in localStorage) {
+    for (const key in localStorage) {
       if (localStorage.hasOwnProperty(key)) {
         totalSize += localStorage[key].length + key.length
       }
@@ -29,7 +55,7 @@ const storageSize = computed(() => {
     // Convert to MB
     const sizeInMB = (totalSize / (1024 * 1024)).toFixed(1)
     return `${sizeInMB} MB`
-  } catch (error) {
+  } catch {
     return 'Unknown'
   }
 })
@@ -38,17 +64,13 @@ const storageSize = computed(() => {
 const exportAllData = async () => {
   isExporting.value = true
   try {
-    await notaStore.exportAllNotas()
-    toast({
-      title: 'Export Successful',
-      description: 'All data has been exported successfully',
-      variant: 'default'
+    const archive = await notaStore.exportAllNotas()
+    toast.success('Export successful', {
+      description: `Backed up ${archive.notas.length} notas and their canonical blocks.`,
     })
   } catch (error) {
-    toast({
-      title: 'Export Failed',
-      description: 'Failed to export data. Please try again.',
-      variant: 'destructive'
+    toast.error('Export failed', {
+      description: error instanceof Error ? error.message : 'The backup could not be created.',
     })
   } finally {
     isExporting.value = false
@@ -67,10 +89,8 @@ const handleFileImport = (event: Event) => {
 // Import data
 const importData = async () => {
   if (!importFile.value) {
-    toast({
-      title: 'No File Selected',
-      description: 'Please select a file to import',
-      variant: 'destructive'
+    toast.error('No file selected', {
+      description: 'Select a BashNota JSON backup to restore.',
     })
     return
   }
@@ -79,19 +99,10 @@ const importData = async () => {
   try {
     const text = await importFile.value.text()
     const data = JSON.parse(text)
-    
-    // Validate data structure (basic validation)
-    if (!data.notas || !Array.isArray(data.notas)) {
-      throw new Error('Invalid data format')
-    }
-    
-    // Import the data (this would need to be implemented in the store)
-    // notaStore.importAllNotas(data)
-    
-    toast({
-      title: 'Import Successful',
-      description: `Imported ${data.notas.length} notas successfully`,
-      variant: 'default'
+    const result = await notaStore.importAllNotas(data)
+
+    toast.success('Import successful', {
+      description: `Restored ${result.notaCount} notas and their canonical blocks.`,
     })
     
     // Clear the file input
@@ -100,10 +111,10 @@ const importData = async () => {
     if (fileInput) fileInput.value = ''
     
   } catch (error) {
-    toast({
-      title: 'Import Failed',
-      description: 'Failed to import data. Please check the file format.',
-      variant: 'destructive'
+    toast.error('Import failed', {
+      description: error instanceof Error
+        ? error.message
+        : 'The selected file could not be restored. No data was imported.',
     })
   } finally {
     isImporting.value = false
@@ -131,7 +142,7 @@ const clearCache = () => {
         description: 'Application cache has been cleared',
         variant: 'default'
       })
-    } catch (error) {
+    } catch {
       toast({
         title: 'Clear Failed',
         description: 'Failed to clear cache. Please try again.',
@@ -143,32 +154,74 @@ const clearCache = () => {
   }
 }
 
-// Clear all data
-const clearAllData = () => {
-  if (confirm('⚠️ WARNING: This will delete ALL your data including notas, settings, and cache. This action cannot be undone. Are you sure?')) {
-    if (confirm('This is your final warning. All data will be permanently deleted. Continue?')) {
-      try {
-        // Clear all localStorage
-        localStorage.clear()
-        
-        // Reload the page to reset the application state
-        window.location.reload()
-        
-        toast({
-          title: 'All Data Cleared',
-          description: 'Application has been reset to factory defaults',
-          variant: 'default'
-        })
-      } catch (error) {
-        toast({
-          title: 'Clear Failed',
-          description: 'Failed to clear all data. Please try again.',
-          variant: 'destructive'
-        })
-      }
-    }
+const openDeleteDialog = async () => {
+  isPreparingDeletion.value = true
+  try {
+    deletionPlan.value = await prepareDataDeletion()
+    deletionReport.value = null
+    confirmationText.value = ''
+    filesystemAuthorized.value = false
+    deleteDialogOpen.value = true
+  } catch (error) {
+    toast.error('Could not inspect all storage', {
+      description: error instanceof Error ? error.message : 'Review storage permissions and try again.',
+    })
+  } finally {
+    isPreparingDeletion.value = false
   }
 }
+
+const clearAllData = async () => {
+  if (!deletionPlan.value || !deletionConfirmed.value || isDeleting.value) return
+  isDeleting.value = true
+  try {
+    deletionReport.value = await deleteAllData(deletionPlan.value)
+    if (deletionReport.value.complete) {
+      notaStore.$reset()
+      toast.success('All configured data cleared', {
+        description: 'Every storage authority was cleared and verified. Reload BashNota to start fresh.',
+      })
+    } else {
+      const failures = deletionReport.value.results.filter((result) => result.status === 'failed')
+      toast.error('Some data could not be cleared', {
+        description: failures.map((result) => `${result.label}: ${result.detail}`).join(' '),
+      })
+    }
+  } finally {
+    isDeleting.value = false
+  }
+}
+
+const retryFailedDeletion = async () => {
+  if (isDeleting.value) return
+  isDeleting.value = true
+  try {
+    const refreshedPlan = await prepareDataDeletion()
+    deletionPlan.value = refreshedPlan
+    deletionReport.value = await deleteAllData(refreshedPlan)
+    if (deletionReport.value.complete) {
+      notaStore.$reset()
+      toast.success('All configured data cleared', {
+        description: 'Every storage authority was cleared and verified. Reload BashNota to start fresh.',
+      })
+    } else {
+      toast.error('Some data still could not be cleared', {
+        description: deletionReport.value.results
+          .filter((result) => result.status === 'failed')
+          .map((result) => `${result.label}: ${result.detail}`)
+          .join(' '),
+      })
+    }
+  } catch (error) {
+    toast.error('Retry failed', {
+      description: error instanceof Error ? error.message : 'Storage could not be inspected again.',
+    })
+  } finally {
+    isDeleting.value = false
+  }
+}
+
+const reloadApplication = () => window.location.reload()
 
 // Reset to defaults (no-op for this component)
 const resetToDefaults = () => {
@@ -194,12 +247,12 @@ defineExpose({
           <Download class="h-5 w-5" />
           Export Data
         </CardTitle>
-        <CardDescription>Create a backup of all your notas and settings</CardDescription>
+        <CardDescription>Create a complete backup of your notas</CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
         <div class="space-y-2">
           <p class="text-sm text-muted-foreground">
-            Export all your notas, settings, and user data as a JSON file. This creates a complete backup that can be imported later.
+            Export nota metadata, hierarchy, version history, canonical block order, and every typed block payload as one JSON file.
           </p>
           <Button 
             @click="exportAllData" 
@@ -251,7 +304,7 @@ defineExpose({
             <div class="flex items-start gap-2">
               <AlertTriangle class="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
               <p class="text-xs text-yellow-800 dark:text-yellow-200">
-                Importing data will merge with existing data. Duplicate items may be created.
+                The complete file is validated before anything changes. If restore fails, existing nota metadata and canonical blocks are recovered.
               </p>
             </div>
           </div>
@@ -312,12 +365,13 @@ defineExpose({
             This will permanently delete all your notas, settings, and cached data. This action cannot be undone.
           </p>
           <Button 
-            @click="clearAllData" 
+            @click="openDeleteDialog"
+            :disabled="isPreparingDeletion"
             variant="destructive" 
             class="w-full flex items-center justify-center gap-2"
           >
             <Trash2 class="h-4 w-4" />
-            Delete All Data
+            {{ isPreparingDeletion ? 'Inspecting Storage...' : 'Delete All Data' }}
           </Button>
         </div>
         
@@ -331,5 +385,102 @@ defineExpose({
         </div>
       </CardContent>
     </Card>
+
+    <AlertDialog v-model:open="deleteDialogOpen">
+      <AlertDialogContent class="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-xl overflow-y-auto p-4 sm:p-6">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete all configured BashNota data?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This permanently clears every storage authority listed below. Export a nota backup first if you may need to recover notas; settings and caches are not included in that backup.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <div v-if="deletionPlan" class="min-w-0 space-y-4">
+          <ul class="space-y-2" aria-label="Storage authorities affected">
+            <li
+              v-for="authority in deletionPlan.authorities"
+              :key="authority.id"
+              class="rounded-md border bg-muted/30 p-3 text-sm"
+            >
+              <p class="font-medium">{{ authority.label }}</p>
+              <p class="break-words text-muted-foreground">{{ authority.detail }}</p>
+            </li>
+          </ul>
+
+          <div v-if="deletionPlan.filesystem" class="space-y-3 rounded-md border border-destructive/40 p-3">
+            <p class="text-sm font-medium">
+              Files in “{{ deletionPlan.filesystem.directoryName }}”
+            </p>
+            <p v-if="deletionPlan.filesystem.fileNames.length === 0" class="text-sm text-muted-foreground">
+              No managed nota files were found. Unrelated files will remain untouched.
+            </p>
+            <ul v-else class="max-h-28 overflow-y-auto rounded bg-muted p-2 font-mono text-xs" aria-label="Filesystem files affected">
+              <li v-for="fileName in deletionPlan.filesystem.fileNames" :key="fileName" class="break-all py-0.5">
+                {{ fileName }}
+              </li>
+            </ul>
+            <div class="flex items-start gap-3">
+              <input
+                id="authorize-filesystem-delete"
+                v-model="filesystemAuthorized"
+                type="checkbox"
+                class="mt-0.5 h-4 w-4 shrink-0 rounded border-primary accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+              <Label for="authorize-filesystem-delete" class="text-sm font-normal leading-5">
+                I authorize BashNota to delete exactly these {{ deletionPlan.filesystem.fileNames.length }} managed files from “{{ deletionPlan.filesystem.directoryName }}”.
+              </Label>
+            </div>
+          </div>
+
+          <div v-if="!deletionReport" class="space-y-2">
+            <Label for="delete-all-confirmation">Type <span class="font-mono font-semibold">{{ DELETE_CONFIRMATION }}</span> to continue</Label>
+            <Input
+              id="delete-all-confirmation"
+              v-model="confirmationText"
+              autocomplete="off"
+              :disabled="isDeleting"
+            />
+          </div>
+
+          <div v-else class="space-y-2" role="status" aria-live="polite">
+            <p class="font-medium">
+              {{ deletionReport.complete ? 'Every authority was cleared and verified.' : 'Deletion was only partially completed.' }}
+            </p>
+            <ul class="space-y-2 text-sm">
+              <li v-for="result in deletionReport.results" :key="result.id" class="rounded border p-2">
+                <span :class="result.status === 'cleared' ? 'text-green-700 dark:text-green-400' : 'text-destructive'" class="font-medium">
+                  {{ result.status === 'cleared' ? 'Cleared' : 'Failed' }} — {{ result.label }}
+                </span>
+                <p class="break-words text-muted-foreground">{{ result.detail }}</p>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <AlertDialogFooter class="gap-2 sm:gap-0">
+          <Button v-if="!deletionReport" type="button" variant="outline" :disabled="isDeleting" @click="exportAllData">
+            Export Nota Backup First
+          </Button>
+          <AlertDialogCancel :disabled="isDeleting">
+            {{ deletionReport ? 'Close' : 'Cancel' }}
+          </AlertDialogCancel>
+          <Button
+            v-if="!deletionReport"
+            type="button"
+            variant="destructive"
+            :disabled="!deletionConfirmed || isDeleting"
+            @click="clearAllData"
+          >
+            {{ isDeleting ? 'Deleting...' : 'Permanently Delete All Data' }}
+          </Button>
+          <Button v-else-if="deletionReport.complete" type="button" @click="reloadApplication">
+            Reload BashNota
+          </Button>
+          <Button v-else type="button" variant="destructive" :disabled="isDeleting" @click="retryFailedDeletion">
+            {{ isDeleting ? 'Retrying...' : 'Retry Failed Authorities' }}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
-</template> 
+</template>

@@ -6,9 +6,9 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label'
-import { useCodeTemplates, type CodeTemplate, type TemplateVariable } from './composables/features/useCodeTemplates'
+import { useCodeTemplates, type CodeTemplate } from './composables/features/useCodeTemplates';
 
 const props = defineProps<{
   language: string

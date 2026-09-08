@@ -1,46 +1,40 @@
-import { Node } from '@tiptap/core'
-import { mergeAttributes } from '@tiptap/core'
+/**
+ * PageLink node — ported onto the raw-ProseMirror primitives.
+ *
+ * Like-for-like port of the former `Node.create`. It had NO node view (rendered
+ * purely from `toDOM`), so ProseMirror renders it without a node view. The `convertPublicPageLinks` helper
+ * is preserved verbatim for its existing import sites.
+ */
+import { defineNode } from '@/features/editor/pm'
+import type { NodeDefinition } from '@/features/editor/pm'
+import { isSafeLinkUri } from '@/features/editor/pm/stockExtensions'
 
-export const PageLink = Node.create({
+export const pageLinkNodeDefinition: NodeDefinition = {
   name: 'pageLink',
   group: 'inline',
   inline: true,
   selectable: true,
   atom: true, // Makes it behave as a single unit
-
-  addAttributes() {
-    return {
-      href: {
-        default: null,
-      },
-      title: {
-        default: null,
-      },
+  attrs: {
+    href: { default: null },
+    title: { default: null },
+  },
+  parseDOM: [{ tag: 'a[data-type="page-link"]' }],
+  toDOM: (node) => {
+    const a = node.attrs
+    const attrs: Record<string, unknown> = {
+      'data-type': 'page-link',
+      class: 'nota-link',
     }
+    if (isSafeLinkUri(a.href)) attrs.href = a.href
+    if (a.title != null) attrs.title = a.title
+    return ['a', attrs, `📄 ${a.title}`]
   },
+}
 
-  parseHTML() {
-    return [
-      {
-        tag: 'a[data-type="page-link"]',
-      },
-    ]
-  },
+export const pageLinkDefinition = defineNode(pageLinkNodeDefinition)
 
-  renderHTML({ HTMLAttributes }) {
-    return [
-      'a',
-      mergeAttributes(
-        {
-          'data-type': 'page-link',
-          class: 'nota-link',
-        },
-        HTMLAttributes,
-      ),
-      `📄 ${HTMLAttributes.title}`,
-    ]
-  },
-})
+export const PageLink = pageLinkDefinition
 
 // Helper function to convert page link URLs from /nota/ to /p/ for published content
 export function convertPublicPageLinks(doc: Document) {
@@ -51,13 +45,13 @@ export function convertPublicPageLinks(doc: Document) {
   // Get all page links in the document
   const pageLinks = doc.querySelectorAll('a[data-type="page-link"]')
   console.log('Found page links:', pageLinks.length)
-  
+
   // Get the current URL path to determine if we're using a user tag format
   const currentPath = window.location.pathname
   console.log('Current path:', currentPath)
-  
+
   const isUserTagFormat = currentPath.startsWith('/@')
-  
+
   // Extract user tag if present (format: /@username/notaId)
   let userTag = ''
   if (isUserTagFormat) {
@@ -72,7 +66,7 @@ export function convertPublicPageLinks(doc: Document) {
   pageLinks.forEach((link: HTMLAnchorElement) => {
     const href = link.getAttribute('href')
     console.log('Processing link with href:', href)
-    
+
     if (href?.startsWith('/nota/')) {
       const linkedNotaId = href.replace('/nota/', '')
       console.log('Found internal nota link to:', linkedNotaId)
@@ -84,20 +78,11 @@ export function convertPublicPageLinks(doc: Document) {
       } else {
         newHref = `/p/${linkedNotaId}`
       }
-      
+
       console.log('Converting link from', href, 'to', newHref)
       link.setAttribute('href', newHref)
     }
   })
-  
+
   console.log('Conversion complete')
 }
-
-
-
-
-
-
-
-
-

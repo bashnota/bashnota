@@ -1,6 +1,5 @@
 import { computed, ref } from 'vue'
 import { useCodeExecutionStore } from '@/features/editor/stores/codeExecutionStore'
-import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
 import { logger } from '@/services/logger'
 
 export function useCodeExecution(cellId: string) {

@@ -71,7 +71,7 @@ const currentComponent = computed(() => {
 </script>
 
 <template>
-  <div class="p-6">
+  <div class="p-4 sm:p-6 lg:p-8">
     <!-- Loading State -->
     <div v-if="settingsStore.isLoading" class="flex items-center justify-center h-32">
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -99,12 +99,15 @@ const currentComponent = computed(() => {
       </Alert>
     </div>
     
-    <!-- Unsaved Changes Indicator -->
+    <!-- Keep transient save status in the panel flow so it cannot cover
+         controls, dialogs, or mobile navigation. -->
     <div 
       v-if="settingsStore.hasUnsavedChanges" 
-      class="fixed bottom-6 right-6 bg-primary text-primary-foreground px-4 py-2 rounded-md shadow-lg animate-in slide-in-from-bottom-2"
+      class="mt-6 text-sm text-muted-foreground"
+      role="status"
+      aria-live="polite"
     >
-      Changes will be saved automatically
+      Saving changes…
     </div>
   </div>
-</template> 
+</template>

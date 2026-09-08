@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, nextTick } from 'vue'
+import { computed, ref } from 'vue';
 import { Input } from '@/components/ui/input'
 import {
   DropdownMenu,

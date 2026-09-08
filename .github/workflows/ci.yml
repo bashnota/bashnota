@@ -1,0 +1,202 @@
+name: Quality
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    name: Static and supply-chain checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22.14.0
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Generate CycloneDX SBOM
+        run: npm run release:sbom -- --output sbom.cdx.json
+      - name: Generate dependency license report
+        run: npm run release:licenses -- --output dependency-licenses.json
+      - name: Fetch pinned release provenance refs
+        run: node scripts/release/fetch-pinned-history-refs.mjs
+      - name: Validate release policies and provenance
+        run: npm run release:self-test
+      - name: Upload supply-chain reports
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: supply-chain-reports
+          path: |
+            sbom.cdx.json
+            dependency-licenses.json
+          if-no-files-found: error
+      - name: Type check application and unit tests
+        run: npm run type-check
+      - name: Type check browser test surfaces
+        run: npm run type-check:e2e
+      - name: Enforce sole-backend boundary
+        run: npm run check:backend-purity
+      - name: Enforce repository and environment hygiene
+        run: npm run check:repository-hygiene
+      - name: Verify production deploy gate
+        run: node scripts/check-supabase-deploy-config.self-test.mjs
+      - name: Verify deploy workflow pins the tested commit
+        run: npm run test:deploy-workflow
+      - name: Lint without warning growth
+        run: npm run lint:ratchet
+
+  unit:
+    name: Unit and coverage tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22.14.0
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Unit tests and risk-tier coverage
+        run: npm run test:ci:unit
+      - name: Upload unit and coverage results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: unit-and-coverage-results
+          path: |
+            coverage/
+            test-results/vitest-junit.xml
+          if-no-files-found: warn
+
+  browser:
+    name: Browser and security journeys
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      PLAYWRIGHT_USE_BUNDLED_CHROMIUM: '1'
+      VITE_SUPABASE_URL: http://127.0.0.1:54321
+      VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22.14.0
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Critical application journeys
+        run: npm run test:playwright
+      - name: Production PWA lifecycle
+        run: npm run test:pwa
+      - name: Enforce initial route asset graph budget
+        run: npm run test:initial-route-assets
+      - name: Iframe sandbox isolation
+        run: npm run test:iframe-security
+      - name: Generated export browser security
+        run: npm run test:export-security
+      - name: Token-authenticated Jupyter browser security
+        run: npm run test:jupyter-security
+      - name: Local Jupyter kernel execution
+        env:
+          JUPYTER_ALLOWED_ORIGIN: http://127.0.0.1:4173
+        run: |
+          docker compose -f docker-compose.jupyter.yml up -d --wait
+          npm run test:jupyter-local
+          npm run test:jupyter-ui
+      - name: Stop local Jupyter
+        if: always()
+        run: docker compose -f docker-compose.jupyter.yml down
+      - name: Upload browser diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: browser-test-results
+          path: test-results/
+          if-no-files-found: warn
+
+  database:
+    name: Supabase schema and security
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22.14.0
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Test migration engine
+        run: npm run test:migration-engine
+      - name: Start local Supabase
+        run: npm run supabase:start
+      - name: Lint database schema
+        run: npm run supabase:lint
+      - name: Test database, auth, publishing, community, storage, and API security
+        run: npm run test:supabase
+      - name: Rehearse upgrade path
+        run: npm run test:supabase:upgrade
+  build:
+    name: Production artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22.14.0
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build-only
+      - name: Production container smoke test
+        run: npm run test:container
+
+  quality:
+    name: quality
+    if: always()
+    needs: [static, unit, browser, database, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    env:
+      STATIC_RESULT: ${{ needs.static.result }}
+      UNIT_RESULT: ${{ needs.unit.result }}
+      BROWSER_RESULT: ${{ needs.browser.result }}
+      DATABASE_RESULT: ${{ needs.database.result }}
+      BUILD_RESULT: ${{ needs.build.result }}
+    steps:
+      - name: Require every quality shard
+        run: |
+          for result in "$STATIC_RESULT" "$UNIT_RESULT" "$BROWSER_RESULT" "$DATABASE_RESULT" "$BUILD_RESULT"; do
+            test "$result" = success
+          done

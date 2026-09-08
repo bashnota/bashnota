@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { TagsInput } from '@/components/ui/tags-input'
 import TagsInputItem from '@/components/ui/tags-input/TagsInputItem.vue'
@@ -7,9 +7,9 @@ import TagsInputItemDelete from '@/components/ui/tags-input/TagsInputItemDelete.
 import TagsInputItemText from '@/components/ui/tags-input/TagsInputItemText.vue'
 import TagsInputInput from '@/components/ui/tags-input/TagsInputInput.vue'
 import { Button } from '@/components/ui/button'
-import { Editor } from '@tiptap/vue-3'
+import type { Editor } from '@/features/editor/pm'
 import { logger } from '@/services/logger'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import { SidebarSection } from '@/ui/sidebars'
 
 // Props definition
@@ -176,28 +176,49 @@ const validateTags = (tags: string[]): string[] => {
     .map(tag => tag.length > 30 ? tag.substring(0, 30) : tag)
 }
 
+// Named listeners so they can be removed on unmount
+const handleDocumentClick = (e: MouseEvent) => {
+  const target = e.target as HTMLElement
+  if (target.closest('.tags-input-input')) {
+    showSuggestions.value = true
+  } else {
+    showSuggestions.value = false
+  }
+}
+
+const handleTagsInputInput = (e: Event) => {
+  inputValue.value = (e.target as HTMLInputElement).value
+}
+
+// Track the tags input element we attached to so we can detach cleanly
+let tagsInputEl: HTMLInputElement | null = null
+
 // Set up event listeners for tag suggestions
 onMounted(() => {
   // Listen for TagsInput focus
-  document.addEventListener('click', (e) => {
-    const target = e.target as HTMLElement
-    if (target.closest('.tags-input-input')) {
-      showSuggestions.value = true
-    } else {
-      showSuggestions.value = false
-    }
-  })
-  
+  document.addEventListener('click', handleDocumentClick)
+
   // Listen for input in the tags input
-  const tagsInput = document.querySelector('.tags-input-input input') as HTMLInputElement
-  if (tagsInput) {
-    tagsInput.addEventListener('input', (e) => {
-      inputValue.value = (e.target as HTMLInputElement).value
-    })
+  tagsInputEl = document.querySelector('.tags-input-input input') as HTMLInputElement | null
+  if (tagsInputEl) {
+    tagsInputEl.addEventListener('input', handleTagsInputInput)
   }
-  
+
   // Initialize the tag suggestion cache
   tagSuggestionCache.value = allTags.value
+})
+
+// Clean up listeners and any pending debounce on unmount
+onUnmounted(() => {
+  document.removeEventListener('click', handleDocumentClick)
+  if (tagsInputEl) {
+    tagsInputEl.removeEventListener('input', handleTagsInputInput)
+    tagsInputEl = null
+  }
+  if (debounceTimeout.value) {
+    clearTimeout(debounceTimeout.value)
+    debounceTimeout.value = null
+  }
 })
 </script>
 

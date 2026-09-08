@@ -1,39 +1,83 @@
 name: Deploy to GitHub Pages
 
+# Deploy runs ONLY after the Quality workflow (ci.yml) concludes successfully on
+# master. The quality gates (type-check, lint, unit tests, build, size budget)
+# live in ci.yml now; this workflow no longer runs them itself and no longer
+# uses `build-only` to bypass type-check — it builds with `npm run build`, which
+# type-checks as part of the build. If the Quality workflow fails, `workflow_run`
+# still fires but the job's `if:` guard skips the deploy, so a red gate never
+# ships.
 on:
-  push:
+  workflow_run:
+    workflows: ["Quality"]
+    types:
+      - completed
     branches:
       - master
 
 permissions:
   contents: write
 
+# Every production deployment competes for the same slot. A newly completed
+# Quality run cancels any older deployment that is still in progress.
+concurrency:
+  group: github-pages-production
+  cancel-in-progress: true
+
 jobs:
   build-and-deploy:
-    concurrency: ci-${{ github.ref }}
+    # Deploy only the exact commit from a successful same-repository push to
+    # master. Quality also runs for pull requests, whose head SHA is untrusted.
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository && github.event.workflow_run.head_branch == 'master' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout 🛎️
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Setup Node 🧱
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22.14.0
+          cache: npm
 
       - name: Create .env file
         run: |
-          echo "VITE_FIREBASE_API_KEY=${{ secrets.VITE_FIREBASE_API_KEY }}" >> .env
-          echo "VITE_FIREBASE_AUTH_DOMAIN=${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}" >> .env
-          echo "VITE_FIREBASE_PROJECT_ID=${{ secrets.VITE_FIREBASE_PROJECT_ID }}" >> .env
-          echo "VITE_FIREBASE_STORAGE_BUCKET=${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}" >> .env
-          echo "VITE_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}" >> .env
-          echo "VITE_FIREBASE_APP_ID=${{ secrets.VITE_FIREBASE_APP_ID }}" >> .env
-          echo "VITE_FIREBASE_MEASUREMENT_ID=${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}" >> .env
           echo "VITE_APP_BASE_URL=${{ secrets.VITE_APP_BASE_URL }}" >> .env
-          echo "VITE_API_URL=${{ secrets.VITE_API_URL }}" >> .env
+          echo "VITE_SUPABASE_URL=${{ vars.VITE_SUPABASE_URL }}" >> .env
+          echo "VITE_SUPABASE_PUBLISHABLE_KEY=${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}" >> .env
+          echo "SUPABASE_MIGRATION_EVIDENCE_SHA256=${{ vars.SUPABASE_MIGRATION_EVIDENCE_SHA256 }}" >> .env
+          echo "SUPABASE_RECONCILIATION_EVIDENCE_SHA256=${{ vars.SUPABASE_RECONCILIATION_EVIDENCE_SHA256 }}" >> .env
 
-      - name: Install and Build 🔧
-        run: |
-          npm ci
-          npm run build-only
+      - name: Install dependencies 📦
+        run: npm ci
+
+      - name: Verify sole-backend configuration
+        run: npm run check:backend-purity
+
+      - name: Verify Supabase deployment configuration and approved cutover
+        run: node scripts/check-supabase-deploy-config.mjs
+
+      # `npm run build` runs type-check + build (not `build-only`), so the deploy
+      # build no longer bypasses type-check.
+      - name: Build 🔧
+        run: npm run build
+
+      - name: Verify GitHub Pages deep links
+        run: npm run test:github-pages-deep-links
+
+      # A successful Quality run can finish after master has advanced. Re-read
+      # the protected branch immediately before publishing and fail closed
+      # unless this run tested the commit that is still at its head.
+      - name: Refuse stale Quality run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: node scripts/refuse-stale-deploy.mjs
 
       - name: Deploy 🚀
-        uses: JamesIves/github-pages-deploy-action@v4
+        uses: JamesIves/github-pages-deploy-action@d92aa235d04922e8f08b40ce78cc5442fcfbfa2f # v4.8.0
         with:
           folder: dist

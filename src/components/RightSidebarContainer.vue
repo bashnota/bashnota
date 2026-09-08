@@ -19,6 +19,7 @@
             variant="ghost" 
             size="sm" 
             @click="closeSidebar('references')"
+            aria-label="Close references sidebar"
             class="h-8 w-8 p-0"
           >
             <X class="h-4 w-4" />
@@ -49,6 +50,7 @@
             variant="ghost" 
             size="sm" 
             @click="closeSidebar('jupyter')"
+            aria-label="Close Jupyter sidebar"
             class="h-8 w-8 p-0"
           >
             <X class="h-4 w-4" />
@@ -90,6 +92,7 @@
             variant="ghost" 
             size="sm" 
             @click="closeSidebar('ai')"
+            aria-label="Close AI assistant sidebar"
             class="h-8 w-8 p-0"
           >
             <X class="h-4 w-4" />
@@ -134,6 +137,7 @@
             variant="ghost" 
             size="sm" 
             @click="closeSidebar('metadata')"
+            aria-label="Close metadata sidebar"
             class="h-8 w-8 p-0"
           >
             <X class="h-4 w-4" />
@@ -176,6 +180,7 @@
             variant="ghost" 
             size="sm" 
             @click="closeSidebar('favorites')"
+            aria-label="Close favorite blocks sidebar"
             class="h-8 w-8 p-0"
           >
             <X class="h-4 w-4" />
@@ -219,6 +224,7 @@
             variant="ghost" 
             size="sm" 
             @click="closeSidebar('subNotas')"
+            aria-label="Close sub-notas sidebar"
             class="h-8 w-8 p-0"
           >
             <X class="h-4 w-4" />
@@ -229,9 +235,9 @@
       <SidebarContent class="flex-1 overflow-hidden">
         <div class="h-full overflow-y-auto">
           <SubNotaManager 
-            v-if="activeNota?.id"
+            v-if="activeNota?.id && editor"
             :current-nota-id="activeNota.id"
-            @insert-sub-nota-link="handleInsertSubNotaLink"
+            :editor="editor"
           />
         </div>
       </SidebarContent>
@@ -256,11 +262,10 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { Editor } from '@tiptap/vue-3'
+import type { Editor } from '@/features/editor/pm'
 import { useSidebarManager } from '@/composables/useSidebarManager'
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useRoute } from 'vue-router'
-import { cn } from '@/lib/utils'
 
 // Shadcn components
 import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter } from '@/components/ui/sidebar'
@@ -304,30 +309,4 @@ const activeSidebar = computed(() => {
   return null
 })
 
-// Event handler for inserting sub-nota link
-const handleInsertSubNotaLink = (notaId: string, title: string) => {
-  console.log('handleInsertSubNotaLink called with:', { notaId, title })
-  if (props.editor) {
-    // Get the target nota to get its title
-    const targetNota = notaStore.getItem(notaId)
-    console.log('Target nota found:', targetNota)
-    if (targetNota) {
-      console.log('Inserting subNotaLink with:', {
-        targetNotaId: notaId,
-        targetNotaTitle: targetNota.title,
-        displayText: title,
-        linkStyle: 'inline'
-      })
-      props.editor.chain().focus().setSubNotaLink({
-        targetNotaId: notaId,
-        targetNotaTitle: targetNota.title,
-        displayText: title,
-        linkStyle: 'inline'
-      }).run()
-      console.log('setSubNotaLink command executed')
-    }
-  } else {
-    console.log('No editor available')
-  }
-}
 </script>

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Executable output sandbox test</title>
+  <script>
+    localStorage.setItem('bashnota-token', 'parent-secret')
+    window.__parentApiCalls = 0
+    window.__bashnotaParentApi = () => { window.__parentApiCalls += 1 }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const iframe = document.createElement('iframe')
+      iframe.id = 'output'
+      iframe.setAttribute('sandbox', 'allow-scripts')
+      iframe.srcdoc = `<!DOCTYPE html>
+        <p id="safe-output">safe <strong>HTML</strong></p>
+        <script>
+          const access = {}
+          try {
+            window.parent.localStorage.getItem('bashnota-token')
+            access.storage = 'allowed'
+          } catch (error) {
+            access.storage = error.name
+          }
+          try {
+            window.parent.document.querySelector('[data-private]')
+            access.dom = 'allowed'
+          } catch (error) {
+            access.dom = error.name
+          }
+          try {
+            window.parent.__bashnotaParentApi()
+            access.api = 'allowed'
+          } catch (error) {
+            access.api = error.name
+          }
+          window.__isolatedScriptRan = true
+          window.parent.postMessage({
+            type: 'bashnota:sandbox-test-result',
+            access,
+            safeHtmlRendered: document.querySelector('#safe-output strong')?.textContent === 'HTML',
+            isolatedScriptRan: window.__isolatedScriptRan === true
+          }, '*')
+        <\/script>`
+
+      window.addEventListener('message', (event) => {
+        const data = event.data
+        if (event.source !== iframe.contentWindow
+          || data === null
+          || typeof data !== 'object'
+          || data.type !== 'bashnota:sandbox-test-result') {
+          return
+        }
+
+        document.querySelector('#result').textContent = JSON.stringify({
+          ...data.access,
+          parentApiCalls: window.__parentApiCalls,
+          safeHtmlRendered: data.safeHtmlRendered,
+          isolatedScriptRan: data.isolatedScriptRan,
+          sandbox: iframe.getAttribute('sandbox'),
+        })
+      })
+
+      document.body.appendChild(iframe)
+    })
+  </script>
+</head>
+<body data-private="parent DOM">
+  <pre id="result">pending</pre>
+</body>
+</html>

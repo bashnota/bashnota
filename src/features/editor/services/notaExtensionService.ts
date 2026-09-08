@@ -1,4 +1,4 @@
-import { type Editor } from '@tiptap/core'
+import type { Editor } from '@/features/editor/pm'
 
 /**
  * Unified service for interacting with Nota editor extensions
@@ -197,7 +197,6 @@ export class NotaExtensionService {
 
 // Create a singleton instance
 export const notaExtensionService = new NotaExtensionService() 
-
 
 
 

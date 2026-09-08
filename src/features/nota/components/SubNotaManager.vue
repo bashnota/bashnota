@@ -198,20 +198,19 @@ import {
   ArrowUp, 
   Folder 
 } from 'lucide-vue-next'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import type { Nota } from '@/features/nota/types/nota'
+import type { Editor } from '@/features/editor/pm'
+import { createLinkedSubNota } from '@/features/nota/services/subNotaService'
 
 interface Props {
   currentNotaId: string
+  editor: Editor
 }
 
 const props = defineProps<Props>()
 const router = useRouter()
 const notaStore = useNotaStore()
-
-const emit = defineEmits<{
-  'insert-sub-nota-link': [notaId: string, title: string]
-}>()
 
 // State
 const showCreateDialog = ref(false)
@@ -243,12 +242,13 @@ const createSubNota = async () => {
   if (!newSubNotaTitle.value.trim()) return
   
   try {
-    const newNota = await notaStore.createSubNota(props.currentNotaId, newSubNotaTitle.value.trim())
+    await createLinkedSubNota({
+      parentId: props.currentNotaId,
+      title: newSubNotaTitle.value,
+      editor: props.editor,
+    })
     newSubNotaTitle.value = ''
     showCreateDialog.value = false
-    
-    // Emit event to insert a link to the new sub-nota
-    emit('insert-sub-nota-link', newNota.id, newNota.title)
     
     toast.success('Sub-nota created successfully')
   } catch (error) {

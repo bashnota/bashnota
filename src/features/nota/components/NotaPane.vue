@@ -2,7 +2,9 @@
   <div 
     class="h-full w-full max-h-full flex flex-col bg-background border-r border-border overflow-hidden"
     :class="{ 'border-primary border-2': isActive }"
-    @click="handlePaneClick"
+    :data-pane-id="pane.id"
+    @click.capture="handlePaneClick"
+    @focusin="handlePaneClick"
   >
     <!-- Pane Tabs (when there are multiple tabs) -->
     <PaneTabs 
@@ -33,7 +35,7 @@
     
     <!-- Nota Content -->
     <div v-else class="flex-1 min-h-0 w-full max-h-full overflow-hidden">
-      <template v-if="isReady && nota">
+      <template v-if="loadState === 'ready' && isReady && nota">
         <BlockCommandMenu :editor-view="notaEditorRef?.editor?.view">
           <NotaEditor
             :nota-id="pane.notaId"
@@ -53,9 +55,9 @@
         </BlockCommandMenu>
       </template>
       
-      <div v-else class="flex items-center justify-center h-full">
+      <div v-else-if="loadState === 'loading'" class="flex items-center justify-center h-full">
         <div class="flex flex-col items-center gap-4 p-8 rounded-lg bg-card border shadow-lg">
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-3" role="status" aria-live="polite">
             <div class="w-8 h-8 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
             <div class="flex flex-col">
               <h3 class="text-lg font-semibold">Loading Nota</h3>
@@ -80,6 +82,36 @@
           </div>
         </div>
       </div>
+
+      <div v-else class="flex items-center justify-center h-full p-4">
+        <section class="flex max-w-md flex-col items-center gap-4 rounded-lg border bg-card p-8 text-center shadow-lg" role="alert">
+          <FileText class="h-10 w-10 text-muted-foreground" aria-hidden="true" />
+          <div class="space-y-1">
+            <h3 class="text-lg font-semibold">
+              {{ loadState === 'not-found' ? 'Nota not found' : 'Unable to read nota' }}
+            </h3>
+            <p class="text-sm text-muted-foreground">
+              <template v-if="loadState === 'not-found'">
+                This notebook no longer exists or is unavailable in the selected storage.
+              </template>
+              <template v-else>
+                {{ loadError || 'The notebook could not be read. Check your storage connection and try again.' }}
+              </template>
+            </p>
+          </div>
+          <div class="flex flex-wrap justify-center gap-2">
+            <button type="button" class="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground" @click.stop="retryLoad">
+              Retry
+            </button>
+            <button type="button" class="rounded-md border px-3 py-2 text-sm font-medium" @click.stop="goHome">
+              Home
+            </button>
+            <button type="button" class="rounded-md border px-3 py-2 text-sm font-medium" @click.stop="closeStaleTab">
+              Close stale tab
+            </button>
+          </div>
+        </section>
+      </div>
     </div>
     
     <!-- Modals -->
@@ -101,25 +133,19 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useNotaStore } from '@/features/nota/stores/nota'
-import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
 
 import { useLayoutStore, type Pane } from '@/stores/layoutStore'
 import { useCodeExecutionStore } from '@/features/editor/stores/codeExecutionStore'
-import { toast } from 'vue-sonner'
-import { Button } from '@/components/ui/button'
+import { toast } from '@/services/toast'
 import NotaEditor from '@/features/editor/components/NotaEditor.vue'
 import BlockCommandMenu from '@/features/editor/components/ui/BlockCommandMenu.vue'
 import { useEditorStore } from '@/features/editor/stores/editorStore'
 import NotaConfigModal from '@/features/editor/components/blocks/nota-config/NotaConfigModal.vue'
 import PublishNotaModal from '@/features/editor/components/dialogs/PublishNotaModal.vue'
 import PaneTabs from './PaneTabs.vue'
-import { 
-  X, 
-  FileText, 
-  SplitSquareHorizontal, 
-  SplitSquareVertical 
-} from 'lucide-vue-next'
+import { FileText } from 'lucide-vue-next';
 import { logger } from '@/services/logger'
 
 const props = defineProps<{
@@ -128,10 +154,10 @@ const props = defineProps<{
 
 // Stores
 const notaStore = useNotaStore()
-const jupyterStore = useJupyterStore()
 const layoutStore = useLayoutStore()
 const codeExecutionStore = useCodeExecutionStore()
 const editorStore = useEditorStore()
+const router = useRouter()
 
 // State
 const isExecutingAll = ref(false)
@@ -141,6 +167,9 @@ const showShareDialog = ref(false)
 const isDragOver = ref(false)
 const notaEditorRef = ref<InstanceType<typeof NotaEditor> | null>(null)
 const loadingStep = ref<'nota' | 'editor' | 'ready'>('nota')
+const loadState = ref<'loading' | 'ready' | 'not-found' | 'error'>('loading')
+const loadError = ref<string | null>(null)
+let loadRequestId = 0
 
 // Computed properties
 const nota = computed(() => {
@@ -186,15 +215,24 @@ watch(
 )
 
 const loadNota = async (notaId: string) => {
+  const requestId = ++loadRequestId
   try {
     isReady.value = false
     loadingStep.value = 'nota'
+    loadState.value = 'loading'
+    loadError.value = null
     
     // Ensure the nota is loaded
     const loadedNota = await notaStore.loadNota(notaId)
+    if (requestId !== loadRequestId || props.pane.notaId !== notaId) return
+
+    if (!loadedNota) {
+      loadState.value = 'not-found'
+      return
+    }
     
     // Initialize tags array if it doesn't exist
-    if (loadedNota && !loadedNota.tags) {
+    if (!loadedNota.tags) {
       loadedNota.tags = []
       await notaStore.saveItem(loadedNota)
     }
@@ -202,21 +240,19 @@ const loadNota = async (notaId: string) => {
     // Tab registration is now handled by the layout store
     // when openNotaInPane is called
 
-    // Check if this is a root nota and has no Jupyter servers configured
-    if (loadedNota && !loadedNota.parentId && jupyterStore.jupyterServers.length === 0) {
-      toast({
-        title: 'Configure Jupyter',
-        description: 'Set up your Jupyter server to enable code execution in this notebook.',
-      })
-    }
-    
     loadingStep.value = 'editor'
     // Wait a bit for the editor to initialize
     await new Promise(resolve => setTimeout(resolve, 100))
+    if (requestId !== loadRequestId || props.pane.notaId !== notaId) return
     isReady.value = true
     loadingStep.value = 'ready'
+    loadState.value = 'ready'
   } catch (error) {
+    if (requestId !== loadRequestId || props.pane.notaId !== notaId) return
     logger.error('Error loading nota in pane:', error)
+    isReady.value = false
+    loadState.value = 'error'
+    loadError.value = error instanceof Error ? error.message : 'The notebook could not be read.'
     toast({
       title: 'Error',
       description: 'Failed to load notebook. Please try again.',
@@ -232,8 +268,11 @@ watch(
     if (newNotaId) {
       await loadNota(newNotaId)
     } else {
+      ++loadRequestId
       isReady.value = false
       loadingStep.value = 'nota'
+      loadState.value = 'loading'
+      loadError.value = null
     }
   },
   { immediate: true }
@@ -278,6 +317,20 @@ const splitVertical = () => {
 
 const closePane = () => {
   layoutStore.closePane(props.pane.id)
+}
+
+const retryLoad = () => {
+  if (props.pane.notaId) void loadNota(props.pane.notaId)
+}
+
+const goHome = () => {
+  void router.push({ name: 'home' })
+}
+
+const closeStaleTab = () => {
+  if (props.pane.notaId) {
+    layoutStore.closeTabInPane(props.pane.id, props.pane.notaId)
+  }
 }
 
 const executeAllCells = async () => {
@@ -357,4 +410,4 @@ defineExpose({
   saveVersion,
   openHistory,
 })
-</script> 
+</script>

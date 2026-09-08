@@ -293,9 +293,13 @@ jupyter notebook --no-browser --port=8888
 ### 2. Remote Jupyter Server
 
 If you have a remote Jupyter server:
-1. Ensure it's accessible via URL
-2. Add the full URL in BashNota
-3. Provide authentication token if required
+1. Expose it through HTTPS (WebSocket execution uses WSS)
+2. Add the full URL in BashNota and explicitly confirm the remote connection
+3. For token-authenticated execution, use a same-origin HTTPS proxy. BashNota sends tokens only in
+   authorization headers and never puts them in request or WebSocket URLs.
+
+Jupyter tokens are kept in memory for the current tab and are excluded from saved settings and
+exports. Closing the tab clears them.
 
 ### 3. JupyterLab
 
@@ -324,7 +328,10 @@ jupyter lab --no-browser --port=8888
 1. Create a code block
 2. Click the kernel dropdown
 3. Select an available kernel
-4. Code will execute on that kernel
+4. Review and accept the execution confirmation
+5. Code will execute with all authority granted to that Jupyter process, including its access to
+   files, network resources, environment variables, and other credentials. Only run notebook code
+   you trust.
 
 ### Session Management
 - Each note can have its own session

@@ -22,12 +22,10 @@ export function useCodeBlockExecutionSimplified(props: any, emit: any, dependenc
   const selectedKernel = ref('')
   const selectedSession = ref('')
   
-  // Connect to Jupyter store for servers and kernels
+  // Connect to Jupyter store for servers and kernels.
+  // NOTE: this computed must stay pure — loading servers happens in
+  // initializeComponent()/on mount, not as a side effect of reading this value.
   const availableServers = computed(() => {
-    // Ensure servers are loaded from localStorage
-    if (!jupyterStore.jupyterServers.length) {
-      jupyterStore.loadServers()
-    }
     return jupyterStore.jupyterServers || []
   })
   

@@ -7,14 +7,15 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { formatDate } from '@/lib/utils'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import { Trash2, Clock, Search, Grid, Table, AlertCircle, CalendarDays, BarChart, Eye, Filter, DownloadCloud, ThumbsUp, ThumbsDown, FileText } from 'lucide-vue-next'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Skeleton } from '@/components/ui/skeleton'
 import { type PublishedNota } from '@/features/nota/types/nota'
 import { logger } from '@/services/logger'
-import { collection, query, where, getDocs, doc, getDoc, limit } from 'firebase/firestore'
-import { firestore } from '@/services/firebase'
+import { supabaseAuthService } from '@/features/auth/services/supabaseAuth'
+
+defineOptions({ inheritAttrs: false })
 
 const route = useRoute()
 const router = useRouter()
@@ -28,11 +29,14 @@ const searchQuery = ref('')
 const viewType = ref<'grid' | 'table'>('grid') // Removed 'list' option
 const isConfirmDeleteOpen = ref(false)
 const notaToDelete = ref<string | null>(null)
+const isUnpublishing = ref(false)
 const dateFilter = ref<'all' | 'today' | 'week' | 'month' | 'year'>('all')
 const isFilterOpen = ref(false)
 const sortBy = ref<'date' | 'views' | 'title'>('date')
 const sortDirection = ref<'asc' | 'desc'>('desc')
 const userProfileImage = ref<string | null>(null)
+const publicDisplayName = ref('')
+const resolvedUserTag = ref('')
 
 // Pagination
 const currentPage = ref(1)
@@ -162,12 +166,11 @@ const filteredNotas = computed(() => {
   )
 })
 
-// Computed property to get author name from the first published nota
 const authorName = computed(() => {
-  if (publishedNotas.value.length > 0) {
-    return publishedNotas.value[0].authorName
-  }
-  return 'Author'
+  return publicDisplayName.value
+    || publishedNotas.value[0]?.authorName
+    || userTag.value
+    || 'Author'
 })
 
 // Computed property to generate initials from author name
@@ -186,7 +189,7 @@ const authorInitials = computed(() => {
 // Computed property to check which route parameter is available
 const userTag = computed(() => {
   const tag = route.params.userTag;
-  return typeof tag === 'string' ? tag : (Array.isArray(tag) ? tag[0] : '');
+  return typeof tag === 'string' ? tag : (Array.isArray(tag) ? tag[0] : resolvedUserTag.value);
 })
 
 const legacyUserId = computed(() => {
@@ -199,55 +202,17 @@ const profileUrl = computed(() => {
   if (userTag.value) {
     return `/@${userTag.value}`
   }
-  return `/u/${userId.value}`
+  return '/'
 })
 
 // Convert user tag to user ID if needed
 const getUserIdFromTag = async (tag: string): Promise<string | null> => {
-  try {
-    // Use the userTags collection for lookup
-    const tagDoc = doc(firestore, 'userTags', tag)
-    const tagSnapshot = await getDoc(tagDoc)
-    
-    if (tagSnapshot.exists()) {
-      const userData = tagSnapshot.data()
-      return userData && userData.uid ? userData.uid : null
-    }
-    
-    return null
-  } catch (err) {
-    logger.error('Error fetching user ID from tag:', err)
-    
-    // Additional logging to help diagnose the issue
-    if (err instanceof Error) {
-      logger.error('Error details:', {
-        message: err.message,
-        code: (err as any).code,
-        name: err.name
-      })
-    }
-
-    // If this was a permission error, try to create a custom solution
-    // to bypass the security rules via a different path
-    if ((err as any)?.code === 'permission-denied') {
-      try {
-        logger.info('Attempting to fetch user tag via alternative method')
-        
-        // Try querying users collection instead (if your security rules allow this)
-        const usersRef = collection(firestore, 'users')
-        const q = query(usersRef, where('userTag', '==', tag), limit(1))
-        const querySnapshot = await getDocs(q)
-        
-        if (!querySnapshot.empty) {
-          return querySnapshot.docs[0].id
-        }
-      } catch (fallbackErr) {
-        logger.error('Fallback method also failed:', fallbackErr)
-      }
-    }
-    
-    return null
-  }
+  const profile = await supabaseAuthService.getPublicProfileByTag(tag)
+  if (!profile) return null
+  userProfileImage.value = profile.photoUrl || null
+  publicDisplayName.value = profile.displayName
+  resolvedUserTag.value = profile.userTag
+  return profile.userId
 }
 
 // Date filtering logic
@@ -458,7 +423,7 @@ const loadPublishedNotas = async () => {
       return
     }
 
-    const notas = await notaStore.getPublishedNotasByUser(userIdToUse)
+    const notas = await notaStore.getPublishedNotasByUser(userIdToUse, userTag.value || undefined)
     publishedNotas.value = notas
 
     if (notas.length === 0) {
@@ -627,6 +592,14 @@ watch(
 // Resolve user ID from either direct ID or user tag
 const resolveUserId = async () => {
   try {
+    isLoading.value = true
+    error.value = null
+    userId.value = null
+    publishedNotas.value = []
+    userProfileImage.value = null
+    publicDisplayName.value = ''
+    resolvedUserTag.value = ''
+
     if (legacyUserId.value) {
       // Direct user ID provided
       userId.value = legacyUserId.value
@@ -646,24 +619,31 @@ const resolveUserId = async () => {
       return
     }
     
-    // Load user profile image if available
-    if (userId.value) {
+    // Tag lookups already load this projection; legacy ID routes use the same
+    // explicitly public Supabase profile view.
+    if (userId.value && !userTag.value) {
       try {
-        const userDoc = await getDoc(doc(firestore, 'users', userId.value))
-        if (userDoc.exists()) {
-          userProfileImage.value = userDoc.data().photoURL || null
-          logger.log('User profile image URL:', userProfileImage.value)
+        const profile = await supabaseAuthService.getPublicProfile(userId.value)
+        if (!profile) {
+          error.value = 'User not found'
+          return
         }
+        userProfileImage.value = profile.photoUrl || null
+        publicDisplayName.value = profile.displayName
+        resolvedUserTag.value = profile.userTag
       } catch (err) {
-        logger.error('Error fetching user profile image:', err)
-        // Continue even if profile image fails to load
+        logger.error('Error fetching public profile:', err)
+        error.value = 'Failed to load public profile'
+        return
       }
     }
     
     await loadPublishedNotas()
   } catch (err) {
     logger.error('Error resolving user ID:', err)
-    error.value = 'Error finding user'
+    error.value = 'Failed to load public profile'
+    isLoading.value = false
+  } finally {
     isLoading.value = false
   }
 }
@@ -688,29 +668,27 @@ const confirmDelete = (notaId: string) => {
 }
 
 const cancelDelete = () => {
+  if (isUnpublishing.value) return
   notaToDelete.value = null
   isConfirmDeleteOpen.value = false
 }
 
 const unpublishNota = async () => {
-  if (!notaToDelete.value) return
+  if (!notaToDelete.value || isUnpublishing.value) return
+  const notaId = notaToDelete.value
+  isUnpublishing.value = true
   
   try {
-    // First try to load the nota into the store to ensure it exists locally
-    await notaStore.loadNota(notaToDelete.value)
-    
-    // Then unpublish it
-    await notaStore.unpublishNota(notaToDelete.value)
+    await notaStore.unpublishNota(notaId)
     
     // Remove the nota from the list
-    publishedNotas.value = publishedNotas.value.filter(nota => nota.id !== notaToDelete.value)
-    toast('Nota unpublished successfully')
-  } catch (error) {
-    logger.error('Error unpublishing nota:', error)
-    toast('Failed to unpublish nota')
-  } finally {
+    publishedNotas.value = publishedNotas.value.filter(nota => nota.id !== notaId)
     isConfirmDeleteOpen.value = false
     notaToDelete.value = null
+  } catch (error) {
+    logger.error('Error unpublishing nota:', error)
+  } finally {
+    isUnpublishing.value = false
   }
 }
 
@@ -798,8 +776,17 @@ const handlePageSizeChange = (event: Event) => {
     <!-- Error state -->
     <div v-else-if="error" class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
       <h2 class="text-red-600 text-xl font-semibold mb-2">{{ error }}</h2>
-      <p class="text-gray-600 mb-4">There was an error loading the published notas.</p>
-      <Button @click="router.push('/')">Go Home</Button>
+      <p class="text-gray-600 mb-4">
+        {{ error === 'User not found'
+          ? 'This public profile does not exist.'
+          : error === 'Failed to load published notas'
+            ? 'This profile exists, but its publications could not be loaded. Try again.'
+            : 'The public profile could not be loaded. Your connection or the service may be unavailable.' }}
+      </p>
+      <div class="flex justify-center gap-2">
+        <Button v-if="error !== 'User not found'" @click="resolveUserId">Retry</Button>
+        <Button variant="outline" @click="router.push('/')">Go Home</Button>
+      </div>
     </div>
 
     <!-- Empty state -->
@@ -1290,17 +1277,11 @@ const handlePageSizeChange = (event: Event) => {
         but you can publish it again later.
       </p>
       <div class="flex justify-end gap-2">
-        <Button variant="outline" @click="cancelDelete">Cancel</Button>
-        <Button variant="destructive" @click="unpublishNota">Unpublish</Button>
+        <Button variant="outline" :disabled="isUnpublishing" @click="cancelDelete">Cancel</Button>
+        <Button variant="destructive" :disabled="isUnpublishing" @click="unpublishNota">
+          {{ isUnpublishing ? 'Unpublishing…' : 'Unpublish' }}
+        </Button>
       </div>
     </div>
   </div>
 </template>
-
-
-
-
-
-
-
-

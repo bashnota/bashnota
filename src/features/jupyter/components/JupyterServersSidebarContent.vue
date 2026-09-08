@@ -7,6 +7,7 @@ import { Server, RotateCw, Plus } from 'lucide-vue-next'
 import { useJupyterServers } from '@/features/jupyter/composables/useJupyterServers'
 import ServerItem from './ServerItem.vue'
 import AddServerDialog from '@/features/editor/components/jupyter/AddServerDialog.vue'
+import { logger } from '@/services/logger'
 
 const props = defineProps<{
   notaId: string
@@ -37,7 +38,7 @@ const {
   removeServer,
   parseJupyterUrl,
   resetForm,
-  initializeKernels
+  initializeKernels,
 } = useJupyterServers()
 
 // Computed properties for session and kernel data
@@ -78,11 +79,11 @@ const handleServerRefresh = (server: any) => refreshKernels(server)
 const handleServerRemove = (server: any) => removeServer(server)
 const handleKernelConnect = (server: any, kernel: any) => {
   // This would need to be implemented based on your kernel connection logic
-  console.log('Connect kernel:', kernel, 'on server:', server)
+  logger.log('Connect kernel:', kernel, 'on server:', server)
 }
 const handleSessionUse = (session: any) => {
   // This would need to be implemented based on your session usage logic
-  console.log('Use session:', session)
+  logger.log('Use session:', session)
 }
 
 const setupPolling = () => {
@@ -107,10 +108,10 @@ onUnmounted(() => {
   <div class="p-3 border-b">
     <div class="flex items-center gap-2">
       <Tooltip content="Refresh All Servers">
-        <Button 
-          size="sm" 
-          variant="ghost" 
-          class="h-8 w-8 p-0" 
+        <Button
+          size="sm"
+          variant="ghost"
+          class="h-8 w-8 p-0"
           @click="handleRefreshAll"
           :disabled="isAnyRefreshing"
         >
@@ -118,17 +119,12 @@ onUnmounted(() => {
         </Button>
       </Tooltip>
       <Tooltip content="Add Server">
-        <Button 
-          size="sm" 
-          variant="ghost" 
-          class="h-8 w-8 p-0" 
-          @click="showAddServerDialog = true"
-        >
+        <Button size="sm" variant="ghost" class="h-8 w-8 p-0" @click="showAddServerDialog = true">
           <Plus class="w-4 h-4" />
         </Button>
       </Tooltip>
     </div>
-    
+
     <div v-if="hasServers" class="mt-2">
       <p class="text-xs text-muted-foreground">
         {{ servers.length }} server{{ servers.length !== 1 ? 's' : '' }}
@@ -137,10 +133,7 @@ onUnmounted(() => {
   </div>
 
   <!-- No Servers State -->
-  <div 
-    v-if="!hasServers" 
-    class="flex flex-col items-center justify-center h-64 p-4"
-  >
+  <div v-if="!hasServers" class="flex flex-col items-center justify-center h-64 p-4">
     <Server class="w-12 h-12 text-muted-foreground/20 mb-4" />
     <h3 class="text-base font-medium mb-2">No Jupyter Servers</h3>
     <p class="text-sm text-muted-foreground text-center mb-4">
@@ -151,12 +144,12 @@ onUnmounted(() => {
       Add Server
     </Button>
   </div>
-  
+
   <!-- Server List -->
   <ScrollArea v-else class="flex-1 w-full h-full">
     <div class="p-2 space-y-2">
-      <ServerItem 
-        v-for="server in servers" 
+      <ServerItem
+        v-for="server in servers"
         :key="createServerKey(server)"
         :server="server"
         :kernels="getKernelsForServer(server)"
@@ -174,7 +167,7 @@ onUnmounted(() => {
   </ScrollArea>
 
   <!-- Add Server Dialog -->
-  <AddServerDialog 
+  <AddServerDialog
     :open="showAddServerDialog"
     @update:open="showAddServerDialog = $event"
     :form="serverForm"

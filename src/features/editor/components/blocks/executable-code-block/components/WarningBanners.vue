@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { AlertTriangle, Link2, Zap, CheckCircle, Info, Server } from 'lucide-vue-next'
+import { AlertTriangle, Link2, Zap, CheckCircle } from 'lucide-vue-next';
 import { useSharedSession } from '@/features/editor/composables/useSharedSession'
 import { useRobustExecution } from '@/features/editor/composables/useRobustExecution'
 

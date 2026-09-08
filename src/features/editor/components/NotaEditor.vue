@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { useEditor, EditorContent } from '@tiptap/vue-3'
+import { useEditor, EditorContent } from '@/features/editor/pm'
 import { TagsInput } from '@/components/ui/tags-input'
-import { RotateCw, CheckCircle, Star, Share2, Download, PlayCircle, Save, Clock, Sparkles, Book, Server, Tag, Link2 } from 'lucide-vue-next'
+import { Button } from '@/components/ui/button'
+import { RotateCw, CheckCircle, Download, Clock } from 'lucide-vue-next';
 import { useNotaStore } from '@/features/nota/stores/nota'
 import { useJupyterStore } from '@/features/jupyter/stores/jupyterStore'
 import { ref, watch, computed, onUnmounted, onMounted, reactive, provide, nextTick } from 'vue'
 import 'highlight.js/styles/github.css'
 import { useRouter } from 'vue-router'
-import { Skeleton } from '@/components/ui/skeleton'
 import { useCodeExecutionStore } from '@/features/editor/stores/codeExecutionStore'
 import { getURLWithoutProtocol } from '@/lib/utils'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import VersionHistoryDialog from './dialogs/VersionHistoryDialog.vue'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { getEditorExtensions } from './extensions'
@@ -24,6 +24,14 @@ import NotaBreadcrumb from '@/features/nota/components/NotaBreadcrumb.vue'
 import MarkdownInputComponent from './blocks/MarkdownInputComponent.vue'
 import { EnhancedMarkdownPasteHandler } from '../services/EnhancedMarkdownPasteHandler'
 import { exportNotaToHtml } from '@/features/editor/services/exportService'
+import {
+  drainPersistedEdits,
+  enqueuePersistedEdit,
+  shouldCaptureEditorUpdate,
+  type PersistedEditOperation,
+} from '@/features/editor/services/editPersistenceQueue'
+import { withNotaPersistence } from '@/services/databaseAdapter'
+import { createLinkedSubNota } from '@/features/nota/services/subNotaService'
 
 // Import shared CSS
 import '@/assets/editor-styles.css'
@@ -49,6 +57,7 @@ const showMarkdownInput = ref(false)
 // Initialize block editor integration
 const { 
   syncContentToBlocks, 
+  syncContentForVersion,
   initializeBlocks, 
   getTiptapContent, 
   blockStats,
@@ -59,19 +68,47 @@ const {
 const isTogglingSharedMode = ref(false)
 
 // Edit queue system for smooth editing experience
-interface EditOperation {
-  id: string
-  type: 'insert' | 'delete' | 'update'
-  position: number
-  content?: any
-  timestamp: number
-  applied: boolean
-}
+type EditOperation = PersistedEditOperation<any>
 
 const editQueue = ref<EditOperation[]>([])
 const isProcessingQueue = ref(false)
 const lastSavedContent = ref<string>('')
 const editorContentHash = ref<string>('')
+const isApplyingPersistedContent = ref(false)
+const AUTOSAVE_RETRY_DELAYS_MS = [250, 1000, 3000] as const
+let editQueueRetryTimer: ReturnType<typeof setTimeout> | null = null
+let consecutiveSaveFailures = 0
+let terminalSaveFailureShown = false
+let isEditorUnmounted = false
+
+const clearEditQueueRetry = () => {
+  if (editQueueRetryTimer !== null) clearTimeout(editQueueRetryTimer)
+  editQueueRetryTimer = null
+}
+
+const resetEditQueueRetry = () => {
+  clearEditQueueRetry()
+  consecutiveSaveFailures = 0
+  terminalSaveFailureShown = false
+}
+
+const scheduleEditQueueRetry = () => {
+  if (isEditorUnmounted || editQueueRetryTimer !== null || editQueue.value.length === 0) return
+
+  const retryDelay = AUTOSAVE_RETRY_DELAYS_MS[consecutiveSaveFailures - 1]
+  if (retryDelay === undefined) {
+    if (!terminalSaveFailureShown) {
+      terminalSaveFailureShown = true
+      toast.error('Autosave could not recover. Your unsaved edits remain in this tab; check storage access and edit again to retry.')
+    }
+    return
+  }
+
+  editQueueRetryTimer = setTimeout(() => {
+    editQueueRetryTimer = null
+    if (!isEditorUnmounted) void processEditQueue()
+  }, retryDelay)
+}
 
 // Generate a hash for content comparison
 const generateContentHash = (content: any): string => {
@@ -84,16 +121,8 @@ const generateContentHash = (content: any): string => {
 
 // Add edit operation to queue
 const queueEdit = (operation: Omit<EditOperation, 'id' | 'timestamp' | 'applied'>) => {
-  // Don't queue if we're already processing
-  if (isProcessingQueue.value) return
-  
-  // Limit queue size to prevent memory issues
-  if (editQueue.value.length >= 50) {
-    logger.warn('Edit queue limit reached, processing queue immediately')
-    processEditQueue()
-    return
-  }
-  
+  if (terminalSaveFailureShown) resetEditQueueRetry()
+
   const editOp: EditOperation = {
     ...operation,
     id: `edit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -101,10 +130,14 @@ const queueEdit = (operation: Omit<EditOperation, 'id' | 'timestamp' | 'applied'
     applied: false
   }
   
-  editQueue.value.push(editOp)
+  const wasSaturated = editQueue.value.length >= 50
+  editQueue.value = enqueuePersistedEdit(editQueue.value, editOp)
+  if (wasSaturated) {
+    logger.warn('Edit queue limit reached; compacted to the newest complete document snapshot')
+  }
   
   // Process queue if not already processing
-  if (!isProcessingQueue.value) {
+  if (!isProcessingQueue.value && editQueueRetryTimer === null) {
     // Use nextTick to ensure we're not in the middle of a transaction
     nextTick(() => {
       if (!isProcessingQueue.value) {
@@ -116,7 +149,7 @@ const queueEdit = (operation: Omit<EditOperation, 'id' | 'timestamp' | 'applied'
 
 // Handle specific edit types more intelligently
 const handleEditOperation = (transaction: any, editor: any) => {
-  if (!transaction.docChanged || isProcessingQueue.value) return
+  if (!transaction.docChanged) return
   
   // Analyze the transaction to determine edit type
   const { steps } = transaction
@@ -150,37 +183,30 @@ const processEditQueue = async () => {
   isProcessingQueue.value = true
   
   try {
-    // Get current editor content
-    const currentContent = editor.value?.getJSON()
-    if (!currentContent) return
-    
-    // Clean up old edits (older than 5 minutes) to prevent memory issues
-    const now = Date.now()
-    editQueue.value = editQueue.value.filter(edit => 
-      now - edit.timestamp < 5 * 60 * 1000 && !edit.applied
-    )
-    
-    // Apply all pending edits
-    for (const edit of editQueue.value) {
-      if (!edit.applied) {
-        await applyEditToDatabase(edit, currentContent)
-        edit.applied = true
-      }
-    }
-    
-    // Clear processed edits
-    editQueue.value = editQueue.value.filter(edit => edit.applied)
-    
-    // Update last saved content
-    lastSavedContent.value = JSON.stringify(currentContent)
-    
+    // Reserve the complete drain for this nota. A replacement editor can queue
+    // behind it, but cannot insert a newer write between this instance's
+    // in-flight snapshot and its queued final snapshot.
+    await withNotaPersistence(props.notaId, async () => {
+      await drainPersistedEdits({
+        readQueue: () => editQueue.value,
+        writeQueue: queue => { editQueue.value = queue },
+        persist: async edit => {
+          const contentToPersist = edit.content ?? editor.value?.getJSON()
+          if (!contentToPersist) throw new Error('Editor content was unavailable while saving.')
+
+          await applyEditToDatabase(edit, contentToPersist)
+          lastSavedContent.value = JSON.stringify(contentToPersist)
+        },
+      })
+    })
+    resetEditQueueRetry()
   } catch (error) {
+    consecutiveSaveFailures += 1
     logger.error('Error processing edit queue:', error)
+    scheduleEditQueueRetry()
   } finally {
     isProcessingQueue.value = false
     
-    // Don't recursively call processEditQueue here to prevent infinite loops
-    // New edits will be processed on the next save cycle
   }
 }
 
@@ -188,10 +214,10 @@ const processEditQueue = async () => {
 const applyEditToDatabase = async (edit: EditOperation, currentContent: any) => {
   try {
     // Save to block-based system
-    await syncContentToBlocks(currentContent)
+    await syncContentToBlocks(currentContent, true)
     
     // Save sessions
-    await codeExecutionStore.saveSessions(props.notaId)
+    await codeExecutionStore.saveSessions(props.notaId, true)
     
     logger.info(`Applied edit ${edit.id} to database`)
   } catch (error) {
@@ -473,9 +499,11 @@ const editor = useEditor({
     })
   },
   onUpdate: ({ editor, transaction }) => {
-    // Only handle edits if they're actual content changes, not just cursor movements
-    // AND we're not currently processing the edit queue to prevent infinite loops
-    if (transaction.docChanged && editor.isFocused && !isProcessingQueue.value) {
+    if (shouldCaptureEditorUpdate({
+      docChanged: transaction.docChanged,
+      isFocused: editor.isFocused,
+      isApplyingPersistedContent: isApplyingPersistedContent.value,
+    })) {
       // Use intelligent edit handling
       handleEditOperation(transaction, editor)
       
@@ -523,6 +551,27 @@ watch(() => content.value, () => {
 
 // Title block is now displayed separately in the UI, not in the content
 
+const loadPersistedContent = (persistedContent: any, reason: string): boolean => {
+  if (!editor.value) return false
+
+  isApplyingPersistedContent.value = true
+  try {
+    const loaded = editor.value.commands.setContent(persistedContent)
+    if (!loaded) {
+      logger.error(`Persisted content load refused (${reason}); preserving the current editor document`)
+      return false
+    }
+
+    const loadedContent = editor.value.getJSON()
+    editorContentHash.value = generateContentHash(loadedContent)
+    lastSavedContent.value = JSON.stringify(loadedContent)
+    logger.info(`Persisted content loaded (${reason})`, loadedContent)
+    return true
+  } finally {
+    isApplyingPersistedContent.value = false
+  }
+}
+
 // Function to load content from blocks into editor
 const loadContentFromBlocks = () => {
   try {
@@ -540,21 +589,13 @@ const loadContentFromBlocks = () => {
         )
       
       if (!hasRealContent) {
-        // Load content from database
-        editor.value.commands.setContent(blockContent)
-        
-        // Update content hash and last saved content
-        editorContentHash.value = generateContentHash(blockContent)
-        lastSavedContent.value = JSON.stringify(blockContent)
-        
-        logger.info('Content loaded from blocks into editor:', blockContent)
-        return true
+        return loadPersistedContent(blockContent, 'block load')
       } else {
         logger.info('Editor already has content, skipping load')
         return false
       }
     } else {
-      logger.warn('No block content available to load')
+      logger.info('No block content available to load')
       return false
     }
   } catch (error) {
@@ -582,19 +623,12 @@ watch(isBlockSystemReady, (ready) => {
           )
         
         if (!hasRealContent) {
-          // This is the initial load (page refresh), set content from database
-          editor.value.commands.setContent(blockContent)
-          
-          // Update content hash and last saved content for the new content
-          editorContentHash.value = generateContentHash(blockContent)
-          lastSavedContent.value = JSON.stringify(blockContent)
-          
-          logger.info('Initial editor content loaded from blocks (page refresh):', blockContent)
+          loadPersistedContent(blockContent, 'block system ready')
         } else {
           logger.info('Editor already has content, skipping load:', currentContent)
         }
       } else {
-        logger.warn('No block content available when block system is ready')
+        logger.info('No block content available when block system is ready')
       }
     }
   } catch (error) {
@@ -611,14 +645,7 @@ watch(() => getTiptapContent.value, (newContent, oldContent) => {
       const hasContent = currentContent && currentContent.content && currentContent.content.length > 0
       
       if (!hasContent) {
-        // Force load content from database on page refresh
-        editor.value.commands.setContent(newContent)
-        
-        // Update content hash and last saved content
-        editorContentHash.value = generateContentHash(newContent)
-        lastSavedContent.value = JSON.stringify(newContent)
-        
-        logger.info('Content loaded from database on page refresh:', newContent)
+        loadPersistedContent(newContent, 'page refresh')
       }
     }
   } catch (error) {
@@ -639,14 +666,7 @@ watch(() => getTiptapContent.value, (newContent) => {
         const hasContent = currentContent && currentContent.content && currentContent.content.length > 0
         
         if (!hasContent) {
-          // This is the initial load (page refresh), set content from database
-          editor.value.commands.setContent(newContent)
-          
-          // Update content hash and last saved content for the new content
-          editorContentHash.value = generateContentHash(newContent)
-          lastSavedContent.value = JSON.stringify(newContent)
-          
-          logger.info('Initial editor content loaded from content watcher (page refresh):', newContent)
+          loadPersistedContent(newContent, 'content watcher')
         }
       }
     }
@@ -706,6 +726,15 @@ const titleInput = ref<HTMLElement>()
 const originalTitle = ref('')
 const currentTitle = ref('')
 const isTitleSaving = ref(false)
+
+const syncTitleField = (title: string) => {
+  const input = titleInput.value
+  if (!input || document.activeElement === input) return
+
+  if (input.textContent !== title) input.textContent = title
+  currentTitle.value = title
+  originalTitle.value = title
+}
 
 // Optimize toggleSharedSessionMode
 const toggleSharedSessionMode = async () => {
@@ -805,18 +834,14 @@ const handleKeyboardShortcuts = (event: KeyboardEvent) => {
 
 // Listen for custom event to open AI sidebar
 onMounted(async () => {
+  // Initialize the visible title before the asynchronous block load. Waiting
+  // until after that load can overwrite text a user has already started
+  // entering on a slower device or CI worker.
+  await nextTick()
+  syncTitleField(currentNota.value?.title || '')
+
   // Initialize block system for this nota
   await initializeBlocks()
-  
-  // Initialize title field after a short delay to ensure DOM is ready
-  nextTick(() => {
-    if (titleInput.value && currentNota.value) {
-      const title = currentNota.value.title || ''
-      titleInput.value.textContent = title
-      currentTitle.value = title
-      originalTitle.value = title
-    }
-  })
   
   // Add keyboard shortcut event listener
   document.addEventListener('keydown', handleKeyboardShortcuts)
@@ -898,6 +923,9 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  isEditorUnmounted = true
+  clearEditQueueRetry()
+
   // Clean up event listeners
   document.removeEventListener('keydown', handleKeyboardShortcuts)
   window.removeEventListener('activate-ai-assistant', (() => { }) as EventListener)
@@ -943,31 +971,34 @@ const handleExport = async () => {
 }
 
 const isSavingVersion = ref(false)
+let saveVersionInFlight: ReturnType<typeof notaStore.saveNotaVersion> | null = null
 
-const saveVersion = async () => {
-  if (isSavingVersion.value || !editor.value || !currentNota.value) return
-  
+const saveVersion = () => {
+  if (saveVersionInFlight) return saveVersionInFlight
+  if (!editor.value || !currentNota.value) {
+    return Promise.reject(new Error('Unable to save version: the editor is not ready.'))
+  }
+
   isSavingVersion.value = true
-  try {
-    const content = editor.value.getJSON()
-    // Save version using the current nota
-    const versionNota = {
-      ...currentNota.value
-    } as any
-    
-    await notaStore.saveNotaVersion({
+  const content = editor.value.getJSON()
+
+  saveVersionInFlight = notaStore.saveNotaVersion({
       id: props.notaId,
-      nota: versionNota,
       versionName: `Version ${new Date().toLocaleString()}`,
       createdAt: new Date(),
+      // Convert the live PM document through the production normalized-block
+      // path inside the same transaction as the historical snapshot.
+      prepareCanonical: () => syncContentForVersion(content),
     })
-    toast('Version saved successfully')
-  } catch (error) {
-    logger.error('Error saving version:', error)
-    toast('Failed to save version')
-  } finally {
-    isSavingVersion.value = false
-  }
+    .catch((error) => {
+      logger.error('Error saving version:', error)
+      throw error
+    })
+    .finally(() => {
+      isSavingVersion.value = false
+      saveVersionInFlight = null
+    })
+  return saveVersionInFlight
 }
 const refreshEditorContent = async () => {
   if (editor.value) {
@@ -975,8 +1006,7 @@ const refreshEditorContent = async () => {
     const blockContent = getTiptapContent.value
     
     if (blockContent) {
-      // Set content directly as Tiptap object
-      editor.value.commands.setContent(blockContent)
+      loadPersistedContent(blockContent, 'manual refresh')
     }
   }
 }
@@ -1013,13 +1043,11 @@ const createAndLinkSubNota = async (title: string) => {
   if (!editor.value) return
 
   try {
-    // Create the sub-nota
-    const newNota = await notaStore.createItem(title, props.notaId)
-
-    // Insert a link to the new nota at current cursor position
-    insertSubNotaLink(newNota.id, newNota.title)
-
-    return newNota
+    return await createLinkedSubNota({
+      parentId: props.notaId,
+      title,
+      editor: editor.value,
+    })
   } catch (error) {
     logger.error('Error creating sub-nota:', error)
     toast('Failed to create sub-nota')
@@ -1085,17 +1113,17 @@ const updateCitationNumbers = () => {
 // Watch for changes in citations and update numbers
 watch(() => citationStore.getCitationsByNotaId(props.notaId), () => {
   updateCitationNumbers()
-}, { deep: true })
-
-// Watch for nota changes to update title field
-watch(currentNota, (newNota) => {
-  if (newNota && titleInput.value) {
-    const title = newNota.title || ''
-    titleInput.value.textContent = title
-    currentTitle.value = title
-    originalTitle.value = title
-  }
 })
+
+// Only title changes should update the title field. Canonical body/config
+// refreshes must not rewrite a focused contenteditable while the user types.
+watch(
+  () => currentNota.value?.title,
+  (title) => {
+    if (title !== undefined) syncTitleField(title)
+  },
+  { flush: 'post' },
+)
 
 // Title field methods
 const handleTitleInput = (event: Event) => {
@@ -1174,7 +1202,10 @@ const handleMarkdownBlocksInsertion = (blocks: any[]) => {
   
   try {
     // Insert blocks at current cursor position
-    editor.value.commands.insertContent(blocks)
+    const inserted = editor.value.commands.insertContent(blocks)
+    if (!inserted) {
+      throw new Error('The editor rejected one or more parsed blocks.')
+    }
     
     // Show success message
     toast.success(`Successfully inserted ${blocks.length} block${blocks.length !== 1 ? 's' : ''}`)
@@ -1217,11 +1248,7 @@ defineExpose({
     if (editor.value) {
       const blockContent = getTiptapContent.value
       if (blockContent) {
-        editor.value.commands.setContent(blockContent)
-        editorContentHash.value = generateContentHash(blockContent)
-        lastSavedContent.value = JSON.stringify(blockContent)
-        logger.info('Content force-loaded from database:', blockContent)
-        return true
+        return loadPersistedContent(blockContent, 'forced reload')
       }
       return false
     }
@@ -1251,6 +1278,9 @@ defineExpose({
                     ref="titleInput"
                     class="nota-title-input flex-1"
                     contenteditable="true"
+                    role="textbox"
+                    aria-label="Nota title"
+                    aria-multiline="false"
                     :placeholder="'Untitled'"
                     @input="handleTitleInput"
                     @blur="handleTitleBlur"
@@ -1362,11 +1392,3 @@ defineExpose({
   }
 }
 </style>
-
-
-
-
-
-
-
-

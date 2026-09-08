@@ -3,7 +3,7 @@ import type { CitationEntry } from '@/features/nota/types/nota'
 import type { ParsedBibTexEntry } from './useBatchBibTexParser'
 import { useBatchBibTexParser } from './useBatchBibTexParser'
 import { useCitationStore } from '@/features/editor/stores/citationStore'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 
 export interface UseReferenceBatchDialogReturn {
   // State

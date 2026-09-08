@@ -5,7 +5,6 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Separator } from '@/components/ui/separator'
 import { 
   FileText, 
   Plus, 
@@ -20,7 +19,7 @@ import {
   ChevronRight
 } from 'lucide-vue-next'
 import type { CitationEntry } from '@/features/nota/types/nota'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import { useReferenceBatchDialog } from '@/features/nota/composables/useReferenceBatchDialog'
 import ReferencesPreviewTable from './ReferencesPreviewTable.vue'
 

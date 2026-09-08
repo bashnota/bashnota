@@ -5,12 +5,11 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, CheckCircle, XCircle, Eye, EyeOff, ExternalLink, Zap } from 'lucide-vue-next'
 import { useAIProviders } from '@/features/ai/components/composables/useAIProviders'
 import { useAISettingsStore } from '@/features/ai/stores/aiSettingsStore'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 
 interface Props {
   providerId: string
@@ -184,6 +183,11 @@ onMounted(() => {
             </Button>
           </div>
         </div>
+
+        <p class="text-xs text-muted-foreground">
+          Kept in memory for this browser tab only. The key is cleared when the tab closes and is
+          excluded from saved settings and exports.
+        </p>
         
         <Alert v-if="requiresApiKey && !hasApiKey" class="border-amber-200 bg-amber-50 dark:bg-amber-950">
           <AlertDescription class="text-sm">

@@ -4,9 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 import { 
   Eye, 
   EyeOff, 
@@ -222,6 +221,10 @@ const openSetupUrl = () => {
             <Key class="h-3 w-3" />
           </Button>
         </div>
+
+        <p class="text-xs text-muted-foreground">
+          Kept in memory for this browser tab only; it is not saved or exported.
+        </p>
 
         <!-- Setup Link -->
         <Button

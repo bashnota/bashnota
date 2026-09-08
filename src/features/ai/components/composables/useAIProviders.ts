@@ -10,7 +10,7 @@ import type {
   WebLLMInitProgressReport,
 } from '@/features/ai/services'
 import { logger } from '@/services/logger'
-import { toast } from 'vue-sonner'
+import { toast } from '@/services/toast'
 
 /**
  * Composable for AI provider functionality

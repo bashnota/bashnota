@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
-import { Search, MessageSquare, Bot, Plus, Calendar, Trash2, Clock } from 'lucide-vue-next'
+import { Search, MessageSquare, Bot, Plus, Trash2, Clock } from 'lucide-vue-next';
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { format } from 'date-fns'
@@ -156,7 +155,12 @@ const handleRefresh = async () => {
           :key="item.id"
           class="group border rounded-md p-2.5 hover:bg-accent/40 cursor-pointer transition-colors relative"
           :class="{'bg-accent/80': item.isActive}"
+          role="button"
+          tabindex="0"
+          :aria-label="`Open conversation ${item.title}`"
           @click="selectChat(item)"
+          @keydown.enter.prevent="selectChat(item)"
+          @keydown.space.prevent="selectChat(item)"
         >
           <div class="flex justify-between gap-2 mb-1">
             <h4 class="font-medium text-sm line-clamp-1 pr-8">{{ item.title }}</h4>
@@ -169,6 +173,7 @@ const handleRefresh = async () => {
                 variant="ghost"
                 size="sm"
                 class="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                :aria-label="`Delete conversation ${item.title}`"
                 @click="(e: Event) => handleDeleteConversation(item, e)"
               >
                 <Trash2 class="h-3 w-3 text-muted-foreground hover:text-destructive" />
@@ -207,7 +212,6 @@ const handleRefresh = async () => {
   overflow: hidden;
 }
 </style>
-
 
 
 

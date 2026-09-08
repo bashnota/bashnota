@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "generatedThrough": "2026-09-03",
+  "historyPolicy": "Git authorship is authoritative; aliases are reconciled additively and automated attribution is preserved.",
+  "entries": [
+    {
+      "id": "person:taha-bouhsine",
+      "kind": "human",
+      "displayName": "Taha Bouhsine",
+      "aliases": [
+        { "name": "Taha Bouhsine", "email": "45195299+mlnomadpy@users.noreply.github.com" },
+        { "name": "Taha Bouhsine", "email": "contact@tahabouhsine.com" },
+        { "name": "Taha Bouhsine", "email": "skywolf.mo@gmail.com" },
+        { "name": "Taha Bouhsine", "email": "tahabhs14@gmail.com" },
+        { "name": "mlnomadpy", "email": "45195299+mlnomadpy@users.noreply.github.com" },
+        { "name": "mlnomadpy", "email": "mlnomadpy@users.noreply.github.com" }
+      ],
+      "rightsBasis": "Repository owner/original contributor; contributions were committed to this AGPL-3.0-only repository and retained as project source.",
+      "evidence": ["Git history beginning at 9be4195", "GitHub account mlnomadpy"]
+    },
+    {
+      "id": "person:brahim-elhoube",
+      "kind": "human",
+      "displayName": "Brahim Elhoube",
+      "aliases": [
+        { "name": "ElhoubeBrahim", "email": "brahim.elhoube@gmail.com" },
+        { "name": "Brahim Elhoube", "email": "64067001+ElhoubeBrahim@users.noreply.github.com" }
+      ],
+      "rightsBasis": "Contributor-authored commits were intentionally submitted and merged into the repository after its AGPL-3.0-only license was present; no relicensing is asserted.",
+      "evidence": ["Git commits and preserved merge commits including 5758675"]
+    },
+    {
+      "id": "automation:github-copilot-swe-agent",
+      "kind": "automated-agent",
+      "displayName": "GitHub Copilot SWE agent",
+      "aliases": [
+        { "name": "copilot-swe-agent[bot]", "email": "198982749+Copilot@users.noreply.github.com" }
+      ],
+      "rightsBasis": "Generated contributions were requested and accepted into the AGPL repository by maintainers; bot attribution remains on every commit and changes are governed by the generated-code review policy in CONTRIBUTING.md.",
+      "evidence": ["Git author identity and associated preserved merges"]
+    },
+    {
+      "id": "automation:claude-opus-5",
+      "kind": "automated-agent",
+      "displayName": "Claude Opus 5",
+      "aliases": [
+        { "name": "Claude Opus 5", "email": "noreply@anthropic.com" }
+      ],
+      "rightsBasis": "Generated contribution was requested and accepted into the AGPL repository by maintainers; its co-author attribution is preserved and the change is governed by the generated-code review policy in CONTRIBUTING.md.",
+      "evidence": ["Co-authored-by trailer in preserved Git history"]
+    },
+    {
+      "id": "automation:dacli-agents",
+      "kind": "automated-agent-class",
+      "displayName": "dacli execution agents",
+      "match": { "emailSuffix": "@agent.dacli" },
+      "rightsBasis": "Agent changes were created under accountable repository tasks and accepted by maintainers under AGPL-3.0-only; exact run identity, role, and provenance trailers remain in each commit.",
+      "evidence": ["Git author/committer fields", "Dacli-Agent, Dacli-Role, and Dacli-Task commit trailers when present"]
+    }
+  ]
+}

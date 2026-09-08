@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "fixtures": [
+    {
+      "path": "e2e/fixtures/imported-nota.nota",
+      "purpose": "Deterministic browser import workflow fixture",
+      "origin": "Synthetic nota authored for BashNota tests; first introduced by dacli agent a-root in commit f4d4817 and merged by maintainer commit 2771f4a.",
+      "containsPersonalOrUserData": false,
+      "privacyReview": "Contains only fixed identifiers, dates, the tag fixture, and the text Imported fixture content; no production export, credential, or person is represented.",
+      "rightsBasis": "Project-authored synthetic test data distributed under AGPL-3.0-only with the repository.",
+      "blobOid": "9d341304b165ac58d53a9871994987ff23b967c5",
+      "sha256": "a3e18b77ba85ab0e8cb4bf59015ff0f60c0399c80a287d90cfde2611a05dbbe8"
+    }
+  ],
+  "historicalFixtures": [
+    {
+      "path": "Cool_shit.nota",
+      "blobOid": "14a74170ab1559b8e9b030071fa6f0e2565691c4",
+      "introducedCommit": "c52c4c269af5311ce4cf93719165ffd76c1fffa7",
+      "removedCommit": "318022b89292183b6d67d5ef66ae2b2fe552e452",
+      "origin": "Development export authored and committed by repository owner Taha Bouhsine while testing nota export and citation behavior.",
+      "containsPersonalOrUserData": false,
+      "privacyReview": "Reviewed JSON contains synthetic prose, math/code examples, generated local identifiers and timestamps, and a public scholarly citation; no credentials, private account data, or third-party user content.",
+      "rightsBasis": "Repository-owner-authored development fixture retained only in authentic Git history under AGPL-3.0-only.",
+      "sha256": "95deacd0a9434c323c9b7c54e12c07cfeadc7152e525daddc6a1d1b181263cfa"
+    },
+    {
+      "path": "Cool_shit (1).nota",
+      "blobOid": "78efc46172f3b1e741b213386d368a249ec7e5fc",
+      "introducedCommit": "b4e0d26847e004200976d937ce9559d77af8de7d",
+      "removedCommit": "318022b89292183b6d67d5ef66ae2b2fe552e452",
+      "origin": "Development export authored and committed by repository owner Taha Bouhsine while testing nota export and citation behavior.",
+      "containsPersonalOrUserData": false,
+      "privacyReview": "Reviewed JSON contains synthetic prose, math/code examples, generated local identifiers and timestamps, and a public scholarly citation; no credentials, private account data, or third-party user content.",
+      "rightsBasis": "Repository-owner-authored development fixture retained only in authentic Git history under AGPL-3.0-only.",
+      "sha256": "5a2eaab64a50db2ae1d0194ca28a7ea4a166a4cd7b87b1612d8514145967b8d7"
+    },
+    {
+      "path": "Cool_shit (2).nota",
+      "blobOid": "dfc5c837e4e4792b2dd9040fe8297f08d8a65f38",
+      "introducedCommit": "b4e0d26847e004200976d937ce9559d77af8de7d",
+      "removedCommit": "318022b89292183b6d67d5ef66ae2b2fe552e452",
+      "origin": "Development export authored and committed by repository owner Taha Bouhsine while testing nota export and citation behavior.",
+      "containsPersonalOrUserData": false,
+      "privacyReview": "Reviewed JSON contains synthetic prose, math/code examples, generated local identifiers and timestamps, and a public scholarly citation; no credentials, private account data, or third-party user content.",
+      "rightsBasis": "Repository-owner-authored development fixture retained only in authentic Git history under AGPL-3.0-only.",
+      "sha256": "5a57dae45d7494574a4547149dbf79fda560bb83a9257cf1033af35bb176e05a"
+    }
+  ]
+}
