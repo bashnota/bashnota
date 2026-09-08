@@ -38,16 +38,30 @@ const pinnedLegacyOids = new Map(historyBranchLedger.preserveUnique.map((entry) 
 const pinnedHistoryPlan = pinnedHistoryFetchPlan(historyBranchLedger)
 assert.deepEqual(
   pinnedHistoryPlan.map(({ ref }) => ref),
-  historyBranchLedger.preserveUnique.map(({ ref }) => ref),
+  [...historyBranchLedger.preserveUnique, ...historyBranchLedger.excludePinned].map(({ ref }) => ref),
+)
+assert.deepEqual(
+  pinnedHistoryPlan.map(({ kind }) => kind),
+  [
+    ...historyBranchLedger.preserveUnique.map(() => 'preserve-unique'),
+    ...historyBranchLedger.excludePinned.map(() => 'exclude-pinned'),
+  ],
 )
 assert.ok(pinnedHistoryPlan.every(({ refspec }) => (
-  refspec.startsWith('refs/heads/') && refspec.includes(':refs/remotes/origin/')
+  refspec.startsWith('+refs/heads/') && refspec.includes(':refs/remotes/origin/')
 )))
 assert.throws(() => pinnedHistoryFetchPlan({
   ...historyBranchLedger,
   preserveUnique: [{
     ...historyBranchLedger.preserveUnique[0],
     ref: 'refs/tags/not-a-development-branch',
+  }],
+}), /cannot be fetched as a development branch/)
+assert.throws(() => pinnedHistoryFetchPlan({
+  ...historyBranchLedger,
+  excludePinned: [{
+    ...historyBranchLedger.excludePinned[0],
+    ref: 'refs/tags/not-an-operational-branch',
   }],
 }), /cannot be fetched as a development branch/)
 const allowedSecretFindings = validatedSecretScanExceptions(JSON.parse(await readFile(path.join(root, 'scripts/release/secret-scan-exceptions.json'), 'utf8')))

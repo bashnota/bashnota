@@ -10,7 +10,10 @@ const root = path.resolve(new URL('../..', import.meta.url).pathname)
 
 export function pinnedHistoryFetchPlan(ledger) {
   validateHistoryBranchLedger(ledger)
-  return ledger.preserveUnique.map(({ ref, oid }) => {
+  return [
+    ...ledger.preserveUnique.map((entry) => ({ ...entry, kind: 'preserve-unique' })),
+    ...ledger.excludePinned.map((entry) => ({ ...entry, kind: 'exclude-pinned' })),
+  ].map(({ ref, oid, kind }) => {
     const prefix = 'refs/remotes/origin/'
     if (!ref.startsWith(prefix)) {
       throw new Error(`Pinned history ref cannot be fetched as a development branch: ${ref}`)
@@ -20,9 +23,13 @@ export function pinnedHistoryFetchPlan(ledger) {
       throw new Error(`Pinned history ref has an unsafe branch name: ${ref}`)
     }
     return {
+      kind,
       oid,
       ref,
-      refspec: `refs/heads/${branch}:${ref}`,
+      // The checkout's origin may be the canonical repository while the ledger
+      // intentionally records the audited development fork. Force the local
+      // tracking ref, then verify its immutable OID below.
+      refspec: `+refs/heads/${branch}:${ref}`,
     }
   })
 }
