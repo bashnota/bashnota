@@ -26,10 +26,9 @@ export function pinnedHistoryFetchPlan(ledger) {
       kind,
       oid,
       ref,
-      // The checkout's origin may be the canonical repository while the ledger
-      // intentionally records the audited development fork. Force the local
-      // tracking ref, then verify its immutable OID below.
-      refspec: `+refs/heads/${branch}:${ref}`,
+      // Fetch the reviewed object itself. Operational branches such as gh-pages
+      // can move while CI is running, but the ledger's immutable commit cannot.
+      refspec: `+${oid}:${ref}`,
     }
   })
 }
