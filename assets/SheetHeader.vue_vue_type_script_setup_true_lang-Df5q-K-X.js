@@ -1,0 +1,1 @@
+import{c as a}from"./utils-CcwN-uY5.js";import{d as r,o,j as n,y as l,u as c,r as p}from"./index-C5OMlyxE.js";const u=r({__name:"SheetHeader",props:{class:{type:[Boolean,null,String,Object,Array]}},setup(e){const s=e;return(t,m)=>(o(),n("div",{class:l(c(a)("flex flex-col gap-y-2 text-center sm:text-left",s.class))},[p(t.$slots,"default")],2))}});export{u as _};
