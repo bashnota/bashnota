@@ -12,6 +12,7 @@ import { canonicalHistoryRefs, classifyHistoryRef, forbiddenBundleRef, isCanonic
 import { validateLicenseOverrides } from './license-evidence-policy.mjs'
 import { assertReleaseVersionBinding, assertValidReleaseVersion } from './release-version-policy.mjs'
 import { validatedSecretScanExceptions } from './secret-scan-exceptions.mjs'
+import { pinnedHistoryFetchPlan } from './fetch-pinned-history-refs.mjs'
 
 const root = path.resolve(new URL('../..', import.meta.url).pathname)
 const testCredential = 'aB3dE5fG7hI9jK1mN3pQ5rS7tU9wX2zC'
@@ -27,12 +28,28 @@ const required = [
   'docs/provenance/license-evidence/khroma-2.1.0-LICENSE.txt',
   'docs/provenance/license-evidence/vaul-vue-0.4.1-LICENSE.txt',
   'scripts/release/history-branches.json',
+  'scripts/release/fetch-pinned-history-refs.mjs',
   'scripts/release/secret-scan-exceptions.json',
 ]
 
 for (const file of required) await readFile(path.join(root, file))
 const historyBranchLedger = JSON.parse(await readFile(path.join(root, 'scripts/release/history-branches.json'), 'utf8'))
 const pinnedLegacyOids = new Map(historyBranchLedger.preserveUnique.map((entry) => [entry.ref, entry.oid]))
+const pinnedHistoryPlan = pinnedHistoryFetchPlan(historyBranchLedger)
+assert.deepEqual(
+  pinnedHistoryPlan.map(({ ref }) => ref),
+  historyBranchLedger.preserveUnique.map(({ ref }) => ref),
+)
+assert.ok(pinnedHistoryPlan.every(({ refspec }) => (
+  refspec.startsWith('refs/heads/') && refspec.includes(':refs/remotes/origin/')
+)))
+assert.throws(() => pinnedHistoryFetchPlan({
+  ...historyBranchLedger,
+  preserveUnique: [{
+    ...historyBranchLedger.preserveUnique[0],
+    ref: 'refs/tags/not-a-development-branch',
+  }],
+}), /cannot be fetched as a development branch/)
 const allowedSecretFindings = validatedSecretScanExceptions(JSON.parse(await readFile(path.join(root, 'scripts/release/secret-scan-exceptions.json'), 'utf8')))
 assert.equal(forbiddenArchivePath('node_modules/vue/index.js'), 'generated/dependency directory')
 assert.equal(forbiddenArchivePath('dist/index.html'), 'generated/dependency directory')
