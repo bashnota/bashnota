@@ -48,7 +48,7 @@ assert.deepEqual(
   ],
 )
 assert.ok(pinnedHistoryPlan.every(({ refspec }) => (
-  refspec.startsWith('+refs/heads/') && refspec.includes(':refs/remotes/origin/')
+  /^\+[0-9a-f]{40}:refs\/remotes\/origin\//.test(refspec)
 )))
 assert.throws(() => pinnedHistoryFetchPlan({
   ...historyBranchLedger,
