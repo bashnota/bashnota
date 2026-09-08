@@ -16,6 +16,7 @@ const ASSETS_DIRECTORY = new URL('../dist/assets/', import.meta.url)
 const ENTRY_BUDGET_BYTES = 400_000
 const PRELOAD_BUDGET_BYTES = 0
 const INITIAL_STYLESHEET_BUDGET_BYTES = 150_000
+const LARGEST_LAZY_CHUNK_BUDGET_BYTES = 5_000_000
 const HEAVY_ASSET = /(?:^|\/)(?:editor|d3-chart|katex|vue-flow)-/i
 const PRECACHE_FORBIDDEN = /(?:^|\/)(?:editor|d3-chart|katex|vue-flow|webllm|heavy-style)-|(?:^|\/)EditorAppShell-|(?:^|\/)KaTeX_/i
 const representativeRoutes = ['/', '/login', '/p/published-nota', '/settings']
@@ -243,9 +244,16 @@ const editorChunks = await Promise.all(assets
   .filter((asset) => /^editor-.*\.js$/i.test(asset))
   .map(async (asset) => ({ asset, bytes: (await stat(join(ASSETS_DIRECTORY.pathname, asset))).size })))
 const largestEditorChunk = editorChunks.sort((left, right) => right.bytes - left.bytes)[0]
+const lazyChunks = await Promise.all(assets
+  .filter((asset) => asset.endsWith('.js') && asset !== entry)
+  .map(async (asset) => ({ asset, bytes: (await stat(join(ASSETS_DIRECTORY.pathname, asset))).size })))
+const largestLazyChunk = lazyChunks.sort((left, right) => right.bytes - left.bytes)[0]
 
 assert.ok(largestEditorChunk, 'The editor must remain emitted as a lazy chunk.')
 assert.ok(largestEditorChunk.bytes > 500_000, 'The editor report must identify the substantial deferred payload.')
+assert.ok(largestLazyChunk, 'The production build must retain at least one lazy chunk.')
+assert.ok(largestLazyChunk.bytes <= LARGEST_LAZY_CHUNK_BUDGET_BYTES,
+  `Largest lazy chunk ${largestLazyChunk.asset} is ${largestLazyChunk.bytes} bytes; budget is ${LARGEST_LAZY_CHUNK_BUDGET_BYTES}.`)
 
 for (const route of representativeRoutes) {
   assert.deepEqual(initialAssets.filter((asset) => HEAVY_ASSET.test(asset)), [],
@@ -256,5 +264,6 @@ console.log(`Initial entry: ${entry} = ${entryBytes} bytes (budget ${ENTRY_BUDGE
 console.log(`Initial modulepreloads: ${preloadBytes.length} files = ${preloadBytes.reduce((total, bytes) => total + bytes, 0)} bytes (budget ${PRELOAD_BUDGET_BYTES})`)
 console.log(`Initial route stylesheets: ${stylesheetBytes.reduce((total, bytes) => total + bytes, 0)} bytes (budget ${INITIAL_STYLESHEET_BUDGET_BYTES})`)
 console.log(`Deferred editor chunks: ${editorChunks.length}; largest ${largestEditorChunk.asset} = ${largestEditorChunk.bytes} bytes`)
+console.log(`Largest lazy chunk: ${largestLazyChunk.asset} = ${largestLazyChunk.bytes} bytes (budget ${LARGEST_LAZY_CHUNK_BUDGET_BYTES})`)
 console.log(`PWA precache: ${precacheAssets.length} core assets; deferred feature payloads excluded and runtime-cached on first use`)
 console.log(`Static artifact accounting verified for ${representativeRoutes.join(', ')}; browser network enforcement runs via test:initial-route-assets.`)

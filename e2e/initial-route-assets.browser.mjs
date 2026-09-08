@@ -1,5 +1,5 @@
 import { createServer } from 'node:http'
-import { existsSync, mkdtempSync, readFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import {
@@ -194,6 +194,11 @@ try {
         }
         const timing = dom.match(/data-route-assets="([^"]*)"/)?.[1] ?? ''
         const assetRequests = timing.split('|').filter((path) => /\/assets\/.*\.(?:js|css)(?:\?|$)/.test(path))
+        const uniqueAssetRequests = [...new Set(assetRequests)]
+        const loadedAssetBytes = uniqueAssetRequests.reduce((total, path) => {
+          const served = all.find(record => record.path === path && record.status === 200 && record.filePath)
+          return total + (served?.filePath ? statSync(served.filePath).size : 0)
+        }, 0)
         const externalResources = (routeReports.get(routeToken)?.subresourceUrls ?? []).filter((resourceUrl) => {
           try {
             return new URL(resourceUrl).origin !== new URL(url).origin
@@ -226,7 +231,7 @@ try {
         if (route.startsWith('/p/') && assetRequests.some((path) => /NotaContentViewer/i.test(path))) {
           throw new Error(`${route} fetched the public reader before published content became available`)
         }
-        console.log(`${route}: ${assetRequests.join(', ') || 'no route assets'}; public viewer=${route.startsWith('/p/') ? 'deferred-until-content' : 'n/a'}`)
+        console.log(`${route}: ${uniqueAssetRequests.length} route assets, ${loadedAssetBytes} bytes; ${uniqueAssetRequests.join(', ') || 'no route assets'}; public viewer=${route.startsWith('/p/') ? 'deferred-until-content' : 'n/a'}`)
       }
     } catch (error) {
       primaryFailure ??= error

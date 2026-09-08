@@ -7,6 +7,7 @@ import vue from '@vitejs/plugin-vue'
 import vueJsx from '@vitejs/plugin-vue-jsx'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import { VitePWA } from 'vite-plugin-pwa'
+import { visualizer } from 'rollup-plugin-visualizer'
 import autoprefixer from 'autoprefixer'
 import tailwind from 'tailwindcss'
 import { isSameOriginDeferredAssetRequest } from './src/pwa/deferredAssetPolicy'
@@ -108,6 +109,13 @@ export default defineConfig({
           },
         }],
       },
+    }),
+    process.env.BUNDLE_ANALYZE === '1' && visualizer({
+      filename: 'reports/bundle-visualizer.html',
+      template: 'treemap',
+      gzipSize: true,
+      brotliSize: true,
+      open: false,
     }),
   ],
   server: {

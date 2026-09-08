@@ -15,6 +15,9 @@ const doubles = vi.hoisted(() => ({
   getPublication: vi.fn(),
   listPublications: vi.fn(),
   recordClone: vi.fn(),
+  cachePublicPublication: vi.fn(),
+  readCachedPublicPublication: vi.fn(),
+  removeCachedPublicPublication: vi.fn(),
   importTiptapContent: vi.fn(),
   clearNotaBlocks: vi.fn(),
 }))
@@ -35,6 +38,11 @@ vi.mock('@/features/nota/stores/blockStore', () => ({
 }))
 vi.mock('@/features/nota/services/publishNotaUtilities', () => ({
   processNotaContent: doubles.processNotaContent,
+}))
+vi.mock('@/features/nota/services/publicPublicationCache', () => ({
+  cachePublicPublication: doubles.cachePublicPublication,
+  readCachedPublicPublication: doubles.readCachedPublicPublication,
+  removeCachedPublicPublication: doubles.removeCachedPublicPublication,
 }))
 vi.mock('@/services/cloud/supabaseImageStorage', () => ({
   deletePublishedImages: doubles.cleanup,
@@ -102,6 +110,9 @@ describe('atomic nota hierarchy publication orchestration', () => {
       data: { items: [], nextCursor: null },
     })
     doubles.recordClone.mockReset().mockResolvedValue({ ok: true, data: 1 })
+    doubles.cachePublicPublication.mockReset().mockResolvedValue(undefined)
+    doubles.readCachedPublicPublication.mockReset().mockResolvedValue(null)
+    doubles.removeCachedPublicPublication.mockReset().mockResolvedValue(undefined)
     doubles.importTiptapContent.mockReset().mockResolvedValue(undefined)
     doubles.clearNotaBlocks.mockReset().mockResolvedValue(undefined)
     doubles.upsertHierarchy.mockReset().mockImplementation(async (values: any[]) => ({
@@ -332,6 +343,7 @@ describe('atomic nota hierarchy publication orchestration', () => {
     await store.deleteItem('root')
 
     expect(doubles.deletePublication).toHaveBeenCalledWith('root')
+    expect(doubles.removeCachedPublicPublication).toHaveBeenCalledWith('root')
     expect(store.items.find(item => item.id === 'root')).toBeUndefined()
     expect(doubles.cleanupOrphans).toHaveBeenCalledOnce()
   })
@@ -348,6 +360,11 @@ describe('atomic nota hierarchy publication orchestration', () => {
 
     expect(doubles.deletePublication).toHaveBeenCalledOnce()
     expect(doubles.deletePublication).toHaveBeenCalledWith('root')
+    expect(doubles.removeCachedPublicPublication.mock.calls.map(([id]) => id)).toEqual([
+      'root',
+      'child-b',
+      'grandchild',
+    ])
     expect(store.items).toEqual([])
     expect(store.publishedNotas).toEqual([])
   })
@@ -367,6 +384,7 @@ describe('atomic nota hierarchy publication orchestration', () => {
     await expect(store.unpublishNota('remote-only')).resolves.toBe(true)
 
     expect(doubles.deletePublication).toHaveBeenCalledWith('remote-only')
+    expect(doubles.removeCachedPublicPublication).toHaveBeenCalledWith('remote-only')
     expect(store.publishedNotas).toEqual([])
     expect(saveItem).not.toHaveBeenCalled()
     expect(doubles.cleanupOrphans).toHaveBeenCalledOnce()
@@ -391,6 +409,7 @@ describe('atomic nota hierarchy publication orchestration', () => {
     await expect(store.unpublishNota(local.id)).rejects.toThrow('remote unavailable')
 
     expect(store.publishedNotas).toEqual([local.id])
+    expect(doubles.removeCachedPublicPublication).not.toHaveBeenCalled()
     expect(local).toMatchObject({ isPublished: true })
     expect(doubles.cleanupOrphans).not.toHaveBeenCalled()
   })

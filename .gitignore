@@ -25,6 +25,7 @@ coverage
 
 # Vitest CI results (uploaded as a job artifact by .github/workflows/ci.yml)
 test-results/
+reports/bundle-visualizer.html
 
 # nyc test coverage
 .nyc_output

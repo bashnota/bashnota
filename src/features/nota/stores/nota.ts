@@ -15,6 +15,11 @@ import { toast } from '@/services/toast'
 import { useAuthStore } from '@/features/auth/stores/auth'
 import { processNotaContent } from '@/features/nota/services/publishNotaUtilities'
 import { listAllPublications } from '@/features/nota/services/listAllPublications'
+import {
+  cachePublicPublication,
+  readCachedPublicPublication,
+  removeCachedPublicPublication,
+} from '@/features/nota/services/publicPublicationCache'
 import { getPublicationCloudApi, normalizeCloudPublishedContent } from '@/services/cloud'
 import { CloudError, type CloudJson, type CloudPublication, type CloudPublicationWrite } from '@/services/cloud/types'
 import { cleanupOrphanedPublishedImages, deletePublishedImages } from '@/services/cloud/supabaseImageStorage'
@@ -1941,6 +1946,16 @@ export const useNotaStore = defineStore('nota', {
         const remotelyRemovedIds = new Set([id, ...publishedSubPageIds])
         this.publishedNotas = this.publishedNotas.filter((notaId) => !remotelyRemovedIds.has(notaId))
         const localReconciliationFailures: unknown[] = []
+        for (const removedId of remotelyRemovedIds) {
+          try {
+            await removeCachedPublicPublication(removedId)
+          } catch (error) {
+            // The server delete is authoritative, so do not turn a committed
+            // unpublish into a reported remote failure. Surface the local
+            // privacy cleanup failure through the existing reconciliation UI.
+            localReconciliationFailures.push(error)
+          }
+        }
         const reconcileLocalNota = async (localNota: Nota | undefined) => {
           if (!localNota) return
           localNota.isPublished = false
@@ -1986,8 +2001,24 @@ export const useNotaStore = defineStore('nota', {
       try {
         const result = await (await getPublicationCloudApi()).publishing.getPublication(id)
         if (!result.ok) throw result.error
-        return result.data ? publishedNota(result.data) : null
+        if (!result.data) {
+          await removeCachedPublicPublication(id).catch(() => undefined)
+          return null
+        }
+        await cachePublicPublication(result.data).catch((cacheError) => {
+          logger.warn('Failed to cache public nota for offline reading:', cacheError)
+        })
+        return publishedNota(result.data)
       } catch (error) {
+        const mayUseOfflineCopy = (typeof navigator !== 'undefined' && navigator.onLine === false)
+          || (error instanceof CloudError && ['unavailable', 'unknown'].includes(error.code))
+        const cached = mayUseOfflineCopy
+          ? await readCachedPublicPublication(id).catch(() => null)
+          : null
+        if (cached) {
+          logger.info('Loaded a cached public nota while the publication service was unavailable.')
+          return publishedNota(cached)
+        }
         logger.error('Failed to fetch published nota:', error)
         throw error
       }
