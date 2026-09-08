@@ -107,7 +107,7 @@
     "lowlight": "^3.3.0",
     "lucide-vue-next": "^0.475.0",
     "markdown-it": "^15.0.1",
-    "marked": "^15.0.9",
+    "marked": "^18.0.11",
     "mermaid": "^11.17.2",
     "pinia": "^2.3.1",
     "prosemirror-commands": "^1.6.2",
